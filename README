@@ -1,0 +1,16 @@
+-------------------------------------------------------------------------------
+PIPELINE FOR HIV MISEQ SEQUENCING DATA
+-------------------------------------------------------------------------------
+1. We get three FASTQ files from Joerg (and the Miseq):
+ - R1 is read 2
+ - R2 is adapter sequence
+ - R3 is read 2
+
+2. Demultiplex by adapter and put into separate folders with the adapter IDs and
+   sample names (demultiplex.py)
+
+3. Assess quality (read length distribution, error in adapter IDs)
+
+4. Map recursively onto HIV
+
+5. Popgen
