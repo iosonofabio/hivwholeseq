@@ -68,6 +68,10 @@ if __name__ == '__main__':
     adapter_table = load_adapter_table(data_folder)
     for adaID in adapter_table['ID']:
 
+        # FIXME
+        if adaID == 2:
+            continue
+
         # Directory to read
         dirname = 'adapterID_'+'{:02d}'.format(adaID)+'/'
 
