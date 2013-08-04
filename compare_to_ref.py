@@ -2,9 +2,9 @@ from Bio import AlignIO
 import numpy as np
 import matplotlib.pyplot as plt
 
-fname = 'alignment_all_with_NL4-3_aligned_with_BAL.fasta'
-all_refs = ['B.US.', 'B.FR.', 'gi|19']
-ref = all_refs[2]
+fname = 'alignment_all_with_NL4-3_aligned.fasta'
+all_refs = ['B.FR.'] #, 'B.US.', 'gi|19']
+ref = all_refs[0]
 
 smoothing=200
 
