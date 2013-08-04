@@ -2,6 +2,8 @@
 logout
 logerr
 
+# figure output
+*pdf
 
 ### /home/fabio/.gitignore-boilerplates/Python.gitignore
 
