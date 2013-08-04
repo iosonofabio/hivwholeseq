@@ -80,7 +80,7 @@ if __name__ == '__main__':
         qsub_list = ['qsub','-cwd',
                      '-o',JOBLOGOUT,
                      '-e',JOBLOGERR,
-                     '-N', 'stampy '+'{:02d}'.format(adaID),
+                     '-N', 'stampy_'+'{:02d}'.format(adaID),
                      '-l', 'h_rt='+cluster_time,
                      '-l', 'h_vmem='+vmem,
                      stampy_bin,
