@@ -68,6 +68,10 @@ if __name__ == '__main__':
     adapter_table = load_adapter_table(data_folder)
     for adaID in adapter_table['ID']:
 
+        # FIXME
+        if adaID == 2:
+            continue
+
         # Directory to read
         dirname = 'adapterID_'+'{:02d}'.format(adaID)+'/'
 
@@ -76,7 +80,7 @@ if __name__ == '__main__':
         qsub_list = ['qsub','-cwd',
                      '-o',JOBLOGOUT,
                      '-e',JOBLOGERR,
-                     '-N', 'stampy '+'{:02d}'.format(adaID),
+                     '-N', 'stampy_'+'{:02d}'.format(adaID),
                      '-l', 'h_rt='+cluster_time,
                      '-l', 'h_vmem='+vmem,
                      stampy_bin,
