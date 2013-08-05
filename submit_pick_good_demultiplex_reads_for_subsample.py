@@ -11,21 +11,24 @@ import os
 import sys
 import numpy as np
 import subprocess as sp
+from map_HIV_HXB2 import load_adapter_table
 
 
 
 # Globals
 VERBOSE = 1
+data_folder = '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run28_test_samples/'
 
 # Submit vars
 JOBSUBMIT = os.path.realpath(__file__)      # This file
 JOBDIR = os.path.dirname(JOBSUBMIT)+'/'
-JOBSCRIPT = JOBDIR+'pick_good_demultiplex_reads_for_subsample.py'
+#JOBSCRIPT = JOBDIR+'pick_good_demultiplex_reads_for_subsample.py'
+JOBSCRIPT = JOBDIR+'filter_trim_demultiplexed_reads.py'
 JOBLOGERR = JOBDIR+'logerr'
 JOBLOGOUT = JOBDIR+'logout'
 
 # Cluster parameters
-cluster_time = '0:59:59'
+cluster_time = '23:59:59'
 vmem = '2G'
     
 
@@ -39,9 +42,9 @@ if __name__ == '__main__':
 
         # Call script
         qsub_list = ['qsub','-cwd',
-                     '-o',JOBLOGOUT,
-                     '-e',JOBLOGERR,
-                     '-N', 'pick '+'{:02d}'.format(adaID),
+                     '-o', JOBLOGOUT,
+                     '-e', JOBLOGERR,
+                     '-N', 'pick_'+'{:02d}'.format(adaID),
                      '-l', 'h_rt='+cluster_time,
                      '-l', 'h_vmem='+vmem,
                      JOBSCRIPT,
