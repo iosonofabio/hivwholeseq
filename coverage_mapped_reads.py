@@ -29,10 +29,20 @@ maxreads = 20000
 data_folder = '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run28_test_samples/subsample/'
 adapters_table_file = 'adapters_table.dat'
 ref_file = 'HXB2.fa.gz'
-mapped_file_sam = 'mapped_to_HXB2.sam'
-mapped_file_bam = 'mapped_to_HXB2.bam'
-consensus_file = 'consensus.fasta'
 coverage_file = 'coverage.pdf'
+use_filtered_reads = True
+ref_to_own_consensus = True
+
+# Prepare I/O filenames
+if use_filtered_reads: file_suffix = '_filtered_trimmed'
+else: file_suffix = ''
+if not ref_to_own_consensus: map_infix = 'HXB2'
+else: map_infix = 'self'
+mapped_file_sam = 'mapped_to_'+map_infix+file_suffix+'.sam'
+mapped_file_bam = 'mapped_to_'+map_infix+file_suffix+'.bam'
+consensus_file_dict = {'HXB2': 'consensus'+file_suffix+'.fasta',
+                       'self': 'consensus_self'+file_suffix+'.fasta'}
+consensus_file = consensus_file_dict[map_infix]
 
 
 
@@ -44,6 +54,11 @@ if __name__ == '__main__':
     
     # Iterate for all adapterIDs
     for adaID in adapter_table['ID']:
+
+        if VERBOSE:
+            print adaID
+
+        # Folder name
         dirname = 'adapterID_'+'{:02d}'.format(adaID)+'/'
     
         # Convert SAM (output of stampy) to BAM (more efficient)
@@ -59,8 +74,11 @@ if __name__ == '__main__':
         bamfile = pysam.Samfile(data_folder+dirname+mapped_file_bam, 'rb')
     
         # Read reference
-        with gzip.open(ref_file, "r") as ref_fileh:
-            refseq = SeqIO.read(ref_fileh, 'fasta')
+        if not ref_to_own_consensus:
+            with gzip.open(ref_file, "r") as ref_fileh:
+                refseq = SeqIO.read(ref_fileh, 'fasta')
+        else:
+            refseq = SeqIO.read(data_folder+dirname+consensus_file_dict['HXB2'], 'fasta')
         ref = np.array(refseq)
     
         # Prepare allele counts
@@ -82,12 +100,9 @@ if __name__ == '__main__':
                 continue
     
             # Divide by read 1/2 and forward/reverse
-            if read.is_read1:
-                js = 0
-            else:
-                js = 2
-            if read.is_reverse:
-                js += 1
+            if read.is_read1: js = 0
+            else: js = 2
+            if read.is_reverse: js += 1
     
             # Sequence and position
             # Note: stampy takes the reverse complement already
@@ -178,7 +193,7 @@ if __name__ == '__main__':
                     polymorphic.append(pos)
                     tmp = zip(*Counter(cons_pos).items())
                     consensus[pos] = tmp[0][np.argmax(tmp[1])]
-    
+
         # 2.0 get all inserts
         insert_names = set()
         for insert in inserts:
@@ -188,7 +203,8 @@ if __name__ == '__main__':
         for insert_name in insert_names:
             # Get counts for the insert and local coverage
             ins_counts = np.array([insert[insert_name] for insert in inserts])
-            cov_loc = counts[:, :, insert_name[0]: min(len(refseq), insert_name[0] + 2)].mean(axis=2).sum(axis=1)
+            # FIXME: there is a division by zero here!
+            cov_loc = counts[:, :, insert_name[0]: min(len(refseq), insert_name[0] + 2)].sum(axis=1).mean(axis=1)
             # Get read types in which the insert is called
             types_ins_called = ins_counts > 0.5 * cov_loc
             # Get read types which actually cover this region
@@ -214,26 +230,25 @@ if __name__ == '__main__':
         consensus_final = re.sub('-', '', consensus_final)
     
         # Plot coverage along the genome
-        plt.figure(figsize=(14, 10))
-        for read_type, count in izip(read_types, counts):
-            plt.plot(count.sum(axis=0), lw=1.5, label=read_type)
-        plt.xlabel('Position (HXB2)')
-        plt.ylabel('# reads (tot '+str(maxreads)+')')
-        plt.legend(loc=1)
-        plt.title('Coverage for adapterID '+'{:02d}'.format(adaID))
-        plt.tight_layout()
-        plt.savefig(data_folder+dirname+coverage_file)
+        if not ref_to_own_consensus:
+            plt.figure(figsize=(14, 10))
+            for read_type, count in izip(read_types, counts):
+                plt.plot(count.sum(axis=0), lw=1.5, label=read_type)
+            plt.xlabel('Position (HXB2)')
+            plt.ylabel('# reads (tot '+str(maxreads)+')')
+            plt.legend(loc=1)
+            plt.title('Coverage for adapterID '+'{:02d}'.format(adaID))
+            plt.tight_layout()
+            plt.savefig(data_folder+dirname+coverage_file)
     
-        #plt.ion()
-        #plt.show()
+            #plt.ion()
+            #plt.show()
     
-        # Print divergence to reference excluding inserts
-        print 'Adapter ID'+'{:02d}'.format(adaID)+': divergence to ref:', (ref != consensus)[consensus != 'N'].mean()
+            # Print divergence to reference excluding inserts
+            print 'Adapter ID'+'{:02d}'.format(adaID)+': divergence to ref:', (ref != consensus)[consensus != 'N'].mean()
     
         # Save consensus
         consensusseq = SeqRecord(Seq(consensus_final),
                                  id='{:02d}'.format(adaID)+'_consensus',
                                  name='{:02d}'.format(adaID)+'_consensus')
-        SeqIO.write(consensusseq, data_folder+dirname+consensus_file, 'fasta')
-    
-    
+        SeqIO.write(consensusseq, data_folder+dirname+consensus_file, 'fasta') 
