@@ -1,3 +1,4 @@
+#!/ebio/ag-neher/share/programs/EPD/bin/python
 # vim: fdm=indent
 '''
 author:     Fabio Zanini
@@ -7,11 +8,11 @@ content:    Get the allele frequencies out of a SAM/BAM file and a reference.
 # Modules
 import os
 import sys
+import cPickle as pickle
 from collections import defaultdict
 from itertools import izip
 import pysam
 import numpy as np
-import matplotlib.pyplot as plt
 from Bio import SeqIO
 
 
@@ -20,9 +21,11 @@ from Bio import SeqIO
 VERBOSE = 1
 alpha = np.array(list('ACGT-N'), 'S1')
 read_types = ['read1 f', 'read1 r', 'read2 f', 'read2 r']
-maxreads = 20000
+maxreads = 2000000000
 ref_filename = 'consensus_filtered_trimmed.fasta'
 bam_filename = 'mapped_to_self_filtered_trimmed.bam'
+allele_count_filename = 'allele_counts.npy'
+insert_count_filename = 'insert_counts.pickle'
 
 
 
@@ -40,6 +43,10 @@ def get_allele_counts(ref, bamfile):
     
         # Limit to the first reads
         if i >= maxreads: break
+
+        # Print output
+        if VERBOSE and not ((i +1) % 10000):
+            print (i+1)
     
         # Ignore unmapped reads
         if read.is_unmapped:
@@ -106,47 +113,60 @@ if __name__ == '__main__':
     args = sys.argv
     if len(args) < 2:
         raise ValueError('This script takes the adapterID folder as input')
-
     data_folder = args[1].rstrip('/')+'/'
-    ref_file = data_folder+ref_filename
-    bamfilename = data_folder+bam_filename
+
 
     # Read reference
+    if os.path.isfile(data_folder+ref_filename): ref_file = data_folder+ref_filename
+    else: ref_file = '/'.join(data_folder.split('/')[:-2]+['subsample/']+data_folder.split('/')[-2:])+ref_filename
     refseq = SeqIO.read(ref_file, 'fasta')
     ref = np.array(refseq)
 
     # Open BAM
+    bamfilename = data_folder+bam_filename
+    # Try to convert to BAM if needed
+    if not os.path.isfile(bamfilename):
+        samfile = pysam.Samfile(bamfilename[:-3]+'sam', 'r')
+        bamfile = pysam.Samfile(bamfilename, 'wb', template=samfile)
+        for s in samfile:
+            bamfile.write(s)
     bamfile = pysam.Samfile(bamfilename, 'rb')
     
     # Get counts
     counts, inserts = get_allele_counts(ref, bamfile)
+
+    # Save counts and inserts to file
+    np.save(data_folder+allele_count_filename, counts)
+    with open(data_folder+insert_count_filename, 'w') as f:
+        pickle.dump(inserts, f, protocol=-1)
 
     # Raw estimate of diversity
     coverage = counts.sum(axis=0).sum(axis=0)
     nu_major = counts.sum(axis=0).max(axis=0) / (coverage + 0.000001)
     nu = counts.sum(axis=0) / (coverage + 0.000001)
 
-    # Plot info about the major allele
-    fig, axs = plt.subplots(2, 1, figsize=(14.3, 11.9))
-    plt.sca(axs[0])
-    plt.plot(nu_major, lw=2, c='k')
-    plt.xlabel('position (b.p.)')
-    plt.ylabel(r'$\nu_{maj}$')
-    plt.ylim(-0.05, 1.05)
-    # Maximal entropy line
-    plt.plot([0, len(ref)], [1.0 / len(alpha)] * 2, lw=1.5, ls='--')
-    plt.title('Major allele frequency along the HIV genome')
-    # Plot histogram of major allele frequency
-    h = np.histogram(nu_major, bins=np.linspace(1.0 / len(alpha), 1, 20),
-                     density=True)
-    x = 0.5 * (h[1][1:] + h[1][:-1])
-    y = h[0]
-    plt.sca(axs[1])
-    plt.plot(x, y + 1e-6, lw=1.5, c='k')
-    plt.xlabel(r'$\nu_{maj}$')
-    plt.title('Distribution of major allele frequency')
-    plt.yscale('log')
-    plt.tight_layout()
+    ## Plot info about the major allele
+    #import matplotlib.pyplot as plt
+    #fig, axs = plt.subplots(2, 1, figsize=(14.3, 11.9))
+    #plt.sca(axs[0])
+    #plt.plot(nu_major, lw=2, c='k')
+    #plt.xlabel('position (b.p.)')
+    #plt.ylabel(r'$\nu_{maj}$')
+    #plt.ylim(-0.05, 1.05)
+    ## Maximal entropy line
+    #plt.plot([0, len(ref)], [1.0 / len(alpha)] * 2, lw=1.5, ls='--')
+    #plt.title('Major allele frequency along the HIV genome')
+    ## Plot histogram of major allele frequency
+    #h = np.histogram(nu_major, bins=np.linspace(1.0 / len(alpha), 1, 20),
+    #                 density=True)
+    #x = 0.5 * (h[1][1:] + h[1][:-1])
+    #y = h[0]
+    #plt.sca(axs[1])
+    #plt.plot(x, y + 1e-6, lw=1.5, c='k')
+    #plt.xlabel(r'$\nu_{maj}$')
+    #plt.title('Distribution of major allele frequency')
+    #plt.yscale('log')
+    #plt.tight_layout()
 
     # Per read-type analysis
     fig, axs = plt.subplots(2, 1, figsize=(14.3, 11.9))
