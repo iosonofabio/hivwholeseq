@@ -21,7 +21,9 @@ from Bio import SeqIO
 VERBOSE = 1
 alpha = np.array(list('ACGT-N'), 'S1')
 read_types = ['read1 f', 'read1 r', 'read2 f', 'read2 r']
-maxreads = 2000000000
+maxreads = 10000    #FIXME
+match_len_min = 30
+trim_bad_cigars = 3
 ref_filename = 'consensus_filtered_trimmed.fasta'
 bam_filename = 'mapped_to_self_filtered_trimmed.bam'
 allele_count_filename = 'allele_counts.npy'
@@ -37,7 +39,7 @@ def get_allele_counts(ref, bamfile):
     
     # Insertions must be dealt with separately
     inserts = [defaultdict(int) for k in read_types]
- 
+
     # Count alleles
     for i, read in enumerate(bamfile):
     
@@ -49,7 +51,12 @@ def get_allele_counts(ref, bamfile):
             print (i+1)
     
         # Ignore unmapped reads
-        if read.is_unmapped:
+        if read.is_unmapped or not read.is_proper_pair:
+            continue
+
+        # Ignore small inserts FIXME: should lift really
+        # Note: this fixes the other bug!
+        if abs(read.isize) < 250:
             continue
     
         # Divide by read 1/2 and forward/reverse
@@ -63,18 +70,48 @@ def get_allele_counts(ref, bamfile):
         pos = read.pos
     
         # Read CIGAR code for indels, and anayze each block separately
+        # Note: some reads are weird ligations of HIV and contaminants
+        # (e.g. fosmid plasmids). Those always have crazy CIGARs, because
+        # only the HIV part maps. We hence trim away short indels from the
+        # end of reads (this is still unbiased).
         cigar = read.cigar
         len_cig = len(cigar)
+        good_cigars = np.array(map(lambda x: (x[0] == 0) and (x[1] >= match_len_min), cigar), bool)
+        # If no long match, skip read
+        # FIXME: we must skip the mate pair also? But what if it's gone already?
+        if not (good_cigars).any():
+            continue
+        # If only one long match, trim both edges unless it's a full-match read,
+        if (good_cigars).sum() == 1:
+            first_good_cigar = last_good_cigar = good_cigars.nonzero()[0][0]
+        # else include stuff between the extremes
+        else:
+            tmp = good_cigars.nonzero()[0]
+            first_good_cigar = tmp[0]
+            last_good_cigar = tmp[-1]
+            good_cigars[first_good_cigar: last_good_cigar + 1] = True
+
+        # Iterate over CIGARs
         for ic, block in enumerate(cigar):
+            # Exclude bad CIGARs
+            if not good_cigars[ic]:
+                continue
+
             # Inline block
             if block[0] == 0:
-                seqb = np.array(list(seq[:block[1]]), 'S1')
+                # The first and last good CIGARs are matches: trim them
+                if (ic == first_good_cigar) and (len_cig > 1): trim_left = trim_bad_cigars
+                else: trim_left = 0
+                if (ic == last_good_cigar) and (len_cig > 1): trim_right = trim_bad_cigars
+                else: trim_right = 0
+
+                seqb = np.array(list(seq[trim_left:block[1] - trim_right]), 'S1')
                 # Increment counts
                 for j, a in enumerate(alpha):
                     posa = (seqb == a).nonzero()[0]
                     if not len(posa):
                         continue
-                    counts[js, j, pos + posa] += 1
+                    counts[js, j, pos + trim_left + posa] += 1
     
                 # Chop off this block
                 if ic != len_cig - 1:
@@ -145,8 +182,8 @@ if __name__ == '__main__':
     nu_major = counts.sum(axis=0).max(axis=0) / (coverage + 0.000001)
     nu = counts.sum(axis=0) / (coverage + 0.000001)
 
-    ## Plot info about the major allele
-    #import matplotlib.pyplot as plt
+    # Plot info about the major allele
+    import matplotlib.pyplot as plt
     #fig, axs = plt.subplots(2, 1, figsize=(14.3, 11.9))
     #plt.sca(axs[0])
     #plt.plot(nu_major, lw=2, c='k')
