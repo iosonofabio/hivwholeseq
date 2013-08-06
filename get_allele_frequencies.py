@@ -8,6 +8,7 @@ content:    Get the allele frequencies out of a SAM/BAM file and a reference.
 import os
 import sys
 from collections import defaultdict
+from itertools import izip
 import pysam
 import numpy as np
 import matplotlib.pyplot as plt
@@ -135,7 +136,6 @@ if __name__ == '__main__':
     # Maximal entropy line
     plt.plot([0, len(ref)], [1.0 / len(alpha)] * 2, lw=1.5, ls='--')
     plt.title('Major allele frequency along the HIV genome')
-
     # Plot histogram of major allele frequency
     h = np.histogram(nu_major, bins=np.linspace(1.0 / len(alpha), 1, 20),
                      density=True)
@@ -146,7 +146,41 @@ if __name__ == '__main__':
     plt.xlabel(r'$\nu_{maj}$')
     plt.title('Distribution of major allele frequency')
     plt.yscale('log')
-
     plt.tight_layout()
+
+    # Per read-type analysis
+    fig, axs = plt.subplots(2, 1, figsize=(14.3, 11.9))
+    import matplotlib.cm as cm
+    for i, (read_type, count, insert) in enumerate(izip(read_types, counts, inserts)):
+        coverage = count.sum(axis=0)
+        nu_major = count.max(axis=0) / (coverage + 0.000001)
+        nu = count / (coverage + 0.000001)
+
+        # Plot info about the major allele
+        plt.sca(axs[0])
+        plt.plot(nu_major + len(read_types) - i - 1, lw=2, c=cm.jet(int(255.0 * i / len(read_types))))
+        plt.plot([0, len(ref)], [1.0 / len(alpha) + len(read_types) - i - 1] * 2, lw=1.5, ls='--', c='k')
+        plt.xlabel('position (b.p.)')
+        plt.ylabel(r'$\nu_{maj}$')
+        plt.ylim(-0.05, 4.05)
+        # Maximal entropy line
+        plt.title('Major allele frequency along the HIV genome')
+        # Plot histogram of major allele frequency
+        h = np.histogram(nu_major, bins=np.linspace(1.0 / len(alpha), 1, 20),
+                         density=True)
+        x = 0.5 * (h[1][1:] + h[1][:-1])
+        y = h[0]
+        plt.sca(axs[1])
+        plt.plot(x, y + 1e-4, lw=1.5,
+                 c=cm.jet(int(255.0 * i / len(read_types))),
+                 label=read_type)
+        plt.xlabel(r'$\nu_{maj}$')
+        plt.title('Distribution of major allele frequency')
+        plt.yscale('log')
+
+    plt.legend(loc=2)
+    plt.tight_layout()
+
+
     plt.ion()
     plt.show()

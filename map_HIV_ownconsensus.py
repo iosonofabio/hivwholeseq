@@ -17,7 +17,7 @@ from map_HIV_HXB2 import load_adapter_table
 
 # Globals
 VERBOSE = 1
-data_folder = '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run28_test_samples/subsample/'
+data_folder = '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run28_test_samples/'
 data_folder_subsample = '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run28_test_samples/subsample/'
 adapters_table_file = 'adapters_table.dat'
 stampy_bin = '/ebio/ag-neher/share/programs/bundles/stampy-1.0.22/stampy.py'
@@ -36,7 +36,7 @@ JOBLOGERR = JOBDIR+'logerr'
 JOBLOGOUT = JOBDIR+'logout'
 
 # Cluster parameters (short time for subsample only)
-cluster_time = '0:59:59'
+cluster_time = '23:59:59'
 vmem = '8G'
     
 
