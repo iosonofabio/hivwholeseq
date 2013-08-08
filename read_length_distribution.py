@@ -34,7 +34,7 @@ data_folder = '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run28_test_samples
 phred_min = 20
 
 # Max reads
-max_reads = 500000
+max_reads = 5000000
 # length of reads and list of positions (needed for rapid updating of the phred distribution)
 L=250
 positions = np.arange(L)

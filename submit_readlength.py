@@ -21,7 +21,7 @@ JOBLOGOUT = JOBDIR+'logout'
 
 
 # Cluster parameters
-cluster_time = '0:59:59'
+cluster_time = '10:59:59'
 vmem = '8G'
 VERBOSE = 1
 
@@ -30,8 +30,8 @@ VERBOSE = 1
 # Script
 if __name__ == '__main__':
 
-    dir_list = glob.glob('/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run28_test_samples/subsample/adapterID*')
-    dir_list.extend(glob.glob('/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run28_test_samples/subsample/unclass*'))
+    dir_list = glob.glob('/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run28_test_samples/adapterID*')
+    dir_list.extend(glob.glob('/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run28_test_samples/unclass*'))
     for dirname in dir_list:
         sample_dir = dirname.split('/')[-1]
         # Create the path and the model (every run has a slightly
