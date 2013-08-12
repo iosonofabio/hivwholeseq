@@ -63,9 +63,9 @@ if __name__ == '__main__':
             within_fragment = (fwd_rev_coverage[0]<50000)*(fwd_rev_coverage[1]<50000)
             if adaID>10 and ni<4:
                 plt.subplot(121)
-                plt.scatter(1.0*nuc_counts[0][overlap]/fwd_rev_coverage[0][overlap], 1.0*nuc_counts[1][overlap]/fwd_rev_coverage[1][overlap], c=col[ni])
+                plt.scatter(1.0*nuc_counts[0][overlap]/fwd_rev_coverage[0][overlap]+1e-10, 1.0*nuc_counts[1][overlap]/fwd_rev_coverage[1][overlap]+1e-10, c=col[ni])
                 plt.subplot(122)
-                plt.scatter(1.0*nuc_counts[0][within_fragment]/fwd_rev_coverage[0][within_fragment], 1.0*nuc_counts[1][within_fragment]/fwd_rev_coverage[1][within_fragment], c=col[ni], label=nuc)
+                plt.scatter(1.0*nuc_counts[0][within_fragment]/fwd_rev_coverage[0][within_fragment]+1e-10, 1.0*nuc_counts[1][within_fragment]/fwd_rev_coverage[1][within_fragment]+1e-10, c=col[ni], label=nuc)
 
             for pos in xrange(L):
                 if (fwd_rev_coverage[0][pos]<100 or fwd_rev_coverage[1][pos]<100):

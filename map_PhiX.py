@@ -13,7 +13,7 @@ import subprocess as sp
 
 # Globals
 VERBOSE = 1
-data_folder = '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run28_test_samples/subsample/'
+data_folder = '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run28_test_samples/'
 phiX_file = '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/phiX_genome.fasta'
 stampy_bin = '/ebio/ag-neher/share/programs/bundles/stampy-1.0.22/stampy.py'
 
@@ -62,8 +62,8 @@ if __name__ == '__main__':
                  stampy_bin,
                  '-g', data_folder+'phiX',
                  '-h', data_folder+'phiX', 
-                 '-o', data_folder+dirname+'mapped_to_phiX.sam',
-                 '-M', data_folder+dirname+'read1.fastq', data_folder+dirname+'read2.fastq']
+                 '-o', data_folder+dirname+'mapped_to_phiX_filtered_trimmed.sam',
+                 '-M', data_folder+dirname+'read1_filtered_trimmed.fastq', data_folder+dirname+'read2_filtered_trimmed.fastq']
     qsub_list = map(str,qsub_list)
     if VERBOSE:
         print ' '.join(qsub_list)
