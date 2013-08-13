@@ -12,6 +12,7 @@ content:    Filter and trim demultiplexed reads.
 # Modules
 import os
 import sys
+import argparse
 import numpy as np
 from Bio import SeqIO
 from itertools import izip
@@ -44,14 +45,20 @@ if __name__ == '__main__':
     # Get a list of the good adapter IDs
     adapter_table = load_adapter_table(data_folder)
 
-    # If an input argument is specified, do only that adapter ID, else do all
-    args = sys.argv
-    if len(args) > 1:
-        adaIDs = [int(args[1])]
-    else:
-        adaIDs = adapter_table['ID']
+    # Parse input arguments
+    # - the option --full tells the script to analyze the whole demultiplexed reads,
+    #   otherwise only the subsample is taken
+    # - the positional arguments are adapterIDs to process within this script
+    parser = argparse.ArgumentParser(description='Filter and trim the demultiplexed reads.')
+    parser.add_argument('--full', dest='use_full', action='store_false',
+                        help='Analyze the full dataset instead of a subsample')
+    parser.add_argument('adaIDs', nargs='+', type=int,
+                        help='Adapter IDs to analyze (e.g. 02 16)')
 
-    # Iterate over adapters (if needed)
+    args = parser.parse_args()
+    adaIDs = list(args.adaIDs)
+
+    # Iterate over adapters
     for adaID in adaIDs:
 
         # Keep log

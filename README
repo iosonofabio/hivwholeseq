@@ -7,10 +7,21 @@ PIPELINE FOR HIV MISEQ SEQUENCING DATA
  - R3 is read 2
 
 2. Demultiplex by adapter and put into separate folders with the adapter IDs and
-   sample names (demultiplex.py)
+   sample names. Create a subsample of demultiplexed adapters for consensus
+   building. (demultiplex.py)
 
-3. Assess quality (read length distribution, error in adapter IDs)
+CHECKPOINT: errors in adapter IDs
 
-4. Map recursively onto HIV
+3. Filter by quality and trim reads, for subsample and full dataset separately.
+   (filter_trim_demultiplexed_reads.py)
 
-5. Popgen
+CHECKPOINT: length distribution of trimmed reads
+
+4. Recursive mapping of subsample onto HIV: HXB2 fragments first, then its own
+   consensus. (mapping_subsample_recursive.py)
+
+CHECKPOINT: mapping issues, coverage
+
+5. Map the full dataset against the final self consensus.
+
+6. Downstream: calculate allele frequencies, etc.
