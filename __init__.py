@@ -1,1 +1,5 @@
-__all__ = ['map_HIV_HXB2']
+__all__ = ['test',
+           'adapter_info',
+           'datasets',
+           'map_HIV_HXB2',
+          ]

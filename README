@@ -1,27 +1,27 @@
 -------------------------------------------------------------------------------
 PIPELINE FOR HIV MISEQ SEQUENCING DATA
 -------------------------------------------------------------------------------
-1. We get three FASTQ files from Joerg (and the Miseq):
+0. We get three FASTQ files from Joerg (and the Miseq):
  - R1 is read 2
  - R2 is adapter sequence
  - R3 is read 2
 
-2. Demultiplex by adapter and put into separate folders with the adapter IDs and
+1. Demultiplex by adapter and put into separate folders with the adapter IDs and
    sample names. Create a subsample of demultiplexed adapters for consensus
    building. (demultiplex.py)
 
 CHECKPOINT: errors in adapter IDs
 
-3. Filter by quality and trim reads, for subsample and full dataset separately.
+2. Filter by quality and trim reads, for subsample and full dataset separately.
    (filter_trim_demultiplexed_reads.py)
 
 CHECKPOINT: length distribution of trimmed reads
 
-4. Recursive mapping of subsample onto HIV: HXB2 fragments first, then its own
+3. Recursive mapping of subsample onto HIV: HXB2 fragments first, then its own
    consensus. (mapping_subsample_recursive.py)
 
 CHECKPOINT: mapping issues, coverage
 
-5. Map the full dataset against the final self consensus.
+4. Map the full dataset against the final self consensus.
 
-6. Downstream: calculate allele frequencies, etc.
+5. Downstream: calculate allele frequencies, etc.

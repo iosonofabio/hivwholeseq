@@ -1,6 +1,6 @@
 # log files
-logout
-logerr
+logout/*
+logerr/*
 
 # figure output
 *pdf
