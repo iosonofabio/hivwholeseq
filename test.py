@@ -1,12 +1,12 @@
-#def pair_generator(iterable):
-#    it = iter(iterable)
-#    while True:
-#        try:
-#            a = it.next()
-#            b = it.next()
-#            yield (a, b)
-#        except StopIteration:
-#            raise
+def pair_generator(iterable):
+    it = iter(iterable)
+    while True:
+        try:
+            a = it.next()
+            b = it.next()
+            yield (a, b)
+        except StopIteration:
+            raise
 #
 #a = [1, 2, 3, 4]
 #b = [1, 2, 3, 4, 5]
@@ -17,3 +17,6 @@
 def identity(x):
     '''Test function for import only'''
     return x
+
+
+print __file__

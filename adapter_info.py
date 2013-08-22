@@ -40,9 +40,10 @@ adapters_table_file = 'adapters_table.dat'
 # Functions
 def load_adapter_table(data_folder):
     '''Load table of adapters and samples'''
-    table = np.loadtxt(data_folder+adapters_table_file,
-                       dtype=[('seq', 'S6'), ('ID', int), ('sample', 'S50')],
-                       ndmin=1)
+    from numpy import loadtxt
+    table = loadtxt(data_folder+adapters_table_file,
+                    dtype=[('seq', 'S6'), ('ID', int), ('sample', 'S50')],
+                    ndmin=1)
     return table
 
 

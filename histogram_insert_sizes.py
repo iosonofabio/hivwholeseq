@@ -18,6 +18,8 @@ import pysam
 import numpy as np
 from Bio import SeqIO
 
+from mapping.miseq import pair_generator
+
 
 
 # Globals
@@ -29,21 +31,6 @@ match_len_min = 30
 trim_bad_cigars = 3
 ref_filename = 'consensus_filtered_trimmed.fasta'
 bam_filename = 'mapped_to_self_filtered_trimmed.bam'
-
-
-
-
-# Iterator that gives pairs of reads at a time (if the total number of reads is
-# odd, skip the last one)
-def pair_generator(iterable):
-    it = iter(iterable)
-    while True:
-        try:
-            a = it.next()
-            b = it.next()
-            yield (a, b)
-        except StopIteration:
-            raise
 
 
 

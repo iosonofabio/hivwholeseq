@@ -20,7 +20,7 @@ content:    Map a subsample to HXB2 first, then build a consensus, then map
             subprocesses, each of which tends to its own stampy child. This is
             not most efficient in terms of cluster jobs, but much easier to
             control and debug than a single master script (unless we wait for all
-            IDs to finish at each recursion step).
+            IDs to finish at each iteration).
 '''
 # Modules
 import os
@@ -41,20 +41,20 @@ from Bio.SeqRecord import SeqRecord
 
 # Horizontal import of modules from this folder
 import mapping
-from mapping.datasets import dataset_testmiseq as dataset
 from mapping.adapter_info import load_adapter_table, foldername_adapter
-from mapping.miseq import alpha, read_types
+from mapping.miseq import alpha, read_types, pair_generator
 
 
 # Globals
 VERBOSE = 3
+# FIXME
+from mapping.datasets import dataset_testmiseq as dataset
 data_folder = dataset['folder']
 HXB2_fragmented_file = 'HXB2_fragmented.fasta'
 
 # Mapping
 stampy_bin = '/ebio/ag-neher/share/programs/bundles/stampy-1.0.22/stampy.py'
 subsrate = '0.05'
-recursion_max = 4	# 0 means only map to HXB2
 
 # Consensus building
 maxreads = 100000
@@ -65,10 +65,10 @@ trim_bad_cigars = 3
 JOBDIR = mapping.__path__[0].rstrip('/')+'/'
 JOBLOGERR = JOBDIR+'logerr'
 JOBLOGOUT = JOBDIR+'logout'
-JOBSCRIPT = os.path.realpath(__file__)
+JOBSCRIPT = JOBDIR+'mapping_subsample_recursive.py'
 cluster_time = '0:59:59'
 vmem = '8G'
-interval_check = 60
+interval_check = 10
 
 
 
@@ -127,6 +127,17 @@ def get_bam_file(data_folder, adaID, refname):
     return data_folder+'subsample/'+dirname+'mapped_to_'+refname+'_fragmented.bam'
 
 
+def get_iteration(refname):
+    '''Find the iteration number'''
+    if refname == 'HXB2':
+        return -1
+    try:
+        refnum = int(refname.split('_')[-1])
+    except ValueError:
+        raise ValueError('Reference not understood')
+    return refnum
+
+
 def transform_reference(reference):
     '''Add some text to the reference without affecting the command line'''
     if reference == 'HXB2':
@@ -142,28 +153,17 @@ def transform_reference(reference):
     return 'consensus_'+str(refnum)
 
 
-def get_recursion_depth(refname):
-    '''Find the recursion depth'''
-    if refname == 'HXB2':
-        return -1
-    try:
-        refnum = int(refname.split('_')[-1])
-    except ValueError:
-        raise ValueError('Reference not understood')
-    return refnum
-
-
 def detransform_reference(refname):
     '''Delete some test from reference'''
-    if reference == 'HXB2':
-        return reference
-    refnum = get_recursion_depth(refname)
+    if refname == 'HXB2':
+        return refname
+    refnum = get_iteration(refname)
     return 'c'+str(refnum)
 
 
 def next_refname(refname, shortversion=False):
     '''Find the next reference'''
-    refnum = get_recursion_depth(refname)
+    refnum = get_iteration(refname)
     nextref = 'c'+str(refnum+1)
     if shortversion:
         return nextref
@@ -220,23 +220,25 @@ def call_stampy_for_mapping(data_folder, refname, adaID):
                  data_folder+'subsample/'+dirname+'read1_filtered_trimmed.fastq',
                  data_folder+'subsample/'+dirname+'read2_filtered_trimmed.fastq']
     qsub_list = map(str,qsub_list)
-    if VERBOSE >= 2:
+    if VERBOSE:
         print ' '.join(qsub_list)
 
     # Call stampy and check output
     qsub_output = sp.check_output(qsub_list).rstrip('\n')
-    if VERBOSE >= 2:
+    if VERBOSE:
         print qsub_output
     jobID = qsub_output.split(' ')[2]
-    if VERBOSE >= 2:
+    if VERBOSE:
         print jobID
 
     return jobID
 
 
-def fork_self(data_folder, refname, adaID, stage=3):
+def fork_self(data_folder, refname, adaID, stage=3, iterations_max=0):
     '''Fork self for each adapter ID'''
     qsub_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
                  '-o',JOBLOGOUT,
                  '-e',JOBLOGERR,
                  '-N', 'map_'+'{:02d}'.format(adaID),
@@ -246,8 +248,12 @@ def fork_self(data_folder, refname, adaID, stage=3):
                  '--adaID', adaID,
                 '--reference', detransform_reference(refname),
                  '--stage', stage,
+                 '--verbose', 3,
+                 '--iterations', iterations_max,
                 ]
     qsub_list = map(str, qsub_list)
+    if VERBOSE:
+        print ' '.join(qsub_list)
     sp.call(qsub_list)
 
 
@@ -296,119 +302,136 @@ def make_consensus(data_folder, refname, adaID):
                   for s in refseqs]
     inserts_all = [[defaultdict(int) for k in read_types]
                    for s in refseqs]
-    
-    import pdb; pdb.set_trace()
 
     # Count alleles
-    for i, read in enumerate(bamfile):
-    
-        # Limit to the first reads
-        if i >= maxreads: break
-    
-        # Ignore unmapped reads
-        if read.is_unmapped or (not read.is_proper_pair):
-            continue
-    
-        # Find out on what chromosome the read has been mapped
-        fragment = read.tid
-        counts = counts_all[fragment]
-        inserts = inserts_all[fragment]
-        refseq = refseqs[fragment]
-        ref = refs[fragment]
-    
-        # Divide by read 1/2 and forward/reverse
-        if read.is_read1: js = 0
-        else: js = 2
-        if read.is_reverse: js += 1
-    
-        # Sequence and position
-        # Note: stampy takes the reverse complement already
-        seq = read.seq
-        pos = read.pos
+    # Iterate over pairs of reads
+    for i_pairs, (read1, read2) in enumerate(pair_generator(bamfile)):
 
-        # FIXME: if the insert size is less than 250, we read over into the adapters
-        # TODO: should not this be taken care of by our block-by-block strategy below?
-        # Note: skip also the mate
-        if read.isize <= 250:
-            pass
-    
-        # Read CIGAR code for indels, and anayze each block separately
-        # Note: some reads are weird ligations of HIV and contaminants
-        # (e.g. fosmid plasmids). Those always have crazy CIGARs, because
-        # only the HIV part maps. We hence trim away short indels from the
-        # end of reads (this is still unbiased).
-        cigar = read.cigar
-        len_cig = len(cigar)
-        good_cigars = np.array(map(lambda x: (x[0] == 0) and (x[1] >= match_len_min), cigar), bool, ndmin=1)
-        # If no long match, skip read
-        # FIXME: we must skip the mate pair also? But what if it's gone already?
-        # Note: they come in pairs: read1 first, read2 next, so we can just read two at a time    
-        if not (good_cigars).any():
+        # Check a few things to make sure we are looking at paired reads
+        if read1.qname != read2.qname:
+            raise ValueError('Read pair '+str(i_pairs)+': reads have different names!')
+
+        # Ignore unmapped reads
+        if (read1.is_unmapped or (not read1.is_proper_pair)
+            or read2.is_unmapped or (not read2.is_proper_pair)):
             continue
-        # If only one long match, no problem
-        if (good_cigars).sum() == 1:
-            first_good_cigar = last_good_cigar = good_cigars.nonzero()[0][0]
-        # else include stuff between the extremes
-        else:
-            tmp = good_cigars.nonzero()[0]
-            first_good_cigar = tmp[0]
-            last_good_cigar = tmp[-1]
-            good_cigars[first_good_cigar: last_good_cigar + 1] = True
-    
-        # Iterate over CIGARs
-        for ic, block in enumerate(cigar):
-    
-            # Inline block
-            if block[0] == 0:
-                # Exclude bad CIGARs
-                if good_cigars[ic]: 
-    
-                    # The first and last good CIGARs are matches: trim them (unless they end the read)
-                    if (ic == first_good_cigar) and (ic != 0): trim_left = trim_bad_cigars
-                    else: trim_left = 0
-                    if (ic == last_good_cigar) and (ic != len_cig - 1): trim_right = trim_bad_cigars
-                    else: trim_right = 0
-    
-                    seqb = np.array(list(seq[trim_left:block[1] - trim_right]), 'S1')
-                    # Increment counts
-                    for j, a in enumerate(alpha):
-                        posa = (seqb == a).nonzero()[0]
-                        if len(posa):
-                            counts[js, j, pos + trim_left + posa] += 1
-    
-                # Chop off this block
-                if ic != len_cig - 1:
-                    seq = seq[block[1]:]
-                    pos += block[1]
-    
-            # Deletion
-            elif block[0] == 2:
-                # Exclude bad CIGARs
-                if good_cigars[ic]: 
-                    # Increment gap counts
-                    counts[js, 4, pos:pos + block[1]] += 1
-    
-                # Chop off pos, but not sequence
-                pos += block[1]
-    
-            # Insertion
-            elif block[0] == 1:
-                # Exclude bad CIGARs
-                if good_cigars[ic]: 
-                    seqb = seq[:block[1]]
-                    inserts[js][(pos, seqb)] += 1
-    
-                # Chop off seq, but not pos
-                if ic != len_cig - 1:
-                    seq = seq[block[1]:]
-    
-            # Other types of cigar?
+
+        # Limit to the first reads
+        if 2 * i_pairs >= maxreads: break
+
+        # What to do with bad CIGARs? Shall we skip both?
+
+        # Cover both reads of the pair
+        for i_within_pair, read in enumerate([read1, read2]):
+        
+            # Find out on what chromosome the read has been mapped
+            fragment = read.tid
+            counts = counts_all[fragment]
+            inserts = inserts_all[fragment]
+            refseq = refseqs[fragment]
+            ref = refs[fragment]
+        
+            # Divide by read 1/2 and forward/reverse
+            if read.is_read1: js = 0
+            else: js = 2
+            if read.is_reverse: js += 1
+        
+            # FIXME: if the insert size is less than 250, we read over into the adapters
+            # TODO: should not this be taken care of by our block-by-block strategy below?
+            # Note: skip also the mate
+            if read.isize <= 250:
+                pass
+        
+            # Read CIGAR code for indels, and anayze each block separately
+            # Note: some reads are weird ligations of HIV and contaminants
+            # (e.g. fosmid plasmids). Those always have crazy CIGARs, because
+            # only the HIV part maps. We hence trim away short indels from the
+            # end of reads (this is still unbiased).
+            cigar = read.cigar
+            len_cig = len(cigar)
+            good_cigars = np.array(map(lambda x: (x[0] == 0) and (x[1] >= match_len_min), cigar), bool, ndmin=1)
+            # If no long match, skip read
+            # FIXME: we must skip the mate pair also? But what if it's gone already?
+            # Note: they come in pairs: read1 first, read2 next, so we can just read two at a time    
+            if not (good_cigars).any():
+                continue
+            # If only one long match, no problem
+            if (good_cigars).sum() == 1:
+                first_good_cigar = last_good_cigar = good_cigars.nonzero()[0][0]
+            # else include stuff between the extremes
             else:
-                raise ValueError('CIGAR type '+str(block[0])+' not recognized')
+                tmp = good_cigars.nonzero()[0]
+                first_good_cigar = tmp[0]
+                last_good_cigar = tmp[-1]
+                good_cigars[first_good_cigar: last_good_cigar + 1] = True
+        
+            # Sequence and position
+            # Note: stampy takes the reverse complement already
+            seq = read.seq
+            pos = read.pos
+
+            # Iterate over CIGARs
+            for ic, (block_type, block_len) in enumerate(cigar):
+
+                # Check for pos: it should never exceed the length of the fragment
+                if (block_type in [0, 1, 2]) and (pos > len(ref)):
+                    raise ValueError('Pos exceeded the length of the fragment')
+        
+                # Inline block
+                if block_type == 0:
+                    # Exclude bad CIGARs
+                    if good_cigars[ic]: 
+        
+                        # The first and last good CIGARs are matches: trim them (unless they end the read)
+                        if (ic == first_good_cigar) and (ic != 0): trim_left = trim_bad_cigars
+                        else: trim_left = 0
+                        if (ic == last_good_cigar) and (ic != len_cig - 1): trim_right = trim_bad_cigars
+                        else: trim_right = 0
+        
+                        seqb = np.array(list(seq[trim_left:block_len - trim_right]), 'S1')
+                        # Increment counts
+                        for j, a in enumerate(alpha):
+                            posa = (seqb == a).nonzero()[0]
+                            if len(posa):
+                                counts[js, j, pos + trim_left + posa] += 1
+        
+                    # Chop off this block
+                    if ic != len_cig - 1:
+                        seq = seq[block_len:]
+                        pos += block_len
+        
+                # Deletion
+                elif block_type == 2:
+                    # Exclude bad CIGARs
+                    if good_cigars[ic]: 
+                        # Increment gap counts
+                        counts[js, 4, pos:pos + block_len] += 1
+        
+                    # Chop off pos, but not sequence
+                    pos += block_len
+        
+                # Insertion
+                # an insert @ pos 391 means that seq[:391] is BEFORE the insert,
+                # THEN the insert, FINALLY comes seq[391:]
+                elif block_type == 1:
+                    # Exclude bad CIGARs
+                    if good_cigars[ic]: 
+                        seqb = seq[:block_len]
+                        inserts[js][(pos, seqb)] += 1
+        
+                    # Chop off seq, but not pos
+                    if ic != len_cig - 1:
+                        seq = seq[block_len:]
+        
+                # Other types of cigar?
+                else:
+                    raise ValueError('CIGAR type '+str(block_type)+' not recognized')
+
     
     # Build consensus for each fragment
-    consensus_all = []
-    for i, counts, inserts, refseq in izip(xrange(len(chromosomes)), counts_all, inserts_all, refseqs):
+    consensus_all = {}
+    for chromosome, counts, inserts, refseq in \
+                            izip(chromosomes, counts_all, inserts_all, refseqs):
     
         # Make consensi for each of the four categories
         consensi = np.zeros((len(read_types), len(refseq)), 'S1')
@@ -419,10 +442,18 @@ def make_consensus(data_folder, refname, adaID):
             consensi[js] = alpha[count.argmax(axis=0)]
     
         # Add inserts that are present in more than half the reads
-        inserts_consensi = [[k for (k, i) in insert.iteritems()
-                             if ((i > 10) and
-                                 (i > 0.5 * counts[js, :, max(0, k[0]-5):min(len(ref), k[0]+5)].sum(axis=0).mean()))]
-                            for js, insert in enumerate(inserts)]
+        inserts_consensi = []
+        for js, insert in enumerate(inserts):
+            insert_consensus = []
+            for (k, i) in insert.iteritems():
+                pos_pre = max(0, k[0]-1)
+                pos_post = min(len(refseq), k[0]+1)
+                if pos_post <= pos_pre:
+                    print chromosome, pos_pre, pos_post, k, len(refseq), counts[js, :, pos_pre:pos_post].sum(axis=0)
+                threshold = 0.5 * counts[js, :, pos_pre:pos_post].sum(axis=0).mean()
+                if (i > 10) and (i > threshold):
+                    insert_consensus.append(k)
+            inserts_consensi.append(insert_consensus)
     
         # Make final consensus
         # This has two steps: 1. counts; 2. inserts
@@ -464,7 +495,7 @@ def make_consensus(data_folder, refname, adaID):
         for insert_name in insert_names:
             # Get counts for the insert and local coverage
             ins_counts = np.array([insert[insert_name] for insert in inserts])
-            # FIXME: there is a division by zero here!
+            # FIXME: is there a division by zero here?
             cov_loc = counts[:, :, insert_name[0]: min(len(refseq), insert_name[0] + 2)].sum(axis=1).mean(axis=1)
             # Get read types in which the insert is called
             types_ins_called = ins_counts > 0.5 * cov_loc
@@ -490,25 +521,34 @@ def make_consensus(data_folder, refname, adaID):
         consensus_final = ''.join(consensus_final).strip('N')
         consensus_final = re.sub('-', '', consensus_final)
     
-        consensus_all.append(consensus_final)
-    
-    # Save consensi to file (using the next reference name)
-    consensusseqs = [SeqRecord(Seq(consensus),
-                                id=fname+' '+'{:02d}'.format(adaID)+'_consensus',
-                                name=fname+' '+'{:02d}'.format(adaID)+'_consensus')
-                      for consensus, fname in izip(consensus_all, chromosomes)]
-    SeqIO.write(consensusseqs,
-                get_ref_file(data_folder, adaID, next_refname(refname)),
-                'fasta') 
+        # Store
+        consensus_all[chromosome] = consensus_final
+
+    return refseqs, consensus_all
+
+
+def check_new_old_consensi(refseqs, consensus_all):
+    '''Check the old and the new consensi, whether they match'''
     
     # check whether the old consensus is exactly equal to the newly built one
     all_match = True
-    for refseq, consensusseq in izip(refseqs, consensusseqs):
-        if str(refseq.seq) != str(consensusseq.seq):
+    for refseq in refseqs:
+        if str(refseq.seq) != consensus_all[refseq.id]:
             all_match = False
             break
 
     return all_match
+
+
+def write_consensus(data_folder, refname, adaID, conensus_all):
+    '''Write consensus sequences into FASTA'''
+    consensusseqs = [SeqRecord(Seq(consensus),
+                               id=fname+' '+'{:02d}'.format(adaID)+'_consensus',
+                               name=fname+' '+'{:02d}'.format(adaID)+'_consensus')
+                     for fname, consensus in consensus_all.iteritems()]
+    SeqIO.write(consensusseqs,
+                get_ref_file(data_folder, adaID, next_refname(refname)),
+                'fasta')
 
 
 
@@ -530,30 +570,47 @@ if __name__ == '__main__':
                               '- c0: use the raw consensus\n'+
                               '- c1: use the 1st refined consensus\n'+
                               '- etc.'))
+    parser.add_argument('--iterations', type=int, default=0,
+                        help=('Maximal number of map/consensus iterations'))
+    parser.add_argument('--verbose', type=int, default=0,
+                        help=('Verbosity level [0-3]'))
+
     args = parser.parse_args()
     stage = args.stage
     adaID = args.adaID
     refname = transform_reference(args.reference)
+    iterations_max = args.iterations
+    VERBOSE = args.verbose
 
     # MAIN RECURSION LOOP (IT'S BROKEN AT THE END OF THE SCRIPT)
     # Note: exceptions also stop the loop.
-    while True:
+    done = False
+    while not done:
     
         ###########################################################################
         # 1. PREPARE HXB2 OR CONSENSUS FOR MAPPING
         ###########################################################################
         if stage == 1:
 
+            if VERBOSE >= 2:
+                print str(get_iteration(refname))+': entered stage 1...'
+
             # Make index and hash files out of reference/consensus sequence
             make_index_and_hash(data_folder, refname, adaID=adaID)
 
             # This was easy, move to the mapping part
             stage = 2
+
+            if VERBOSE >= 2:
+                print 'Exit stage 1.'
     
         ###########################################################################
         # 2. MAP AGAINST HXB2 OR CONSENSUS
         ###########################################################################
         if stage == 2:
+
+            if VERBOSE >= 2:
+                print str(get_iteration(refname))+': entered stage 2...'
     
             # If the script is called with no adaID, make it a master script for all
             # adapters: otherwise, keep it a master script for its own stampy only
@@ -591,33 +648,48 @@ if __name__ == '__main__':
                     if not is_in_qstat_output:
                         mapping_is_done[i] = True
 
-                        # If this is not the last ID, fork self to a child
-                        if not mapping_is_done.all():
-                            fork_self(data_folder, refname, adaID, stage=3)
-                        # Otherwise, proceed straight to consensus building
+                        # Fork self to a child unless there is only one process
+                        if len(adaIDs) > 1:
+                            fork_self(data_folder, refname, adaID, stage=3,
+                                      iterations_max=iterations_max)
+                            done = True
                         else:
                             stage = 3
+
+            if VERBOSE >= 2:
+                print 'Exit stage 2.'
+
     
         ###########################################################################
-        # 3. MAKE CONSENSUS AFTER MAP
+        # 3. MAKE CONSENSUS AFTER MAPPING
         ###########################################################################
         if stage == 3:
 
+            if VERBOSE >= 2:
+                print str(adaID)+', '+str(get_iteration(refname))+': entered stage 3...'
+
             # Make consensus
-            all_match = make_consensus(data_folder, refname, adaID)
-                
-            # RECURSION: stop if old consensus equals the new one, or if the
-            # maximal number of iterations has been reached
-            if (not all_match) and (get_recursion_depth(refname) + 1 < recursion_max):
-    
-                # Call yourself
-                if VERBOSE:
-                    print 'Starting itself for recursion '+str(get_recursion_depth(refname)+1)
-                refname = next_refname(refname)
-                stage = 1
-                continue
-     
-        ###########################################################################
-        # 4. QUIT MAIN LOOP
-        ###########################################################################
-        break
+            refseqs, consensus_all = make_consensus(data_folder, refname, adaID)
+
+            # Check whether the old and new consensi match
+            all_match = check_new_old_consensi(refseqs, consensus_all)
+            if all_match:
+                print 'Consensus converged.'
+                done = True
+
+            else:
+                # Save consensi to file
+                write_consensus(data_folder, refname, adaID, consensus_all)
+
+                # Check whether we are at the max number of iterations
+                if (get_iteration(refname) + 1 >= iterations_max):
+                    print 'Maximal number of iterations reached.'
+                    done = True
+                else:
+                    if VERBOSE:
+                        print 'Starting again for iteration '+str(get_iteration(refname)+1)
+                    refname = next_refname(refname)
+                    stage = 1
+
+            if VERBOSE >= 2:
+                print 'Exit stage 3.'
