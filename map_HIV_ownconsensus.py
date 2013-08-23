@@ -3,31 +3,25 @@
 '''
 author:     Fabio Zanini
 date:       02/08/13
-content:    Map the reads to their own consensus, produced with a preliminary
-            mapping to HXB2. This is the final mapping.
+content:    Map the reads to their own consensus, produced with an iterative
+            mapping of HIV onto itself (HXB2 at first). This is the final mapping.
 '''
 # Modules
 import os
 import sys
 import numpy as np
 import subprocess as sp
-from map_HIV_HXB2 import load_adapter_table
+from adapter_info import load_adapter_table, foldername_adapter
+from mapping.mapping_utils import stampy_bin, subsrate
 
 
 
 # Globals
 VERBOSE = 1
-data_folder = '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run28_test_samples/'
-data_folder_subsample = '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run28_test_samples/subsample/'
-adapters_table_file = 'adapters_table.dat'
-stampy_bin = '/ebio/ag-neher/share/programs/bundles/stampy-1.0.22/stampy.py'
-subsrate = '0.02'
-use_filtered_reads = True
+# FIXME
+from mapping.datasets import dataset_testmiseq as dataset
+data_folder = dataset['folder']
 
-# Prepare I/O filenames
-if use_filtered_reads: file_suffix = '_filtered_trimmed'
-else: file_suffix = ''
-consensus_file = 'consensus'+file_suffix+'.fasta'
 
 # Submit vars
 JOBSUBMIT = os.path.realpath(__file__)      # This file
@@ -38,6 +32,8 @@ JOBLOGOUT = JOBDIR+'logout'
 # Cluster parameters (short time for subsample only)
 cluster_time = '23:59:59'
 vmem = '8G'
+
+
     
 
 
@@ -45,27 +41,44 @@ vmem = '8G'
 if __name__ == '__main__':
   
     # Iterate over all adapter IDs
-    # Note: the hash tables for mapping can be done on the cluster frontend,
-    # because the HIV genome is small
+    # Note: the hash tables for mapping might have been done by the recursive
+    # map already, depending on convergence of that
     adapter_table = load_adapter_table(data_folder)
     for adaID in adapter_table['ID']:
 
         # Directory to read
-        dirname = 'adapterID_'+'{:02d}'.format(adaID)+'/'
+        dirname = foldername_adapter(adaID)
+
+        # Find the last (fragmented) consensus
+        g = os.walk(data_folder+'subsample/'+dirname)
+        fns = g.next()[2]
+        if VERBOSE >= 3:
+            print fns
+        fns = filter(lambda x: ('consensus' in x) and ('fragmented.fasta' in x), fns)
+        consensus_numbers = map(lambda x: int(x.split('_')[1]), fns)
+        cons_max = max(consensus_numbers)
+        if VERBOSE >= 2:
+            print cons_max
+
+        # Fragmented consensus filenames
+        file_pattern = 'consensus_'+str(cons_max)+'_fragmented'
+        ref_file = file_pattern+'.fasta'
+        index_file = file_pattern+'.stidx'
+        hash_file = file_pattern+'.sthash'
 
         # 1. Make genome index file
-        if not os.path.isfile(data_folder_subsample+dirname+'consensus'+file_suffix+'.stidx'):
+        if not os.path.isfile(data_folder+'subsample/'+dirname+index_file):
             sp.call([stampy_bin,
                      '--species=HIV',
-                     '-G', data_folder_subsample+dirname+'consensus'+file_suffix,
-                     data_folder_subsample+dirname+consensus_file,
+                     '-G', data_folder+'subsample/'+dirname+file_pattern,
+                     data_folder+'subsample/'+dirname+ref_file,
                      ])
         
         # 2. Build a hash file
-        if not os.path.isfile(data_folder_subsample+dirname+'consensus'+file_suffix+'.sthash'):
+        if not os.path.isfile(data_folder+'subsample/'+dirname+hash_file):
             sp.call([stampy_bin,
-                     '-g', data_folder_subsample+dirname+'consensus'+file_suffix,
-                     '-H', data_folder_subsample+dirname+'consensus'+file_suffix,
+                     '-g', data_folder+'subsample/'+dirname+file_pattern,
+                     '-H', data_folder+'subsample/'+dirname+file_pattern,
                      ])
 
         # 3. Map (using STAMPY)
@@ -77,13 +90,13 @@ if __name__ == '__main__':
                      '-l', 'h_rt='+cluster_time,
                      '-l', 'h_vmem='+vmem,
                      stampy_bin,
-                     '-g', data_folder_subsample+dirname+'consensus'+file_suffix,
-                     '-h', data_folder_subsample+dirname+'consensus'+file_suffix, 
-                     '-o', data_folder+dirname+'mapped_to_self'+file_suffix+'.sam',
+                     '-g', data_folder+'subsample/'+dirname+file_pattern,
+                     '-h', data_folder+'subsample/'+dirname+file_pattern, 
+                     '-o', data_folder+dirname+'mapped_to_consensus_'+str(cons_max)+'_fragmented.sam',
                      '--substitutionrate='+subsrate,
                      '-M',
-                     data_folder+dirname+'read1'+file_suffix+'.fastq',
-                     data_folder+dirname+'read2'+file_suffix+'.fastq']
+                     data_folder+dirname+'read1_filtered_trimmed.fastq',
+                     data_folder+dirname+'read2_filtered_trimmed.fastq']
         qsub_list = map(str,qsub_list)
         if VERBOSE:
             print ' '.join(qsub_list)

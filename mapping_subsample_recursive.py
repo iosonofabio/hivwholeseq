@@ -43,6 +43,7 @@ from Bio.SeqRecord import SeqRecord
 import mapping
 from mapping.adapter_info import load_adapter_table, foldername_adapter
 from mapping.miseq import alpha, read_types, pair_generator
+from mapping.mapping_utils import stampy_bin, subsrate
 
 
 # Globals
@@ -51,10 +52,6 @@ VERBOSE = 3
 from mapping.datasets import dataset_testmiseq as dataset
 data_folder = dataset['folder']
 HXB2_fragmented_file = 'HXB2_fragmented.fasta'
-
-# Mapping
-stampy_bin = '/ebio/ag-neher/share/programs/bundles/stampy-1.0.22/stampy.py'
-subsrate = '0.05'
 
 # Consensus building
 maxreads = 100000

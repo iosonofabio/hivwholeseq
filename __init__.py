@@ -4,4 +4,6 @@ __all__ = ['test',
            'miseq',
            'map_HIV_HXB2',
            'mapping_subsample_recursive',
+           'mapping_utils',
+           'filenames',
           ]
