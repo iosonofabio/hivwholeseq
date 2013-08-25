@@ -46,3 +46,10 @@ def get_last_mapped(data_folder, adaID, type='bam'):
     else:
         raise ValueError('Type of mapped reads file not recognized')
     return data_folder+foldername_adapter(adaID)+filename
+
+
+def get_mutations_file(data_folder, adaID):
+    '''Get the filename with the mutations for all reads'''
+    filename = 'mutations.pickle'
+    filename = data_folder+foldername_adapter(adaID)+filename
+    return filename

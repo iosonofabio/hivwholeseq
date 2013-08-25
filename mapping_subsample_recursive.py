@@ -40,7 +40,6 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
 # Horizontal import of modules from this folder
-import mapping
 from mapping.adapter_info import load_adapter_table, foldername_adapter
 from mapping.miseq import alpha, read_types, pair_generator
 from mapping.mapping_utils import stampy_bin, subsrate
@@ -59,6 +58,7 @@ match_len_min = 30
 trim_bad_cigars = 3
 
 # Cluster submit
+import mapping
 JOBDIR = mapping.__path__[0].rstrip('/')+'/'
 JOBLOGERR = JOBDIR+'logerr'
 JOBLOGOUT = JOBDIR+'logout'
@@ -236,8 +236,8 @@ def fork_self(data_folder, refname, adaID, stage=3, iterations_max=0):
     qsub_list = ['qsub','-cwd',
                  '-b', 'y',
                  '-S', '/bin/bash',
-                 '-o',JOBLOGOUT,
-                 '-e',JOBLOGERR,
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
                  '-N', 'map_'+'{:02d}'.format(adaID),
                  '-l', 'h_rt='+cluster_time,
                  '-l', 'h_vmem='+vmem,
