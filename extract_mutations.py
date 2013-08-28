@@ -18,7 +18,7 @@ from Bio import SeqIO
 
 
 # Horizontal import of modules from this folder
-from mapping.adapter_info import load_adapter_table, foldername_adapter
+from mapping.adapter_info import load_adapter_table
 from mapping.miseq import alpha, read_types, pair_generator
 from mapping.filenames import get_last_reference, get_last_mapped
 from mapping.mapping_utils import get_ind_good_cigars
@@ -32,7 +32,7 @@ VERBOSE = 1
 from mapping.datasets import dataset_testmiseq as dataset
 data_folder = dataset['folder']
 
-maxreads = 5000000    #FIXME
+maxreads = 50000    #FIXME
 match_len_min = 30
 trim_bad_cigars = 3
 
@@ -98,7 +98,7 @@ if __name__ == '__main__':
     # The actual script starts here
     ###########################################################################
     # Open BAM
-    bamfilename = get_last_mapped(data_folder, adaID, type='bam')
+    bamfilename = get_last_mapped(data_folder, adaID, type='bam', filtered=True)
     # Try to convert to BAM if needed
     if not os.path.isfile(bamfilename):
         samfile = pysam.Samfile(bamfilename[:-3]+'sam', 'r')
@@ -130,6 +130,9 @@ if __name__ == '__main__':
     
         # Limit to the first reads
         if 2 * i_pairs >= maxreads: break
+
+        # Log
+        if VERBOSE and (not (i_pairs % 10000)): print i_pairs,
     
         # Assign names
         read1 = reads[0]
@@ -142,20 +145,19 @@ if __name__ == '__main__':
         # Ignore unmapped reads
         if (read1.is_unmapped or (not read1.is_proper_pair)
             or read2.is_unmapped or (not read2.is_proper_pair)):
-            continue
+            raise ValueError('Read pair '+str(i_pairs)+': not filtered properly')
     
         # If the reads are mapped to different fragments, that's mismapping
         if read1.tid != read2.tid:
-            print read1.qname
-            continue
+            raise ValueError('Read pair '+str(i_pairs)+': not filtered properly')
     
+        # Find out on what chromosome the read has been mapped
+        fragment = read1.tid
+        ref = refs[fragment]
+
         # Make a list of mutations for the read_pair
         muts = []
         for read in reads:
-    
-            # Find out on what chromosome the read has been mapped
-            fragment = read.tid
-            ref = refs[fragment]
     
             seq = read.seq
             good_cigar = get_ind_good_cigars(read.cigar,
@@ -166,10 +168,12 @@ if __name__ == '__main__':
             # separately
             pos_read = 0
             pos_ref = read.pos
-    
+
             # TODO: include indels as 'mutations'
             # TODO: include CIGAR trimming (we should really filter them out!)
             for (block_type, block_len), is_good in izip(read.cigar, good_cigar):
+                #if read.is_read2:
+                #    print pos_read, pos_ref
                 # Match
                 if block_type == 0:
                     if is_good:
@@ -177,6 +181,11 @@ if __name__ == '__main__':
                         seqtmp = seq[pos_read: pos_read + block_len]
                         seqtmp = np.array(list(seqtmp), 'S1')
                         mut_pos = (reftmp != seqtmp).nonzero()[0]
+
+                        #if (read.qname == 'HWI-M01346:28:000000000-A53RP:1:1101:5648:7688') and (read.is_read2):
+                        #    raise ValueError
+    
+
     
                         ## FIXME: this is mismapping at the beginning of the reference
                         ## (the insert length is wrong by 2 bases!)
@@ -186,6 +195,7 @@ if __name__ == '__main__':
                         if len(mut_pos):
                             mut_der_all = seqtmp[mut_pos]
                             muts.extend(zip(mut_pos + pos_ref, mut_der_all))
+
                     pos_read += block_len
                     pos_ref += block_len
     
@@ -202,22 +212,18 @@ if __name__ == '__main__':
                     raise ValueError('CIGAR type '+str(block_type)+' not recognized')
     
     
-        if len(muts):
-            # Guard against mismapped reads, which appear as containing a lot of
-            # mutations
-            if len(muts) <= 50:
-                muts_all.append((read1.qname, fragment, muts))
+        # Guard against mismapped reads, which contain a lot of mutations
+        if 0 < len(muts) <= 50:
+            muts_all.append((read1.qname, fragment, muts))
+        elif len(muts) > 50:
+            raise ValueError('Read pair '+str(i_pairs)+': not filtered properly')
+
+        if VERBOSE and (not (i_pairs % 10000)): print len(muts_all)
     
-        # Log
-        if VERBOSE and (not (i_pairs % 10000)): print i_pairs, len(muts_all)
     
     
-    # Get rid of mismapped stuff (no read has 50 or more SNPs, not even in the)
-    mismapped = [x[0] for x in muts_all if len(x[2]) > 50]
-    muts_all_red = [x for x in muts_all if len(x[2]) < 50]
-    
-    # Write results to file (~1 Gb per 1.5x10^6 reads in the patient sample)
-    import cPickle as pickle
-    mut_file = 'mutations.pickle'
-    with open(data_folder+foldername_adapter(adaID)+mut_file, 'w') as f:
-        pickle.dump(muts_all_red, f, protocol=-1)
+    ## Write results to file (~1 Gb per 1.5x10^6 reads in the patient sample)
+    #import cPickle as pickle
+    #mut_file = 'mutations.pickle'
+    #with open(data_folder+foldername_adapter(adaID)+mut_file, 'w') as f:
+    #    pickle.dump(muts_all, f, protocol=-1)

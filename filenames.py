@@ -10,6 +10,7 @@ import os
 from mapping.adapter_info import foldername_adapter
 
 
+
 # Functions
 def get_last_consensus_number(data_folder, adaID):
     '''Find the number of the final consensus after iterative mapping'''
@@ -35,10 +36,12 @@ def get_last_reference(data_folder, adaID, ext=True):
     return data_folder+'subsample/'+foldername_adapter(adaID)+filename
 
 
-def get_last_mapped(data_folder, adaID, type='bam'):
+def get_last_mapped(data_folder, adaID, type='bam', filtered=False):
     '''Find the filename of the mapped reads to the last consensus'''
     cons_max = get_last_consensus_number(data_folder, adaID)
     filename = 'mapped_to_consensus_'+str(cons_max)+'_fragmented'
+    if filtered:
+        filename = filename + '_filtered'
     if type == 'sam':
         filename = filename + '.sam'
     elif type == 'bam':
@@ -51,5 +54,22 @@ def get_last_mapped(data_folder, adaID, type='bam'):
 def get_mutations_file(data_folder, adaID):
     '''Get the filename with the mutations for all reads'''
     filename = 'mutations.pickle'
-    filename = data_folder+foldername_adapter(adaID)+filename
-    return filename
+    return data_folder+foldername_adapter(adaID)+filename
+
+
+def get_allele_counts_filename(data_folder, adaID):
+    '''Get the filename with the allele counts for all reads'''
+    filename = 'allele_counts.npy'
+    return data_folder+foldername_adapter(adaID)+filename
+
+
+def get_insert_counts_filename(data_folder, adaID):
+    '''Get the filename with the insert counts for all reads'''
+    filename = 'insert_counts.pickle'
+    return data_folder+foldername_adapter(adaID)+filename
+
+
+def get_coverage_filename(data_folder, adaID):
+    '''Get the filename with the coverage'''
+    filename = 'coverage.npy'
+    return data_folder+foldername_adapter(adaID)+filename

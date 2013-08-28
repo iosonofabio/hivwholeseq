@@ -35,7 +35,7 @@ VERBOSE = 1
 from mapping.datasets import dataset_testmiseq as dataset
 data_folder = dataset['folder']
 
-maxreads = 50000    #FIXME
+maxreads = 5000000    #FIXME
 match_len_min = 30
 trim_bad_cigars = 3
 
@@ -152,6 +152,8 @@ if __name__ == '__main__':
                 # Other types of cigar?
                 else:
                     raise ValueError('CIGAR type '+str(block_type)+' not recognized')
+
+            # TODO: the problem is mismapped reads!
 
 
         # Check which tuples are fully covered

@@ -20,3 +20,12 @@ def identity(x):
 
 
 print __file__
+
+
+bs = []
+for aa in a:
+    b = np.zeros((4, 6, len(aa[0][0])), int)
+    for i, aaa in enumerate(aa):
+        for ii, aaaa in enumerate(aaa):
+            b[i, ii] = aaaa
+    bs.append(b)

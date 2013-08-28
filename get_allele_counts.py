@@ -3,11 +3,12 @@
 '''
 author:     Fabio Zanini
 date:       05/08/13
-content:    Get the allele frequencies out of a SAM/BAM file and a reference.
+content:    Get the allele frequencies out of a BAM file and a reference.
 '''
 # Modules
 import os
 import sys
+import argparse
 import cPickle as pickle
 from collections import defaultdict
 from itertools import izip
@@ -15,32 +16,41 @@ import pysam
 import numpy as np
 from Bio import SeqIO
 
+# Horizontal import of modules from this folder
+from mapping.adapter_info import load_adapter_table
+from mapping.miseq import alpha, read_types
+from mapping.filenames import get_last_reference, get_last_mapped
+from mapping.filenames import get_allele_counts_filename, get_insert_counts_filename, get_coverage_filename
+from mapping.mapping_utils import get_ind_good_cigars, get_trims_from_good_cigars
 
 
 # Globals
 VERBOSE = 1
-alpha = np.array(list('ACGT-N'), 'S1')
-read_types = ['read1 f', 'read1 r', 'read2 f', 'read2 r']
-maxreads = 500000000000000000    #FIXME
+
+# FIXME
+from mapping.datasets import dataset_testmiseq as dataset
+data_folder = dataset['folder']
+
+maxreads = 500000000000000    #FIXME
 match_len_min = 30
 trim_bad_cigars = 3
-ref_filename = 'consensus_filtered_trimmed.fasta'
-bam_filename = 'mapped_to_self_filtered_trimmed.bam'
-allele_count_filename = 'allele_counts.npy'
-insert_count_filename = 'insert_counts.pickle'
 
 
 
-def get_allele_counts(ref, bamfile):
+def get_allele_counts(refs, bamfile):
     '''Extract allele and insert counts from a bamfile'''
     
     # Prepare allele counts
-    counts = np.zeros((len(read_types), len(alpha), len(ref)), int)
+    counts = [np.zeros((len(read_types), len(alpha), len(ref)), int)
+              for ref in refs]
     
     # Insertions must be dealt with separately
-    inserts = [defaultdict(int) for k in read_types]
+    inserts = []
+    for ref in refs:
+        inserts.append([defaultdict(int) for k in read_types])
 
-    # Count alleles
+    # Count alleles and inserts
+    # Note: the reads should already be filtered of unmapped stuff at this point
     for i, read in enumerate(bamfile):
     
         # Limit to the first reads
@@ -63,6 +73,12 @@ def get_allele_counts(ref, bamfile):
         # Note: stampy takes the reverse complement already
         seq = read.seq
         pos = read.pos
+
+        # Fragment
+        fragment = read.tid
+        ref = refs[fragment]
+        count = counts[fragment]
+        insert = inserts[fragment]
     
         # Read CIGAR code for indels, and anayze each block separately
         # Note: some reads are weird ligations of HIV and contaminants
@@ -70,69 +86,54 @@ def get_allele_counts(ref, bamfile):
         # only the HIV part maps. We hence trim away short indels from the
         # end of reads (this is still unbiased).
         cigar = read.cigar
-        len_cig = len(cigar)
-        good_cigars = np.array(map(lambda x: (x[0] == 0) and (x[1] >= match_len_min), cigar), bool, ndmin=1)
-        # If no long match, skip read
-        # FIXME: we must skip the mate pair also? But what if it's gone already?
-        # Note: they come in pairs: read1 first, read2 next, so we can just read two at a time
-        if not (good_cigars).any():
-            continue
-        # If only one long match, no problem
-        if (good_cigars).sum() == 1:
-            first_good_cigar = last_good_cigar = good_cigars.nonzero()[0][0]
-        # else include stuff between the extremes
-        else:
-            tmp = good_cigars.nonzero()[0]
-            first_good_cigar = tmp[0]
-            last_good_cigar = tmp[-1]
-            good_cigars[first_good_cigar: last_good_cigar + 1] = True
+        len_cigar = len(cigar)
+        good_cigars = get_ind_good_cigars(cigar, match_len_min=match_len_min)
+        trims = get_trims_from_good_cigars(good_cigars,
+                                           trim_left=trim_bad_cigars,
+                                           trim_right=trim_bad_cigars)
 
         # Iterate over CIGARs
-        for ic, block in enumerate(cigar):
+        for ic, ((block_type, block_len),
+                 good_cigar,
+                 (trim_left, trim_right)) in enumerate(izip(cigar, good_cigars, trims)):
 
             # Inline block
-            if block[0] == 0:
+            if block_type == 0:
                 # Exclude bad CIGARs
-                if good_cigars[ic]: 
-
-                    # The first and last good CIGARs are matches: trim them (unless they end the read)
-                    if (ic == first_good_cigar) and (ic != 0): trim_left = trim_bad_cigars
-                    else: trim_left = 0
-                    if (ic == last_good_cigar) and (ic != len_cig - 1): trim_right = trim_bad_cigars
-                    else: trim_right = 0
-    
-                    seqb = np.array(list(seq[trim_left:block[1] - trim_right]), 'S1')
+                if good_cigar: 
+                    # Get subsequence
+                    seqb = np.array(list(seq[trim_left:block_len - trim_right]), 'S1')
                     # Increment counts
                     for j, a in enumerate(alpha):
                         posa = (seqb == a).nonzero()[0]
                         if len(posa):
-                            counts[js, j, pos + trim_left + posa] += 1
+                            count[js, j, pos + trim_left + posa] += 1
     
                 # Chop off this block
-                if ic != len_cig - 1:
-                    seq = seq[block[1]:]
-                    pos += block[1]
+                if ic != len_cigar - 1:
+                    seq = seq[block_len:]
+                    pos += block_len
     
             # Deletion
-            elif block[0] == 2:
+            elif block_type == 2:
                 # Exclude bad CIGARs
-                if good_cigars[ic]: 
+                if good_cigar: 
                     # Increment gap counts
-                    counts[js, 4, pos:pos + block[1]] += 1
+                    count[js, 4, pos:pos + block_len] += 1
     
                 # Chop off pos, but not sequence
-                pos += block[1]
+                pos += block_len
     
             # Insertion
-            elif block[0] == 1:
+            elif block_type == 1:
                 # Exclude bad CIGARs
-                if good_cigars[ic]: 
-                    seqb = seq[:block[1]]
-                    inserts[js][(pos, seqb)] += 1
+                if good_cigar: 
+                    seqb = seq[:block_len]
+                    insert[js][(pos, seqb)] += 1
     
                 # Chop off seq, but not pos
-                if ic != len_cig - 1:
-                    seq = seq[block[1]:]
+                if ic != len_cigar - 1:
+                    seq = seq[block_len:]
     
             # Other types of cigar?
             else:
@@ -146,19 +147,31 @@ def get_allele_counts(ref, bamfile):
 if __name__ == '__main__':
 
     # Input arguments
-    args = sys.argv
-    if len(args) < 2:
-        raise ValueError('This script takes the adapterID folder as input')
-    data_folder = args[1].rstrip('/')+'/'
+    parser = argparse.ArgumentParser(description='Extract linkage information')
+    parser.add_argument('--adaID', metavar='00', type=int, required=True,
+                        help='Adapter ID sample to analyze')
+    parser.add_argument('--submit', action='store_true', default=False,
+                        help='Submit the job to the cluster via qsub')
+    args = parser.parse_args()
+    adaID = args.adaID
+    submit = args.submit
 
-    # Read reference
-    if os.path.isfile(data_folder+ref_filename): ref_file = data_folder+ref_filename
-    else: ref_file = '/'.join(data_folder.split('/')[:-2]+['subsample/']+data_folder.split('/')[-2:])+ref_filename
-    refseq = SeqIO.read(ref_file, 'fasta')
-    ref = np.array(refseq)
+    # Branch to the cluster if required
+    if submit:
+        # If no adaID is specified, use all
+        if adaID == 0:
+            adaIDs = load_adapter_table(data_folder)['ID']
+        else:
+            adaIDs = [adaID]
+        for adaID in adaIDs:
+            fork_self(data_folder, adaID) 
+        sys.exit()
 
+    ###########################################################################
+    # The actual script starts here
+    ###########################################################################
     # Open BAM
-    bamfilename = data_folder+bam_filename
+    bamfilename = get_last_mapped(data_folder, adaID, type='bam', filtered=True)
     # Try to convert to BAM if needed
     if not os.path.isfile(bamfilename):
         samfile = pysam.Samfile(bamfilename[:-3]+'sam', 'r')
@@ -167,12 +180,33 @@ if __name__ == '__main__':
             bamfile.write(s)
     bamfile = pysam.Samfile(bamfilename, 'rb')
     
+    # Chromosome list
+    chromosomes = bamfile.references
+    
+    # Read reference (fragmented)
+    refseqs_raw = list(SeqIO.parse(get_last_reference(data_folder, adaID, ext=True),
+                                   'fasta'))
+    # Sort according to the chromosomal ordering
+    refseqs = []
+    for chromosome in chromosomes:
+        for seq in refseqs_raw:
+            if chromosome == seq.id:
+                refseqs.append(seq)
+                break
+    refs = [np.array(refseq) for refseq in refseqs]
+    
     # Get counts
-    counts, inserts = get_allele_counts(ref, bamfile)
+    counts, inserts = get_allele_counts(refs, bamfile)
+
+    # Get coverage
+    coverage = [c.sum(axis=1) for c in counts]
 
     # Save counts and inserts to file
-    np.save(data_folder+allele_count_filename, counts)
-    with open(data_folder+insert_count_filename, 'w') as f:
+    with open(get_allele_counts_filename(data_folder, adaID), 'w') as f:
+        pickle.dump(counts, f, protocol=-1)
+    with open(get_coverage_filename(data_folder, adaID), 'w') as f:
+        pickle.dump(coverage, f, protocol=-1)
+    with open(get_insert_counts_filename(data_folder, adaID), 'w') as f:
         pickle.dump(inserts, f, protocol=-1)
 
     ## Raw estimate of diversity

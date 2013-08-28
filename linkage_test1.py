@@ -54,7 +54,7 @@ def filter_only_mutations_seen_x_times(muts_all, times=4):
 
     # 2. Count and filter them
     allele_counts = Counter(muts_flat)
-    alleles_good = [m for m, count in allele_counts.iteritems() if count >= times]
+    alleles_good = {m: count for m, count in allele_counts.iteritems() if count >= times}
     return alleles_good
 
 
@@ -62,15 +62,15 @@ def filter_only_mutations_seen_x_times(muts_all, times=4):
 # Script
 if __name__ == '__main__':
 
-    # Input arguments
-    parser = argparse.ArgumentParser(description='Extract linkage information')
-    parser.add_argument('--adaID', metavar='00', type=int, required=True,
-                        help='Adapter ID sample to analyze')
-    args = parser.parse_args()
-    adaID = args.adaID
-
-    # Load the mutations
-    muts_all = load_mutations(data_folder, adaID)
+#    # Input arguments
+#    parser = argparse.ArgumentParser(description='Extract linkage information')
+#    parser.add_argument('--adaID', metavar='00', type=int, required=True,
+#                        help='Adapter ID sample to analyze')
+#    args = parser.parse_args()
+#    adaID = args.adaID
+#
+#    # Load the mutations
+#    muts_all = load_mutations(data_folder, adaID)
 
     # Pick the mutations seen at least 4 times (the rest is error)
     from time import time
@@ -78,6 +78,13 @@ if __name__ == '__main__':
     mutations_good = filter_only_mutations_seen_x_times(muts_all, 4)
     t1 = time()
     print int(t1 - t0)
+
+    # Sort them by frequency
+    muts, counts = zip(*mutations_good.iteritems())
+    ind = np.argsort(counts)[::-1]
+    muts = np.array(muts, dtype=list)[ind]
+    counts = np.array(counts)[ind]
+
 
     # TODO: exclude known high-error sites (Richard should have written the
     # error filters somewhere?)
