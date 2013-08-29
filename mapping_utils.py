@@ -28,6 +28,51 @@ def get_ind_good_cigars(cigar, match_len_min=30):
     return good_cigars
 
 
+def get_range_good_cigars(cigar, pos, match_len_min=30):
+    '''Get the range of the good CIGARs, in the read and ref sys of coordinates'''
+    from numpy import array
+
+    criterion = lambda x: (x[0] == 0) and (x[1] >= match_len_min)
+    good_cigars = array(map(criterion, cigar), bool, ndmin=1)
+    if not (good_cigars).any():
+        return (None, None)
+    else:
+        tmp = good_cigars.nonzero()[0]
+        first_good_cigar = tmp[0]
+        last_good_cigar = tmp[-1]
+
+        # Get the start
+        start_read = 0
+        start_ref = pos
+        for (block_type, block_len) in cigar[:first_good_cigar]:
+            if block_type == 0:
+                start_read += block_len
+                start_ref += block_len
+            elif block_type == 1:
+                start_read += block_len
+            elif block_type == 2:
+                start_ref += block_len
+            else:
+                raise ValueError('CIGAR type '+str(block_type)+' not recognized')
+
+        # Get the end
+        end_read = start_read
+        end_ref = start_ref
+        for (block_type, block_len) in cigar[first_good_cigar: last_good_cigar + 1]:
+            if block_type == 0:
+                end_read += block_len
+                end_ref += block_len
+            elif block_type == 1:
+                end_read += block_len
+            elif block_type == 2:
+                end_ref += block_len
+            else:
+                raise ValueError('CIGAR type '+str(block_type)+' not recognized')
+
+        return ((start_read, end_read), (start_ref, end_ref))
+
+
+
 def get_trims_from_good_cigars(good_cigars, trim_left=3, trim_right=3):
     '''Set the trimming of cigars'''
     from numpy import zeros
@@ -68,3 +113,12 @@ def get_fragment_list(data_folder, adaID):
     chromosomes = bamfile.references
     bamfile.close()
     return chromosomes
+
+
+def get_read_start_end(read):
+    '''Get the start and end position of a read in its reference'''
+    start = read.pos
+    len_ref = sum(block_len for (block_type, block_len) in read.cigar
+                  if block_type in [0, 2])
+    end = start + len_ref
+    return (start, end)

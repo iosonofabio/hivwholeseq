@@ -7,21 +7,40 @@ PIPELINE FOR HIV MISEQ SEQUENCING DATA
  - R3 is read 2
 
 1. Demultiplex by adapter and put into separate folders with the adapter IDs and
-   sample names. Create a subsample of demultiplexed adapters for consensus
-   building. (demultiplex.py)
+   sample names. (demultiplex.py)
 
 CHECKPOINT: errors in adapter IDs
 
-2. Filter by quality and trim reads, for subsample and full dataset separately.
-   (filter_trim_demultiplexed_reads.py)
+2. Filter by quality and trim reads. (filter_trim_demultiplexed_reads.py)
 
 CHECKPOINT: length distribution of trimmed reads
 
-3. Recursive mapping of subsample onto HIV: HXB2 fragments first, then its own
-   consensus. (mapping_subsample_recursive.py)
+3. Do a preliminary mapping onto HXB2 to separate into fragments and spot
+   cross-fragment ligation, short insert sizes reading back into the adapters,
+   contaminants. (divide_reads_into_fragments.py)
+
+NOTE: now the reads should be relatively clean.
+
+NOTE: from this point on, the fragments do not talk to each other anymore. This
+      means that for each operation we have 6 x n_samples ~ 50 parallel jobs.
+
+4. Extract a subsample of reads to build a consensus.
+
+5. Consensus building via iterative mapping of subsample: on HXB2 fragments
+   first, then on its own consensus. (mapping_subsample_recursive.py)
 
 CHECKPOINT: mapping issues, coverage
 
-4. Map the full dataset against the final self consensus.
+6. Map the full dataset against the final consensus.
 
-5. Downstream: calculate allele frequencies, etc.
+CHECKPOINT: mapping issues, coverage
+
+7. Filter BAM files of unmapped stuff and similia.
+
+-------------------------------------------------------------------------------
+END OF MAPPING
+-------------------------------------------------------------------------------
+
+8. Calculate useful observables: coverage, allele frequencies, mutations.
+
+9. Downstream: do popgen on this.

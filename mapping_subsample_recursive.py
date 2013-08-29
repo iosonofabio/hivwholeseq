@@ -43,6 +43,7 @@ from Bio.SeqRecord import SeqRecord
 from mapping.adapter_info import load_adapter_table, foldername_adapter
 from mapping.miseq import alpha, read_types, pair_generator
 from mapping.mapping_utils import stampy_bin, subsrate
+from mapping.filenames import get_HXB2_fragmented
 
 
 # Globals
@@ -50,7 +51,6 @@ VERBOSE = 3
 # FIXME
 from mapping.datasets import dataset_testmiseq as dataset
 data_folder = dataset['folder']
-HXB2_fragmented_file = 'HXB2_fragmented.fasta'
 
 # Consensus building
 maxreads = 100000
@@ -73,7 +73,7 @@ interval_check = 10
 def get_ref_file(data_folder, adaID=0, refname='HXB2'):
     '''Get the reference filename'''
     if refname == 'HXB2':
-        reffile = data_folder+HXB2_fragmented_file
+        reffile = get_HXB2_fragmented(data_folder)
     elif adaID == 0:
         raise ValueError('Adapter ID not specified.')
     else:

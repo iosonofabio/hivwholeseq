@@ -13,18 +13,15 @@ from itertools import izip
 import numpy as np
 import Bio.SeqIO as SeqIO
 
-
-# Env var
-module_group = '/ebio/ag-neher/share/programs/modules'
-if module_group not in sys.path:
-    sys.path.append(module_group)
-from annotate_HXB2 import load_HXB2
+from mapping.sequence_utils.annotate_HXB2 import load_HXB2
+from mapping.filenames import get_HXB2_fragmented, get_HXB2_entire
 
 
 
 # Globals
-data_folder = '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run28_test_samples/'
-data_folder = 'data/'
+# FIXME
+from mapping.datasets import dataset_testmiseq as dataset
+data_folder = dataset['folder']
 
 
 
@@ -44,8 +41,17 @@ if __name__ == '__main__':
         fs.id = fs.name
         fs.description = re.sub('complete genome', f.type, fs.description).split(';')[0]
 
-    # Write to file
-    SeqIO.write(frag_seqs,
-                data_folder+'HXB2_fragmented.fasta',
-                'fasta')
+    # Make a cropped sequence from F1 to F6, to reduce LTR degeneracy problems
+    start_F1 = [f for f in seq.features
+                if f.type == 'fragment F1'][0].location.nofuzzy_start
+    end_F6 = [f for f in seq.features
+              if f.type == 'fragment F6'][0].location.nofuzzy_end
+    seq_cropped = seq[start_F1: end_F6]
+    seq_cropped.id = seq_cropped.name = seq.name+'_cropped_F1_F6'
+    seq_cropped.description = seq.description+' (cropped to fragments F1-F6)'
+
+    # Write to file both the entire, the cropped, and the fragmented
+    SeqIO.write(seq, get_HXB2_entire(data_folder), 'fasta')
+    SeqIO.write(seq_cropped, get_HXB2_entire(data_folder, cropped=True), 'fasta')
+    SeqIO.write(frag_seqs, get_HXB2_fragmented(data_folder), 'fasta')
 

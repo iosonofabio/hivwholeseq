@@ -6,4 +6,5 @@ __all__ = ['test',
            'mapping_subsample_recursive',
            'mapping_utils',
            'filenames',
+           'sequence_utils',
           ]
