@@ -28,7 +28,8 @@ def get_ind_good_cigars(cigar, match_len_min=30):
     return good_cigars
 
 
-def get_range_good_cigars(cigar, pos, match_len_min=30):
+def get_range_good_cigars(cigar, pos, match_len_min=30,
+                          trim_left=3, trim_right=3):
     '''Get the range of the good CIGARs, in the read and ref sys of coordinates'''
     from numpy import array
 
@@ -68,6 +69,21 @@ def get_range_good_cigars(cigar, pos, match_len_min=30):
                 end_ref += block_len
             else:
                 raise ValueError('CIGAR type '+str(block_type)+' not recognized')
+
+        # If some CIGARs are chopped off, trim a few bases from that side too
+        # This is also useful to avoid short random matches to HXB2 that appear
+        # like crossing the fragment boundary but are actually only a short
+        # insert reading back into the illumina adapters
+        # Note also that trimming is fine in both coordinate systems because at
+        # the edges there is a long match block:
+        #    match_len_min > trim_left + trim_right
+        # must be fulfilled, otherwise we do bogus.
+        if first_good_cigar != 0:
+            start_read += trim_left
+            start_ref += trim_left
+        if last_good_cigar != len(cigar) - 1:
+            end_read -= trim_right
+            end_ref -= trim_right
 
         return ((start_read, end_read), (start_ref, end_ref))
 

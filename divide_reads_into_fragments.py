@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # vim: fdm=marker
 '''
 author:     Fabio Zanini
@@ -62,7 +63,7 @@ def make_index_and_hash(data_folder, cropped=False):
     # 1. Make genome index file for HXB2
     if not os.path.isfile(get_HXB2_index_file(data_folder, ext=True)):
         sp.call([stampy_bin,
-                 '--species="HIV 6 fragments"',
+                 '--species="HIV"',
                  '-G', get_HXB2_index_file(data_folder, ext=False),
                  get_HXB2_entire(data_folder, cropped=cropped),
                  ])
@@ -75,14 +76,14 @@ def make_index_and_hash(data_folder, cropped=False):
                  ])
 
 
-def call_stampy_for_mapping(data_folder, adaID, VERBOSE=3):
+def call_stampy_for_mapping(data_folder, adaID, VERBOSE=3, subsample=False):
     '''Call stampy for actual mapping'''
     readfiles = get_read_filenames(data_folder, adaID,
-                                   subsample=True, # FIXME
+                                   subsample=subsample,
                                    filtered=True)
 
     output_filename =  get_premapped_file(data_folder, adaID, type='sam',
-                                          subsample=True) #FIXME
+                                          subsample=subsample)
     # If the output file exist, do not map
     if os.path.isfile(output_filename):
         return None
@@ -116,7 +117,7 @@ def call_stampy_for_mapping(data_folder, adaID, VERBOSE=3):
     return jobID
 
 
-def fork_self(data_folder, adaID, VERBOSE=3):
+def fork_self(data_folder, adaID, VERBOSE=3, subsample=False):
     '''Fork self for each adapter ID'''
     qsub_list = ['qsub','-cwd',
                  '-b', 'y',
@@ -131,6 +132,8 @@ def fork_self(data_folder, adaID, VERBOSE=3):
                  '--verbose', VERBOSE,
                  '--stage', 3,
                 ]
+    if subsample:
+        qsub_list.append('--subsample')
     qsub_list = map(str, qsub_list)
     if VERBOSE:
         print ' '.join(qsub_list)
@@ -162,25 +165,24 @@ def write_read_pair(reads, ranges, fileouts):
 # Script
 if __name__ == '__main__':
 
-    # Parse input args: this is used to call itself recursively
+    # Parse input args
     parser = argparse.ArgumentParser(description='Divide HIV reads into fragments')
     parser.add_argument('--adaID', metavar='00', type=int, nargs='?',
                         default=0,
                         help='Adapter ID')
     parser.add_argument('--verbose', type=int, default=0,
-                        help=('Verbosity level [0-3]'))
+                        help='Verbosity level [0-3]')
     parser.add_argument('--stage', metavar='N', type=int, nargs='?',
                         default=1,
-                        help=('1: initialize, 2: map, 3: divide'))
+                        help='1: initialize, 2: map, 3: divide')
+    parser.add_argument('--subsample', action='store_true',
+                        help='Apply only to a subsample of the reads')
 
     args = parser.parse_args()
     stage = args.stage
     adaID = args.adaID
     VERBOSE = args.verbose
-
-    # FIXME: extend to all adaIDs
-    if adaID == 0:
-        adaID = 2
+    subsample = args.subsample
 
     ###########################################################################
     # 1. PREPARE HXB2 FOR MAPPING
@@ -208,9 +210,18 @@ if __name__ == '__main__':
         else:
             adaIDs = [adaID]
 
+        # Make folders for premapped reads if necessary
+        for adaID in adaIDs:
+            dirname =  os.path.dirname(get_premapped_file(data_folder, adaID,
+                                                          subsample=subsample))
+            if not os.path.isdir(dirname):
+                os.mkdir(dirname)
+
         # Call stampy for mapping and get the jobIDs
         if VERBOSE: print 'Mapping...'
-        jobIDs = [call_stampy_for_mapping(data_folder, adaID) for adaID in adaIDs]
+        jobIDs = [call_stampy_for_mapping(data_folder, adaID,
+                                          subsample=subsample)
+                  for adaID in adaIDs]
         
         # Wait for all stampy children to finish, then either proceed or fork self
         mapping_is_done = np.zeros(len(jobIDs), bool)
@@ -243,7 +254,7 @@ if __name__ == '__main__':
                 # Fork self to a child unless there is only one process
                 if (mapping_is_done[i]):
                     if len(adaIDs) > 1:
-                        fork_self(data_folder, adaID)
+                        fork_self(data_folder, adaID, subsample=subsample)
                     else:
                         stage = 3
 
@@ -253,6 +264,10 @@ if __name__ == '__main__':
     # 3. DIVIDE INTO FRAGMENTS
     ###########################################################################
     if stage == 3:
+
+        # We should get to stage three only with a single adapterID
+        if adaID == 0:
+            raise ValueError('Stage 3 can only be executed for a single adapterID.')
 
         # Divide the mapped reads into fragments
         seq = load_HXB2()
@@ -267,15 +282,15 @@ if __name__ == '__main__':
 
         # Get the premapped reads
         samfilename = get_premapped_file(data_folder, adaID, type='sam',
-                                         subsample=True) #FIXME
+                                         subsample=subsample)
         bamfilename = get_premapped_file(data_folder, adaID, type='bam',
-                                         subsample=True) #FIXME
+                                         subsample=subsample)
         if not os.path.isfile(bamfilename):
             convert_sam_to_bam(bamfilename, samfilename)
 
         # Output fastq files
         fileouts = get_read_filenames(data_folder, adaID,
-                                      subsample=True, # FIXME
+                                      subsample=subsample,
                                       premapped=True)
         
         # Iterate over the mapped reads and assign fragments

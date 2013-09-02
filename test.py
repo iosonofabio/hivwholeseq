@@ -30,5 +30,24 @@
 #            b[i, ii] = aaaa
 #    bs.append(b)
 
-import mapping.sequence_utils
-from mapping.sequence_utils.annotate_HXB2 import load_HXB2
+#import mapping.sequence_utils
+#from mapping.sequence_utils.annotate_HXB2 import load_HXB2
+
+#import Bio.SeqIO as SeqIO
+#from mapping.adapter_info import load_adapter_table, foldername_adapter
+#def consensus_file(data_folder, adaID, fragment):
+#    return data_folder+foldername_adapter(adaID)+'consensus_'+fragment+'.fasta'
+#data_folder = '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run28_test_samples/'
+#adaIDs = load_adapter_table(data_folder)['ID']
+#fragments = ['F'+str(i) for i in xrange(1, 7)]
+#for adaID in adaIDs:
+#    for fragment in fragments:
+#        fn = consensus_file(data_folder, adaID, fragment)
+#        seq = SeqIO.read(fn, 'fasta')
+#        print seq.name
+#        #seq.name = seq.id = 'adaID_'+'{:02}'.format(adaID)+'_'+seq.id+'_consensus'
+#        #with open(fn, 'w') as f:
+#        #    SeqIO.write(seq, f, 'fasta')
+#
+#
+
