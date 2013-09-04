@@ -12,11 +12,13 @@ from mapping.adapter_info import foldername_adapter
 
 
 # Functions
-def get_consensus_filename(data_folder, adaID, fragment):
+def get_consensus_filename(data_folder, adaID, fragment, subsample=False):
     '''Find the filename of the final consensus'''
     filename = 'consensus_'+fragment+'.fasta'
-    filename = data_folder+foldername_adapter(adaID)+filename
-    return filename
+    filename = foldername_adapter(adaID)+filename
+    if subsample:
+        filename = 'subsample/'+filename
+    return data_folder+filename
 
 
 def get_last_consensus_number(data_folder, adaID):
@@ -160,3 +162,21 @@ def get_premapped_file(data_folder, adaID, type='bam', subsample=False):
         filename = 'subsample/'+filename
     return data_folder+filename
 
+
+def get_mapped_filename(data_folder, adaID, fragment, type='bam', subsample=False,
+                        bwa=False):
+    '''Get the filename of the mapped reads onto consensus'''
+    filename = fragment
+    if bwa:
+        filename = filename + '_bwa'
+    if type == 'sam':
+        filename = filename + '.sam'
+    elif type == 'bam':
+        filename = filename + '.bam'
+    else:
+        raise ValueError('Type of mapped reads file not recognized')
+    filename = 'mapped/'+filename
+    filename = foldername_adapter(adaID)+filename
+    if subsample:
+        filename = 'subsample/'+filename
+    return data_folder+filename

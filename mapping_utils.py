@@ -7,6 +7,7 @@ content:    Settings of stampy used by our mapping scripts.
 # Globals
 stampy_bin = '/ebio/ag-neher/share/programs/bundles/stampy-1.0.22/stampy.py'
 subsrate = '0.05'
+bwa_bin = '/ebio/ag-neher/share/programs/bin/bwa'
 
 
 
