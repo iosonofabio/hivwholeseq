@@ -50,9 +50,13 @@ if __name__ == '__main__':
     seq_cropped.id = seq_cropped.name = seq.name+'_cropped_F1_F6'
     seq_cropped.description = seq.description+' (cropped to fragments F1-F6)'
 
+    # Make output folder if necessary
+    dirname = os.path.dirname(get_HXB2_entire(data_folder))
+    if not os.path.isdir(dirname):
+        os.mkdir(dirname)
+
     # Write to file both the entire, the cropped, and the fragmented (in separated files)
     SeqIO.write(seq, get_HXB2_entire(data_folder), 'fasta')
     SeqIO.write(seq_cropped, get_HXB2_entire(data_folder, cropped=True), 'fasta')
     for frag_seq, fragment in izip(frag_seqs, ('F'+str(i) for i in xrange(1, 7))):
         SeqIO.write(frag_seq, get_HXB2_fragmented(data_folder, fragment), 'fasta')
-

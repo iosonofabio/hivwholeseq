@@ -12,15 +12,8 @@ content:    Map a subsample to HXB2 first, then build a consensus, then map
             Note that mismapping is a serious problem for us, so maximal care
             must be taken here.
 
-            Note: this script forks in a tree-like fashion. The first call might
-            refer to a single adapter ID, in which case the script controls one
-            single child, the stampy process, and waits until that's done. This
-            script might also get called for all adapter IDs, in which case it
-            proceeds linearly to produce hash files of HXB2, then forks into
-            subprocesses, each of which tends to its own stampy child. This is
-            not most efficient in terms of cluster jobs, but much easier to
-            control and debug than a single master script (unless we wait for all
-            IDs to finish at each iteration).
+            Note: this script can call itself in a parallel fashion with the
+            flag --submit as a cluster job.
 '''
 # Modules
 import os
@@ -71,173 +64,132 @@ interval_check = 10
 
 
 # Functions
-def get_ref_file(data_folder, adaID=0, refname='HXB2', fragment='F0'):
+def get_ref_file(data_folder, adaID, fragment, n_iter, ext=True):
     '''Get the reference filename'''
-    if refname == 'HXB2':
+    if n_iter == 0:
         fn = get_HXB2_fragmented(data_folder, fragment=fragment)
+        if not ext:
+            # Strip the '.fasta' part
+            fn = fn[:-6]
     else:
-        fn = refname+'_'+fragment+'.fasta'
+        fn = '_'.join(['consensus', str(n_iter-1), fragment])
         fn = data_folder+'subsample/'+foldername_adapter(adaID)+'map_iter/'+fn
+        if ext:
+            fn = fn+'.fasta'
     return fn
 
 
-def get_index_file(data_folder, adaID=0, refname='HXB2', fragment='F0', ext=True):
+def get_index_file(data_folder, adaID, fragment, n_iter, ext=True):
     '''Get the index filename, with or w/o extension'''
-    if refname == 'HXB2':
+    if n_iter == 0:
         return get_HXB2_index_file(data_folder, fragment, ext=ext)
     else:
-        fn = refname+'_'+fragment
-        fn = data_folder+'subsample/'+foldername_adapter(adaID)+'map_iter/'+fn
+        fn = get_ref_file(data_folder, adaID, fragment, n_iter, ext=False)
         if ext:
             fn = fn+'.stidx'
         return fn
 
 
-def get_hash_file(data_folder, adaID, refname='HXB2', fragment='F0', ext=True):
+def get_hash_file(data_folder, adaID, fragment, n_iter, ext=True):
     '''Get the index filename, with or w/o extension'''
-    if refname == 'HXB2':
+    if n_iter == 0:
         return get_HXB2_hash_file(data_folder, fragment, ext=ext)
     else:
-        fn = refname+'_'+fragment
-        fn = data_folder+'subsample/'+foldername_adapter(adaID)+'map_iter/'+fn
+        fn = get_ref_file(data_folder, adaID, fragment, n_iter, ext=False)
         if ext:
             fn = fn+'.sthash'
         return fn
 
 
-def get_sam_file(data_folder, adaID, refname, fragment):
-    '''Get the mapped SAM filename'''
-    filename = 'mapped_to_'+refname+'_'+fragment+'.sam'
-    return data_folder+'subsample/'+foldername_adapter(adaID)+'map_iter/'+filename
-
-
-def get_bam_file(data_folder, adaID, refname, fragment):
-    '''Get the mapped BAM filename'''
-    filename = 'mapped_to_'+refname+'_'+fragment+'.bam'
-    return data_folder+'subsample/'+foldername_adapter(adaID)+'map_iter/'+filename
-
-
-def get_iteration(refname):
-    '''Find the iteration number'''
-    if refname == 'HXB2':
-        return -1
-    try:
-        refnum = int(refname.split('_')[-1])
-    except ValueError:
-        raise ValueError('Reference not understood')
-    return refnum
-
-
-def transform_reference(reference):
-    '''Add some text to the reference without affecting the command line'''
-    if reference == 'HXB2':
-        return reference
-
-    if (len(reference) < 2) or (reference[0] != 'c'):
-        raise ValueError('Reference not understood')
-    try:
-        refnum = int(reference[1:])
-    except ValueError:
-        raise ValueError('Reference not understood')
-
-    return 'consensus_'+str(refnum)
-
-
-def detransform_reference(refname):
-    '''Delete some test from reference'''
-    if refname == 'HXB2':
-        return refname
-    refnum = get_iteration(refname)
-    return 'c'+str(refnum)
-
-
-def next_refname(refname, shortversion=False):
-    '''Find the next reference'''
-    refnum = get_iteration(refname)
-    nextref = 'c'+str(refnum+1)
-    if shortversion:
-        return nextref
+def get_mapped_filename(data_folder, adaID, fragment, n_iter, type='bam'):
+    '''Get the mapped filenames'''
+    filename = 'mapped_to_'
+    if n_iter == 0:
+        filename = filename + 'HXB2'
     else:
-        return transform_reference(nextref)
+        filename = filename + 'consensus_'+str(n_iter - 1)
+    filename = filename+'_'+fragment
+    if type == 'sam':
+        filename = filename + '.sam'
+    elif type == 'bam':
+        filename = filename + '.bam'
+    else:
+        raise ValueError('Type of mapped reads file not recognized')
+ 
+    return data_folder+'subsample/'+foldername_adapter(adaID)+'map_iter/'+filename
 
 
-def make_index_and_hash(data_folder, refname, adaID=0, fragment='F0'):
+def make_index_and_hash(data_folder, adaID, fragment, n_iter, VERBOSE=0):
     '''Make index and hash files for reference or consensus'''
+    if VERBOSE:
+        print 'Build stampy hashes: '+'{:02d}'.format(adaID)+' '+fragment\
+                +' iteration '+str(n_iter)
+
+    # Make folder if necessary
+    dirname = os.path.dirname(get_index_file(data_folder, adaID, fragment, n_iter))
+    if not os.path.isdir(dirname):
+        os.mkdir(dirname)
+
     # 1. Make genome index file for 6 fragments (chromosomes)
-    if not os.path.isfile(get_index_file(data_folder, adaID, refname, fragment, ext=True)):
-        if VERBOSE:
-            print 'Make '+refname+' '+fragment+' index'
+    if not os.path.isfile(get_index_file(data_folder, adaID, fragment, n_iter, ext=True)):
         sp.call([stampy_bin,
-                 '--species="HIV fragment '+fragment+'"',
-                 '-G', get_index_file(data_folder, adaID, refname, fragment, ext=False),
-                 get_ref_file(data_folder, adaID, refname, fragment),
+                 '--species="HIV adaID '+'{:02d}'.format(adaID)+' fragment '+fragment+'"',
+                 '-G', get_index_file(data_folder, adaID, fragment, n_iter, ext=False),
+                 get_ref_file(data_folder, adaID, fragment, n_iter),
                  ])
     
     # 2. Build a hash file for 6 fragments
-    if not os.path.isfile(get_hash_file(data_folder, adaID, refname, fragment, ext=True)):
-        if VERBOSE:
-            print 'Make '+refname+' '+fragment+' hash'
+    if not os.path.isfile(get_hash_file(data_folder, adaID, fragment, n_iter, ext=True)):
         sp.call([stampy_bin,
-                 '-g', get_index_file(data_folder, adaID, refname, fragment, ext=False),
-                 '-H', get_hash_file(data_folder, adaID, refname, fragment, ext=False),
+                 '-g', get_index_file(data_folder, adaID, fragment, n_iter, ext=False),
+                 '-H', get_hash_file(data_folder, adaID, fragment, n_iter, ext=False),
                  ])
 
 
-def call_stampy_for_mapping(data_folder, refname, adaID, fragment, VERBOSE=1):
-    '''Call stampy for actual mapping'''
+def map_stampy(data_folder, adaID, fragment, n_iter, VERBOSE=0):
+    '''Map using stampy'''
     if VERBOSE:
-        print 'Map adaID '+str(adaID)+' '+fragment+' to '+refname
-    
-    # Stampy command line
-    read_filenames = get_read_filenames(data_folder, adaID,
-                                        subsample=True,
-                                        premapped=True,
-                                        fragment=fragment)
+        print 'Map via stampy: '+'{:02d}'.format(adaID)+' '+fragment\
+                +' iteration '+str(n_iter)
 
-    # Note: no --solexa option as of 2013 (illumina v1.8)
-    qsub_list = ['qsub','-cwd',
-                 '-o', JOBLOGOUT,
-                 '-e', JOBLOGERR,
-                 '-N', 'spy '+'{:02d}'.format(adaID)+' '+fragment,
-                 '-l', 'h_rt='+cluster_time,
-                 '-l', 'h_vmem='+vmem,
-                 stampy_bin,
-                 '-g', get_index_file(data_folder, adaID, refname, fragment, ext=False),
-                 '-h', get_hash_file(data_folder, adaID, refname, fragment, ext=False), 
-                 '-o', get_sam_file(data_folder, adaID, refname, fragment),
+    read_filenames = get_read_filenames(data_folder, adaID, subsample=True,
+                                        premapped=True, fragment=fragment)
+
+    mapped_filename = get_mapped_filename(data_folder, adaID, fragment,
+                                          n_iter, type='sam')
+
+    # Make folder if necessary
+    dirname = os.path.dirname(mapped_filename)
+    if not os.path.isdir(dirname):
+        os.mkdir(dirname)
+
+    # Map
+    call_list = [stampy_bin,
+                 '-g', get_index_file(data_folder, adaID, fragment,
+                                      n_iter, ext=False),
+                 '-h', get_hash_file(data_folder, adaID, fragment,
+                                     n_iter, ext=False), 
+                 '-o', mapped_filename,
                  '--substitutionrate='+subsrate,
                  '-M'] + read_filenames
-    qsub_list = map(str,qsub_list)
-    if VERBOSE:
-        print ' '.join(qsub_list)
-
-    # Call stampy and check output
-    qsub_output = sp.check_output(qsub_list).rstrip('\n')
-    if VERBOSE:
-        print qsub_output
-    jobID = qsub_output.split(' ')[2]
-    if VERBOSE:
-        print jobID
-
-    return jobID
+    if VERBOSE >=2:
+        print ' '.join(call_list)
+    sp.call(call_list)
 
 
-def fork_self(data_folder, refname, adaID, fragment, stage=3, iterations_max=0,
-              VERBOSE=3):
+def fork_self(data_folder, adaID, fragment, iterations_max=0, VERBOSE=0):
     '''Fork self for each adapter ID and fragment'''
     qsub_list = ['qsub','-cwd',
                  '-b', 'y',
                  '-S', '/bin/bash',
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
-                 '-N', 'map '+'{:02d}'.format(adaID)+' '+fragment,
+                 '-N', 'mit '+'{:02d}'.format(adaID)+' '+fragment,
                  '-l', 'h_rt='+cluster_time,
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
                  '--adaID', adaID,
                  '--fragment', fragment,
-                '--reference', detransform_reference(refname),
-                 '--stage', stage,
                  '--verbose', VERBOSE,
                  '--iterations', iterations_max,
                 ]
@@ -247,30 +199,27 @@ def fork_self(data_folder, refname, adaID, fragment, stage=3, iterations_max=0,
     sp.call(qsub_list)
 
 
-def make_consensus(data_folder, refname, adaID, fragment):
+def make_consensus(data_folder, adaID, fragment, n_iter, VERBOSE=0):
     '''Make consensus sequence from the mapped reads'''
     if VERBOSE:
-        print 'Building consensus after mapping against '+refname
+        print 'Build consensus: '+'{:02d}'.format(adaID)+' '+fragment\
+                +' iteration '+str(n_iter)
     
+    # Read reference
+    reffilename = get_ref_file(data_folder, adaID, fragment, n_iter)
+    refseq = SeqIO.read(reffilename, 'fasta')
+    ref = np.array(refseq)
+    
+    # Allele counts and inserts
+    counts = np.zeros((len(read_types), len(alpha), len(ref)), int)
+    inserts = [defaultdict(int) for k in read_types]
+
     # Open BAM file
-    bamfilename = get_bam_file(data_folder, adaID, refname, fragment)
+    bamfilename = get_mapped_filename(data_folder, adaID, fragment, n_iter)
     if not os.path.isfile(bamfilename):
         convert_sam_to_bam(bamfilename)
     with pysam.Samfile(bamfilename, 'rb') as bamfile:
-    
-        # Chromosome list
-        chromosomes = bamfile.references
-        
-        # Read reference (fragmented)
-        refseq = SeqIO.read(get_ref_file(data_folder, adaID, refname, fragment),
-                            'fasta')
-        ref = np.array(refseq)
-        
-        # Allele counts and inserts
-        counts = np.zeros((len(read_types), len(alpha), len(ref)), int)
-        inserts = [defaultdict(int) for k in read_types]
 
-        # Count alleles
         # Iterate over pairs of reads
         for i_pairs, reads in enumerate(pair_generator(bamfile)):
 
@@ -408,7 +357,7 @@ def make_consensus(data_folder, refname, adaID, fragment):
             pos_pre = max(0, k[0]-1)
             pos_post = min(len(refseq), k[0]+1)
             if pos_post <= pos_pre:
-                print chromosome, pos_pre, pos_post, k, len(refseq), counts[js, :, pos_pre:pos_post].sum(axis=0)
+                print 'Strange insert:', pos_pre, pos_post, k, len(refseq), counts[js, :, pos_pre:pos_post].sum(axis=0)
             threshold = 0.5 * counts[js, :, pos_pre:pos_post].sum(axis=0).mean()
             if (i > 10) and (i > threshold):
                 insert_consensus.append(k)
@@ -490,7 +439,7 @@ def check_new_old_consensi(refseq, consensus):
     return match
 
 
-def write_consensus(data_folder, refname, adaID, fragment, consensus, final=False):
+def write_consensus(data_folder, adaID, fragment, n_iter, consensus, final=False):
     '''Write consensus sequences into FASTA'''
     name = 'adaID_'+'{:02d}'.format(adaID)+'_'+fragment+'_consensus'
     consensusseq = SeqRecord(Seq(consensus),
@@ -498,8 +447,10 @@ def write_consensus(data_folder, refname, adaID, fragment, consensus, final=Fals
     if final:
         outfile = get_consensus_filename(data_folder, adaID, fragment)
     else:
-        outfile = get_ref_file(data_folder, adaID, next_refname(refname), fragment)
+        outfile = get_ref_file(data_folder, adaID, fragment, n_iter+1)
     SeqIO.write(consensusseq, outfile, 'fasta')
+             
+
 
 
 
@@ -508,204 +459,91 @@ if __name__ == '__main__':
 
     # Parse input args: this is used to call itself recursively
     parser = argparse.ArgumentParser(description='Map HIV reads recursively')
-    parser.add_argument('--stage', metavar='N', type=int, nargs='?',
-                        default=1,
-                        help=('1: initialize, 2: map, 3: build consensus'))
     parser.add_argument('--adaID', metavar='00', type=int, nargs='?',
                         default=0,
                         help='Adapter ID sample to map')
     parser.add_argument('--fragment', metavar='F0', nargs='?',
                         default='F0',
                         help='Fragment to map (F1-F6)')
-    parser.add_argument('--reference', metavar='REF', default='HXB2',
-                        help=('What reference to use for mapping/consensus '+
-                              'building:\n'+
-                              '- HXB2: use that reference\n'+
-                              '- c0: use the raw consensus\n'+
-                              '- c1: use the 1st refined consensus\n'+
-                              '- etc.'))
     parser.add_argument('--iterations', type=int, default=0,
                         help=('Maximal number of map/consensus iterations'))
     parser.add_argument('--verbose', type=int, default=0,
                         help=('Verbosity level [0-3]'))
+    parser.add_argument('--submit', action='store_true',
+                        help='Execute the script in parallel on the cluster')
 
     args = parser.parse_args()
-    stage = args.stage
     adaID = args.adaID
     fragment = args.fragment
-    refname = transform_reference(args.reference)
     iterations_max = args.iterations
     VERBOSE = args.verbose
+    submit = args.submit
 
-    # MAIN RECURSION LOOP (IT'S BROKEN AT THE END OF THE SCRIPT)
-    # Note: exceptions also stop the loop.
-    done = False
-    while not done:
-    
-        ###########################################################################
-        # 1. PREPARE HXB2 OR CONSENSUS FOR MAPPING
-        ###########################################################################
-        if stage == 1:
+    # If the script is called with no adaID, iterate over all
+    if adaID == 0:
+        adaIDs = load_adapter_table(data_folder)['ID']
+    else:
+        adaIDs = [adaID]
+    if VERBOSE >= 3:
+        print 'adaIDs', adaIDs
 
-            if VERBOSE >= 2:
-                print str(get_iteration(refname))+': entered stage 1...'
+    # If the script is called with no fragment, iterate over all
+    if fragment == 'F0':
+        fragments = ['F'+str(i) for i in xrange(1, 7)]
+    else:
+        fragments = [fragment]
+    if VERBOSE >= 3:
+        print 'fragments', fragments
 
-            # Make index and hash files out of reference/consensus sequence
-            if fragment == 'F0':
-                fragments = ['F'+str(i) for i in xrange(1, 7)]
+    # Iterate over all requested samples
+    for frag in fragments:
+
+        # Make hashes for the reference, they are shared across adaIDs
+        make_index_and_hash(data_folder, adaID, frag, 0, VERBOSE=VERBOSE)
+
+        for adaID in adaIDs:
+
+            # Submit to the cluster self if requested
+            if submit:
+                fork_self(data_folder, adaID, frag, iterations_max, VERBOSE=VERBOSE)
+
             else:
-                fragments = [fragment]
-            for frag in fragments:
-                make_index_and_hash(data_folder, refname, adaID, frag)
 
-            # This was easy, move to the mapping part
-            stage = 2
+                # Iterate the consensus building until convergence
+                n_iter = 0
+                done = False
+                while not done:
+                
+                    # Make hashes of consensus (the reference is hashed earlier)
+                    if (n_iter > 0):
+                        make_index_and_hash(data_folder, adaID, frag, n_iter, VERBOSE=VERBOSE)
 
-            if VERBOSE >= 2:
-                print 'Exit stage 1.'
-    
-        ###########################################################################
-        # 2. MAP AGAINST HXB2 OR CONSENSUS
-        ###########################################################################
-        if stage == 2:
+                    # Map against reference or consensus
+                    map_stampy(data_folder, adaID, frag, n_iter, VERBOSE=VERBOSE)
 
-            if VERBOSE >= 2:
-                print str(get_iteration(refname))+': entered stage 2...'
-    
-            # If the script is called with no adaID, make it a master script for all
-            # adapters: otherwise, keep it a master script for its own stampy only
-            if adaID == 0:
-                adaIDs = load_adapter_table(data_folder)['ID']
-            else:
-                adaIDs = [adaID]
-            if VERBOSE >= 3:
-                print 'adaIDs', adaIDs
+                    # Build consensus
+                    refseq, consensus = make_consensus(data_folder, adaID, fragment, n_iter, VERBOSE=VERBOSE)
 
-            # If the script is called with no fragment, make it a master script for
-            # all fragments
-            if fragment == 'F0':
-                fragments = ['F'+str(i) for i in xrange(1, 7)]
-            else:
-                fragments = [fragment]
-            if VERBOSE >= 3:
-                print 'fragments', fragments
+                    # Save consensus to file
+                    write_consensus(data_folder, adaID, fragment, n_iter, consensus, final=False)
 
-            # Make folders for premapped reads if necessary
-            for adaID in adaIDs:
-                dirname =  os.path.dirname(get_sam_file(data_folder, adaID,
-                                                        refname, 'F0'))
-                if not os.path.isdir(dirname):
-                    os.mkdir(dirname)
+                    # Check whether the old and new consensi match
+                    match = check_new_old_consensi(refseq, consensus)
 
-            # Call stampy for mapping and get the jobIDs
-            jobIDs = []
-            for adaID in adaIDs:
-                jobIDa = []
-                for frag in fragments:
-                    jobID = call_stampy_for_mapping(data_folder, refname,
-                                                    adaID, frag, VERBOSE=VERBOSE)
-                    jobIDa.append(jobID)
-                jobIDs.append(jobIDa)
-            jobIDs = np.array(jobIDs, 'S20', ndmin=2)
-            if VERBOSE >= 3:
-                print 'jobIDs', jobIDs
+                    # Start a new round
+                    if (not match) and (n_iter + 1 < iterations_max):
+                            n_iter += 1
+                            if VERBOSE:
+                                print 'Starting again for iteration '+str(n_iter) 
 
-            # Give the cluster a few seconds to notice the presence of the jobs
-            time.sleep(3)
+                    # or terminate
+                    else:
+                        write_consensus(data_folder, adaID, fragment, n_iter, consensus, final=True)
+                        done = True
 
-            # Wait for all stampy children to finish, then either proceed to
-            # consensus building (if only one child is left) or fork an instance
-            # of self to that stage 3
-            mapping_is_done = np.zeros_like(jobIDs, bool)
-            while not mapping_is_done.all():
-                if VERBOSE >= 2:
-                    print 'Mapping progress: '
-                    for ifr, frag in enumerate(fragments):
-                        print frag,
-                    print
-                    for ia, adaID in enumerate(adaIDs):
-                        for ifr, frag in enumerate(fragments):
-                            print '{:2d}'.format(int(mapping_is_done[ia, ifr])),
-                        print
-
-                # Wait for some time for stampy to map
-                time.sleep(interval_check)
-        
-                # Ask qstat about our stampy jobs
-                qstat_output = sp.check_output(['qstat'])
-                if VERBOSE >= 3:
-                    print qstat_output
-
-                # Check all unfinished mappings
-                for ia, adaID in enumerate(adaIDs):
-                    for ifr, frag in enumerate(fragments):
-                        if mapping_is_done[ia, ifr]:
-                            continue
-
-                        # If that mapping is done, proceed to consensus building
-                        # FIXME: this check is rather lousy
-                        is_in_qstat_output = jobIDs[ia, ifr] in qstat_output
-                        if not is_in_qstat_output:
-                            mapping_is_done[ia, ifr] = True
-
-                            # Fork self to a child unless there is only one process
-                            if (len(adaIDs) > 1) or (len(fragments) > 1):
-                                fork_self(data_folder, refname,
-                                          adaID, frag,
-                                          stage=3,
-                                          iterations_max=iterations_max,
-                                          VERBOSE=VERBOSE)
-
-                                # Kill this job at the end of the forking
-                                done = True
-
+                        if VERBOSE:
+                            if match:
+                                print 'Consensus converged.' 
                             else:
-                                stage = 3
-
-            if VERBOSE >= 2:
-                print 'Exit stage 2.'
-
-        ###########################################################################
-        # 3. MAKE CONSENSUS AFTER MAPPING
-        ###########################################################################
-        if stage == 3:
-
-            if VERBOSE >= 2:
-                print (str(adaID)+', '+
-                       str(fragment)+', '+
-                       str(get_iteration(refname))+': entered stage 3...')
-
-            # We should never be here unless with a single fragment of a single
-            # adapterID
-            if adaID == 0 or fragment == 'F0':
-                raise ValueError('Stage 3 can only be executed for a single \
-                                 fragment and adapterID.')
-
-            # Make consensus
-            refseq, consensus = make_consensus(data_folder, refname, adaID, fragment)
-
-            # Check whether the old and new consensi match
-            match = check_new_old_consensi(refseq, consensus)
-            if match:
-                print 'Consensus converged.'
-                write_consensus(data_folder, refname, adaID, fragment, consensus, final=True)
-                done = True
-
-            else:
-                # Save consensi to file
-                write_consensus(data_folder, refname, adaID, fragment, consensus)
-
-                # Check whether we are at the max number of iterations
-                if (get_iteration(refname) + 1 >= iterations_max):
-                    print 'Maximal number of iterations reached.'
-
-                    write_consensus(data_folder, refname, adaID, fragment, consensus, final=True)
-                    done = True
-                else:
-                    if VERBOSE:
-                        print 'Starting again for iteration '+str(get_iteration(refname)+1)
-                    refname = next_refname(refname)
-                    stage = 1
-
-            if VERBOSE >= 2:
-                print 'Exit stage 3.'
+                                print 'Maximal number of iterations reached.'
+                        

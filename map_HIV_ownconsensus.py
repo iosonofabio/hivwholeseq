@@ -167,19 +167,20 @@ def map_stampy_after_bwa(data_folder, adaID, fragment, subsample=False, VERBOSE=
 
     mapped_filename = get_mapped_filename(data_folder, adaID, fragment,
                                           type='sam', subsample=subsample)
-    if VERBOSE >= 2:
-        print 'Mapping...'
-    sp.call([stampy_bin,
-             '-g', get_index_file(data_folder, adaID, fragment,
-                                  subsample=subsample, ext=False),
-             '-h', get_hash_file(data_folder, adaID, fragment,
-                                 subsample=subsample, ext=False), 
-             '-o', mapped_filename,
-             '--substitutionrate='+subsrate,
-             '--bamkeepgoodreads',
-             '-M', bwa_filename])
-    if VERBOSE >= 2:
-        print 'done.'
+    # Map
+    call_list = [stampy_bin,
+                 '-g', get_index_file(data_folder, adaID, fragment,
+                                      subsample=subsample, ext=False),
+                 '-h', get_hash_file(data_folder, adaID, fragment,
+                                     subsample=subsample, ext=False), 
+                 '-o', mapped_filename,
+                 '--substitutionrate='+subsrate,
+                 '--bamkeepgoodreads',
+                 '-M', bwa_filename]
+    if VERBOSE >=2:
+        print ' '.join(call_list)
+    sp.call(call_list)
+
              
 
 def fork_self(data_folder, adaID, fragment, subsample=False, VERBOSE=3):

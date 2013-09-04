@@ -104,7 +104,7 @@ def get_HXB2_index_file(data_folder, fragment='F0', ext=True):
     filename = 'HXB2'
     if fragment != 'F0':
         filename = filename+'_'+fragment
-    filename = data_folder+'reference/'+filename
+    filename = data_folder+'reference/hash/'+filename
     if ext:
         filename = filename+'.stidx'
     return filename
@@ -115,7 +115,7 @@ def get_HXB2_hash_file(data_folder, fragment='F0', ext=True):
     filename = 'HXB2'
     if fragment != 'F0':
         filename = filename+'_'+fragment
-    filename = data_folder+'reference/'+filename
+    filename = data_folder+'reference/hash/'+filename
     if ext:
         filename = filename+'.sthash'
     return filename
