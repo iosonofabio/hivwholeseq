@@ -191,7 +191,7 @@ def fork_self(data_folder, adaID, VERBOSE=0, subsample=False):
                  '-S', '/bin/bash',
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
-                 '-N', 'premap_'+'{:02d}'.format(adaID),
+                 '-N', 'divide '+'{:02d}'.format(adaID),
                  '-l', 'h_rt='+cluster_time,
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,

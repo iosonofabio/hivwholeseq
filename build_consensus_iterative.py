@@ -56,7 +56,7 @@ import mapping
 JOBDIR = mapping.__path__[0].rstrip('/')+'/'
 JOBLOGERR = JOBDIR+'logerr'
 JOBLOGOUT = JOBDIR+'logout'
-JOBSCRIPT = JOBDIR+'mapping_subsample_recursive.py'
+JOBSCRIPT = JOBDIR+'build_consensus_iterative.py'
 cluster_time = '0:59:59'
 vmem = '8G'
 interval_check = 10
@@ -184,7 +184,7 @@ def fork_self(data_folder, adaID, fragment, iterations_max=0, VERBOSE=0):
                  '-S', '/bin/bash',
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
-                 '-N', 'mit '+'{:02d}'.format(adaID)+' '+fragment,
+                 '-N', 'bci '+'{:02d}'.format(adaID)+' '+fragment,
                  '-l', 'h_rt='+cluster_time,
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
@@ -467,7 +467,7 @@ if __name__ == '__main__':
                         help='Fragment to map (F1-F6)')
     parser.add_argument('--iterations', type=int, default=0,
                         help=('Maximal number of map/consensus iterations'))
-    parser.add_argument('--verbose', type=int, default=0,
+    parser.add_argument('--verbose', type=int, default=5,
                         help=('Verbosity level [0-3]'))
     parser.add_argument('--submit', action='store_true',
                         help='Execute the script in parallel on the cluster')

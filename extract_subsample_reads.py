@@ -72,8 +72,19 @@ def extract_subsample(data_folder, adaID, n_reads, VERBOSE=0, filtered=True):
     read_filenames = get_read_filenames(data_folder, adaID, subsample=False,
                                         filtered=filtered)
 
-    # Get the random indices of the reads to store (between 50k and 500k only)
-    ind_store = np.arange(50000, 500000)
+    # Count the number of reads
+    if VERBOSE >= 2:
+        print 'Counting the number of reads...',
+        sys.stdout.flush()
+    with open(read_filenames[0], 'r') as fh1:
+        n_reads_tot = sum(1 for _ in FGI(fh1))
+    if VERBOSE >= 2:
+        print n_reads_tot
+        sys.stdout.flush()
+
+    # Get the random indices of the reads to store
+    # (only from the middle of the file)
+    ind_store = np.arange(int(0.2 * n_reads_tot), int(0.8 * n_reads_tot))
     np.random.shuffle(ind_store)
     ind_store = ind_store[:n_reads]
     ind_store.sort()
