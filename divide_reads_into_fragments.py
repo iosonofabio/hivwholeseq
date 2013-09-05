@@ -51,7 +51,6 @@ JOBDIR = mapping.__path__[0].rstrip('/')+'/'
 JOBLOGERR = JOBDIR+'logerr'
 JOBLOGOUT = JOBDIR+'logout'
 JOBSCRIPT = JOBDIR+'divide_reads_into_fragments.py'
-interval_check = 10
 cluster_time = '0:59:59'
 vmem = '8G'
 
