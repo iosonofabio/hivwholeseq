@@ -21,7 +21,7 @@ import scipy as sp
 import matplotlib.pyplot as plt
 
 from mapping.filenames import get_raw_read_files
-from adapter_info import adapters_LT, adapters_table_file
+from adapter_info import adapters_LT, adapters_table_file, foldername_adapter
 
 
 # Globals
@@ -82,28 +82,24 @@ if __name__ == '__main__':
         adapters.add(adapter_string)
 
         # If the adapter does not match any know one, throw into wastebin folder
-        if adapter_string in adapters_used:
-            dirname = 'adapterID_'+'{:02d}'.format(adapters_used[adapter_string])+'/'
-        else:
+        if adapter_string not in adapters_used:
             dirname = 'unclassified_reads/'
-
-        # Create a subsample folder and split there the first reads for consensus building
-        if i < reads_subsample:
-            data_folders = [data_folder, data_folder_subsample]
-        elif i == reads_subsample:
-            print 'Subsample done!'
-            sys.stdout.flush()
         else:
-            data_folders = [data_folder]
+            adaID = adapters_used[adapter_string]
+            dirname = foldername_adapter(adaID)
 
-        # Create a folder for the adapter if not present
-        if dirname.rstrip('/') not in subdirs[data_folder]:
-            os.mkdir(data_folder+dirname)
-            with open(data_folder+adapters_table_file, 'a') as f:
-                f.write('\t'.join([adapter_string, str(adapters_used[adapter_string])])+'\n')
-            subdirs[data_folder].append(dirname.rstrip('/'))
-            if VERBOSE:
-                print 'Folder created:', data_folder+dirname
+            # Create a folder for the adapter if not present
+            if dirname.rstrip('/') not in subdirs:
+                os.mkdir(data_folder+dirname)
+
+                sample = dataset['samples'][dataset['adapters'].index(adaID)]
+                with open(data_folder+adapters_table_file, 'a') as f:
+                    f.write('\t'.join([adapter_string,
+                                       str(adaID),
+                                       sample])+'\n')
+                subdirs.append(dirname.rstrip('/'))
+                if VERBOSE:
+                    print 'Folder created:', data_folder+dirname
     
         # Write sequences (append to file)
         with open(data_folder+dirname+'read1.fastq', 'a') as fout:
@@ -113,6 +109,3 @@ if __name__ == '__main__':
         if 'adapterID' not in dirname:
             with open(data_folder+dirname+'adapter.fastq', 'a') as fout:
                 SeqIO.write(adapter, fout, 'fastq')
-    
-
-    # Note: the adapter table must be enriched of descriptions by hand afterwards
