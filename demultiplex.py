@@ -51,6 +51,17 @@ if __name__ == '__main__':
 
     # List of used adapters
     used_adapters = {adapters_LT[adaID]: adaID for adaID in dataset['adapters']}
+    for adaID in used_adapters.itervalues():
+            dirname = foldername_adapter(adaID)
+
+            # Make subdir if necessary
+            if not os.path.isdir(data_folder+dirname):
+                os.mkdir(data_folder+dirname)
+
+            # Add entry to the adapters table
+            sample = dataset['samples'][dataset['adapters'].index(adaID)]
+            with open(data_folder+adapters_table_file, 'a') as f:
+                f.write('\t'.join([adapter_string, str(adaID), sample])+'\n')
 
     # List of found subfolders
     g = os.walk(data_folder)
@@ -85,21 +96,7 @@ if __name__ == '__main__':
         if adapter_string not in adapters_used:
             dirname = 'unclassified_reads/'
         else:
-            adaID = adapters_used[adapter_string]
-            dirname = foldername_adapter(adaID)
-
-            # Create a folder for the adapter if not present
-            if dirname.rstrip('/') not in subdirs:
-                os.mkdir(data_folder+dirname)
-
-                sample = dataset['samples'][dataset['adapters'].index(adaID)]
-                with open(data_folder+adapters_table_file, 'a') as f:
-                    f.write('\t'.join([adapter_string,
-                                       str(adaID),
-                                       sample])+'\n')
-                subdirs.append(dirname.rstrip('/'))
-                if VERBOSE:
-                    print 'Folder created:', data_folder+dirname
+            dirname = foldername_adapter(adapters_used[adapter_string])
     
         # Write sequences (append to file)
         with open(data_folder+dirname+'read1.fastq', 'a') as fout:
