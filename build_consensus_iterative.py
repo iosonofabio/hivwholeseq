@@ -507,6 +507,7 @@ if __name__ == '__main__':
             if submit:
                 fork_self(data_folder, adaID, frag, iterations_max, VERBOSE=VERBOSE)
 
+            # or else, build the consensus
             else:
 
                 # Iterate the consensus building until convergence

@@ -147,15 +147,19 @@ def get_read_filenames(data_folder, adaID, subsample=False,
     return filenames
 
 
-def get_premapped_file(data_folder, adaID, type='bam', subsample=False):
+def get_premapped_file(data_folder, adaID, type='bam', subsample=False, bwa=False):
     '''Get the filename of the readed mapped to HXB2 to split into fragments'''
     filename = 'premapped_to_HXB2'
+    if bwa:
+        filename = filename + '_bwa'
+
     if type == 'sam':
         filename = filename + '.sam'
     elif type == 'bam':
         filename = filename + '.bam'
     else:
         raise ValueError('Type of mapped reads file not recognized')
+
     filename = 'premapped/'+filename
     filename = foldername_adapter(adaID)+filename
     if subsample:
@@ -164,11 +168,14 @@ def get_premapped_file(data_folder, adaID, type='bam', subsample=False):
 
 
 def get_mapped_filename(data_folder, adaID, fragment, type='bam', subsample=False,
-                        bwa=False):
+                        bwa=False, filtered=False):
     '''Get the filename of the mapped reads onto consensus'''
     filename = fragment
     if bwa:
         filename = filename + '_bwa'
+    if filtered:
+        filename = filename + '_filtered'
+
     if type == 'sam':
         filename = filename + '.sam'
     elif type == 'bam':

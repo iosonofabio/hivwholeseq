@@ -32,7 +32,7 @@ adapters_LT = {1: 'ATCACG',
                27: 'ATTCCT'}
 
 
-adapters_table_file = 'adapters_table.dat'
+adapters_table_file = 'table_adapters.dat'
 
 
 

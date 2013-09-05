@@ -29,7 +29,7 @@ data_folder = dataset['folder']
 # Cluster submit
 import mapping
 JOBDIR = mapping.__path__[0].rstrip('/')+'/'
-JOBSCRIPT = JOBDIR+'map_HIV_ownconsensus.py'
+JOBSCRIPT = JOBDIR+'map_to_consensus.py'
 JOBLOGERR = JOBDIR+'logerr'
 JOBLOGOUT = JOBDIR+'logout'
 # Different times based on subsample flag
