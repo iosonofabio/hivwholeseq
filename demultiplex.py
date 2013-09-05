@@ -9,90 +9,69 @@ content:    Demultiplex the FASTQ files we get into single adapter IDs (samples)
                 - R2 is adapter sequence
                 - R3 is read 2
             and the order of them is the same (we do not have to search around).
-
-            This script creates a folder for a subsample of the reads in parallel,
-            so that consensus building and preliminary mapping can be started
-            immediately without having to wait the full demultiplex.
 '''
 # Modules
 import os
 import sys
+import argparse
 from Bio import SeqIO
 from itertools import izip
 import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
 
+from mapping.filenames import get_raw_read_files
+from adapter_info import adapters_LT, adapters_table_file
 
 
 # Globals
-VERBOSE = 1
-reads_subsample = 100000
-data_folder = '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run28_test_samples/'
-datafile_read1 = data_folder+'lane1_NoIndex_L001_R1_001.fastq'
-datafile_adapter = data_folder+'lane1_NoIndex_L001_R2_001.fastq'
-datafile_read2 = data_folder+'lane1_NoIndex_L001_R3_001.fastq'
-adapters_used = {'CGATGT': 02,
-                 'TGACCA': 04,
-                 'CAGATC': 07,
-                 'CCGTCC': 16,
-                 'GTCCGC': 18,
-                 'GTGAAA': 19}
-adapters_table_file = 'adapters_table.dat'
-
-
-
-
-# Function
-def next_adapter(a1, adapters_used):
-    '''Look for an adapter close to the input sequence'''
-    a1 = np.array(list(a1), 'S1')
-    for a in adapters_used:
-        d = (a1 != np.array(list(a), 'S1')).sum()
-        if d <= 1:
-            return a
-    return None
-
+# FIXME
+from mapping.datasets import dataset_testmiseq as dataset
+data_folder = dataset['folder']
 
 
 
 # Script
 if __name__ == '__main__':
 
-    # FIXME: do better with input arguments and stuff (import helper modules, etc.)
+    # Parse input args
+    parser = argparse.ArgumentParser(description='Divide HIV reads into fragments')
+    parser.add_argument('--verbose', type=int, default=0,
+                        help='Verbosity level [0-3]')
 
-    # Initialize adapter table file
+    args = parser.parse_args()
+    VERBOSE = args.verbose
+
+    # Create adapter table file
     with open(data_folder+adapters_table_file, 'w') as f:
         f.write('\t'.join(['# adapter sequence', 'adapter ID'])+'\n')
     
     # List of found adapters
     adapters = set()
 
+    # List of used adapters
+    used_adapters = {adapters_LT[adaID]: adaID for adaID in dataset['adapters']}
+
     # List of found subfolders
     g = os.walk(data_folder)
-    subdirs = {data_folder: g.next()[1]}
-
-    # Subfolder for subsample
-    data_folder_subsample = data_folder+'subsample/'
-    if not os.path.isdir(data_folder_subsample):
-        os.mkdir(data_folder_subsample)
-    g = os.walk(data_folder_subsample)
-    subdirs[data_folder_subsample] = g.next()[1]
+    subdirs = g.next()[1]
 
     # Make a default directory for unclassified reads
-    for data_folder_x in [data_folder, data_folder_subsample]:
-        if 'unclassified_reads' not in subdirs:
-            os.mkdir(data_folder_x+'unclassified_reads')
-            subdirs[data_folder_x].append('unclassified_reads')
+    if 'unclassified_reads' not in subdirs:
+        os.mkdir(data_folder+'unclassified_reads')
+        subdirs.append('unclassified_reads')
 
-    # Prepare iterators
-    iter_read1 = SeqIO.parse(datafile_read1, 'fastq')
-    iter_adapter = SeqIO.parse(datafile_adapter, 'fastq')
-    iter_read2 = SeqIO.parse(datafile_read2, 'fastq')
-    iter_tot = izip(iter_read1, iter_adapter, iter_read2)
+    # Get the read filenames
+    data_filenames = get_raw_read_files(data_folder)
+    datafile_read1 = data_filenames['read1']
+    datafile_read2 = data_filenames['read2']
+    datafile_adapter = data_filenames['adapter']
 
     # Iterate over all reads
-    for i, (read1, adapter, read2) in enumerate(iter_tot):
+    iter_tot = izip(SeqIO.parse(datafile_read1, 'fastq'),
+                    SeqIO.parse(datafile_read2, 'fastq'),
+                    SeqIO.parse(datafile_adapter, 'fastq'))
+    for i, (read1, read2, adapter) in enumerate(iter_tot):
         
         # Print some output
         if VERBOSE and (not ((i + 1) % 1000)):
@@ -117,23 +96,23 @@ if __name__ == '__main__':
         else:
             data_folders = [data_folder]
 
-        for data_folder_x in data_folders:
+        # Create a folder for the adapter if not present
+        if dirname.rstrip('/') not in subdirs[data_folder]:
+            os.mkdir(data_folder+dirname)
+            with open(data_folder+adapters_table_file, 'a') as f:
+                f.write('\t'.join([adapter_string, str(adapters_used[adapter_string])])+'\n')
+            subdirs[data_folder].append(dirname.rstrip('/'))
+            if VERBOSE:
+                print 'Folder created:', data_folder+dirname
+    
+        # Write sequences (append to file)
+        with open(data_folder+dirname+'read1.fastq', 'a') as fout:
+            SeqIO.write(read1, fout, 'fastq')
+        with open(data_folder+dirname+'read2.fastq', 'a') as fout:
+            SeqIO.write(read2, fout, 'fastq')
+        if 'adapterID' not in dirname:
+            with open(data_folder+dirname+'adapter.fastq', 'a') as fout:
+                SeqIO.write(adapter, fout, 'fastq')
+    
 
-            # Create a folder for the adapter if not present
-            if dirname.rstrip('/') not in subdirs[data_folder_x]:
-                os.mkdir(data_folder_x+dirname)
-                with open(data_folder_x+adapters_table_file, 'a') as f:
-                    f.write('\t'.join([adapter_string, str(adapters_used[adapter_string])])+'\n')
-                subdirs[data_folder_x].append(dirname.rstrip('/'))
-                if VERBOSE:
-                    print 'Folder created:', data_folder_x+dirname
-    
-            # Write sequences (append to file)
-            with open(data_folder_x+dirname+'read1.fastq', 'a') as fout:
-                SeqIO.write(read1, fout, 'fastq')
-            with open(data_folder_x+dirname+'read2.fastq', 'a') as fout:
-                SeqIO.write(read2, fout, 'fastq')
-            if 'adapterID' not in dirname:
-                with open(data_folder_x+dirname+'adapter.fastq', 'a') as fout:
-                    SeqIO.write(adapter, fout, 'fastq')
-    
+    # Note: the adapter table must be enriched of descriptions by hand afterwards

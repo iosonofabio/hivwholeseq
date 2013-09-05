@@ -6,7 +6,7 @@ content:    Description module for our HIV datasets.
 '''
 # Globals
 dataset_testmiseq = {'description': 'Test run for the MiSeq and the PCR',
-                     'adapters': (02, 04, 07, 16, 18, 19),
+                     'adapters': (2, 4, 7, 16, 18, 19),
                      'samples': ('NL4-3', 'SF162', 'F10',
                                  'patient 37024',
                                  'MIX1 SF162 50% + NL4-3 50%',

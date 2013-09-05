@@ -187,3 +187,13 @@ def get_mapped_filename(data_folder, adaID, fragment, type='bam', subsample=Fals
     if subsample:
         filename = 'subsample/'+filename
     return data_folder+filename
+
+
+def get_raw_read_files(data_folder):
+    '''Get the raw files which we obtain from Joerg'''
+    datafile_read1 = data_folder+'lane1_NoIndex_L001_R1_001.fastq'
+    datafile_adapter = data_folder+'lane1_NoIndex_L001_R2_001.fastq'
+    datafile_read2 = data_folder+'lane1_NoIndex_L001_R3_001.fastq'
+    return {'read1': datafile_read1,
+            'read2': datafile_read2,
+            'adapter': datafile_adapter}
