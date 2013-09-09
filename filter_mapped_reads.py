@@ -18,9 +18,10 @@ from Bio import SeqIO
 
 # Horizontal import of modules from this folder
 from mapping.adapter_info import load_adapter_table, foldername_adapter
-from mapping.miseq import alpha, read_types, pair_generator
+from mapping.miseq import alpha, read_types
 from mapping.filenames import get_last_reference, get_last_mapped
-from mapping.mapping_utils import get_ind_good_cigars, convert_sam_to_bam
+from mapping.mapping_utils import get_ind_good_cigars, convert_sam_to_bam,\
+        pair_generator
 
 
 
@@ -60,8 +61,8 @@ def fork_self(data_folder, adaID, fragment, VERBOSE=0):
                  '-l', 'h_rt='+cluster_time,
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
-                 '--adaID', adaID,
-                 '--fragment', fragment,
+                 '--adaIDs', adaID,
+                 '--fragments', fragment,
                  '--verbose', VERBOSE,
                 ]
     qsub_list = map(str, qsub_list)
@@ -155,35 +156,29 @@ if __name__ == '__main__':
 
     # Input arguments
     parser = argparse.ArgumentParser(description='Extract linkage information')
-    parser.add_argument('--adaID', metavar='00', type=int,
-                        default=0,
-                        help='Adapter ID sample to analyze')
-    parser.add_argument('--fragment', metavar='F0', nargs='?',
-                        default='F0',
-                        help='Fragment to map (F1-F6)')
+    parser.add_argument('--adaIDs', nargs='*', type=int,
+                        help='Adapter IDs to analyze (e.g. 2 16)')
+    parser.add_argument('--fragments', nargs='*',
+                        help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('--verbose', type=int, default=0,
                         help=('Verbosity level [0-3]'))
     parser.add_argument('--submit', action='store_true', default=False,
                         help='Submit the job to the cluster via qsub')
     args = parser.parse_args()
-    adaID = args.adaID
-    fragment = args.fragment
+    adaIDs = args.adaIDs
+    fragments = args.fragments
     VERBOSE = args.verbose
     submit = args.submit
 
     # If the script is called with no adaID, iterate over all
-    if adaID == 0:
+    if not adaIDs:
         adaIDs = load_adapter_table(data_folder)['ID']
-    else:
-        adaIDs = [adaID]
     if VERBOSE >= 3:
         print 'adaIDs', adaIDs
 
     # If the script is called with no fragment, iterate over all
-    if fragment == 'F0':
+    if not fragments:
         fragments = ['F'+str(i) for i in xrange(1, 7)]
-    else:
-        fragments = [fragment]
     if VERBOSE >= 3:
         print 'fragments', fragments
 
@@ -194,10 +189,10 @@ if __name__ == '__main__':
             # Submit to the cluster self if requested
             if submit:
                 fork_self(data_folder, adaID, frag, VERBOSE=VERBOSE)
+                continue
 
             # or else, perform the filtering
-            else:
-                filter_reads(data_folder, adaID, fragment, VERBOSE=VERBOSE)
+            filter_reads(data_folder, adaID, fragment, VERBOSE=VERBOSE)
 
 
 

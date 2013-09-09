@@ -30,13 +30,13 @@ from Bio.Seq import reverse_complement
 
 # Horizontal import of modules from this folder
 from mapping.adapter_info import load_adapter_table, foldername_adapter
-from mapping.miseq import alpha, read_types, pair_generator
-from mapping.mapping_utils import stampy_bin, subsrate, bwa_bin
+from mapping.miseq import alpha, read_types
 from mapping.sequence_utils.annotate_HXB2 import load_HXB2
-from mapping.filenames import get_HXB2_entire, get_HXB2_index_file, get_HXB2_hash_file
-from mapping.filenames import get_read_filenames, get_premapped_file
-from mapping.mapping_utils import convert_sam_to_bam, get_read_start_end
-from mapping.mapping_utils import get_range_good_cigars
+from mapping.filenames import get_HXB2_entire, get_HXB2_index_file,\
+        get_HXB2_hash_file, get_read_filenames, get_premapped_file
+from mapping.mapping_utils import stampy_bin, subsrate, bwa_bin,\
+        convert_sam_to_bam, get_read_start_end, get_range_good_cigars,\
+        pair_generator
 
 
 
@@ -51,7 +51,7 @@ JOBDIR = mapping.__path__[0].rstrip('/')+'/'
 JOBLOGERR = JOBDIR+'logerr'
 JOBLOGOUT = JOBDIR+'logout'
 JOBSCRIPT = JOBDIR+'divide_reads_into_fragments.py'
-cluster_time = '0:59:59'
+cluster_time = ['23:59:59', '0:59:59']
 vmem = '8G'
 
 
@@ -192,10 +192,10 @@ def fork_self(data_folder, adaID, VERBOSE=0, subsample=False):
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
                  '-N', 'divide '+'{:02d}'.format(adaID),
-                 '-l', 'h_rt='+cluster_time,
+                 '-l', 'h_rt='+cluster_time[subsample],
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
-                 '--adaID', adaID,
+                 '--adaIDs', adaID,
                  '--verbose', VERBOSE,
                 ]
     if subsample:
@@ -356,9 +356,8 @@ if __name__ == '__main__':
 
     # Parse input args
     parser = argparse.ArgumentParser(description='Divide HIV reads into fragments')
-    parser.add_argument('--adaID', metavar='00', type=int, nargs='?',
-                        default=0,
-                        help='Adapter ID')
+    parser.add_argument('--adaIDs', nargs='*', type=int,
+                        help='Adapter IDs to analyze (e.g. 2 16)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
     parser.add_argument('--subsample', action='store_true',
@@ -369,17 +368,15 @@ if __name__ == '__main__':
                         help='Use BWA for premapping?')
 
     args = parser.parse_args()
-    adaID = args.adaID
+    adaIDs = args.adaIDs
     VERBOSE = args.verbose
     subsample = args.subsample
     submit = args.submit
     bwa = args.bwa
 
     # If the script is called with no adaID, iterate over all
-    if adaID == 0:
+    if not adaIDs:
         adaIDs = load_adapter_table(data_folder)['ID']
-    else:
-        adaIDs = [adaID]
 
     # Make index and hash files for HXB2, using a cropped reference to
     # reduce the problems of LTRs
@@ -393,19 +390,15 @@ if __name__ == '__main__':
         # Submit to the cluster self if requested
         if submit:
             fork_self(data_folder, adaID, VERBOSE=VERBOSE, subsample=subsample)
+            continue
 
-        # or else, divide into fragments
-        else:
+        # Map roughly to HXB2
+        if bwa:
+            premap_bwa(data_folder, adaID,
+                       VERBOSE=VERBOSE, subsample=subsample)
+        premap_stampy(data_folder, adaID,
+                      VERBOSE=VERBOSE, subsample=subsample, bwa=bwa)
 
-            # Map roughly to HXB2
-            if bwa:
-                premap_bwa(data_folder, adaID,
-                           VERBOSE=VERBOSE, subsample=subsample)
-            premap_stampy(data_folder, adaID,
-                          VERBOSE=VERBOSE, subsample=subsample, bwa=bwa)
-
-            # Divide into fragments and unclassified
-            divide_into_fragments(data_folder, adaID,
-                                  VERBOSE=VERBOSE, subsample=subsample)
-
-
+        # Divide into fragments and unclassified
+        divide_into_fragments(data_folder, adaID,
+                              VERBOSE=VERBOSE, subsample=subsample)

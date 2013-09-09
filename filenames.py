@@ -197,3 +197,13 @@ def get_raw_read_files(data_folder):
     return {'read1': datafile_read1,
             'read2': datafile_read2,
             'adapter': datafile_adapter}
+
+
+def get_read_unpaired_filename(data_folder, adaID, subsample=False):
+    '''Get the reads pairs for which one read is low quality'''
+    fn = 'reads_unpaired.fastq'
+    fn = foldername_adapter(adaID)+fn
+    if subsample:
+        fn = 'subsample/'+fn
+    fn = data_folder+fn
+    return fn

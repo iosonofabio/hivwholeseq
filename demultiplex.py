@@ -18,10 +18,10 @@ from Bio import SeqIO
 from itertools import izip
 import numpy as np
 import scipy as sp
-import matplotlib.pyplot as plt
+from Bio.SeqIO.QualityIO import FastqGeneralIterator as FGI
 
 from mapping.filenames import get_raw_read_files
-from adapter_info import adapters_LT, adapters_table_file, foldername_adapter
+from mapping.adapter_info import adapters_LT, adapters_table_file, foldername_adapter
 
 
 # Globals
@@ -78,31 +78,46 @@ if __name__ == '__main__':
     datafile_read2 = data_filenames['read2']
     datafile_adapter = data_filenames['adapter']
 
-    # Iterate over all reads
-    iter_tot = izip(SeqIO.parse(datafile_read1, 'fastq'),
-                    SeqIO.parse(datafile_read2, 'fastq'),
-                    SeqIO.parse(datafile_adapter, 'fastq'))
-    for i, (read1, read2, adapter) in enumerate(iter_tot):
-        
-        # Print some output
-        if VERBOSE and (not ((i + 1) % 1000)):
-            print i + 1
+    # Open output files
+    fouts = {adaID: (open(data_folder+foldername_adapter(adaID)+'read1.fastq', 'w'),
+                     open(data_folder+foldername_adapter(adaID)+'read2.fastq', 'w'))
+             for adaID in used_adapters.itervalues()}
+    fouts['unclassified'] = (open(data_folder+'unclassified_reads/read1.fastq', 'w'),
+                             open(data_folder+'unclassified_reads/read2.fastq', 'w'),
+                             open(data_folder+'unclassified_reads/adapter.fastq', 'w'))
 
-        # If the adapter is not known, add it to the list
-        adapter_string = str(adapter.seq)
-        adapters.add(adapter_string)
+    # Make sure you close the files
+    try:
 
-        # If the adapter does not match any know one, throw into wastebin folder
-        if adapter_string not in adapters_used:
-            dirname = 'unclassified_reads/'
-        else:
-            dirname = foldername_adapter(adapters_used[adapter_string])
-    
-        # Write sequences (append to file)
-        with open(data_folder+dirname+'read1.fastq', 'a') as fout:
-            SeqIO.write(read1, fout, 'fastq')
-        with open(data_folder+dirname+'read2.fastq', 'a') as fout:
-            SeqIO.write(read2, fout, 'fastq')
-        if 'adapterID' not in dirname:
-            with open(data_folder+dirname+'adapter.fastq', 'a') as fout:
-                SeqIO.write(adapter, fout, 'fastq')
+        # Iterate over all reads (using fast iterators)
+        with open(datafile_read1, 'r') as fh1,\
+             open(datafile_read2, 'r') as fh2,\
+             open(datafile_adapter, 'r') as fha:
+
+            for i, (read1, read2, adapter) in enumerate(izip(FGI(fh1), FGI(fh2),
+                                                             SeqIO.parse(fha, 'fastq'))):
+                
+                # Print some output
+                if VERBOSE and (not ((i + 1) % 10000)):
+                    print i + 1
+
+                # If the adapter is not known, add it to the list
+                adapter_string = str(adapter.seq)
+                adapters.add(adapter_string)
+
+                # If the adapter does not match any know one,
+                # throw into wastebin folder
+                if adapter_string not in adapters_used:
+                    adaID = 'unclassified'
+                else:
+                    adaID = adapters_used[adapter_string]
+            
+                # Write sequences (append to file, manual but fast)
+                fouts[adaID][0].write("@%s\n%s\n+\n%s\n" % read1)
+                fouts[adaID][1].write("@%s\n%s\n+\n%s\n" % read2)
+                if adapter_string not in adapters_used:
+                    SeqIO.write(adapter, fouts[adaID][2], 'fastq')
+
+    finally:
+        for fout in fouts.itervalues():
+            fout.close()

@@ -19,9 +19,9 @@ from Bio import SeqIO
 
 # Horizontal import of modules from this folder
 from mapping.adapter_info import load_adapter_table
-from mapping.miseq import alpha, read_types, pair_generator
+from mapping.miseq import alpha, read_types
 from mapping.filenames import get_last_reference, get_last_mapped
-from mapping.mapping_utils import get_ind_good_cigars
+from mapping.mapping_utils import get_ind_good_cigars, pair_generator
 
 
 

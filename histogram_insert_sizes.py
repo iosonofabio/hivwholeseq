@@ -18,7 +18,7 @@ import pysam
 import numpy as np
 from Bio import SeqIO
 
-from mapping.miseq import pair_generator
+from mapping.mapping_utils import pair_generator
 
 
 

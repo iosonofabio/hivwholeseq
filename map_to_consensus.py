@@ -194,8 +194,8 @@ def fork_self(data_folder, adaID, fragment, subsample=False, VERBOSE=3):
                  '-l', 'h_rt='+cluster_time[subsample],
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
-                 '--adaID', adaID,
-                 '--fragment', fragment,
+                 '--adaIDs', adaID,
+                 '--fragments', fragment,
                  '--verbose', VERBOSE,
                 ]
     if subsample:
@@ -212,12 +212,10 @@ if __name__ == '__main__':
 
     # Parse input args
     parser = argparse.ArgumentParser(description='Divide HIV reads into fragments')
-    parser.add_argument('--adaID', metavar='00', type=int, nargs='?',
-                        default=0,
-                        help='Adapter ID')
-    parser.add_argument('--fragment', metavar='F0', nargs='?',
-                        default='F0',
-                        help='Fragment to map (F1-F6)')
+    parser.add_argument('--adaIDs', nargs='*', type=int,
+                        help='Adapter IDs to analyze (e.g. 2 16)')
+    parser.add_argument('--fragments', nargs='*',
+                        help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
     parser.add_argument('--subsample', action='store_true',
@@ -226,25 +224,21 @@ if __name__ == '__main__':
                         help='Execute the script in parallel on the cluster')
 
     args = parser.parse_args()
-    adaID = args.adaID
-    fragment = args.fragment
+    adaIDs = args.adaIDs
+    fragments = args.fragments
     VERBOSE = args.verbose
     subsample = args.subsample
     submit = args.submit
 
     # If the script is called with no adaID, iterate over all
-    if adaID == 0:
+    if not adaIDs:
         adaIDs = load_adapter_table(data_folder)['ID']
-    else:
-        adaIDs = [adaID]
     if VERBOSE >= 3:
         print 'adaIDs', adaIDs
 
     # If the script is called with no fragment, iterate over all
-    if fragment == 'F0':
+    if not fragments:
         fragments = ['F'+str(i) for i in xrange(1, 7)]
-    else:
-        fragments = [fragment]
     if VERBOSE >= 3:
         print 'fragments', fragments
 
@@ -256,22 +250,21 @@ if __name__ == '__main__':
             if submit:
                 fork_self(data_folder, adaID, frag,
                           subsample=subsample, VERBOSE=VERBOSE)
+                continue
 
-            else:
+            # Make BWA hashes
+            make_bwa_hash(data_folder, adaID, frag,
+                          subsample=subsample, VERBOSE=VERBOSE)
     
-                # Make BWA hashes
-                make_bwa_hash(data_folder, adaID, frag,
-                              subsample=subsample, VERBOSE=VERBOSE)
+            # Map via BWA first
+            map_bwa(data_folder, adaID, frag,
+                    subsample=subsample, VERBOSE=VERBOSE)
     
-                # Map via BWA first
-                map_bwa(data_folder, adaID, frag,
-                        subsample=subsample, VERBOSE=VERBOSE)
-    
-                # Make stampy hashes
-                make_index_and_hash(data_folder, adaID, frag,
-                                    subsample=subsample, VERBOSE=VERBOSE)
-                
-                # Map via stampy afterwards
-                map_stampy_after_bwa(data_folder, adaID, frag,
-                                     subsample=subsample, VERBOSE=VERBOSE)
+            # Make stampy hashes
+            make_index_and_hash(data_folder, adaID, frag,
+                                subsample=subsample, VERBOSE=VERBOSE)
+            
+            # Map via stampy afterwards
+            map_stampy_after_bwa(data_folder, adaID, frag,
+                                 subsample=subsample, VERBOSE=VERBOSE)
     

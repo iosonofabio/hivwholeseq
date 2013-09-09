@@ -12,7 +12,20 @@ bwa_bin = '/ebio/ag-neher/share/programs/bin/bwa'
 
 
 # Functions
-def get_ind_good_cigars(cigar, match_len_min=30):
+def pair_generator(iterable):
+    '''Generator for pairs in interleaved files'''
+    # Note: the last item is lost if odd
+    it = iter(iterable)
+    while True:
+        try:
+            p1 = it.next()
+            p2 = it.next()
+            yield (p1, p2)
+        except StopIteration:
+            raise
+
+
+def get_ind_good_cigars(cigar, match_len_min=30, full_output=False):
     '''Keep only CIGAR blocks between two long matches'''
     from numpy import array
 
@@ -26,7 +39,10 @@ def get_ind_good_cigars(cigar, match_len_min=30):
         last_good_cigar = tmp[-1]
         good_cigars[first_good_cigar: last_good_cigar + 1] = True
 
-    return good_cigars
+    if full_output:
+        return good_cigars, first_good_cigar, last_good_cigar
+    else:
+        return good_cigars
 
 
 def get_range_good_cigars(cigar, pos, match_len_min=30,

@@ -34,8 +34,9 @@ from Bio.SeqRecord import SeqRecord
 
 # Horizontal import of modules from this folder
 from mapping.adapter_info import load_adapter_table, foldername_adapter
-from mapping.miseq import alpha, read_types, pair_generator
-from mapping.mapping_utils import stampy_bin, subsrate, convert_sam_to_bam
+from mapping.miseq import alpha, read_types
+from mapping.mapping_utils import stampy_bin, subsrate, convert_sam_to_bam,\
+        pair_generator, get_ind_good_cigars
 from mapping.filenames import get_HXB2_fragmented, get_read_filenames,\
         get_HXB2_index_file, get_HXB2_hash_file, get_consensus_filename
 
@@ -188,8 +189,8 @@ def fork_self(data_folder, adaID, fragment, iterations_max=0, VERBOSE=0):
                  '-l', 'h_rt='+cluster_time,
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
-                 '--adaID', adaID,
-                 '--fragment', fragment,
+                 '--adaIDs', adaID,
+                 '--fragments', fragment,
                  '--verbose', VERBOSE,
                  '--iterations', iterations_max,
                 ]
@@ -261,21 +262,11 @@ def make_consensus(data_folder, adaID, fragment, n_iter, VERBOSE=0):
                 # end of reads (this is still unbiased).
                 cigar = read.cigar
                 len_cig = len(cigar)
-                good_cigars = np.array(map(lambda x: (x[0] == 0) and (x[1] >= match_len_min), cigar), bool, ndmin=1)
-                # If no long match, skip read
-                # FIXME: we must skip the mate pair also? But what if it's gone already?
-                # Note: they come in pairs: read1 first, read2 next, so we can just read two at a time    
-                if not (good_cigars).any():
-                    continue
-                # If only one long match, no problem
-                if (good_cigars).sum() == 1:
-                    first_good_cigar = last_good_cigar = good_cigars.nonzero()[0][0]
-                # else include stuff between the extremes
-                else:
-                    tmp = good_cigars.nonzero()[0]
-                    first_good_cigar = tmp[0]
-                    last_good_cigar = tmp[-1]
-                    good_cigars[first_good_cigar: last_good_cigar + 1] = True
+                (good_cigars,
+                 first_good_cigar,
+                 last_good_cigar) = get_ind_good_cigars(cigar,
+                                                        match_len_min=match_len_min,
+                                                        full_output=True)
             
                 # Sequence and position
                 # Note: stampy takes the reverse complement already
@@ -459,12 +450,10 @@ if __name__ == '__main__':
 
     # Parse input args: this is used to call itself recursively
     parser = argparse.ArgumentParser(description='Map HIV reads recursively')
-    parser.add_argument('--adaID', metavar='00', type=int, nargs='?',
-                        default=0,
-                        help='Adapter ID sample to map')
-    parser.add_argument('--fragment', metavar='F0', nargs='?',
-                        default='F0',
-                        help='Fragment to map (F1-F6)')
+    parser.add_argument('--adaIDs', nargs='*', type=int,
+                        help='Adapter IDs to analyze (e.g. 2 16)')
+    parser.add_argument('--fragments', nargs='*',
+                        help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('--iterations', type=int, default=0,
                         help=('Maximal number of map/consensus iterations'))
     parser.add_argument('--verbose', type=int, default=5,
@@ -473,25 +462,21 @@ if __name__ == '__main__':
                         help='Execute the script in parallel on the cluster')
 
     args = parser.parse_args()
-    adaID = args.adaID
-    fragment = args.fragment
+    adaIDs = args.adaIDs
+    fragments = args.fragments
     iterations_max = args.iterations
     VERBOSE = args.verbose
     submit = args.submit
 
     # If the script is called with no adaID, iterate over all
-    if adaID == 0:
+    if not adaIDs:
         adaIDs = load_adapter_table(data_folder)['ID']
-    else:
-        adaIDs = [adaID]
     if VERBOSE >= 3:
         print 'adaIDs', adaIDs
 
     # If the script is called with no fragment, iterate over all
-    if fragment == 'F0':
+    if not fragments:
         fragments = ['F'+str(i) for i in xrange(1, 7)]
-    else:
-        fragments = [fragment]
     if VERBOSE >= 3:
         print 'fragments', fragments
 
@@ -499,52 +484,56 @@ if __name__ == '__main__':
     for frag in fragments:
 
         # Make hashes for the reference, they are shared across adaIDs
-        make_index_and_hash(data_folder, adaID, frag, 0, VERBOSE=VERBOSE)
+        # Note: this function is called again with submit, but it checks for
+        # the existance of has files and does nothing if they are present. It is
+        # difficult to cover all usage cases more elegantly without making a mess.
+        make_index_and_hash(data_folder, 0, frag, 0, VERBOSE=VERBOSE)
 
         for adaID in adaIDs:
 
             # Submit to the cluster self if requested
             if submit:
                 fork_self(data_folder, adaID, frag, iterations_max, VERBOSE=VERBOSE)
+                continue
 
-            # or else, build the consensus
-            else:
+            # Iterate the consensus building until convergence
+            n_iter = 0
+            while True:
+            
+                # Make hashes of consensus (the reference is hashed earlier)
+                if (n_iter > 0):
+                    make_index_and_hash(data_folder, adaID, frag, n_iter,
+                                        VERBOSE=VERBOSE)
 
-                # Iterate the consensus building until convergence
-                n_iter = 0
-                done = False
-                while not done:
-                
-                    # Make hashes of consensus (the reference is hashed earlier)
-                    if (n_iter > 0):
-                        make_index_and_hash(data_folder, adaID, frag, n_iter, VERBOSE=VERBOSE)
+                # Map against reference or consensus
+                map_stampy(data_folder, adaID, frag, n_iter, VERBOSE=VERBOSE)
 
-                    # Map against reference or consensus
-                    map_stampy(data_folder, adaID, frag, n_iter, VERBOSE=VERBOSE)
+                # Build consensus
+                refseq, consensus = make_consensus(data_folder, adaID, fragment, n_iter,
+                                                   VERBOSE=VERBOSE)
 
-                    # Build consensus
-                    refseq, consensus = make_consensus(data_folder, adaID, fragment, n_iter, VERBOSE=VERBOSE)
+                # Save consensus to file
+                write_consensus(data_folder, adaID, fragment, n_iter, consensus,
+                                final=False)
 
-                    # Save consensus to file
-                    write_consensus(data_folder, adaID, fragment, n_iter, consensus, final=False)
+                # Check whether the old and new consensi match
+                match = check_new_old_consensi(refseq, consensus)
 
-                    # Check whether the old and new consensi match
-                    match = check_new_old_consensi(refseq, consensus)
-
-                    # Start a new round
-                    if (not match) and (n_iter + 1 < iterations_max):
-                            n_iter += 1
-                            if VERBOSE:
-                                print 'Starting again for iteration '+str(n_iter) 
-
-                    # or terminate
-                    else:
-                        write_consensus(data_folder, adaID, fragment, n_iter, consensus, final=True)
-                        done = True
-
+                # Start a new round
+                if (not match) and (n_iter + 1 < iterations_max):
+                        n_iter += 1
                         if VERBOSE:
-                            if match:
-                                print 'Consensus converged.' 
-                            else:
-                                print 'Maximal number of iterations reached.'
-                        
+                            print 'Starting again for iteration '+str(n_iter) 
+
+                # or terminate
+                else:
+                    write_consensus(data_folder, adaID, fragment, n_iter, consensus,
+                                    final=True)
+                    if VERBOSE:
+                        if match:
+                            print 'Consensus converged.' 
+                        else:
+                            print 'Maximal number of iterations reached.'
+                    
+                    break
+                    
