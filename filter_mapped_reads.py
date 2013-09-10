@@ -183,12 +183,12 @@ if __name__ == '__main__':
         print 'fragments', fragments
 
     # Iterate over all requested samples
-    for frag in fragments:
+    for fragment in fragments:
         for adaID in adaIDs:
 
             # Submit to the cluster self if requested
             if submit:
-                fork_self(data_folder, adaID, frag, VERBOSE=VERBOSE)
+                fork_self(data_folder, adaID, fragment, VERBOSE=VERBOSE)
                 continue
 
             # or else, perform the filtering

@@ -244,27 +244,27 @@ if __name__ == '__main__':
 
     # Iterate over all requested samples
     for adaID in adaIDs:
-        for frag in fragments:
+        for fragment in fragments:
 
             # Submit to the cluster self if requested
             if submit:
-                fork_self(data_folder, adaID, frag,
+                fork_self(data_folder, adaID, fragment,
                           subsample=subsample, VERBOSE=VERBOSE)
                 continue
 
             # Make BWA hashes
-            make_bwa_hash(data_folder, adaID, frag,
+            make_bwa_hash(data_folder, adaID, fragment,
                           subsample=subsample, VERBOSE=VERBOSE)
     
             # Map via BWA first
-            map_bwa(data_folder, adaID, frag,
+            map_bwa(data_folder, adaID, fragment,
                     subsample=subsample, VERBOSE=VERBOSE)
     
             # Make stampy hashes
-            make_index_and_hash(data_folder, adaID, frag,
+            make_index_and_hash(data_folder, adaID, fragment,
                                 subsample=subsample, VERBOSE=VERBOSE)
             
             # Map via stampy afterwards
-            map_stampy_after_bwa(data_folder, adaID, frag,
+            map_stampy_after_bwa(data_folder, adaID, fragment,
                                  subsample=subsample, VERBOSE=VERBOSE)
     

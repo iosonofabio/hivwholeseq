@@ -33,11 +33,16 @@ def get_ind_good_cigars(cigar, match_len_min=30, full_output=False):
     good_cigars = array(map(criterion, cigar), bool, ndmin=1)
 
     # If there are 2+ good CIGARs, keep also stuff in between
-    if (good_cigars).sum() >= 2:
+    n_good_cigars = (good_cigars).sum()
+    if n_good_cigars >= 2:
         tmp = good_cigars.nonzero()[0]
         first_good_cigar = tmp[0]
         last_good_cigar = tmp[-1]
         good_cigars[first_good_cigar: last_good_cigar + 1] = True
+    elif n_good_cigars == 1:
+        first_good_cigar = last_good_cigar = good_cigars.nonzero()[0][0]
+    else:
+        first_good_cigar = last_good_cigar = None
 
     if full_output:
         return good_cigars, first_good_cigar, last_good_cigar

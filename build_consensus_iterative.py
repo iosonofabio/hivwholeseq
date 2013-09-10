@@ -51,6 +51,7 @@ data_folder = dataset['folder']
 maxreads = 100000
 match_len_min = 30
 trim_bad_cigars = 3
+coverage_min = 10
 
 # Cluster submit
 import mapping
@@ -213,7 +214,10 @@ def make_consensus(data_folder, adaID, fragment, n_iter, VERBOSE=0):
     
     # Allele counts and inserts
     counts = np.zeros((len(read_types), len(alpha), len(ref)), int)
-    inserts = [defaultdict(int) for k in read_types]
+    # Note: the data structure for inserts is a nested dict with:
+    # position --> string --> read type --> count
+    #  (dict)      (dict)       (list)      (int)
+    inserts = defaultdict(lambda: defaultdict(lambda: np.zeros(len(read_types), int)))
 
     # Open BAM file
     bamfilename = get_mapped_filename(data_folder, adaID, fragment, n_iter)
@@ -248,12 +252,6 @@ def make_consensus(data_folder, adaID, fragment, n_iter, VERBOSE=0):
                 if read.is_read1: js = 0
                 else: js = 2
                 if read.is_reverse: js += 1
-            
-                # FIXME: if the insert size is less than 250, we read over into the adapters
-                # TODO: should not this be taken care of by our block-by-block strategy below?
-                # Note: skip also the mate
-                if read.isize <= 250:
-                    pass
             
                 # Read CIGAR code for indels, and anayze each block separately
                 # Note: some reads are weird ligations of HIV and contaminants
@@ -320,7 +318,7 @@ def make_consensus(data_folder, adaID, fragment, n_iter, VERBOSE=0):
                         # Exclude bad CIGARs
                         if good_cigars[ic]: 
                             seqb = seq[:block_len]
-                            inserts[js][(pos, seqb)] += 1
+                            inserts[pos][seqb][js] += 1
             
                         # Chop off seq, but not pos
                         if ic != len_cig - 1:
@@ -330,30 +328,15 @@ def make_consensus(data_folder, adaID, fragment, n_iter, VERBOSE=0):
                     else:
                         raise ValueError('CIGAR type '+str(block_type)+' not recognized')
 
-    
     # Build consensus
-    # Make consensi for each of the four categories
+    # Make allele count consensi for each of the four categories
     consensi = np.zeros((len(read_types), len(refseq)), 'S1')
     for js, count in enumerate(counts):
         # Positions without reads are considered N
         # (this should happen only at the ends)
         count.T[(count).sum(axis=0) == 0] = np.array([0, 0, 0, 0, 0, 1])
         consensi[js] = alpha[count.argmax(axis=0)]
-    
-    # Add inserts that are present in more than half the reads
-    inserts_consensi = []
-    for js, insert in enumerate(inserts):
-        insert_consensus = []
-        for (k, i) in insert.iteritems():
-            pos_pre = max(0, k[0]-1)
-            pos_post = min(len(refseq), k[0]+1)
-            if pos_post <= pos_pre:
-                print 'Strange insert:', pos_pre, pos_post, k, len(refseq), counts[js, :, pos_pre:pos_post].sum(axis=0)
-            threshold = 0.5 * counts[js, :, pos_pre:pos_post].sum(axis=0).mean()
-            if (i > 10) and (i > threshold):
-                insert_consensus.append(k)
-        inserts_consensi.append(insert_consensus)
-    
+        
     # Make final consensus
     # This has two steps: 1. counts; 2. inserts
     # We should check that different read types agree (e.g. forward/reverse) on
@@ -385,27 +368,82 @@ def make_consensus(data_folder, adaID, fragment, n_iter, VERBOSE=0):
                 tmp = zip(*Counter(cons_pos).items())
                 consensus[pos] = tmp[0][np.argmax(tmp[1])]
     
-    # 2.0 get all inserts
-    insert_names = set()
-    for insert in inserts:
-        insert_names |= set(insert.keys())
-    # 2.1 iterate over inserts and check all read types
+    # 2. Inserts
+    # This is a bit tricky, because we could have a variety of inserts at the
+    # same position because of PCR or sequencing errors (what we do with that
+    # stuff, is another question). So, assuming the mapping program maps
+    # everything decently at the same starting position, we have to look for
+    # prefix families
     insert_consensus = []
-    for insert_name in insert_names:
-        # Get counts for the insert and local coverage
-        ins_counts = np.array([insert[insert_name] for insert in inserts])
-        # FIXME: is there a division by zero here?
-        cov_loc = counts[:, :, insert_name[0]: min(len(refseq), insert_name[0] + 2)].sum(axis=1).mean(axis=1)
-        # Get read types in which the insert is called
-        types_ins_called = ins_counts > 0.5 * cov_loc
-        # Get read types which actually cover this region
-        types_cov = cov_loc > 3
-        # Check the insert counts compared to the local coverage
-        # if any read type has coverage and all read types with coverage agree, ok
-        if types_cov.sum() and (types_ins_called[types_cov]).all():
-            insert_consensus.append(insert_name)
-    insert_consensus.sort(key=itemgetter(0))
+
+    # Iterate over all insert positions
+    for pos, insert in inserts.iteritems():
+
+        # Get the coverage around the insert in all four read types
+        # Note: the sum is over the four nucleotides, the mean over the two positions
+        cov = counts[:, :, pos: min(len(refseq), pos + 2)].sum(axis=1).mean(axis=1)
+
+        # Determine what read types have coverage
+        is_cov = cov > coverage_min
+        covcs = cov[is_cov]
+
+        # A single covered read type is sufficient
+        if not is_cov.any():
+            continue
+
+        # Use prefixes/suffixes, and come down from highest frequencies
+        # (averaging fractions is not a great idea, but -- oh, well).
+        # Implement it as a count table: this is not very efficient a priori,
+        # but Python is lame anyway if we start making nested loops
+        len_max = max(map(len, insert.keys()))
+        align_pre = np.tile('-', (len(insert), len_max))
+        align_suf = np.tile('-', (len(insert), len_max))
+        counts_loc = np.zeros((len(insert), len(read_types)), int)
+        for i, (s, cs) in enumerate(insert.iteritems()):
+            align_pre[i, :len(s)] = list(s)
+            align_suf[i, -len(s):] = list(s)
+            counts_loc[i] = cs
+
+        # Make the allele count tables
+        counts_pre_table = np.zeros((len(read_types), len(alpha), len_max), int)
+        counts_suf_table = np.zeros((len(read_types), len(alpha), len_max), int)
+        for j, a in enumerate(alpha):
+            counts_pre_table[:, j] = np.dot(counts_loc.T, (align_pre == a))
+            counts_suf_table[:, j] = np.dot(counts_loc.T, (align_suf == a))
+
+        # Look whether any position of the insertion has more than 50% freq
+        # The prefix goes: ----> x
+        ins_pre = []
+        for cs in counts_pre_table.swapaxes(0, 2):
+            freq = 1.0 * (cs[:, is_cov] / covcs).mean(axis=1)
+            iaM = freq.argmax()
+            if (alpha[iaM] != '-') and (freq[iaM] > 0.5):
+                ins_pre.append(alpha[iaM])
+            else:
+                break
+        # The suffix goes: x <----
+        ins_suf = []
+        for cs in counts_suf_table.swapaxes(0, 2)[::-1]:
+            freq = 1.0 * (cs[:, is_cov] / covcs).mean(axis=1)
+            iaM = freq.argmax()
+            if (alpha[iaM] != '-') and (freq[iaM] > 0.5):
+                ins_suf.append(alpha[iaM])
+            else:
+                break
+        ins_suf.reverse()
+
+        if ins_pre or ins_suf:
+            print ''.join(ins_pre)
+            print ''.join(ins_suf)
+
+        # Add the insertion to the list (they should agree in most cases)
+        if ins_pre:
+            insert_consensus.append((pos, ''.join(ins_pre)))
+        elif ins_suf:
+            insert_consensus.append((pos, ''.join(ins_suf)))
+
     # 3. put inserts in
+    insert_consensus.sort(key=itemgetter(0))
     consensus_final = []
     pos = 0
     for insert_name in insert_consensus:
@@ -432,6 +470,7 @@ def check_new_old_consensi(refseq, consensus):
 
 def write_consensus(data_folder, adaID, fragment, n_iter, consensus, final=False):
     '''Write consensus sequences into FASTA'''
+    return # FIXME
     name = 'adaID_'+'{:02d}'.format(adaID)+'_'+fragment+'_consensus'
     consensusseq = SeqRecord(Seq(consensus),
                              id=name, name=name)
@@ -481,19 +520,19 @@ if __name__ == '__main__':
         print 'fragments', fragments
 
     # Iterate over all requested samples
-    for frag in fragments:
+    for fragment in fragments:
 
         # Make hashes for the reference, they are shared across adaIDs
         # Note: this function is called again with submit, but it checks for
         # the existance of has files and does nothing if they are present. It is
         # difficult to cover all usage cases more elegantly without making a mess.
-        make_index_and_hash(data_folder, 0, frag, 0, VERBOSE=VERBOSE)
+        make_index_and_hash(data_folder, 0, fragment, 0, VERBOSE=VERBOSE)
 
         for adaID in adaIDs:
 
             # Submit to the cluster self if requested
             if submit:
-                fork_self(data_folder, adaID, frag, iterations_max, VERBOSE=VERBOSE)
+                fork_self(data_folder, adaID, fragment, iterations_max, VERBOSE=VERBOSE)
                 continue
 
             # Iterate the consensus building until convergence
@@ -502,11 +541,11 @@ if __name__ == '__main__':
             
                 # Make hashes of consensus (the reference is hashed earlier)
                 if (n_iter > 0):
-                    make_index_and_hash(data_folder, adaID, frag, n_iter,
+                    make_index_and_hash(data_folder, adaID, fragment, n_iter,
                                         VERBOSE=VERBOSE)
 
                 # Map against reference or consensus
-                map_stampy(data_folder, adaID, frag, n_iter, VERBOSE=VERBOSE)
+                map_stampy(data_folder, adaID, fragment, n_iter, VERBOSE=VERBOSE)
 
                 # Build consensus
                 refseq, consensus = make_consensus(data_folder, adaID, fragment, n_iter,
