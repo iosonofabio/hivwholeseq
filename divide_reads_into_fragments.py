@@ -167,21 +167,21 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, subsample=False, bwa=False):
     
     # Map
     # Note: no --solexa option as of 2013 (illumina v1.8)
-    qsub_list = [stampy_bin,
+    call_list = [stampy_bin,
                  '-g', get_HXB2_index_file(data_folder, ext=False),
                  '-h', get_HXB2_hash_file(data_folder, ext=False), 
                  '-o', output_filename,
                  '--substitutionrate='+subsrate]
     if bwa:
-        qsub_list.append('--bamkeepgoodreads')
-    qsub_list = qsub_list + ['-M'] + readfiles
-    qsub_list = map(str,qsub_list)
+        call_list.append('--bamkeepgoodreads')
+    call_list = qsub_list + ['-M'] + readfiles
+    call_list = map(str, call_list)
     if VERBOSE >= 2:
-        print ' '.join(qsub_list)
-    sp.call(qsub_list)
+        print ' '.join(call_list)
+    sp.call(call_list)
 
 
-def fork_self(data_folder, adaID, VERBOSE=0, subsample=False):
+def fork_self(data_folder, adaID, VERBOSE=0, subsample=False, bwa=False):
     '''Fork self for each adapter ID'''
     if VERBOSE:
         print 'Forking to the cluster: adaID '+'{:02d}'.format(adaID)
@@ -200,6 +200,8 @@ def fork_self(data_folder, adaID, VERBOSE=0, subsample=False):
                 ]
     if subsample:
         qsub_list.append('--subsample')
+    if bwa:
+        qsub_list.append('--bwa')
     qsub_list = map(str, qsub_list)
     if VERBOSE >= 2:
         print ' '.join(qsub_list)
@@ -389,7 +391,8 @@ if __name__ == '__main__':
 
         # Submit to the cluster self if requested
         if submit:
-            fork_self(data_folder, adaID, VERBOSE=VERBOSE, subsample=subsample)
+            fork_self(data_folder, adaID, VERBOSE=VERBOSE, subsample=subsample,
+                      bwa=bwa)
             continue
 
         # Map roughly to HXB2

@@ -1,4 +1,4 @@
-#!/ebio/ag-neher/share/programs/EPD/bin/python
+#!/usr/bin/env python
 # vim: fdm=indent
 '''
 author:     Fabio Zanini
@@ -35,6 +35,9 @@ JOBLOGOUT = JOBDIR+'logout'
 # Different times based on subsample flag
 cluster_time = ['23:59:59', '0:59:59']
 vmem = '8G'
+stampy_gapopen = 60
+stampy_gapextend = 10
+stampy_sensitive = True
 
 
 # Functions
@@ -131,16 +134,16 @@ def map_bwa(data_folder, adaID, fragment, subsample=False, VERBOSE=0):
 
     if VERBOSE:
         print 'Map via BWA: '+'{:02d}'.format(adaID)+' '+fragment
-    mapped_filename = get_mapped_filename(data_folder, adaID, fragment,
+    output_filename = get_mapped_filename(data_folder, adaID, fragment,
                                           type='sam', subsample=subsample,
                                           bwa=True)
     # Make folder if necessary
-    dirname = os.path.dirname(mapped_filename)
+    dirname = os.path.dirname(output_filename)
     if not os.path.isdir(dirname):
         os.mkdir(dirname)
 
     # Map
-    with open(mapped_filename, 'w') as f:
+    with open(output_filename, 'w') as f:
         call_list = [bwa_bin,
                      'mem',
                      index_prefix] +\
@@ -151,39 +154,59 @@ def map_bwa(data_folder, adaID, fragment, subsample=False, VERBOSE=0):
         sp.call(call_list, stdout=f)
 
 
-def map_stampy_after_bwa(data_folder, adaID, fragment, subsample=False, VERBOSE=0):
-    '''Map using stampy after BWA'''
+def map_stampy(data_folder, adaID, fragment, subsample=False, VERBOSE=0, bwa=False):
+    '''Map using stampy, either directly or after BWA'''
     if VERBOSE:
         print 'Map via stampy after BWA: '+'{:02d}'.format(adaID)+' '+fragment
 
-    bwa_filename = get_mapped_filename(data_folder, adaID, fragment,
-                                       type='bam', subsample=subsample,
-                                       bwa=True)
+    # Get input filenames
+    if bwa:
+        bwa_filename = get_mapped_filename(data_folder, adaID, fragment,
+                                           type='bam', subsample=subsample,
+                                           bwa=True)
+        if not os.path.isfile(bwa_filename):
+            if VERBOSE >= 2:
+                print 'Converting SAM to BAM'
+            convert_sam_to_bam(bwa_filename)
+        readfiles = [bwa_filename]
 
-    if not os.path.isfile(bwa_filename):
-        if VERBOSE >= 2:
-            print 'Converting SAM to BAM'
-        convert_sam_to_bam(bwa_filename)
+    else:
+        readfiles = get_read_filenames(data_folder, adaID, fragment=fragment,
+                                       subsample=subsample,
+                                       filtered=True)
 
-    mapped_filename = get_mapped_filename(data_folder, adaID, fragment,
+    # Get output filename
+    output_filename = get_mapped_filename(data_folder, adaID, fragment,
                                           type='sam', subsample=subsample)
+
+    # Make folder if necessary
+    dirname = os.path.dirname(output_filename)
+    if not os.path.isdir(dirname):
+        os.mkdir(dirname)
+
     # Map
     call_list = [stampy_bin,
                  '-g', get_index_file(data_folder, adaID, fragment,
                                       subsample=subsample, ext=False),
                  '-h', get_hash_file(data_folder, adaID, fragment,
                                      subsample=subsample, ext=False), 
-                 '-o', mapped_filename,
-                 '--substitutionrate='+subsrate,
-                 '--bamkeepgoodreads',
-                 '-M', bwa_filename]
+                 '-o', output_filename,
+                 '--gapopen='+str(stampy_gapopen),
+                 '--gapextend='+str(stampy_gapextend),
+                 '--substitutionrate='+subsrate]
+    if bwa:
+        call_list.append('--bamkeepgoodreads')
+    if stampy_sensitive:
+        call_list.append('--sensitive')
+    call_list = call_list + ['-M'] + readfiles
+    call_list = map(str, call_list)
     if VERBOSE >=2:
         print ' '.join(call_list)
     sp.call(call_list)
 
              
 
-def fork_self(data_folder, adaID, fragment, subsample=False, VERBOSE=3):
+def fork_self(data_folder, adaID, fragment, subsample=False, VERBOSE=3, bwa=False):
     '''Fork self for each adapter ID and fragment'''
     qsub_list = ['qsub','-cwd',
                  '-b', 'y',
@@ -200,6 +223,8 @@ def fork_self(data_folder, adaID, fragment, subsample=False, VERBOSE=3):
                 ]
     if subsample:
         qsub_list.append('--subsample')
+    if bwa:
+        qsub_list.append('--bwa')
     qsub_list = map(str, qsub_list)
     if VERBOSE:
         print ' '.join(qsub_list)
@@ -222,6 +247,8 @@ if __name__ == '__main__':
                         help='Apply only to a subsample of the reads')
     parser.add_argument('--submit', action='store_true',
                         help='Execute the script in parallel on the cluster')
+    parser.add_argument('--bwa', action='store_true',
+                        help='Use BWA for premapping?')
 
     args = parser.parse_args()
     adaIDs = args.adaIDs
@@ -229,6 +256,7 @@ if __name__ == '__main__':
     VERBOSE = args.verbose
     subsample = args.subsample
     submit = args.submit
+    bwa = args.bwa
 
     # If the script is called with no adaID, iterate over all
     if not adaIDs:
@@ -249,22 +277,23 @@ if __name__ == '__main__':
             # Submit to the cluster self if requested
             if submit:
                 fork_self(data_folder, adaID, fragment,
-                          subsample=subsample, VERBOSE=VERBOSE)
+                          subsample=subsample, VERBOSE=VERBOSE, bwa=bwa)
                 continue
 
-            # Make BWA hashes
-            make_bwa_hash(data_folder, adaID, fragment,
-                          subsample=subsample, VERBOSE=VERBOSE)
+            if bwa:
+                # Make BWA hashes
+                make_bwa_hash(data_folder, adaID, fragment,
+                              subsample=subsample, VERBOSE=VERBOSE)
     
-            # Map via BWA first
-            map_bwa(data_folder, adaID, fragment,
-                    subsample=subsample, VERBOSE=VERBOSE)
+                # Map via BWA first
+                map_bwa(data_folder, adaID, fragment,
+                        subsample=subsample, VERBOSE=VERBOSE)
     
             # Make stampy hashes
             make_index_and_hash(data_folder, adaID, fragment,
                                 subsample=subsample, VERBOSE=VERBOSE)
             
             # Map via stampy afterwards
-            map_stampy_after_bwa(data_folder, adaID, fragment,
-                                 subsample=subsample, VERBOSE=VERBOSE)
+            map_stampy(data_folder, adaID, fragment,
+                       subsample=subsample, VERBOSE=VERBOSE, bwa=bwa)
     

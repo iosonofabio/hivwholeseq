@@ -1,4 +1,4 @@
-#!/ebio/ag-neher/share/programs/EPD/bin/python
+#!/usr/bin/env python
 # vim: fdm=indent
 '''
 author:     Fabio Zanini, Richard Neher

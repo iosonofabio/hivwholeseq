@@ -121,8 +121,8 @@ def get_HXB2_hash_file(data_folder, fragment='F0', ext=True):
     return filename
 
 
-def get_read_filenames(data_folder, adaID, subsample=False,
-                       filtered=True, premapped=False, fragment=None):
+def get_read_filenames(data_folder, adaID, fragment=None, subsample=False,
+                       filtered=True, premapped=False):
     '''Get the filenames of the demultiplexed reads'''
     filenames = ['read1', 'read2']
     for i,fn in enumerate(filenames):

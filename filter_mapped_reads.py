@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # vim: fdm=marker
 '''
 author:     Fabio Zanini
@@ -19,7 +20,7 @@ from Bio import SeqIO
 # Horizontal import of modules from this folder
 from mapping.adapter_info import load_adapter_table, foldername_adapter
 from mapping.miseq import alpha, read_types
-from mapping.filenames import get_last_reference, get_last_mapped
+from mapping.filenames import get_consensus_filename, get_mapped_filename
 from mapping.mapping_utils import get_ind_good_cigars, convert_sam_to_bam,\
         pair_generator
 
@@ -75,7 +76,7 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0):
     '''Filter the reads to good chunks'''
 
     # Read reference (fragmented)
-    reffilename = get_consensus_filename(data_folder, adaID, fragment, ext=True)
+    reffilename = get_consensus_filename(data_folder, adaID, fragment)
     refseq = SeqIO.read(reffilename, 'fasta')
     ref = np.array(refseq)
 
@@ -94,6 +95,7 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0):
              pysam.Samfile(trashfilename, 'wb', template=bamfile) as trashfile:
  
             # Iterate over all pairs
+            n_good = 0
             n_unmapped = 0
             n_unpaired = 0
             n_mismapped_edge = 0
@@ -145,9 +147,14 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0):
 
                 # Write the output
                 if not skip:
+                    n_good += 1
                     map(outfile.write, reads)
                 else:
                     map(trashfile.write, reads)
+
+    if VERBOSE >= 3:
+        print 'Reads: '+str(n_good)+' good, '+str(n_unmapped)+' unmapped, '+\
+                str(n_unpaired)+' unpaired, '+str(n_mismapped_edge)+' edge.'
 
 
 

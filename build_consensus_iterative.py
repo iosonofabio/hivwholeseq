@@ -1,4 +1,4 @@
-#!/ebio/ag-neher/share/programs/EPD/bin/python
+#!/usr/bin/env python
 # vim: fdm=indent
 '''
 author:     Fabio Zanini
@@ -387,7 +387,8 @@ def make_consensus(data_folder, adaID, fragment, n_iter, VERBOSE=0):
         is_cov = cov > coverage_min
         covcs = cov[is_cov]
 
-        # A single covered read type is sufficient
+        # A single covered read type is sufficient: we are going to do little
+        # with that, but as a consensus it's fine
         if not is_cov.any():
             continue
 
@@ -432,9 +433,10 @@ def make_consensus(data_folder, adaID, fragment, n_iter, VERBOSE=0):
                 break
         ins_suf.reverse()
 
-        if ins_pre or ins_suf:
-            print ''.join(ins_pre)
-            print ''.join(ins_suf)
+        if VERBOSE >= 4:
+            if ins_pre or ins_suf:
+                print ''.join(ins_pre)
+                print ''.join(ins_suf)
 
         # Add the insertion to the list (they should agree in most cases)
         if ins_pre:
@@ -470,7 +472,6 @@ def check_new_old_consensi(refseq, consensus):
 
 def write_consensus(data_folder, adaID, fragment, n_iter, consensus, final=False):
     '''Write consensus sequences into FASTA'''
-    return # FIXME
     name = 'adaID_'+'{:02d}'.format(adaID)+'_'+fragment+'_consensus'
     consensusseq = SeqRecord(Seq(consensus),
                              id=name, name=name)
@@ -574,5 +575,4 @@ if __name__ == '__main__':
                         else:
                             print 'Maximal number of iterations reached.'
                     
-                    break
-                    
+                    break 
