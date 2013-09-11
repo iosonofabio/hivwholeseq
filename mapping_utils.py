@@ -8,6 +8,8 @@ content:    Settings of stampy used by our mapping scripts.
 stampy_bin = '/ebio/ag-neher/share/programs/bundles/stampy-1.0.22/stampy.py'
 subsrate = '0.05'
 bwa_bin = '/ebio/ag-neher/share/programs/bin/bwa'
+spades_bin = '/ebio/ag-neher/share/programs/bundles/SPAdes-2.5.0-Linux/bin/spades.py'
+
 
 
 

@@ -122,7 +122,7 @@ def get_HXB2_hash_file(data_folder, fragment='F0', ext=True):
 
 
 def get_read_filenames(data_folder, adaID, fragment=None, subsample=False,
-                       filtered=True, premapped=False):
+                       filtered=True, premapped=False, suffix=''):
     '''Get the filenames of the demultiplexed reads'''
     filenames = ['read1', 'read2']
     for i,fn in enumerate(filenames):
@@ -138,11 +138,11 @@ def get_read_filenames(data_folder, adaID, fragment=None, subsample=False,
         # If there was a premap, 6 files have to be made for each orientation
         if premapped:
             if fragment is None:
-                fn = [fn+'_F'+str(j)+'.fastq' for j in xrange(1, 7)] + [fn+'_unmapped.fastq']
+                fn = [fn+'_F'+str(j)+suffix+'.fastq' for j in xrange(1, 7)] + [fn+'_unmapped.fastq']
             else:
-                fn = fn+'_'+fragment+'.fastq'
+                fn = fn+'_'+fragment+suffix+'.fastq'
         else:
-            fn = fn+'.fastq'
+            fn = fn+suffix+'.fastq'
         filenames[i] = fn
     return filenames
 

@@ -52,7 +52,7 @@ def fork_self(data_folder, adaID, n_reads, VERBOSE=0, filtered=True):
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
                  '-n', n_reads,
-                 '--adaID', adaID,
+                 '--adaIDs', adaID,
                  '--verbose', VERBOSE,
                 ]
     if not filtered:
@@ -63,7 +63,8 @@ def fork_self(data_folder, adaID, n_reads, VERBOSE=0, filtered=True):
     sp.call(qsub_list)
 
 
-def extract_subsample(data_folder, adaID, n_reads, VERBOSE=0, filtered=True):
+def extract_subsample(data_folder, adaID, n_reads, VERBOSE=0, filtered=True,
+                      suffix=''):
     '''Extract the subsample'''
     if VERBOSE >= 1:
         print 'adapter ID: '+'{:02d}'.format(adaID)
@@ -127,7 +128,7 @@ def extract_subsample(data_folder, adaID, n_reads, VERBOSE=0, filtered=True):
 
     # Write output
     out_filenames = get_read_filenames(data_folder, adaID, subsample=True,
-                                       filtered=filtered)
+                                       filtered=filtered, suffix=suffix)
     with open(out_filenames[0], 'w') as fh1,\
          open(out_filenames[1], 'w') as fh2:
 
@@ -147,8 +148,7 @@ if __name__ == '__main__':
 
     # Parse input args
     parser = argparse.ArgumentParser(description='Extract a subsample of reads')
-    parser.add_argument('--adaID', metavar='00', type=int, nargs='?',
-                        default=0,
+    parser.add_argument('--adaIDs', type=int, nargs='+',
                         help='Adapter ID')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
@@ -160,17 +160,15 @@ if __name__ == '__main__':
                         help='Execute the script in parallel on the cluster')
  
     args = parser.parse_args()
-    adaID = args.adaID
+    adaIDs = args.adaIDs
     VERBOSE = args.verbose
     filtered = not args.raw
     n_reads = args.n
     submit = args.submit
 
     # If no adapter ID is specified, iterate over all
-    if adaID == 0:
+    if not adaIDs:
         adaIDs = load_adapter_table(data_folder)['ID']
-    else:
-        adaIDs = [adaID]
 
     # Iterate over adapters if needed
     for adaID in adaIDs:
