@@ -1,3 +1,3 @@
-[submodule "sequence_utils"]
-	path = sequence_utils
+[submodule "mapping/sequence_utils"]
+	path = mapping/sequence_utils
 	url = /ebio/ag-neher/share/users/fzanini/bare_repo/modules
