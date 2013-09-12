@@ -35,7 +35,7 @@ JOBLOGOUT = JOBDIR+'logout'
 # Different times based on subsample flag
 cluster_time = ['23:59:59', '0:59:59']
 vmem = '8G'
-stampy_gapopen = 60
+stampy_gapopen = 100
 stampy_gapextend = 10
 stampy_sensitive = True
 

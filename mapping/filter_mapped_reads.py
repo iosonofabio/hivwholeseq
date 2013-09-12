@@ -58,7 +58,7 @@ def fork_self(data_folder, adaID, fragment, VERBOSE=0):
                  '-S', '/bin/bash',
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
-                 '-N', 'exm_'+'{:02d}'.format(adaID),
+                 '-N', 'fmr '+'{:02d}'.format(adaID),
                  '-l', 'h_rt='+cluster_time,
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
@@ -200,71 +200,3 @@ if __name__ == '__main__':
 
             # or else, perform the filtering
             filter_reads(data_folder, adaID, fragment, VERBOSE=VERBOSE)
-
-
-
-#            # Check mutations
-#            seq = read.seq
-#            good_cigar = get_ind_good_cigars(read.cigar,
-#                                             match_len_min=match_len_min)
-#    
-#            # The following two indices indicate the block position in the read
-#            # and in the reference sequence. Because of indels, they are updated
-#            # separately
-#            pos_read = 0
-#            pos_ref = read.pos
-#    
-#            # TODO: include indels as 'mutations'
-#            # TODO: include CIGAR trimming (we should really filter them out!)
-#            for (block_type, block_len), is_good in izip(read.cigar, good_cigar):
-#                # Match
-#                if block_type == 0:
-#                    if is_good:
-#                        reftmp = ref[pos_ref: pos_ref + block_len]
-#                        seqtmp = seq[pos_read: pos_read + block_len]
-#                        seqtmp = np.array(list(seqtmp), 'S1')
-#                        mut_pos = (reftmp != seqtmp).nonzero()[0]
-#    
-#                        ## FIXME: this is mismapping at the beginning of the reference
-#                        ## (the insert length is wrong by 2 bases!)
-#                        #if read.qname == 'HWI-M01346:28:000000000-A53RP:1:1101:11993:2529':
-#                        #    import pdb; pdb.set_trace()
-#    
-#                        if len(mut_pos):
-#                            mut_der_all = seqtmp[mut_pos]
-#                            muts.extend(zip(mut_pos + pos_ref, mut_der_all))
-#                    pos_read += block_len
-#                    pos_ref += block_len
-#    
-#                # Deletion
-#                elif block_type == 2:
-#                    pos_ref += block_len
-#    
-#                # Insert
-#                elif block_type == 1:
-#                    pos_read += block_len
-#    
-#                # Other types of cigar?
-#                else:
-#                    raise ValueError('CIGAR type '+str(block_type)+' not recognized')
-#    
-#    
-#        if len(muts):
-#            # Guard against mismapped reads, which appear as containing a lot of
-#            # mutations
-#            if len(muts) <= 50:
-#                muts_all.append((read1.qname, fragment, muts))
-#    
-#        # Log
-#        if VERBOSE and (not (i_pairs % 10000)): print i_pairs, len(muts_all)
-#    
-#    
-#    # Get rid of mismapped stuff (no read has 50 or more SNPs, not even in the)
-#    mismapped = [x[0] for x in muts_all if len(x[2]) > 50]
-#    muts_all_red = [x for x in muts_all if len(x[2]) < 50]
-#    
-#    ## Write results to file (~1 Gb per 1.5x10^6 reads in the patient sample)
-#    #import cPickle as pickle
-#    #mut_file = 'mutations.pickle'
-#    #with open(data_folder+foldername_adapter(adaID)+mut_file, 'w') as f:
-#    #    pickle.dump(muts_all_red, f, protocol=-1)
