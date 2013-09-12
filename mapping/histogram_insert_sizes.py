@@ -76,9 +76,7 @@ if __name__ == '__main__':
             continue
     
         # Divide by read 1/2 and forward/reverse
-        if read.is_read1: js = 0
-        else: js = 2
-        if read.is_reverse: js += 1
+        js = 2 * read.is_read2 + read.is_reverse
     
         # Sequence and position
         # Note: stampy takes the reverse complement already

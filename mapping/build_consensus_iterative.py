@@ -249,9 +249,7 @@ def make_consensus(data_folder, adaID, fragment, n_iter, VERBOSE=0):
             for i_within_pair, read in enumerate(reads):
             
                 # Divide by read 1/2 and forward/reverse
-                if read.is_read1: js = 0
-                else: js = 2
-                if read.is_reverse: js += 1
+                js = 2 * read.is_read2 + read.is_reverse
             
                 # Read CIGAR code for indels, and anayze each block separately
                 # Note: some reads are weird ligations of HIV and contaminants
