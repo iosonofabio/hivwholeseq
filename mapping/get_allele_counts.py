@@ -197,12 +197,15 @@ def write_output_files(data_folder, adaID, fragment,
         print 'Write to file: '+'{:02d}'.format(adaID)+' '+fragment
 
     # Save counts and coverage
-    counts.dump(get_allele_counts_filename(data_folder, adaID))
-    coverage.dump(get_coverage_filename(data_folder, adaID))
+    counts.dump(get_allele_counts_filename(data_folder, adaID, fragment,
+                                           subsample=subsample))
+    coverage.dump(get_coverage_filename(data_folder, adaID, fragment,
+                                        subsample=subsample))
 
     # Convert inserts to normal nested dictionary for pickle
     inserts_dic = {k: dict(v) for (k, v) in inserts.iteritems()}
-    with open(get_insert_counts_filename(data_folder, adaID), 'w') as f:
+    with open(get_insert_counts_filename(data_folder, adaID, fragment,
+                                         subsample=subsample), 'w') as f:
         pickle.dump(inserts_dic, f, protocol=-1)
 
 
