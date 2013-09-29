@@ -13,4 +13,5 @@ dataset_testmiseq = {'description': 'Test run for the MiSeq and the PCR',
                                  'MIX2 SF162 95% + NL4-3 4.5% + F10 0.5%'),
                      'folder': '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run28_test_samples/',
                      'date': '2013-07-30',
-                     'comments': 'MiSeq run28'}
+                     'comments': 'MiSeq run28',
+                     'primerF5': tuple('F5b' for s in xrange(6))}

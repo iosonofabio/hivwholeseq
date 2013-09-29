@@ -22,12 +22,11 @@ from mapping.adapter_info import load_adapter_table
 from mapping.miseq import alpha, read_types
 from mapping.filenames import get_mapped_filename, get_allele_counts_filename, \
         get_insert_counts_filename, get_coverage_filename, get_consensus_filename
-from mapping.mapping_utils import get_ind_good_cigars, get_trims_from_good_cigars
+from mapping.mapping_utils import get_ind_good_cigars, get_trims_from_good_cigars, \
+        convert_sam_to_bam
 
 
 # Globals
-VERBOSE = 1
-
 # FIXME
 from mapping.datasets import dataset_testmiseq as dataset
 data_folder = dataset['folder']
@@ -43,7 +42,7 @@ JOBLOGERR = JOBDIR+'logerr'
 JOBLOGOUT = JOBDIR+'logout'
 # Different times based on subsample flag
 cluster_time = ['23:59:59', '0:59:59']
-vmem = '8G'
+vmem = '4G'
 
 
 
@@ -76,7 +75,7 @@ def get_allele_counts(data_folder, adaID, fragment, subsample=False, VERBOSE=0):
 
     # Read reference
     reffilename = get_consensus_filename(data_folder, adaID, fragment,
-                                         subsample=subsample)
+                                         subsample=subsample, trim_primers=True)
     refseq = SeqIO.read(reffilename, 'fasta')
     
     # Allele counts and inserts
@@ -87,8 +86,7 @@ def get_allele_counts(data_folder, adaID, fragment, subsample=False, VERBOSE=0):
     inserts = defaultdict(lambda: defaultdict(lambda: np.zeros(len(read_types), int)))
 
     # Open BAM file
-    # Note: the reads should already be filtered of unmapped stuff at this point,
-    # but not of crazy CIGARs
+    # Note: the reads should already be filtered of unmapped stuff at this point
     bamfilename = get_mapped_filename(data_folder, adaID, fragment, type='bam',
                                       filtered=True)
     if not os.path.isfile(bamfilename):
@@ -102,18 +100,10 @@ def get_allele_counts(data_folder, adaID, fragment, subsample=False, VERBOSE=0):
             if (VERBOSE >= 3) and (not ((i +1) % 10000)):
                 print (i+1)
         
-            # Ignore unmapped reads (they should not be here)
-            if read.is_unmapped or not read.is_proper_pair:
-                continue
-        
             # Divide by read 1/2 and forward/reverse
             js = 2 * read.is_read2 + read.is_reverse
         
-            # Read CIGAR code for indels, and anayze each block separately
-            # Note: some reads are weird ligations of HIV and contaminants
-            # (e.g. fosmid plasmids). Those always have crazy CIGARs, because
-            # only the HIV part maps. We hence trim away short indels from the
-            # end of reads (this is still unbiased).
+            # Read CIGARs (they should be clean by now)
             cigar = read.cigar
             len_cig = len(cigar)
             (good_cigars, first_good_cigar, last_good_cigar) = \

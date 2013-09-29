@@ -15,28 +15,29 @@ CHECKPOINT: errors in adapter IDs
 
 CHECKPOINT: length distribution of trimmed reads
 
-3. Do a preliminary mapping onto HXB2 to separate into fragments and spot
+3. Extract a subsample of reads to build a consensus. (extract_subsample_reads.py)
+
+4. Do a preliminary mapping onto HXB2 to separate into fragments and spot
    cross-fragment ligation, short insert sizes reading back into the adapters,
-   contaminants. (divide_reads_into_fragments.py)
+   contaminants. For both the subsample and the full dataset.
+   (divide_reads_into_fragments.py)
 
 NOTE: now the reads should be relatively clean.
 
 NOTE: from this point on, the fragments do not talk to each other anymore. This
       means that for each operation we have 6 x n_samples ~ 50 parallel jobs.
 
-4. Extract a subsample of reads to build a consensus.
-
 5. Consensus building via iterative mapping of subsample: on HXB2 fragments
    first, then on its own consensus. (build_consensus_iterative.py)
 
-CHECKPOINT: check the consensus with reference
+CHECKPOINT: check the consensus with reference (check_consensus.py)
 
-6. Map the full dataset against the final consensus, using BWA and stampy.
+6. Map the full dataset against the final consensus, using stampy (BWA optional).
    (map_to_consensus.py)
 
 CHECKPOINT: mapping issues, coverage
 
-7. Filter BAM files of unmapped stuff and similia.
+7. Filter BAM files of unmapped stuff and similia. (filter_mapped_reads.py)
 
 -------------------------------------------------------------------------------
 END OF MAPPING
@@ -45,3 +46,32 @@ END OF MAPPING
 8. Calculate useful observables: coverage, allele frequencies, mutations.
 
 9. Downstream: do popgen on this.
+
+
+-------------------------------------------------------------------------------
+DIAGRAM
+-------------------------------------------------------------------------------
+  FULL|SUBSAMPLE
+
+    0
+    |
+    1      (long)
+    |
+    2
+    |\
+    | 3
+    | |
+    4 4    (long)
+    | |
+    | 5
+    |/
+    6
+    |
+    7
+    |
+    8
+    |
+    9
+       
+Note: repeating step 4 for the subsample is somewhat redundant, but enables quick checks
+      on the consensus before premapping the full dataset (which is the slow step).

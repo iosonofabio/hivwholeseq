@@ -8,14 +8,17 @@ content:    Map the unclassified reads to phiX as a control.
 # Modules
 import os
 import subprocess as sp
+import argparse
 
+from mapping.filenames import get_mapped_phix_filename, get_phix_filename, \
+        get_unclassified_reads_filenames
+from mapping.mapping_utils import stampy_bin
 
 
 # Globals
-VERBOSE = 1
-data_folder = '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run28_test_samples/'
-phiX_file = '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/phiX_genome.fasta'
-stampy_bin = '/ebio/ag-neher/share/programs/bundles/stampy-1.0.22/stampy.py'
+# FIXME
+from mapping.datasets import dataset_testmiseq as dataset
+data_folder = dataset['folder']
 
 # Submit vars
 JOBSUBMIT = os.path.realpath(__file__)      # This file
@@ -28,43 +31,92 @@ cluster_time = '23:59:59'
 vmem = '8G'
     
 
+# Functions
+def get_phix_index_filename(data_folder, ext=True):
+    '''Get index file for phiX'''
+    dirname = os.path.dirname(get_mapped_phix_filename(data_folder)).rstrip('/')+'/'
+    filename = dirname+'hash/phix'
+    if ext:
+        filename = filename+'.stidx'
+    return filename
+
+
+def get_phix_hash_filename(data_folder, ext=True):
+    '''Get hash file for phiX'''
+    dirname = os.path.dirname(get_mapped_phix_filename(data_folder)).rstrip('/')+'/'
+    filename = dirname+'hash/phix'
+    if ext:
+        filename = filename+'.sthash'
+    return filename
+
+
+def make_output_folders(data_folder, VERBOSE=0):
+    '''Make the phix folder if necessary'''
+    for dirname in map(os.path.dirname,
+                       [get_mapped_phix_filename(data_folder),
+                        get_phix_index_filename(data_folder),
+                        get_phix_hash_filename(data_folder)]):
+
+        if not os.path.isdir(dirname):
+            os.mkdir(dirname)
+            if VERBOSE >= 2:
+                print 'Folder created:', dirname
+
+
 
 # Script
 if __name__ == '__main__':
 
+    # Input arguments
+    parser = argparse.ArgumentParser(description='Map reads to PhiX')
+    parser.add_argument('--verbose', type=int, default=0,
+                        help='Verbosity level [0-3]')
+    parser.add_argument('--submit', action='store_true',
+                        help='Execute the script in parallel on the cluster')
+
+    args = parser.parse_args()
+    VERBOSE = args.verbose
+    submit = args.submit
+
+
+    # Make output folder
+    make_output_folders(data_folder)
+
+    # Get reference sequence filename
+    ref_filename = get_phix_filename()
+
     # 1. Make genome index file
-    if not os.path.isfile(data_folder+'phiX.stidx'):
+    if not os.path.isfile(get_phix_index_filename(data_folder)):
         sp.call([stampy_bin,
                  '--species=phiX',
-                 '-G', data_folder+'phiX',
-                 phiX_file,
+                 '-G', get_phix_index_filename(data_folder, ext=False),
+                 ref_filename,
                  ])
     
     # 2. Build a hash file
-    if not os.path.isfile(data_folder+'phiX.sthash'):
+    if not os.path.isfile(get_phix_hash_filename(data_folder)):
         sp.call([stampy_bin,
-                 '-g', data_folder+'phiX',
-                 '-H', data_folder+'phiX',
+                 '-g', get_phix_index_filename(data_folder, ext=False),
+                 '-H', get_phix_hash_filename(data_folder, ext=False),
                  ])
     
-    # 3. Map (using STAMPY)
-    # Directory to read
-    dirname = 'unclassified_reads/'
+    # 3. Map using stampy
+    input_filenames = get_unclassified_reads_filenames(data_folder, filtered=True)[:2]
+    call_list = [stampy_bin,
+                 '-g', get_phix_index_filename(data_folder, ext=False),
+                 '-h', get_phix_hash_filename(data_folder, ext=False), 
+                 '-o', get_mapped_phix_filename(data_folder, type='sam'),
+                 '-M'] + input_filenames
 
-    # Call stampy
-    # Note: no --solexa option as of 2013 (illumina v1.8)
-    qsub_list = ['qsub','-cwd',
-                 '-o',JOBLOGOUT,
-                 '-e',JOBLOGERR,
-                 '-N', 'stampy_phiX',
-                 '-l', 'h_rt='+cluster_time,
-                 '-l', 'h_vmem='+vmem,
-                 stampy_bin,
-                 '-g', data_folder+'phiX',
-                 '-h', data_folder+'phiX', 
-                 '-o', data_folder+dirname+'mapped_to_phiX_filtered_trimmed.sam',
-                 '-M', data_folder+dirname+'read1_filtered_trimmed.fastq', data_folder+dirname+'read2_filtered_trimmed.fastq']
-    qsub_list = map(str,qsub_list)
+    if submit:
+        call_list = ['qsub','-cwd',
+                     '-o',JOBLOGOUT,
+                     '-e',JOBLOGERR,
+                     '-N', 'map phiX',
+                     '-l', 'h_rt='+cluster_time,
+                     '-l', 'h_vmem='+vmem] + call_list
+
+    call_list = map(str, call_list)
     if VERBOSE:
-        print ' '.join(qsub_list)
-    sp.call(qsub_list)
+        print ' '.join(call_list)
+    sp.call(call_list)

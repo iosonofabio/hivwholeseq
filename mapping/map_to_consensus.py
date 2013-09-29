@@ -35,9 +35,6 @@ JOBLOGOUT = JOBDIR+'logout'
 # Different times based on subsample flag
 cluster_time = ['23:59:59', '0:59:59']
 vmem = '8G'
-stampy_gapopen = 100
-stampy_gapextend = 10
-stampy_sensitive = True
 
 
 # Functions
@@ -65,14 +62,30 @@ def get_hash_file(data_folder, adaID, fragment, subsample=False, ext=True):
     return data_folder+filename
 
 
+def make_output_folders(data_folder, adaID, subsample=False, VERBOSE=0, bwa=False):
+    '''Make the output folders if necessary for hash and map'''
+    hash_foldername = os.path.dirname(get_hash_file(data_folder, adaID, 'F0',
+                                                    subsample=subsample))
+    map_foldername = os.path.dirname(get_mapped_filename(data_folder, adaID, 'F0',
+                                     subsample=subsample))
+    foldernames = [hash_foldername, map_foldername]
+
+    # Add BWA folder if requested
+    if bwa:
+        bwa_foldername = os.path.dirname(get_mapped_filename(data_folder, adaID, 'F0',
+                                         subsample=subsample, bwa=True))
+        foldernames.append(bwa_foldername)
+
+    # Make the folders
+    for dirname in foldernames:
+        if not os.path.isdir(dirname):
+            os.mkdir(dirname)
+        if VERBOSE:
+            print 'Folder created:', dirname
+
+
 def make_index_and_hash(data_folder, adaID, fragment, subsample=False, VERBOSE=0):
     '''Make index and hash files for consensus'''
-    # Make folder if necessary
-    dirname =  os.path.dirname(get_hash_file(data_folder, adaID, 'F0',
-                                             subsample=subsample))
-    if not os.path.isdir(dirname):
-        os.mkdir(dirname)
-
     # 1. Make genome index file
     if not os.path.isfile(get_index_file(data_folder, adaID, fragment,
                                          subsample=subsample, ext=True)):
@@ -104,8 +117,6 @@ def make_bwa_hash(data_folder, adaID, fragment, subsample=False, VERBOSE=0):
     # Make folder if necessary
     dirname =  os.path.dirname(get_hash_file(data_folder, adaID, 'F0',
                                              subsample=subsample))
-    if not os.path.isdir(dirname):
-        os.mkdir(dirname)
 
     # Call bwa index
     cons_filename = get_consensus_filename(data_folder, adaID, fragment,
@@ -137,10 +148,6 @@ def map_bwa(data_folder, adaID, fragment, subsample=False, VERBOSE=0):
     output_filename = get_mapped_filename(data_folder, adaID, fragment,
                                           type='sam', subsample=subsample,
                                           bwa=True)
-    # Make folder if necessary
-    dirname = os.path.dirname(output_filename)
-    if not os.path.isdir(dirname):
-        os.mkdir(dirname)
 
     # Map
     with open(output_filename, 'w') as f:
@@ -156,11 +163,11 @@ def map_bwa(data_folder, adaID, fragment, subsample=False, VERBOSE=0):
 
 def map_stampy(data_folder, adaID, fragment, subsample=False, VERBOSE=0, bwa=False):
     '''Map using stampy, either directly or after BWA'''
-    if VERBOSE:
-        print 'Map via stampy after BWA: '+'{:02d}'.format(adaID)+' '+fragment
-
     # Get input filenames
     if bwa:
+        if VERBOSE:
+            print 'Map via stampy after BWA: '+'{:02d}'.format(adaID)+' '+fragment
+
         bwa_filename = get_mapped_filename(data_folder, adaID, fragment,
                                            type='bam', subsample=subsample,
                                            bwa=True)
@@ -171,18 +178,14 @@ def map_stampy(data_folder, adaID, fragment, subsample=False, VERBOSE=0, bwa=Fal
         readfiles = [bwa_filename]
 
     else:
+        if VERBOSE:
+            print 'Map via stampy (no BWA): '+'{:02d}'.format(adaID)+' '+fragment
         readfiles = get_read_filenames(data_folder, adaID, fragment=fragment,
-                                       subsample=subsample,
-                                       filtered=True)
+                                       subsample=subsample, premapped=True)
 
     # Get output filename
     output_filename = get_mapped_filename(data_folder, adaID, fragment,
                                           type='sam', subsample=subsample)
-
-    # Make folder if necessary
-    dirname = os.path.dirname(output_filename)
-    if not os.path.isdir(dirname):
-        os.mkdir(dirname)
 
     # Map
     call_list = [stampy_bin,
@@ -191,13 +194,9 @@ def map_stampy(data_folder, adaID, fragment, subsample=False, VERBOSE=0, bwa=Fal
                  '-h', get_hash_file(data_folder, adaID, fragment,
                                      subsample=subsample, ext=False), 
                  '-o', output_filename,
-                 '--gapopen='+str(stampy_gapopen),
-                 '--gapextend='+str(stampy_gapextend),
                  '--substitutionrate='+subsrate]
     if bwa:
         call_list.append('--bamkeepgoodreads')
-    if stampy_sensitive:
-        call_list.append('--sensitive')
     call_list = call_list + ['-M'] + readfiles
     call_list = map(str, call_list)
     if VERBOSE >=2:
@@ -272,6 +271,10 @@ if __name__ == '__main__':
 
     # Iterate over all requested samples
     for adaID in adaIDs:
+
+        # Make output folders if necessary
+        make_output_folders(data_folder, adaID, subsample=subsample)
+
         for fragment in fragments:
 
             # Submit to the cluster self if requested

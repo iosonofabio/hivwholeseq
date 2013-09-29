@@ -112,7 +112,6 @@ def get_range_good_cigars(cigar, pos, match_len_min=30,
         return ((start_read, end_read), (start_ref, end_ref))
 
 
-
 def get_trims_from_good_cigars(good_cigars, trim_left=3, trim_right=3):
     '''Set the trimming of cigars'''
     from numpy import zeros
@@ -144,6 +143,19 @@ def convert_sam_to_bam(bamfilename, samfilename=None):
     bamfile.close()
 
 
+def convert_bam_to_sam(samfilename, bamfilename=None):
+    '''Convert BAM file to SAM file format'''
+    import pysam
+    if samfilename is None:
+        samfilename = bamfilename[:-3]+'bam'
+
+    bamfile = pysam.Samfile(samfilename, 'rb')
+    samfile = pysam.Samfile(bamfilename, 'w', template=bamfile)
+    for s in bamfile: samfile.write(s)
+    bamfile.close()
+    samfile.close()
+
+
 def get_fragment_list(data_folder, adaID):
     '''Get the sorted list of fragments as of the BAM file'''
     import pysam
@@ -162,3 +174,62 @@ def get_read_start_end(read):
                   if block_type in [0, 2])
     end = start + len_ref
     return (start, end)
+
+
+def reads_to_seqrecord(reads):
+    '''Build a FASTQ record out of BAM reads
+    
+    Note: copied from Bio.SeqIO.QualityIO.py
+    '''
+    from Bio.Seq import Seq
+    from Bio.SeqRecord import SeqRecord
+
+    # Precompute conversion table
+    SANGER_SCORE_OFFSET = ord("!")
+    q_mapping = dict()
+    for letter in range(0, 255):
+        q_mapping[chr(letter)] = letter - SANGER_SCORE_OFFSET
+    
+    seqs = []
+    for read in reads:
+        # Get the sequence first
+        descr = read.qname
+        id = read.qname
+        name = id
+        from Bio.Alphabet import IUPAC
+        record = SeqRecord(Seq(read.seq, IUPAC.ambiguous_dna),
+                           id=id, name=name, description=descr)
+    
+        # Get the qualities second
+        qualities = [q_mapping[letter] for letter in read.qual]
+        if qualities and (min(qualities) < 0 or max(qualities) > 93):
+            raise ValueError("Invalid character in quality string")
+
+        #For speed, will now use a dirty trick to speed up assigning the
+        #qualities. We do this to bypass the length check imposed by the
+        #per-letter-annotations restricted dict (as this has already been
+        #checked by FastqGeneralIterator). This is equivalent to:
+        #record.letter_annotations["phred_quality"] = qualities
+        dict.__setitem__(record._per_letter_annotations,
+                         "phred_quality", qualities)
+
+        seqs.append(record)
+
+    return seqs
+
+
+def sort_bam(bamfilename_sorted, bamfilename_unsorted=None):
+    '''Sort BAM file'''
+    import pysam
+
+    if bamfilename_unsorted is None:
+        bamfilename_unsorted = bamfilename_sorted[:-11]+'.bam'
+
+    pysam.sort(bamfilename_unsorted, bamfilename_sorted[:-4])
+
+
+def index_bam(bamfilename_sorted):
+    '''Index a BAM file'''
+    import pysam
+
+    pysam.index(bamfilename_sorted)

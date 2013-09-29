@@ -12,9 +12,13 @@ from mapping.adapter_info import foldername_adapter
 
 
 # Functions
-def get_consensus_filename(data_folder, adaID, fragment, subsample=False):
+def get_consensus_filename(data_folder, adaID, fragment, subsample=False,
+                           trim_primers=False):
     '''Find the filename of the final consensus'''
-    filename = 'consensus_'+fragment+'.fasta'
+    filename = 'consensus_'+fragment
+    if trim_primers:
+        filename = filename+'_trim_primers'
+    filename = filename+'.fasta'
     filename = foldername_adapter(adaID)+filename
     if subsample:
         filename = 'subsample/'+filename
@@ -78,10 +82,17 @@ def get_HXB2_fragmented(data_folder, fragment):
 
 
 def get_HXB2_entire(data_folder, cropped=False):
-    '''Get the filename of the reference HXB2 alignment, in one piece'''
+    '''Get the filename of the reference HXB2 sequence, in one piece'''
     filename = 'HXB2'
     if cropped:
         filename = filename+'_cropped_F1_F6'
+    filename = filename+'.fasta'
+    return data_folder+'reference/'+filename
+
+
+def get_NL43_entire(data_folder):
+    '''Get the filename of the reference NL4-3 sequence, in one piece'''
+    filename = 'NL4-3'
     filename = filename+'.fasta'
     return data_folder+'reference/'+filename
 
@@ -125,7 +136,9 @@ def get_read_filenames(data_folder, adaID, fragment=None, subsample=False,
         # If there was a premap, 6 files have to be made for each orientation
         if premapped:
             if fragment is None:
-                fn = [fn+'_F'+str(j)+suffix+'.fastq' for j in xrange(1, 7)] + [fn+'_unmapped.fastq']
+                fn = [fn+'_F'+str(j)+suffix+'.fastq' for j in xrange(1, 7)] +\
+                     [fn+'_ambiguous.fastq'] +\
+                     [fn+'_unmapped.fastq']
             else:
                 fn = fn+'_'+fragment+suffix+'.fastq'
         else:
@@ -155,13 +168,15 @@ def get_premapped_file(data_folder, adaID, type='bam', subsample=False, bwa=Fals
 
 
 def get_mapped_filename(data_folder, adaID, fragment, type='bam', subsample=False,
-                        bwa=False, filtered=False):
+                        bwa=False, filtered=False, sort=False):
     '''Get the filename of the mapped reads onto consensus'''
     filename = fragment
     if bwa:
         filename = filename + '_bwa'
     if filtered:
         filename = filename + '_filtered'
+    if sort:
+        filename = filename + '_sorted'
 
     if type == 'sam':
         filename = filename + '.sam'
@@ -194,3 +209,34 @@ def get_read_unpaired_filename(data_folder, adaID, subsample=False):
         fn = 'subsample/'+fn
     fn = data_folder+fn
     return fn
+
+
+def get_mapped_phix_filename(data_folder, type='bam', filtered=False, sort=False):
+    '''Get the filename of the mapped reads onto PhiX'''
+    filename = 'mapped_to_phix'
+    if filtered:
+        filename = filename + '_filtered'
+    if sort:
+        filename = filename + '_sorted'
+    if type == 'sam':
+        filename = filename + '.sam'
+    elif type == 'bam':
+        filename = filename + '.bam'
+    else:
+        raise ValueError('Type of mapped reads file not recognized')
+    return data_folder+'phix/'+filename
+
+
+def get_phix_filename():
+    '''Get the phiX sequence filename'''
+    filename = '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/phiX_genome.fasta'
+    return filename
+
+
+def get_unclassified_reads_filenames(data_folder, filtered=False):
+    '''Get the filenames of the unclassified reads'''
+    filenames = ['read1', 'read2', 'adapter']
+    if filtered:
+        filenames = [f+'_filtered_trimmed' if 'read' in f else f for f in filenames]
+    filenames = [data_folder+'unclassified_reads/'+f+'.fastq' for f in filenames]
+    return filenames

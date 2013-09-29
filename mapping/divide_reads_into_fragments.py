@@ -31,12 +31,13 @@ from Bio.Seq import reverse_complement
 # Horizontal import of modules from this folder
 from mapping.adapter_info import load_adapter_table, foldername_adapter
 from mapping.miseq import alpha, read_types
-from mapping.sequence_utils.annotate_HXB2 import load_HXB2
+from mapping.reference import load_HXB2
 from mapping.filenames import get_HXB2_entire, get_HXB2_index_file,\
         get_HXB2_hash_file, get_read_filenames, get_premapped_file
 from mapping.mapping_utils import stampy_bin, subsrate, bwa_bin,\
         convert_sam_to_bam, get_read_start_end, get_range_good_cigars,\
         pair_generator
+from mapping.primer_info import primers_coordinates_HXB2_inner as pci
 
 
 
@@ -61,6 +62,13 @@ def make_index_and_hash(data_folder, cropped=True, VERBOSE=0):
     '''Make index and hash files for reference or consensus'''
     if VERBOSE:
         print 'Making index and hash files'
+
+    # Make folder if necessary
+    dirname = os.path.dirname(get_HXB2_hash_file(data_folder))
+    if not os.path.isdir(dirname):
+        os.mkdir(dirname)
+        if VERBOSE:
+            print 'Folder created:', dirname
 
     # 1. Make genome index file for HXB2
     if not os.path.isfile(get_HXB2_index_file(data_folder, ext=True)):
@@ -174,7 +182,7 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, subsample=False, bwa=False):
                  '--substitutionrate='+subsrate]
     if bwa:
         call_list.append('--bamkeepgoodreads')
-    call_list = qsub_list + ['-M'] + readfiles
+    call_list = call_list + ['-M'] + readfiles
     call_list = map(str, call_list)
     if VERBOSE >= 2:
         print ' '.join(call_list)
@@ -231,17 +239,21 @@ def write_read_pair(reads, ranges, fileouts):
     fileouts[1].write("@%s\n%s\n+\n%s\n" % (reads[1].qname, fq2, qual2))
 
 
-def divide_into_fragments(data_folder, adaID, VERBOSE=0, subsample=False):
+def divide_into_fragments(data_folder, adaID, VERBOSE=0, subsample=False,
+                          F5_type='F5b'):
     '''Divide mapped reads into fastq files for the fragments'''
     if VERBOSE:
         print 'Divide into fragments: adaID '+'{:02d}'.format(adaID)
 
-    # Load annotated reference (via GIT submodule)
-    seq = load_HXB2()
+    # Load reference
+    seq = load_HXB2(data_folder)
 
     # Extract fragments
-    frags_pos = [(f.location.nofuzzy_start, f.location.nofuzzy_end)
-                 for f in seq.features if f.type[:8] == 'fragment']
+    frags_sort = ['F1', 'F2', 'F3', 'F4', F5_type, 'F6']
+    frags_pos = []
+    for fragment in frags_sort:
+        co = pci[fragment]
+        frags_pos.append([co[0][0], co[1][1]])
     frags_pos = np.array(frags_pos, int).T
     # Since the reference is cropped, subtract from the positions F1 start
     frags_pos -= frags_pos.min()
@@ -260,7 +272,9 @@ def divide_into_fragments(data_folder, adaID, VERBOSE=0, subsample=False):
     
     # Iterate over the mapped reads and assign fragments
     fragments = []
+    n_mapped = 0
     n_unmapped = 0
+    n_ambiguous = 0
     with pysam.Samfile(bamfilename, 'rb') as bamfile,\
          open(fileouts[0][0], 'w') as fo1_F1,\
          open(fileouts[0][1], 'w') as fo1_F2,\
@@ -268,18 +282,20 @@ def divide_into_fragments(data_folder, adaID, VERBOSE=0, subsample=False):
          open(fileouts[0][3], 'w') as fo1_F4,\
          open(fileouts[0][4], 'w') as fo1_F5,\
          open(fileouts[0][5], 'w') as fo1_F6,\
-         open(fileouts[0][6], 'w') as fo1_um,\
+         open(fileouts[0][6], 'w') as fo1_am,\
+         open(fileouts[0][7], 'w') as fo1_um,\
          open(fileouts[1][0], 'w') as fo2_F1,\
          open(fileouts[1][1], 'w') as fo2_F2,\
          open(fileouts[1][2], 'w') as fo2_F3,\
          open(fileouts[1][3], 'w') as fo2_F4,\
          open(fileouts[1][4], 'w') as fo2_F5,\
          open(fileouts[1][5], 'w') as fo2_F6,\
-         open(fileouts[1][6], 'w') as fo2_um:
+         open(fileouts[1][6], 'w') as fo2_am,\
+         open(fileouts[1][7], 'w') as fo2_um:
 
         # Collect the file handles
-        file_handles = ((fo1_F1, fo1_F2, fo1_F3, fo1_F4, fo1_F5, fo1_F6, fo1_um),
-                        (fo2_F1, fo2_F2, fo2_F3, fo2_F4, fo2_F5, fo2_F6, fo2_um))
+        file_handles = ((fo1_F1, fo1_F2, fo1_F3, fo1_F4, fo1_F5, fo1_F6),
+                        (fo2_F1, fo2_F2, fo2_F3, fo2_F4, fo2_F5, fo2_F6))
 
         for reads in pair_generator(bamfile):
 
@@ -292,8 +308,7 @@ def divide_into_fragments(data_folder, adaID, VERBOSE=0, subsample=False):
                 n_unmapped += 1
                 write_read_pair(reads,
                                 ((0, read1.rlen), (0, read2.rlen)),
-                                (file_handles[0][6],
-                                 file_handles[1][6]))
+                                (fo1_um, fo2_um))
                 continue
 
             # Get the extremes of the good CIGARs (we do some trimming to
@@ -310,8 +325,7 @@ def divide_into_fragments(data_folder, adaID, VERBOSE=0, subsample=False):
                 n_unmapped += 1
                 write_read_pair(reads,
                                 ((0, read1.rlen), (0, read2.rlen)),
-                                (file_handles[0][6],
-                                 file_handles[1][6]))
+                                (fo1_um, fo2_um))
                 continue
 
             # Is the good CIGAR reagion is mapped within a single fragment?
@@ -329,19 +343,21 @@ def divide_into_fragments(data_folder, adaID, VERBOSE=0, subsample=False):
             # A few cases can happen
             # 1. If the intersection is a single fragment, good
             if len(frags_pair) == 1:
+                n_mapped += 1
                 n_frag = frags_pair[0]
                 write_read_pair(reads,
                                 ranges_read,
                                 (file_handles[0][n_frag],
                                  file_handles[1][n_frag]))
 
-            # 2. If 2+ fragments are possible (tie), pick one at random
+            # 2. If 2+ fragments are possible (tie), put into a special bucket
+            # (essentially excluded, because we want two independent measurements
+            # in the overlapping region, but we might want to recover them)
             elif len(frags_pair) > 1:
-                n_frag = np.random.choice(frags_pair)
+                n_ambiguous += 1
                 write_read_pair(reads,
                                 ranges_read,
-                                (file_handles[0][n_frag],
-                                 file_handles[1][n_frag]))
+                                (fo1_am, fo2_am))
             
             # 3. If no fragments are possible (e.g. one read crosses the
             # fragment boundary, they map to different fragments), dump it
@@ -349,8 +365,12 @@ def divide_into_fragments(data_folder, adaID, VERBOSE=0, subsample=False):
                 n_unmapped += 1
                 write_read_pair(reads,
                                 ((0, read1.rlen), (0, read2.rlen)),
-                                (file_handles[0][6],
-                                 file_handles[1][6]))
+                                (fo1_um, fo2_um))
+
+    if VERBOSE >= 3:
+        print 'Mapped: '+str(n_mapped)+', ambiguous: '+str(n_ambiguous)+\
+                ', unmapped: '+str(n_unmapped)
+
 
 
 # Script

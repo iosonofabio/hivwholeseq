@@ -24,6 +24,7 @@ from mapping.miseq import alpha, read_types
 from mapping.filenames import get_consensus_filename, get_mapped_filename
 from mapping.mapping_utils import get_ind_good_cigars, convert_sam_to_bam,\
         pair_generator, get_range_good_cigars
+from mapping.primer_info import primers_inner
 
 
 
@@ -73,11 +74,31 @@ def fork_self(data_folder, adaID, fragment, VERBOSE=0):
 
 def filter_reads(data_folder, adaID, fragment, VERBOSE=0):
     '''Filter the reads to good chunks'''
+    from Bio import pairwise2
 
     # Read reference (fragmented)
     reffilename = get_consensus_filename(data_folder, adaID, fragment)
     refseq = SeqIO.read(reffilename, 'fasta')
     ref = np.array(refseq)
+
+    # Get the coordinate of the inner PCR primers in this consensus via local
+    # alignment
+    primer_fwd, primer_rev = primers_inner[fragment]
+    len_localali = 30
+    ref_fwd = str(refseq.seq)[:len_localali]
+    ref_rev = str(refseq.seq)[-len_localali:]
+    ali_fwd = pairwise2.align.localms(ref_fwd, primer_fwd, 2, -1, -0.5, -0.1)[0][:2]
+    primer_fwd_end = len(ref_fwd) - ali_fwd[1][::-1].index(primer_fwd[-1])
+    primer_fwd_end -= ali_fwd[0][:primer_fwd_end].count('-')
+
+    # The reverse primer works, well, the other way around
+    ali_rev = pairwise2.align.localms(ref_rev, primer_rev, 2, -1, -0.5, -0.1)[0][:2]
+    primer_rev_start = len(ref) - len(ref_rev) + ali_rev[1].index(primer_rev[0])
+    primer_rev_start += ref_rev[len(ref_rev) - len(ref) + primer_rev_start:].count('-')
+
+    # Give decent names
+    start_nonprimer = primer_fwd_end
+    end_nonprimer = primer_rev_start
 
     # Get BAM files
     bamfilename = get_mapped_filename(data_folder, adaID, fragment, type='bam')
@@ -136,7 +157,7 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0):
                     mm = (dict(read1.tags)['NM'], dict(read2.tags)['NM'])
                     if (max(mm) > 50) or (sum(mm) > 50):
                         if VERBOSE >= 2:
-                            print 'Read pair '+read.qname+': too many mismatches '+\
+                            print 'Read pair '+read1.qname+': too many mismatches '+\
                                     '('+str(mm[0])+' + '+str(mm[1])+')'
                         n_mutator += 1
                         skip = True
@@ -172,14 +193,6 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0):
                             skip = True
                             break
 
-                        # If all CIGARs are fine, no tampering needed
-                        elif good_cigars.all():
-                            rlens.append(read.rlen)
-                            continue
-
-                        # We tamper with the read
-                        tampered = True
-
                         # Get the good CIGARs coordinates
                         ((start_read, end_read), (start_ref, end_ref)) = \
                                 get_range_good_cigars(cigar, read.pos,
@@ -187,6 +200,109 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0):
                                                       trim_left=trim_bad_cigars,
                                                       trim_right=trim_bad_cigars)
 
+                        # If all CIGARs are fine and we are at neither end of
+                        # the fragment, no tampering needed
+                        touches_fwd_primer = start_ref < start_nonprimer
+                        touches_rev_primer = end_ref > end_nonprimer
+                        if good_cigars.all() and (not touches_fwd_primer) and (not touches_rev_primer):
+                            rlens.append(read.rlen)
+                            continue
+
+                        # We tamper with the read
+                        tampered = True
+
+                        # Trim CIGAR because of bad CIGARs at the edges
+                        cigarnew = cigar[first_good_cigar: last_good_cigar + 1]
+                        # Trim cigar block lengths
+                        if first_good_cigar != 0:
+                            cigarnew[0] = (cigarnew[0][0],
+                                           cigarnew[0][1] - trim_bad_cigars)
+                        if last_good_cigar != len_cig - 1:
+                            cigarnew[-1] = (cigarnew[-1][0],
+                                            cigarnew[-1][1] - trim_bad_cigars)
+
+                        # Reset first-/last good cigars referred to cigarnew
+                        # (this is needed to trim the primers)
+                        first_good_cigar = 0
+                        last_good_cigar = len(cigarnew) - 1
+
+                        # If we touch the forward primers, we must trim the first cigar chunks
+                        if touches_fwd_primer:
+                            for (block_type, block_len) in cigarnew:
+                                # The first cigar is always a match
+                                if block_type == 0:
+                                    if start_ref + block_len >= start_nonprimer:
+                                        cigarnew[first_good_cigar] = (0, block_len - (start_nonprimer - start_ref))
+                                        start_read += start_nonprimer - start_ref
+                                        start_ref = start_nonprimer
+                                        break
+                                    else:
+                                        start_read += block_len
+                                        start_ref += block_len
+                                        first_good_cigar += 1
+
+                                # For deletions, proceed similar to matches, but
+                                # do not increment the read start
+                                elif block_type == 2:
+                                    if start_ref + block_len >= start_nonprimer:
+                                        cigarnew[first_good_cigar] = (0, block_len - (start_nonprimer - start_ref))
+                                        start_ref = start_nonprimer
+                                        break
+                                    else:
+                                        start_ref += block_len
+                                        first_good_cigar += 1
+
+                                # For inserts, the whole thing is dumped
+                                elif block_type == 1:
+                                    start_read += block_len
+                                    first_good_cigar += 1
+
+                                # Other types of cigar?
+                                else:
+                                    raise ValueError('CIGAR type '+str(block_type)+' not recognized')
+
+                            if VERBOSE >= 4:
+                                print read.qname, 'fwd primer trimming:', cigar, start_ref, start_nonprimer
+
+                        # Repeat the mess for the reverse primer
+                        if touches_rev_primer:
+                            for (block_type, block_len) in cigar[first_good_cigar: last_good_cigar + 1][::-1]:
+                                # The last block is always a match
+                                if block_type == 0:
+                                    if end_ref - block_len <= end_nonprimer:
+                                        cigar[last_good_cigar] = (0, block_len - (end_ref - end_nonprimer))
+                                        end_read -= end_ref - end_nonprimer
+                                        end_ref = end_nonprimer
+                                        break
+                                    else:
+                                        end_read -= block_len
+                                        end_ref -= block_len
+                                        last_good_cigar -= 1
+
+                                # For deletions, similar
+                                elif block_type == 2:
+                                    if end_ref - block_len <= end_nonprimer:
+                                        cigar[last_good_cigar] = (0, block_len - (end_ref - end_nonprimer))
+                                        end_ref = end_nonprimer
+                                        break
+                                    else:
+                                        end_ref -= block_len
+                                        last_good_cigar -= 1
+
+                                elif block_type == 1:
+                                    end_read -= block_len
+                                    last_good_cigar -= 1
+
+                                # Other types of cigar?
+                                else:
+                                    raise ValueError('CIGAR type '+str(block_type)+' not recognized')
+
+                            if VERBOSE >= 4:
+                                print read.qname, 'rev primer trimming:', cigar, len(ref) - end_ref, end_nonprimer
+
+                        # Trim the CIGARs based on trimming primers
+                        read.cigar = cigarnew[first_good_cigar: last_good_cigar + 1]
+                        
                         # Modify the read in place
                         # The mate stuff is done afterwards, and so is isize
                         # Note: we must take the qual BEFORE changing the seq,
@@ -198,16 +314,6 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0):
                         read.pos = start_ref
                         # Give up the number of mismatches
                         read.tags.pop(map(itemgetter(0), read.tags).index('NM'))
-                        # CIGAR
-                        cigarnew = cigar[first_good_cigar: last_good_cigar + 1]
-                        # Trim cigar block lengths
-                        if first_good_cigar != 0:
-                            cigarnew[0] = (cigarnew[0][0],
-                                           cigarnew[0][1] - trim_bad_cigars)
-                        if last_good_cigar != len_cig - 1:
-                            cigarnew[-1] = (cigarnew[-1][0],
-                                            cigarnew[-1][1] - trim_bad_cigars)
-                        read.cigar = cigarnew
                         rlens.append(end_read - start_read)
 
                     # Mate pair stuff if we tampered with any of the reads
@@ -232,7 +338,7 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0):
                     map(outfile.write, reads)
 
 
-    if VERBOSE >= 3:
+    if VERBOSE >= 1:
         print 'Reads: '+str(n_good)+' good, '+str(n_unmapped)+' unmapped, '+\
                 str(n_unpaired)+' unpaired, '+str(n_mismapped_edge)+' edge, '+\
                 str(n_mutator)+' many-mutations, '+str(n_badcigar)+' bad CIGAR.'

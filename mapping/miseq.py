@@ -16,3 +16,4 @@ alpha = array(alphal, 'S1')
 
 # Read types
 read_types = ['read1 f', 'read1 r', 'read2 f', 'read2 r']
+read_pair_types = ['read1 f read2 r', 'read1 r read2 f']

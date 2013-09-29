@@ -134,18 +134,24 @@ def make_index_and_hash(data_folder, adaID, fragment, n_iter, VERBOSE=0):
 
     # 1. Make genome index file for 6 fragments (chromosomes)
     if not os.path.isfile(get_index_file(data_folder, adaID, fragment, n_iter, ext=True)):
-        sp.call([stampy_bin,
-                 '--species="HIV adaID '+'{:02d}'.format(adaID)+' fragment '+fragment+'"',
-                 '-G', get_index_file(data_folder, adaID, fragment, n_iter, ext=False),
-                 get_ref_file(data_folder, adaID, fragment, n_iter),
-                 ])
+        call_list = [stampy_bin,
+                     '--species="HIV adaID '+'{:02d}'.format(adaID)+' fragment '+fragment+'"',
+                     '-G', get_index_file(data_folder, adaID, fragment, n_iter, ext=False),
+                     get_ref_file(data_folder, adaID, fragment, n_iter),
+                    ]
+        if VERBOSE >= 3:
+            print ' '.join(call_list)
+        sp.call(call_list)
     
     # 2. Build a hash file for 6 fragments
     if not os.path.isfile(get_hash_file(data_folder, adaID, fragment, n_iter, ext=True)):
-        sp.call([stampy_bin,
-                 '-g', get_index_file(data_folder, adaID, fragment, n_iter, ext=False),
-                 '-H', get_hash_file(data_folder, adaID, fragment, n_iter, ext=False),
-                 ])
+        call_list = [stampy_bin,
+                     '-g', get_index_file(data_folder, adaID, fragment, n_iter, ext=False),
+                     '-H', get_hash_file(data_folder, adaID, fragment, n_iter, ext=False),
+                    ]
+        if VERBOSE >= 3:
+            print ' '.join(call_list)
+        sp.call(call_list)
 
 
 def map_stampy(data_folder, adaID, fragment, n_iter, VERBOSE=0):
