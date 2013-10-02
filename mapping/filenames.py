@@ -75,6 +75,15 @@ def get_coverage_filename(data_folder, adaID, fragment, subsample=False):
     return data_folder+filename
 
 
+def get_allele_frequencies_filename(data_folder, adaID, fragment, subsample=False):
+    '''Get the filename with the corrected allele frequencies'''
+    filename = 'allele_frequencies_'+fragment+'.npy'
+    filename = foldername_adapter(adaID)+filename
+    if subsample:
+        filename = 'subsample/'+filename
+    return data_folder+filename
+
+
 def get_HXB2_fragmented(data_folder, fragment):
     '''Get the filename of the reference HXB2 alignment, divided in fragments'''
     filename = 'HXB2_'+fragment+'.fasta'

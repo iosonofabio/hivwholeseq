@@ -1,12 +1,14 @@
+#!/usr/bin/env python
 # vim: fdm=indent
 '''
 author:     Fabio Zanini
 date:       05/08/13
-content:    Extract the frequency of minor alleles.
+content:    Correct the allele frequencies comparing read types and write to file.
 '''
 # Modules
 import os
 import sys
+import subprocess as sp
 import cPickle as pickle
 import argparse
 import re
@@ -16,21 +18,10 @@ from itertools import izip
 import pysam
 import numpy as np
 from Bio import SeqIO
-import matplotlib.cm as cm
-
-# Matplotlib parameters
-import matplotlib
-params = {'axes.labelsize': 20, 
-          'text.fontsize': 20,
-          'legend.fontsize': 18,
-          'xtick.labelsize': 16,
-          'ytick.labelsize': 16,
-          'text.usetex': False}
-matplotlib.rcParams.update(params)
-import matplotlib.pyplot as plt
 
 from mapping.miseq import alpha, read_types
-from mapping.filenames import get_allele_counts_filename, get_coverage_filename
+from mapping.filenames import get_allele_counts_filename, get_coverage_filename, \
+        get_allele_frequencies_filename
 from mapping.mapping_utils import get_fragment_list
 from mapping.adapter_info import load_adapter_table
 
@@ -42,30 +33,42 @@ from mapping.datasets import dataset_testmiseq as dataset
 data_folder = dataset['folder']
 
 
+# Cluster submit
+import mapping
+JOBDIR = mapping.__path__[0].rstrip('/')+'/'
+JOBSCRIPT = JOBDIR+'filter_allele_frequencies.py'
+JOBLOGERR = JOBDIR+'logerr'
+JOBLOGOUT = JOBDIR+'logout'
+# Different times based on subsample flag
+cluster_time = '0:59:59'
+vmem = '2G'
+
+
+
+
 
 # Functions
-def get_minor_allele_counts(counts, n_minor=1):
-    '''Extract the minor allele counts
-    
-    Parameters:
-       - counts: the complete allele counts
-       - n_minor: how many minor alleles?
-    '''
-    # Copy input structure
-    counts = counts.copy()
-
-    # Prepare output data structures
-    # The last axis is: [base index (A := 0, C := 1, ...), counts]
-    # Note: the first array is the major allele
-    all_sorted = np.zeros((n_minor + 1, counts.shape[0], counts.shape[2], 2), int)
-    for js, ctype in enumerate(counts):
-        for pos, cpos in enumerate(ctype.swapaxes(0, 1)):
-            for i, all_counts in enumerate(all_sorted):
-                imax = cpos.argmax()
-                all_counts[js, pos] = (imax, cpos[imax])
-                cpos[imax] = -1
-
-    return all_sorted
+def fork_self(data_folder, adaID, fragment, subsample=False, VERBOSE=3):
+    '''Fork self for each adapter ID and fragment'''
+    qsub_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'acn '+'{:02d}'.format(adaID)+' '+fragment,
+                 '-l', 'h_rt='+cluster_time,
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--adaIDs', adaID,
+                 '--fragments', fragment,
+                 '--verbose', VERBOSE,
+                ]
+    if subsample:
+        qsub_list.append('--subsample')
+    qsub_list = map(str, qsub_list)
+    if VERBOSE:
+        print ' '.join(qsub_list)
+    sp.call(qsub_list)
 
 
 def filter_nus(counts, coverage):
@@ -130,6 +133,15 @@ def filter_nus(counts, coverage):
     return nu_filtered
 
 
+def write_frequencies(data_folder, adaID, fragment, nu_filtered,
+                      subsample=False, VERBOSE=0):
+    '''Write the corrected allele frequencies to file'''
+    if VERBOSE:
+        print 'Storing allele frequencies to file:', adaID, fragment
+    nu_filtered.dump(get_allele_frequencies_filename(data_folder, adaID, fragment,
+                                                     subsample=subsample))
+
+
 
 # Script
 if __name__ == '__main__':
@@ -144,12 +156,15 @@ if __name__ == '__main__':
                         help='Verbosity level [0-3]')
     parser.add_argument('--subsample', action='store_true',
                         help='Apply only to a subsample of the reads')
+    parser.add_argument('--submit', action='store_true',
+                        help='Execute the script in parallel on the cluster')
 
     args = parser.parse_args()
     adaIDs = args.adaIDs
     fragments = args.fragments
     VERBOSE = args.verbose
     subsample = args.subsample
+    submit = args.submit
 
     # If the script is called with no adaID, iterate over all
     if not adaIDs:
@@ -165,72 +180,22 @@ if __name__ == '__main__':
 
     # Iterate over all requested samples
     for adaID in adaIDs:
-
-        nus_minor = {}
-        alls_minor = {}
-        nus_filtered = {}
-        nus_minor_filtered = {}
         for fragment in fragments:
 
-            try:
-                counts = np.load(get_allele_counts_filename(data_folder, adaID, fragment))
-                coverage = np.load(get_coverage_filename(data_folder, adaID, fragment))
-    
-    
-                # TODO: study insertions
-    
-                (counts_major,
-                 counts_minor,
-                 counts_minor2) = get_minor_allele_counts(counts, n_minor=2)
-    
-                # Get minor allele frequencies and identities
-                nu_minor = 1.0 * counts_minor[:, :, 1] / (coverage + 1e-6)
-                nus_minor[fragment] = nu_minor
-                all_minor = counts_minor[:, :, 0]
-                alls_minor[fragment] = all_minor
-    
-                # Filter the minor frequencies by comparing the read types
-                nu_filtered = filter_nus(counts, coverage)
-                nut = np.zeros(nu_filtered.shape[-1])
-                for pos, nupos in enumerate(nu_filtered.T):
-                    nut[pos] = np.sort(nupos)[-2]
-                
-                nus_filtered[fragment] = nu_filtered
-                nus_minor_filtered[fragment] = nut
+            # Submit to the cluster self if requested
+            if submit:
+                fork_self(data_folder, adaID, fragment,
+                          subsample=subsample, VERBOSE=VERBOSE)
+                continue
 
-            except IOError:
-               pass 
-
-        # Plot them
-        fig, axs = plt.subplots(2, 3, figsize=(13, 8))
-        fig.suptitle('adapterID '+'{:02d}'.format(adaID), fontsize=20)
-        axs = axs.ravel()
-        for i, fragment in enumerate(fragments):
-            try:
-                ax = axs[i]
-                ax.set_yscale('log')
-                ax.set_title(fragment)
-                if i in [0, 3]:
-                    ax.set_ylabel(r'$\nu$')
-                if i > 2:
-                    ax.set_xlabel('Position')
+            # Get coverage and counts
+            counts = np.load(get_allele_counts_filename(data_folder, adaID, fragment))
+            coverage = np.load(get_coverage_filename(data_folder, adaID, fragment))
     
-                for js, nu_minorjs in enumerate(nus_minor[fragment]):
-                    color = cm.jet(int(255.0 * js / len(read_types)))
-                    ax.plot(nu_minorjs, lw=1.5, c=color, label=read_types[js])
-                    ax.scatter(np.arange(len(nu_minorjs)), nu_minorjs, lw=1.5,
-                               color=color)
-                
-                # Plot filtered
-                ax.plot(nus_minor_filtered[fragment] + 1e-6, lw=1.5, c='k',
-                        alpha=0.5, label='Filtered')
+            # Filter the minor frequencies by comparing the read types
+            nu_filtered = filter_nus(counts, coverage)
 
-                ax.set_xlim(-100, len(nu_minorjs) + 100)
-            except:
-                pass
-    
-        plt.legend(loc='upper center')
-        plt.tight_layout(rect=(0, 0, 1, 0.95))
+            # Write output
+            write_frequencies(data_folder, adaID, fragment, nu_filtered,
+                              subsample=subsample, VERBOSE=VERBOSE)
 
-        plt.ion()
-        plt.show() 
