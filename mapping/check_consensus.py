@@ -37,7 +37,7 @@ from mapping.filenames import get_HXB2_fragmented, get_read_filenames,\
 # Globals
 VERBOSE = 3
 # FIXME
-from mapping.datasets import dataset_testmiseq as dataset
+from mapping.datasets import dataset_2 as dataset
 data_folder = dataset['folder']
 references = {2: 'NL4-3', 4: 'SHIV_SF162'}
 
@@ -81,6 +81,8 @@ def find_overlap(seq1, seq2):
     '''Find the overlap between two consecutive fragments'''
     s1 = str(seq1.seq)
     s2 = str(seq2.seq)
+
+    #FIXME: invert the bsize and while loops!
 
     # Align the seq back to the reference
     for bsize in [40, 30, 20, 15, 10, 7]:
@@ -166,9 +168,9 @@ if __name__ == '__main__':
 
     for adaID in adaIDs:
 
-        # If there is a reference, check it
-        if (adaID in [2, 4]) and (not reference):
-            reference = references[adaID]
+        ## If there is a reference, check it
+        #if (adaID in [2, 4]) and (not reference):
+        #    reference = references[adaID]
         if reference:
             refseq = SeqIO.read(data_folder+'reference/'+reference+'.fasta', 'fasta')
             

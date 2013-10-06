@@ -14,15 +14,21 @@ dataset_testmiseq = {'description': 'Test run for the MiSeq and the PCR',
                      'folder': '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run28_test_samples/',
                      'date': '2013-07-30',
                      'comments': 'MiSeq run28',
-                     'primerF5': tuple('F5b' for s in xrange(6))}
+                     'primerF5': tuple('F5b' for s in xrange(6)),
+                     'raw_data': {'read1': 'lane1_NoIndex_L001_R1_001.fastq',
+                                  'adapter': 'lane1_NoIndex_L001_R2_001.fastq',
+                                  'read2': 'lane1_NoIndex_L001_R3_001.fastq'}}
 
 dataset_2 = {'description': 'Second library (first patient-only)',
              'adapters': (2, 4, 5, 6, 7, 12, 13, 14, 15),
              'samples': ('VK04-3106', '08HR-0235', 'VK07-4778', 'VK03-4298',
                          'VK09-7738', 'VK08-8014', 'VK08-6634', 'VK07-8262',
                          'VK08-2987'),
-             'folder': '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run37_2/',
+             'folder': '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run37/',
              'date': '2013-09-30',
              'comments': 'MiSeq run37',
              'primerF5': ('F5b', 'F5b', 'F5b', 'F5b',
-                          'F5a', 'F5a', 'F5a', 'F5a', 'F5a')}
+                          'F5a', 'F5a', 'F5a', 'F5a', 'F5a'),
+             'raw_data': {'read1': 'read1.fastq',
+                          'adapter': 'barcode.fastq',
+                          'read2': 'read2.fastq'}}

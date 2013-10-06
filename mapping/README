@@ -2,9 +2,9 @@
 PIPELINE FOR HIV MISEQ SEQUENCING DATA
 -------------------------------------------------------------------------------
 0. We get three FASTQ files from Joerg (and the Miseq):
- - R1 is read 2
- - R2 is adapter sequence
- - R3 is read 2
+ - read1
+ - read2
+ - barcode/adapter
 
 1. Demultiplex by adapter and put into separate folders with the adapter IDs and
    sample names. (demultiplex.py)

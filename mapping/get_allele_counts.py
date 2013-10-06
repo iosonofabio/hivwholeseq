@@ -70,7 +70,8 @@ def fork_self(data_folder, adaID, fragment, subsample=False, VERBOSE=3):
     sp.call(qsub_list)
 
 
-def get_allele_counts(data_folder, adaID, fragment, subsample=False, VERBOSE=0):
+def get_allele_counts(data_folder, adaID, fragment, subsample=False, VERBOSE=0,
+                      maxreads=1e10):
     '''Extract allele and insert counts from a bamfile'''
 
     # Read reference
@@ -95,6 +96,11 @@ def get_allele_counts(data_folder, adaID, fragment, subsample=False, VERBOSE=0):
 
         # Iterate over single reads (no linkage info needed)
         for i, read in enumerate(bamfile):
+
+            if i > maxreads:
+                if VERBOSE >= 2:
+                    print 'Max reads reached:', maxreads
+                break
         
             # Print output
             if (VERBOSE >= 3) and (not ((i +1) % 10000)):

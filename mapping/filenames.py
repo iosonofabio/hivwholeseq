@@ -11,6 +11,11 @@ from mapping.adapter_info import foldername_adapter
 
 
 
+# Globals
+reference_folder = '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/reference/'
+
+
+
 # Functions
 def get_consensus_filename(data_folder, adaID, fragment, subsample=False,
                            trim_primers=False):
@@ -57,6 +62,15 @@ def get_allele_counts_filename(data_folder, adaID, fragment, subsample=False):
     return data_folder+filename
 
 
+def get_coallele_counts_filename(data_folder, adaID, fragment, subsample=False):
+    '''Get the filename with the allele counts for all reads'''
+    filename = 'coallele_counts_'+fragment+'.npy'
+    filename = foldername_adapter(adaID)+filename
+    if subsample:
+        filename = 'subsample/'+filename
+    return data_folder+filename
+
+
 def get_insert_counts_filename(data_folder, adaID, fragment, subsample=False):
     '''Get the filename with the insert counts for all reads'''
     filename = 'insert_counts_'+fragment+'.pickle'
@@ -84,45 +98,47 @@ def get_allele_frequencies_filename(data_folder, adaID, fragment, subsample=Fals
     return data_folder+filename
 
 
-def get_HXB2_fragmented(data_folder, fragment):
+def get_HXB2_fragmented(fragment, ext=True):
     '''Get the filename of the reference HXB2 alignment, divided in fragments'''
-    filename = 'HXB2_'+fragment+'.fasta'
-    return data_folder+'reference/'+filename
+    filename = 'HXB2_'+fragment
+    if ext:
+        filename = filename+'.fasta'
+    return reference_folder+filename
 
 
-def get_HXB2_entire(data_folder, cropped=False):
+def get_HXB2_entire(cropped=False):
     '''Get the filename of the reference HXB2 sequence, in one piece'''
     filename = 'HXB2'
     if cropped:
         filename = filename+'_cropped_F1_F6'
     filename = filename+'.fasta'
-    return data_folder+'reference/'+filename
+    return reference_folder+filename
 
 
-def get_NL43_entire(data_folder):
+def get_NL43_entire():
     '''Get the filename of the reference NL4-3 sequence, in one piece'''
     filename = 'NL4-3'
     filename = filename+'.fasta'
-    return data_folder+'reference/'+filename
+    return reference_folder+filename
 
 
-def get_HXB2_index_file(data_folder, fragment='F0', ext=True):
+def get_HXB2_index_file(fragment='F0', ext=True):
     '''Get the index filename, with or w/o extension'''
     filename = 'HXB2'
     if fragment != 'F0':
         filename = filename+'_'+fragment
-    filename = data_folder+'reference/hash/'+filename
+    filename = reference_folder+'hash/'+filename
     if ext:
         filename = filename+'.stidx'
     return filename
 
 
-def get_HXB2_hash_file(data_folder, fragment='F0', ext=True):
+def get_HXB2_hash_file(fragment='F0', ext=True):
     '''Get the index filename, with or w/o extension'''
     filename = 'HXB2'
     if fragment != 'F0':
         filename = filename+'_'+fragment
-    filename = data_folder+'reference/hash/'+filename
+    filename = reference_folder+'hash/'+filename
     if ext:
         filename = filename+'.sthash'
     return filename
@@ -200,14 +216,11 @@ def get_mapped_filename(data_folder, adaID, fragment, type='bam', subsample=Fals
     return data_folder+filename
 
 
-def get_raw_read_files(data_folder):
-    '''Get the raw files which we obtain from Joerg'''
-    datafile_read1 = data_folder+'lane1_NoIndex_L001_R1_001.fastq'
-    datafile_adapter = data_folder+'lane1_NoIndex_L001_R2_001.fastq'
-    datafile_read2 = data_folder+'lane1_NoIndex_L001_R3_001.fastq'
-    return {'read1': datafile_read1,
-            'read2': datafile_read2,
-            'adapter': datafile_adapter}
+def get_raw_read_files(dataset):
+    '''Get the raw files which we obtain from Joerg/Xi'''
+    data_folder = dataset['folder'].rstrip('/')+'/'
+    return {key: data_folder+subdir
+            for key, subdir in dataset['raw_data'].iteritems()}
 
 
 def get_read_unpaired_filename(data_folder, adaID, subsample=False):

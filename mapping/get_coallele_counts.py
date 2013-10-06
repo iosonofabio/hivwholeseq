@@ -22,9 +22,10 @@ from Bio import SeqIO
 from mapping.adapter_info import load_adapter_table
 from mapping.miseq import alpha, alphal, read_pair_types
 from mapping.filenames import get_mapped_filename, get_allele_counts_filename, \
-        get_insert_counts_filename, get_coverage_filename, get_consensus_filename
+        get_coallele_counts_filename, get_consensus_filename
 from mapping.mapping_utils import get_ind_good_cigars, get_trims_from_good_cigars, \
         pair_generator
+from mapping.get_allele_counts import get_allele_counts
 
 
 # Globals
@@ -34,6 +35,7 @@ data_folder = dataset['folder']
 
 match_len_min = 30
 trim_bad_cigars = 3
+maxreads = 1e2 #FIXME
 
 # Cluster submit
 import mapping
@@ -55,7 +57,7 @@ def fork_self(data_folder, adaID, fragment, subsample=False, VERBOSE=3):
                  '-S', '/bin/bash',
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
-                 '-N', 'acn '+'{:02d}'.format(adaID)+' '+fragment,
+                 '-N', 'cac '+'{:02d}'.format(adaID)+' '+fragment,
                  '-l', 'h_rt='+cluster_time[subsample],
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
@@ -76,7 +78,7 @@ def get_coallele_counts(data_folder, adaID, fragment, subsample=False, VERBOSE=0
 
     # Read reference
     reffilename = get_consensus_filename(data_folder, adaID, fragment,
-                                         subsample=subsample)
+                                         subsample=subsample, trim_primers=True)
     refseq = SeqIO.read(reffilename, 'fasta')
     ref = np.array(refseq)
     
@@ -99,6 +101,12 @@ def get_coallele_counts(data_folder, adaID, fragment, subsample=False, VERBOSE=0
 
         # Iterate over read pairs
         for i, reads in enumerate(pair_generator(bamfile)):
+
+            # Limit to some reads for testing
+            if i > maxreads:
+                if VERBOSE:
+                    print 'Max read number reached:', maxreads
+                break
         
             # Print output
             if (VERBOSE >= 3) and (not ((i +1) % 10)):
@@ -116,20 +124,14 @@ def get_coallele_counts(data_folder, adaID, fragment, subsample=False, VERBOSE=0
             # Collect from the pair of reads
             for read in reads:
         
-                # Read CIGARs (they should be clean by now)
-                cigar = read.cigar
-                len_cig = len(cigar)
-                (good_cigars, first_good_cigar, last_good_cigar) = \
-                        get_ind_good_cigars(cigar, match_len_min=match_len_min,
-                                            full_output=True)
-                
                 # Sequence and position
                 # Note: stampy takes the reverse complement already
                 seq = read.seq
                 pos = read.pos
     
                 # Iterate over CIGARs
-                for ic, (block_type, block_len) in enumerate(cigar):
+                len_cig = len(read.cigar)
+                for ic, (block_type, block_len) in enumerate(read.cigar):
     
                     # Check for pos: it should never exceed the length of the fragment
                     if (block_type in [0, 1, 2]) and (pos > len(refseq)):
@@ -137,26 +139,13 @@ def get_coallele_counts(data_folder, adaID, fragment, subsample=False, VERBOSE=0
                 
                     # Inline block
                     if block_type == 0:
-                        # Exclude bad CIGARs
-                        if good_cigars[ic]: 
-
-                            # The first and last good CIGARs are matches:
-                            # trim them (unless they end the read)
-                            if (ic == first_good_cigar) and (ic != 0):
-                                trim_left = trim_bad_cigars
-                            else:
-                                trim_left = 0
-                            if (ic == last_good_cigar) and (ic != len_cig - 1):
-                                trim_right = trim_bad_cigars
-                            else:
-                                trim_right = 0
  
-                            # Get the mutations and add them
-                            indb = map(alphal.index, seq[trim_left:block_len - trim_right])
-                            positions[imut: imut + len(indb)] = \
-                                    pos + trim_left + np.arange(len(indb))
-                            ais[imut: imut + len(indb)] = indb
-                            imut += len(indb)
+                        # Get the mutations and add them
+                        indb = map(alphal.index, seq)
+                        positions[imut: imut + len(indb)] = \
+                                pos + np.arange(len(indb))
+                        ais[imut: imut + len(indb)] = indb
+                        imut += len(indb)
 
                         # Chop off this block
                         if ic != len_cig - 1:
@@ -180,26 +169,38 @@ def get_coallele_counts(data_folder, adaID, fragment, subsample=False, VERBOSE=0
                     else:
                         raise ValueError('CIGAR type '+str(block_type)+' not recognized')
 
+            if VERBOSE >= 4:
+                for pos, ai in izip(positions, ais):
+                    if pos == -1:
+                        break
+                    print pos, ai
+
             # Put the mutations into the matrix
-            # Transversal
             for ai1 in xrange(len(alpha)):
                 for ai2 in xrange(len(alpha)):
                     coun = count[ai1, ai2]
                     pos1 = positions[ais == ai1]
-                    pos2 = positions[ais == ai2]
+                    if ai1 == ai2: pos2 = pos1
+                    else: pos2 = positions[ais == ai2]
                     coords = np.meshgrid(pos1, pos2)
-                    ind = coords[0].ravel() * count.shape[0] + coords[1].ravel()
-                    coun.ravel()[ind] += 1
-
-            ## Longitudinal
-            #for i1, (pos1, ia1) in enumerate(izip(positions, ais)):
-            #    for (pos2, ia2) in izip(positions[:i1], ais[:i1]):
-            #        count[ia1, pos1, ia2, pos2] += 1
-
-        import ipdb; ipdb.set_trace()
-                                        
+                    ind = coords[0].ravel() * coun.shape[0] + coords[1].ravel()
+                    coun.ravel()[ind] += 1                                        
 
     return counts
+
+
+def write_output_files(data_folder, adaID, fragment,
+                       counts, subsample=False, VERBOSE=0):
+    '''Write coallele counts to file'''
+    if VERBOSE >= 1:
+        print 'Write to file: '+'{:02d}'.format(adaID)+' '+fragment
+
+    # Save counts and coverage
+    # TODO: use compressed files?
+    counts.dump(get_coallele_counts_filename(data_folder, adaID, fragment,
+                                             subsample=subsample))
+
+
 
 # Script
 if __name__ == '__main__':
@@ -247,14 +248,30 @@ if __name__ == '__main__':
                 continue
 
             # Get cocounts
-            counts = get_coallele_counts(data_folder, adaID, fragment,
-                                         subsample=subsample, VERBOSE=VERBOSE)
+            cocounts = get_coallele_counts(data_folder, adaID, fragment,
+                                           subsample=subsample, VERBOSE=VERBOSE)
 
-            # Get coverage
-            #coverage = counts.sum(axis=1)
+            ## Check using the allele counts and the diagonal cocounts
+            #counts, _ = get_allele_counts(data_folder, adaID, fragment,
+            #                              subsample=subsample, VERBOSE=VERBOSE,
+            #                              maxreads=2 * maxreads)
 
-            ## Save to file
-            #write_output_files(data_folder, adaID, fragment,
-            #                   counts, inserts, coverage,
-            #                   subsample=subsample, VERBOSE=VERBOSE)
+            #cocount = cocounts.sum(axis=0)
+            #count = counts.sum(axis=0)
+
+            ## Read reference
+            #reffilename = get_consensus_filename(data_folder, adaID, fragment,
+            #                                     subsample=subsample, trim_primers=True)
+            #refseq = SeqIO.read(reffilename, 'fasta')
+            #ref = np.array(refseq)
+            #refi = np.array([(alpha == a).nonzero()[0][0] for a in ref], int)
+
+            ## Check that counts and diagonal cocounts are the same thing
+            #for i in xrange(100):
+            #    j = refi[i]
+            #    print cocount[j, j, i, i], count[j, i]
+
+            # Save to file
+            write_output_files(data_folder, adaID, fragment,
+                               cocounts, subsample=subsample, VERBOSE=VERBOSE)
 

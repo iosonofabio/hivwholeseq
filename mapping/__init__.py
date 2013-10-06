@@ -8,5 +8,6 @@ __all__ = ['test',
            'mapping_utils',
            'filenames',
            'sequence_utils',
+           'get_allele_counts',
            'minor_allele_frequency',
           ]

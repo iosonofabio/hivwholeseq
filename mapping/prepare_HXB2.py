@@ -21,7 +21,7 @@ from mapping.filenames import get_HXB2_fragmented, get_HXB2_entire
 
 # Globals
 # FIXME
-from mapping.datasets import dataset_testmiseq as dataset
+from mapping.datasets import dataset_2 as dataset
 data_folder = dataset['folder']
 
 
@@ -30,9 +30,9 @@ data_folder = dataset['folder']
 if __name__ == '__main__':
 
     # Get the annotated sequence
-    seq = load_HXB2(data_folder)
+    seq = load_HXB2()
 
-    # Extract fragments coordinates and sequences
+    # Extract fragments coordinates and sequences (this is sample specific)
     frag_coos = {f: [co[0][0], co[1][1]] for f, co in pci.iteritems()}
     frag_seqs = {f: seq[co[0]: co[1]] for f, co in frag_coos.iteritems()}
 
@@ -55,8 +55,8 @@ if __name__ == '__main__':
         os.mkdir(dirname)
 
     # Write to file both the entire, the cropped, and the fragmented (in separated files)
-    SeqIO.write(seq, get_HXB2_entire(data_folder), 'fasta')
-    SeqIO.write(seq_cropped, get_HXB2_entire(data_folder, cropped=True), 'fasta')
+    SeqIO.write(seq, get_HXB2_entire(), 'fasta')
+    SeqIO.write(seq_cropped, get_HXB2_entire(cropped=True), 'fasta')
     for (f, fs) in frag_seqs.iteritems():
-        SeqIO.write(fs, get_HXB2_fragmented(data_folder, f), 'fasta')
+        SeqIO.write(fs, get_HXB2_fragmented(f), 'fasta')
         print f

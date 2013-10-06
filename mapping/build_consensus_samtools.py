@@ -84,7 +84,7 @@ def build_consensus(data_folder, adaID, fragment, VERBOSE=0):
     with open(output_filename, 'w') as fo:
         p1 = sp.Popen(['samtools',
                        'mpileup', '-u',
-                       '-f', get_HXB2_fragmented(data_folder, fragment),
+                       '-f', get_HXB2_fragmented(fragment),
                        sorted_reads_filename],               
                       stdout=sp.PIPE)
         p2 = sp.Popen(['bcftools',

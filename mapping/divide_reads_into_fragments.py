@@ -43,7 +43,7 @@ from mapping.primer_info import primers_coordinates_HXB2_inner as pci
 
 # Globals
 # FIXME
-from mapping.datasets import dataset_testmiseq as dataset
+from mapping.datasets import dataset_2 as dataset
 data_folder = dataset['folder']
 
 # Cluster submit
@@ -64,25 +64,25 @@ def make_index_and_hash(data_folder, cropped=True, VERBOSE=0):
         print 'Making index and hash files'
 
     # Make folder if necessary
-    dirname = os.path.dirname(get_HXB2_hash_file(data_folder))
+    dirname = os.path.dirname(get_HXB2_hash_file())
     if not os.path.isdir(dirname):
         os.mkdir(dirname)
         if VERBOSE:
             print 'Folder created:', dirname
 
     # 1. Make genome index file for HXB2
-    if not os.path.isfile(get_HXB2_index_file(data_folder, ext=True)):
+    if not os.path.isfile(get_HXB2_index_file(ext=True)):
         sp.call([stampy_bin,
                  '--species="HIV"',
-                 '-G', get_HXB2_index_file(data_folder, ext=False),
-                 get_HXB2_entire(data_folder, cropped=cropped),
+                 '-G', get_HXB2_index_file(ext=False),
+                 get_HXB2_entire(cropped=cropped),
                  ])
     
     # 2. Build a hash file for HXB2
-    if not os.path.isfile(get_HXB2_hash_file(data_folder, ext=True)):
+    if not os.path.isfile(get_HXB2_hash_file(ext=True)):
         sp.call([stampy_bin,
-                 '-g', get_HXB2_index_file(data_folder, ext=False),
-                 '-H', get_HXB2_hash_file(data_folder, ext=False),
+                 '-g', get_HXB2_index_file(ext=False),
+                 '-H', get_HXB2_hash_file(ext=False),
                  ])
 
 
@@ -92,12 +92,12 @@ def make_bwa_hash(data_folder, cropped=True, VERBOSE=0):
         print 'Build BWA index'
 
     # Make folder if necessary
-    dirname =  os.path.dirname(get_HXB2_hash_file(data_folder))
+    dirname =  os.path.dirname(get_HXB2_hash_file())
     if not os.path.isdir(dirname):
         os.mkdir(dirname)
 
     # Call bwa index
-    ref_filename = get_HXB2_entire(data_folder, cropped=cropped)
+    ref_filename = get_HXB2_entire(cropped=cropped)
     sp.call([bwa_bin,
              'index',
              ref_filename,
@@ -119,8 +119,8 @@ def premap_bwa(data_folder, adaID, VERBOSE=0, subsample=False, cropped=True):
         print 'Map via BWA: '+'{:02d}'.format(adaID)
 
     # Get input filenames
-    index_prefix = os.path.dirname(get_HXB2_hash_file(data_folder, ext=False))+\
-            '/'+os.path.basename(get_HXB2_entire(data_folder, cropped=cropped))
+    index_prefix = os.path.dirname(get_HXB2_hash_file(ext=False))+\
+            '/'+os.path.basename(get_HXB2_entire(cropped=cropped))
             
     readfiles = get_read_filenames(data_folder, adaID,
                                    subsample=subsample,
@@ -176,8 +176,8 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, subsample=False, bwa=False):
     # Map
     # Note: no --solexa option as of 2013 (illumina v1.8)
     call_list = [stampy_bin,
-                 '-g', get_HXB2_index_file(data_folder, ext=False),
-                 '-h', get_HXB2_hash_file(data_folder, ext=False), 
+                 '-g', get_HXB2_index_file(ext=False),
+                 '-h', get_HXB2_hash_file(ext=False), 
                  '-o', output_filename,
                  '--substitutionrate='+subsrate]
     if bwa:

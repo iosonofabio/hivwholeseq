@@ -7,6 +7,7 @@ content:    Extract some reads as a subsample for fast analysis, consensus
             building, et similia.
 '''
 # Modules
+import os
 import sys
 import argparse
 import subprocess as sp
@@ -22,7 +23,7 @@ from mapping.filenames import get_read_filenames
 
 # Globals
 # FIXME
-from mapping.datasets import dataset_testmiseq as dataset
+from mapping.datasets import dataset_2 as dataset
 data_folder = dataset['folder']
 
 # Cluster submit
@@ -61,6 +62,23 @@ def fork_self(data_folder, adaID, n_reads, VERBOSE=0, filtered=True):
     if VERBOSE >= 2:
         print ' '.join(qsub_list)
     sp.call(qsub_list)
+
+
+def make_output_folders(data_folder, adaID, VERBOSE=0):
+    '''Make the output folders if necessary'''
+
+    subdir = data_folder+'subsample'
+    if not os.path.isdir(subdir):
+        os.mkdir(subdir)
+        if VERBOSE:
+            print 'Folder created:', subdir
+
+    output_folder = os.path.dirname(get_read_filenames(data_folder, adaID,
+                                                       subsample=True)[0])
+    if not os.path.isdir(output_folder):
+        os.mkdir(output_folder)
+        if VERBOSE:
+            print 'Folder created:', output_folder
 
 
 def extract_subsample(data_folder, adaID, n_reads, VERBOSE=0, filtered=True,
@@ -154,7 +172,7 @@ if __name__ == '__main__':
                         help='Verbosity level [0-3]')
     parser.add_argument('--raw', action='store_true',
                         help='Use the raw reads instead of the filtered ones')
-    parser.add_argument('-n', type=int, default=10000,
+    parser.add_argument('-n', type=int, default=1000,
                         help='Subsample size')
     parser.add_argument('--submit', action='store_true',
                         help='Execute the script in parallel on the cluster')
@@ -178,8 +196,11 @@ if __name__ == '__main__':
             fork_self(data_folder, adaID, n_reads,
                       VERBOSE=VERBOSE, filtered=filtered)
 
-        # or else, extract the sample
         else:
+            # Make output folder
+            make_output_folders(data_folder, adaID, VERBOSE=VERBOSE)
+
+            # extrace the subsample
             extract_subsample(data_folder, adaID, n_reads,
                               VERBOSE=VERBOSE, filtered=filtered)
 

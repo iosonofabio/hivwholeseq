@@ -24,7 +24,7 @@ from mapping.filenames import get_read_filenames, get_read_unpaired_filename
 
 # Globals
 # FIXME
-from mapping.datasets import dataset_testmiseq as dataset
+from mapping.datasets import dataset_2 as dataset
 data_folder = dataset['folder']
 
 # Quality threshold
@@ -44,7 +44,7 @@ vmem = '8G'
 
 
 # Functions
-def fork_self(data_folder, adaID, fragment, VERBOSE=0):
+def fork_self(data_folder, adaID, VERBOSE=0):
     '''Fork self for each adapter ID'''
     import subprocess as sp
 
@@ -53,12 +53,11 @@ def fork_self(data_folder, adaID, fragment, VERBOSE=0):
                  '-S', '/bin/bash',
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
-                 '-N', 'exm_'+'{:02d}'.format(adaID),
+                 '-N', 'ftd_'+'{:02d}'.format(adaID),
                  '-l', 'h_rt='+cluster_time,
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
                  '--adaIDs', adaID,
-                 '--fragments', fragment,
                  '--verbose', VERBOSE,
                 ]
     qsub_list = map(str, qsub_list)
@@ -67,7 +66,7 @@ def fork_self(data_folder, adaID, fragment, VERBOSE=0):
     sp.call(qsub_list)
     
 
-def filter_trim_reads(data_folder, adaID, VERBOSE=0, subsample=False):
+def filter_trim_reads(data_folder, adaID, VERBOSE=0):
     '''Filter the reads to good chunks, based on phred quality'''
 
     # Prepare temporary data structures
@@ -77,18 +76,16 @@ def filter_trim_reads(data_folder, adaID, VERBOSE=0, subsample=False):
     dirname = foldername_adapter(adaID)
     
     # Scroll read files with demultiplexed raw reads
-    readfiles = get_read_filenames(data_folder, adaID, subsample=subsample,
+    readfiles = get_read_filenames(data_folder, adaID,
                                    filtered=False)
     read1_it = SeqIO.parse(readfiles[0], 'fastq')
     read2_it = SeqIO.parse(readfiles[1], 'fastq')
 
     # Open output files
-    outfiles = get_read_filenames(data_folder, adaID, subsample=subsample,
-                                  filtered=True)
-    outfile_unpaired = get_read_unpaired_filename(data_folder, adaID,
-                                                  subsample=subsample)
+    outfiles = get_read_filenames(data_folder, adaID, filtered=True)
+    outfile_unpaired = get_read_unpaired_filename(data_folder, adaID)
     reads_out = 0
-    read_unpaired = 0
+    reads_unpaired = 0
     reads_missed = 0
     with open(outfiles[0], 'w') as fr1_h, \
          open(outfiles[1], 'w') as fr2_h, \
@@ -131,13 +128,13 @@ def filter_trim_reads(data_folder, adaID, VERBOSE=0, subsample=False):
             # If only one is good, the read is essentially not paired, store
             # it somewhere
             elif read_good.sum() == 1:
-                SeqIO.write(reads_trimmed[0], fru_h, 'fastq')
-                SeqIO.write(reads_trimmed[1], fru_h, 'fastq')
+                SeqIO.write(reads[0], fru_h, 'fastq')
+                SeqIO.write(reads[1], fru_h, 'fastq')
                 reads_unpaired += 1
 
                 # Keep a log
                 if VERBOSE >= 3:
-                    if not (reads_out % 10000):
+                    if not ((reads_out + reads_unpaired) % 10000):
                         print reads_out, reads_unpaired
 
             else:
@@ -160,15 +157,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Filter & trim demultiplexed reads.')
     parser.add_argument('--adaIDs', nargs='*', type=int,
                         help='Adapter IDs to analyze (e.g. 2 16)')
-    parser.add_argument('--subsample', action='store_true',
-                        help='Apply only to a subsample of the reads')
     parser.add_argument('--verbose', type=int, default=0,
                         help=('Verbosity level [0-3]'))
     parser.add_argument('--submit', action='store_true', default=False,
                         help='Submit the job to the cluster via qsub')
 
     args = parser.parse_args()
-    adaIDs = list(args.adaIDs)
+    adaIDs = args.adaIDs
     VERBOSE = args.verbose
     submit = args.submit
 
@@ -183,8 +178,8 @@ if __name__ == '__main__':
 
         # Submit to the cluster self if requested
         if submit:
-            fork_self(data_folder, adaID, VERBOSE=VERBOSE, subsample=subsample)
+            fork_self(data_folder, adaID, VERBOSE=VERBOSE)
             continue
 
         # Filter ad trim
-        filter_trim_reads(data_folder, adaID, VERBOSE=VERBOSE, subsample=subsample)
+        filter_trim_reads(data_folder, adaID, VERBOSE=VERBOSE)

@@ -14,7 +14,9 @@ content:    Map a subsample to HXB2 first, then build a consensus, then map
 
             Note: this script can call itself in a parallel fashion with the
             flag --submit as a cluster job.
+
 '''
+#TODO: tidy up the F5a/b mess.
 # Modules
 import os
 import sys
@@ -44,11 +46,11 @@ from mapping.filenames import get_HXB2_fragmented, get_read_filenames,\
 # Globals
 VERBOSE = 3
 # FIXME
-from mapping.datasets import dataset_testmiseq as dataset
+from mapping.datasets import dataset_2 as dataset
 data_folder = dataset['folder']
 
 # Consensus building
-maxreads = 100000
+maxreads = 10000
 match_len_min = 30
 trim_bad_cigars = 3
 coverage_min = 10
@@ -69,11 +71,11 @@ interval_check = 10
 def get_ref_file(data_folder, adaID, fragment, n_iter, ext=True):
     '''Get the reference filename'''
     if n_iter == 0:
-        fn = get_HXB2_fragmented(data_folder, fragment=fragment)
-        if not ext:
-            # Strip the '.fasta' part
-            fn = fn[:-6]
+        fn = get_HXB2_fragmented(fragment, ext=ext)
     else:
+        # There are two sets of primers for fragment F5
+        if 'F5' in fragment:
+            fragment = 'F5'
         fn = '_'.join(['consensus', str(n_iter-1), fragment])
         fn = data_folder+'subsample/'+foldername_adapter(adaID)+'map_iter/'+fn
         if ext:
@@ -84,8 +86,11 @@ def get_ref_file(data_folder, adaID, fragment, n_iter, ext=True):
 def get_index_file(data_folder, adaID, fragment, n_iter, ext=True):
     '''Get the index filename, with or w/o extension'''
     if n_iter == 0:
-        return get_HXB2_index_file(data_folder, fragment, ext=ext)
+        return get_HXB2_index_file(fragment, ext=ext)
     else:
+        # There are two sets of primers for fragment F5
+        if 'F5' in fragment:
+            fragment = 'F5'
         fn = get_ref_file(data_folder, adaID, fragment, n_iter, ext=False)
         if ext:
             fn = fn+'.stidx'
@@ -95,8 +100,11 @@ def get_index_file(data_folder, adaID, fragment, n_iter, ext=True):
 def get_hash_file(data_folder, adaID, fragment, n_iter, ext=True):
     '''Get the index filename, with or w/o extension'''
     if n_iter == 0:
-        return get_HXB2_hash_file(data_folder, fragment, ext=ext)
+        return get_HXB2_hash_file(fragment, ext=ext)
     else:
+        # There are two sets of primers for fragment F5
+        if 'F5' in fragment:
+            fragment = 'F5'
         fn = get_ref_file(data_folder, adaID, fragment, n_iter, ext=False)
         if ext:
             fn = fn+'.sthash'
@@ -123,6 +131,10 @@ def get_mapped_filename(data_folder, adaID, fragment, n_iter, type='bam'):
 
 def make_index_and_hash(data_folder, adaID, fragment, n_iter, VERBOSE=0):
     '''Make index and hash files for reference or consensus'''
+    # There are two sets of primers for fragment F5
+    if (n_iter > 0) and ('F5' in fragment):
+         fragment = 'F5'
+
     if VERBOSE:
         print 'Build stampy hashes: '+'{:02d}'.format(adaID)+' '+fragment\
                 +' iteration '+str(n_iter)
@@ -156,14 +168,20 @@ def make_index_and_hash(data_folder, adaID, fragment, n_iter, VERBOSE=0):
 
 def map_stampy(data_folder, adaID, fragment, n_iter, VERBOSE=0):
     '''Map using stampy'''
+    # There are two sets of primers for fragment F5
+    if 'F5' in fragment:
+        frag_out = 'F5'
+    else:
+        frag_out = fragment
+
     if VERBOSE:
         print 'Map via stampy: '+'{:02d}'.format(adaID)+' '+fragment\
                 +' iteration '+str(n_iter)
 
     read_filenames = get_read_filenames(data_folder, adaID, subsample=True,
-                                        premapped=True, fragment=fragment)
+                                        premapped=True, fragment=frag_out)
 
-    mapped_filename = get_mapped_filename(data_folder, adaID, fragment,
+    mapped_filename = get_mapped_filename(data_folder, adaID, frag_out,
                                           n_iter, type='sam')
 
     # Make folder if necessary
@@ -209,8 +227,14 @@ def fork_self(data_folder, adaID, fragment, iterations_max=0, VERBOSE=0):
 
 def make_consensus(data_folder, adaID, fragment, n_iter, VERBOSE=0):
     '''Make consensus sequence from the mapped reads'''
+    # There are two sets of primers for fragment F5
+    if 'F5' in fragment:
+        frag_out = 'F5'
+    else:
+        frag_out = fragment
+
     if VERBOSE:
-        print 'Build consensus: '+'{:02d}'.format(adaID)+' '+fragment\
+        print 'Build consensus: '+'{:02d}'.format(adaID)+' '+frag_out\
                 +' iteration '+str(n_iter)
     
     # Read reference
@@ -226,7 +250,7 @@ def make_consensus(data_folder, adaID, fragment, n_iter, VERBOSE=0):
     inserts = defaultdict(lambda: defaultdict(lambda: np.zeros(len(read_types), int)))
 
     # Open BAM file
-    bamfilename = get_mapped_filename(data_folder, adaID, fragment, n_iter)
+    bamfilename = get_mapped_filename(data_folder, adaID, frag_out, n_iter)
     if not os.path.isfile(bamfilename):
         convert_sam_to_bam(bamfilename)
     with pysam.Samfile(bamfilename, 'rb') as bamfile:
@@ -476,6 +500,11 @@ def check_new_old_consensi(refseq, consensus):
 
 def write_consensus(data_folder, adaID, fragment, n_iter, consensus, final=False):
     '''Write consensus sequences into FASTA'''
+
+    # There are two sets of primers for fragment F5
+    if 'F5' in fragment:
+        fragment = 'F5'
+
     name = 'adaID_'+'{:02d}'.format(adaID)+'_'+fragment+'_consensus'
     consensusseq = SeqRecord(Seq(consensus),
                              id=name, name=name)
@@ -484,8 +513,6 @@ def write_consensus(data_folder, adaID, fragment, n_iter, consensus, final=False
     else:
         outfile = get_ref_file(data_folder, adaID, fragment, n_iter+1)
     SeqIO.write(consensusseq, outfile, 'fasta')
-             
-
 
 
 
@@ -498,9 +525,9 @@ if __name__ == '__main__':
                         help='Adapter IDs to analyze (e.g. 2 16)')
     parser.add_argument('--fragments', nargs='*',
                         help='Fragment to map (e.g. F1 F6)')
-    parser.add_argument('--iterations', type=int, default=0,
+    parser.add_argument('--iterations', type=int, default=5,
                         help=('Maximal number of map/consensus iterations'))
-    parser.add_argument('--verbose', type=int, default=5,
+    parser.add_argument('--verbose', type=int, default=0,
                         help=('Verbosity level [0-3]'))
     parser.add_argument('--submit', action='store_true',
                         help='Execute the script in parallel on the cluster')
@@ -525,15 +552,12 @@ if __name__ == '__main__':
         print 'fragments', fragments
 
     # Iterate over all requested samples
-    for fragment in fragments:
+    for adaID in adaIDs:
+        for fragment in fragments:
 
-        # Make hashes for the reference, they are shared across adaIDs
-        # Note: this function is called again with submit, but it checks for
-        # the existance of has files and does nothing if they are present. It is
-        # difficult to cover all usage cases more elegantly without making a mess.
-        make_index_and_hash(data_folder, 0, fragment, 0, VERBOSE=VERBOSE)
-
-        for adaID in adaIDs:
+            # There are two sets of primers for fragment F5
+            if fragment == 'F5':
+                fragment = dataset['primerF5'][dataset['adapters'].index(adaID)]
 
             # Submit to the cluster self if requested
             if submit:
@@ -545,9 +569,8 @@ if __name__ == '__main__':
             while True:
             
                 # Make hashes of consensus (the reference is hashed earlier)
-                if (n_iter > 0):
-                    make_index_and_hash(data_folder, adaID, fragment, n_iter,
-                                        VERBOSE=VERBOSE)
+                make_index_and_hash(data_folder, adaID, fragment, n_iter,
+                                    VERBOSE=VERBOSE)
 
                 # Map against reference or consensus
                 map_stampy(data_folder, adaID, fragment, n_iter, VERBOSE=VERBOSE)
@@ -575,8 +598,8 @@ if __name__ == '__main__':
                                     final=True)
                     if VERBOSE:
                         if match:
-                            print 'Consensus converged.' 
+                            print 'Consensus converged:', adaID, fragment 
                         else:
-                            print 'Maximal number of iterations reached.'
+                            print 'Maximal number of iterations reached:', adaID, fragment
                     
                     break 

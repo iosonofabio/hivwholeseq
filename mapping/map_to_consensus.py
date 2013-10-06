@@ -22,7 +22,7 @@ from mapping.filenames import get_consensus_filename, get_mapped_filename,\
 # Globals
 VERBOSE = 1
 # FIXME
-from mapping.datasets import dataset_testmiseq as dataset
+from mapping.datasets import dataset_2 as dataset
 data_folder = dataset['folder']
 
 
