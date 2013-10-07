@@ -7,20 +7,15 @@ content:    Build a subset of the mapped reads excluding mismappings.
 '''
 # Modules
 import os
-import sys
 import argparse
-import cPickle as pickle
 from operator import itemgetter
-from collections import defaultdict
-from itertools import izip
 import pysam
 import numpy as np
 from Bio import SeqIO
 
 
 # Horizontal import of modules from this folder
-from mapping.adapter_info import load_adapter_table, foldername_adapter
-from mapping.miseq import alpha, read_types
+from mapping.adapter_info import load_adapter_table
 from mapping.filenames import get_consensus_filename, get_mapped_filename
 from mapping.mapping_utils import get_ind_good_cigars, convert_sam_to_bam,\
         pair_generator, get_range_good_cigars
@@ -29,10 +24,6 @@ from mapping.primer_info import primers_inner
 
 
 # Globals
-# FIXME
-from mapping.datasets import dataset_2 as dataset
-data_folder = dataset['folder']
-
 maxreads = 1e9
 match_len_min = 30
 trim_bad_cigars = 3
@@ -49,7 +40,7 @@ vmem = '8G'
 
 
 # Functions
-def fork_self(data_folder, adaID, fragment, VERBOSE=0):
+def fork_self(miseq_run, adaID, fragment, VERBOSE=0):
     '''Fork self for each adapter ID'''
     import subprocess as sp
 
@@ -322,7 +313,9 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0):
 if __name__ == '__main__':
 
     # Input arguments
-    parser = argparse.ArgumentParser(description='Extract linkage information')
+    parser = argparse.ArgumentParser(description='Filter mapped reads')
+    parser.add_argument('--run', type=int, required=True,
+                        help='MiSeq run to analyze (e.g. 28, 37)')
     parser.add_argument('--adaIDs', nargs='*', type=int,
                         help='Adapter IDs to analyze (e.g. 2 16)')
     parser.add_argument('--fragments', nargs='*',
@@ -332,10 +325,15 @@ if __name__ == '__main__':
     parser.add_argument('--submit', action='store_true', default=False,
                         help='Submit the job to the cluster via qsub')
     args = parser.parse_args()
+    miseq_run = args.run
     adaIDs = args.adaIDs
     fragments = args.fragments
     VERBOSE = args.verbose
     submit = args.submit
+
+    # Specify the dataset
+    dataset = MiSeq_runs[miseq_run]
+    data_folder = dataset['folder']
 
     # If the script is called with no adaID, iterate over all
     if not adaIDs:
@@ -355,7 +353,7 @@ if __name__ == '__main__':
 
             # Submit to the cluster self if requested
             if submit:
-                fork_self(data_folder, adaID, fragment, VERBOSE=VERBOSE)
+                fork_self(miseq_run, adaID, fragment, VERBOSE=VERBOSE)
                 continue
 
             # or else, perform the filtering

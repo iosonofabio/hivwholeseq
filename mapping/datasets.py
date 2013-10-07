@@ -32,3 +32,8 @@ dataset_2 = {'description': 'Second library (first patient-only)',
              'raw_data': {'read1': 'read1.fastq',
                           'adapter': 'barcode.fastq',
                           'read2': 'read2.fastq'}}
+
+# MiSeq runs
+MiSeq_runs = {28: dataset_testmiseq,
+              37: dataset_2,
+             }

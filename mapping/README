@@ -30,7 +30,8 @@ NOTE: from this point on, the fragments do not talk to each other anymore. This
 5. Consensus building via iterative mapping of subsample: on HXB2 fragments
    first, then on its own consensus. (build_consensus_iterative.py)
 
-CHECKPOINT: check the consensus with reference (check_consensus.py)
+CHECKPOINT: check the consensus with reference (if applicable) and in overlapping regions
+(check_consensus.py)
 
 6. Map the full dataset against the final consensus, using stampy (BWA optional).
    (map_to_consensus.py)

@@ -11,6 +11,7 @@ import sys
 import argparse
 import subprocess as sp
 
+from mapping.datasets import MiSeq_runs
 from mapping.adapter_info import load_adapter_table
 from mapping.filenames import get_read_filenames
 from mapping.mapping_utils import spades_bin
@@ -18,10 +19,6 @@ from mapping.extract_subsample_reads import extract_subsample as extract_raw
 
 
 # Globals
-# FIXME
-from mapping.datasets import dataset_testmiseq as dataset
-data_folder = dataset['folder']
-
 # Cluster submit
 import mapping
 JOBDIR = mapping.__path__[0].rstrip('/')+'/'
@@ -33,7 +30,7 @@ vmem = '8G'
 
 
 # Functions
-def fork_self(data_folder, adaID, n_reads, VERBOSE=0, filtered=True):
+def fork_self(miseq_run, adaID, n_reads, VERBOSE=0, filtered=True):
     '''Fork self for each adapter ID'''
     if VERBOSE:
         print 'Forking to the cluster: adaID '+'{:02d}'.format(adaID)
@@ -47,12 +44,13 @@ def fork_self(data_folder, adaID, n_reads, VERBOSE=0, filtered=True):
                  '-l', 'h_rt='+cluster_time,
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
+                 '--run', miseq_run,
                  '-n', n_reads,
                  '--adaIDs', adaID,
                  '--verbose', VERBOSE,
                 ]
     if not filtered:
-        qsyb_list.append('--raw')
+        qsub_list.append('--raw')
     qsub_list = map(str, qsub_list)
     if VERBOSE >= 2:
         print ' '.join(qsub_list)
@@ -67,9 +65,9 @@ def extract_subsample(data_folder, adaID, n_reads, VERBOSE=0, filtered=True):
     if all(map(os.path.isfile, read_filenames)):
         print >> sys.stderr, 'Subsample files found!'
     else:
-        extract_subsample_raw(data_folder, adaID, n_reads,
-                              VERBOSE=VERBOSE, filtered=filtered,
-                              suffix=suffix)
+        extract_raw(data_folder, adaID, n_reads,
+                    VERBOSE=VERBOSE, filtered=filtered,
+                    suffix=suffix)
 
 
 def assemble_spades(data_folder, adaID, n_reads, VERBOSE=0, filtered=True):
@@ -100,6 +98,8 @@ if __name__ == '__main__':
 
     # Parse input args
     parser = argparse.ArgumentParser(description='Assemble consensus de novo')
+    parser.add_argument('--run', type=int, required=True,
+                        help='MiSeq run to analyze (e.g. 28, 37)')
     parser.add_argument('--adaIDs', type=int, nargs='+',
                         help='Adapter ID')
     parser.add_argument('--verbose', type=int, default=0,
@@ -112,11 +112,16 @@ if __name__ == '__main__':
                         help='Execute the script in parallel on the cluster')
  
     args = parser.parse_args()
+    miseq_run = args.run
     adaIDs = args.adaIDs
     VERBOSE = args.verbose
     filtered = not args.raw
     n_reads = args.n
     submit = args.submit
+
+    # Specify the dataset
+    dataset = MiSeq_runs[miseq_run]
+    data_folder = dataset['folder']
 
     # If no adapter ID is specified, iterate over all
     if not adaIDs:
@@ -127,7 +132,7 @@ if __name__ == '__main__':
 
         # Submit to the cluster self if requested
         if submit:
-            fork_self(data_folder, adaID, n_reads,
+            fork_self(miseq_run, adaID, n_reads,
                       VERBOSE=VERBOSE, filtered=filtered)
 
         # or else, extract the sample and assemble

@@ -4,26 +4,22 @@ author:     Fabio Zanini
 date:       16/09/13
 content:    Figure out what those errors at 10-15 and 235-240 from the fragment
             ends are.
+
+            Note: they are ambiguous primers!
 '''
 # Modules
 import os
-import sys
 import argparse
-import subprocess as sp
-import cPickle as pickle
-from collections import defaultdict
-from itertools import izip
 import pysam
 import numpy as np
 from Bio import SeqIO
 
 # Horizontal import of modules from this folder
 from mapping.adapter_info import load_adapter_table
-from mapping.miseq import alpha, read_types
+from mapping.miseq import read_types
 from mapping.filenames import get_mapped_filename, get_allele_counts_filename, \
-        get_insert_counts_filename, get_coverage_filename, get_consensus_filename
-from mapping.mapping_utils import get_ind_good_cigars, get_trims_from_good_cigars, \
-        convert_sam_to_bam, reads_to_seqrecord, sort_bam, index_bam
+        get_coverage_filename, get_consensus_filename
+from mapping.mapping_utils import sort_bam, index_bam
 from mapping.minor_allele_frequency import get_minor_allele_counts
 
 

@@ -5,17 +5,9 @@ date:       05/08/13
 content:    Extract the frequency of minor alleles.
 '''
 # Modules
-import os
-import sys
-import cPickle as pickle
 import argparse
-import re
 from operator import itemgetter
-from collections import defaultdict
-from itertools import izip
-import pysam
 import numpy as np
-from Bio import SeqIO
 import matplotlib.cm as cm
 
 # Matplotlib parameters
@@ -31,15 +23,8 @@ import matplotlib.pyplot as plt
 
 from mapping.miseq import alpha, read_types
 from mapping.filenames import get_allele_counts_filename, get_coverage_filename
-from mapping.mapping_utils import get_fragment_list
 from mapping.adapter_info import load_adapter_table
-
-
-
-# Globals
-# FIXME
-from mapping.datasets import dataset_testmiseq as dataset
-data_folder = dataset['folder']
+from mapping.datasets import MiSeq_runs
 
 
 
@@ -136,6 +121,8 @@ if __name__ == '__main__':
 
     # Input arguments
     parser = argparse.ArgumentParser(description='Study minor allele frequency')
+    parser.add_argument('--run', type=int, required=True,
+                        help='MiSeq run to analyze (e.g. 28, 37)')
     parser.add_argument('--adaIDs', nargs='*', type=int,
                         help='Adapter IDs to analyze (e.g. 2 16)')
     parser.add_argument('--fragments', nargs='*',
@@ -146,10 +133,15 @@ if __name__ == '__main__':
                         help='Apply only to a subsample of the reads')
 
     args = parser.parse_args()
+    miseq_run = args.run
     adaIDs = args.adaIDs
     fragments = args.fragments
     VERBOSE = args.verbose
     subsample = args.subsample
+
+    # Specify the dataset
+    dataset = MiSeq_runs[miseq_run]
+    data_folder = dataset['folder']
 
     # If the script is called with no adaID, iterate over all
     if not adaIDs:

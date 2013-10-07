@@ -5,22 +5,15 @@ date:       12/09/13
 content:    Build consensus after map to HXB2 via samtools. Note: this requires
             the mapped reads to HXB2, and does not handle inserts.
 '''
-import os
-import sys
 import argparse
 import subprocess as sp
 
+from mapping.datasets import MiSeq_runs
 from mapping.adapter_info import load_adapter_table, foldername_adapter
-from mapping.filenames import get_read_filenames, get_mapped_filename, get_HXB2_fragmented
-from mapping.mapping_utils import spades_bin
-from mapping.extract_subsample_reads import extract_subsample as extract_raw
+from mapping.filenames import get_HXB2_fragmented
 
 
 # Globals
-# FIXME
-from mapping.datasets import dataset_testmiseq as dataset
-data_folder = dataset['folder']
-
 # Cluster submit
 import mapping
 JOBDIR = mapping.__path__[0].rstrip('/')+'/'
@@ -32,7 +25,7 @@ vmem = '8G'
 
 
 # Functions
-def fork_self(data_folder, adaID, fragment, VERBOSE=0):
+def fork_self(miseq_run, adaID, fragment, VERBOSE=0):
     '''Fork self for each adapter ID'''
     if VERBOSE:
         print 'Forking to the cluster: adaID '+'{:02d}'.format(adaID)
@@ -46,6 +39,7 @@ def fork_self(data_folder, adaID, fragment, VERBOSE=0):
                  '-l', 'h_rt='+cluster_time,
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
+                 '--run', miseq_run,
                  '--adaIDs', adaID,
                  '--fragments', fragment,
                  '--verbose', VERBOSE,
@@ -104,6 +98,8 @@ if __name__ == '__main__':
 
     # Parse input args
     parser = argparse.ArgumentParser(description='Assemble consensus de novo')
+    parser.add_argument('--run', type=int, required=True,
+                        help='MiSeq run to analyze (e.g. 28, 37)')
     parser.add_argument('--adaIDs', type=int, nargs='+',
                         help='Adapter ID')
     parser.add_argument('--fragments', nargs='*',
@@ -114,10 +110,15 @@ if __name__ == '__main__':
                         help='Execute the script in parallel on the cluster')
  
     args = parser.parse_args()
+    miseq_run = args.run
     adaIDs = args.adaIDs
     fragments = args.fragments
     VERBOSE = args.verbose
     submit = args.submit
+
+    # Specify the dataset
+    dataset = MiSeq_runs[miseq_run]
+    data_folder = dataset['folder']
 
     # If the script is called with no adaID, iterate over all
     if not adaIDs:
@@ -137,7 +138,7 @@ if __name__ == '__main__':
 
             # Submit to the cluster self if requested
             if submit:
-                fork_self(data_folder, adaID, fragment, VERBOSE=VERBOSE)
+                fork_self(miseq_run, adaID, fragment, VERBOSE=VERBOSE)
                 continue
 
             # sort BAM file and build consensus

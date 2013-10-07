@@ -6,31 +6,13 @@ content:    Check iterative consensus with reference (if appropriate) and betwee
             fragments at overlaps.
 '''
 # Modules
-import os
-import sys
-import subprocess as sp
-import time
 import argparse
-import re
-from operator import *
-from itertools import izip
-from collections import defaultdict
-from collections import Counter
 import numpy as np
-import pysam
 import Bio.SeqIO as SeqIO
 import Bio.AlignIO as AlignIO
-from Bio.Seq import Seq
-from Bio.SeqRecord import SeqRecord
-from Bio import pairwise2
 
-# Horizontal import of modules from this folder
-from mapping.adapter_info import load_adapter_table, foldername_adapter
-from mapping.miseq import alpha, read_types
-from mapping.mapping_utils import stampy_bin, subsrate, convert_sam_to_bam,\
-        pair_generator, get_ind_good_cigars
-from mapping.filenames import get_HXB2_fragmented, get_read_filenames,\
-        get_HXB2_index_file, get_HXB2_hash_file, get_consensus_filename
+from mapping.adapter_info import load_adapter_table
+from mapping.filenames import get_consensus_filename
 
 
 
@@ -119,7 +101,6 @@ def align_via_muscle(refseq, seq):
     from Bio.Align.Applications import MuscleCommandline
     muscle_cline = MuscleCommandline(diags=True)
     import subprocess as sp
-    import sys
     child = sp.Popen(str(muscle_cline),
                      stdin=sp.PIPE,
                      stdout=sp.PIPE,

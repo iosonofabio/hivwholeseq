@@ -1,3 +1,11 @@
+# vim: fdm=indent
+'''
+author:     Richard Neher, Fabio Zanini
+date:       07/10/13
+content:    This script measures errors (old!)
+'''
+# TODO: this must go, but before that we must make sure we have another one e.g.
+# for scatter plots
 import os
 import sys
 from collections import defaultdict

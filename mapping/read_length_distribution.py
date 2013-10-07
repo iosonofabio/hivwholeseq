@@ -10,7 +10,6 @@ content:    Plot the distribution of read lengths as a first quality assessment
 import argparse
 from Bio import SeqIO
 import numpy as np
-import scipy as sp
 import matplotlib
 from matplotlib import cm
 import sys
@@ -26,14 +25,13 @@ params = {'axes.labelsize': 20,
 matplotlib.rcParams.update(params)
 import matplotlib.pyplot as plt
 
+from mapping.datasets import MiSeq_runs
 from mapping.filenames import get_read_filenames
+from mapping.adapter_info import load_adapter_table
 
 
 
 # Globals
-#data_folder = '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run28_test_samples/'
-data_folder = '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run37/'
-
 # Quality threshold
 phred_min = 20
 
@@ -51,6 +49,8 @@ if __name__ == '__main__':
 
     # Parse input arguments
     parser = argparse.ArgumentParser(description='Filter & trim demultiplexed reads.')
+    parser.add_argument('--run', type=int, required=True,
+                        help='MiSeq run to analyze (e.g. 28, 37)')
     parser.add_argument('--adaIDs', nargs='*', type=int,
                         help='Adapter IDs to analyze (e.g. 2 16)')
     parser.add_argument('--verbose', type=int, default=0,
@@ -59,9 +59,14 @@ if __name__ == '__main__':
                         help='Submit the job to the cluster via qsub')
 
     args = parser.parse_args()
+    miseq_run = args.run
     adaIDs = args.adaIDs
     VERBOSE = args.verbose
     submit = args.submit
+
+    # Specify the dataset
+    dataset = MiSeq_runs[miseq_run]
+    data_folder = dataset['folder']
 
     # If the script is called with no adaID, iterate over all
     if not adaIDs:
@@ -71,7 +76,6 @@ if __name__ == '__main__':
 
     # Iterate over adaIDs
     for adaID in adaIDs:
-
 
         outdir = os.getcwd()+'/q_control_'+'{:02d}'.format(adaID)
         if not os.path.exists(outdir):

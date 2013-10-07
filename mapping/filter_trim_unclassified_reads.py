@@ -10,8 +10,6 @@ content:    Filter and trim unclassified reads. stripped down version of filter_
             Note: we must take both members of a paired-end!
 '''
 # Modules
-import os
-import sys
 import numpy as np
 from Bio import SeqIO
 from itertools import izip

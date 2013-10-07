@@ -6,33 +6,20 @@ date:       05/08/13
 content:    Correct the allele frequencies comparing read types and write to file.
 '''
 # Modules
-import os
-import sys
 import subprocess as sp
-import cPickle as pickle
 import argparse
-import re
 from operator import itemgetter
-from collections import defaultdict
-from itertools import izip
-import pysam
 import numpy as np
-from Bio import SeqIO
 
-from mapping.miseq import alpha, read_types
+from mapping.datasets import MiSeq_runs
+from mapping.miseq import alpha
 from mapping.filenames import get_allele_counts_filename, get_coverage_filename, \
         get_allele_frequencies_filename
-from mapping.mapping_utils import get_fragment_list
 from mapping.adapter_info import load_adapter_table
 
 
 
 # Globals
-# FIXME
-from mapping.datasets import dataset_testmiseq as dataset
-data_folder = dataset['folder']
-
-
 # Cluster submit
 import mapping
 JOBDIR = mapping.__path__[0].rstrip('/')+'/'
@@ -48,7 +35,7 @@ vmem = '2G'
 
 
 # Functions
-def fork_self(data_folder, adaID, fragment, subsample=False, VERBOSE=3):
+def fork_self(miseq_run, adaID, fragment, subsample=False, VERBOSE=3):
     '''Fork self for each adapter ID and fragment'''
     qsub_list = ['qsub','-cwd',
                  '-b', 'y',
@@ -59,6 +46,7 @@ def fork_self(data_folder, adaID, fragment, subsample=False, VERBOSE=3):
                  '-l', 'h_rt='+cluster_time,
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
+                 '--run', miseq_run,
                  '--adaIDs', adaID,
                  '--fragments', fragment,
                  '--verbose', VERBOSE,
@@ -148,6 +136,8 @@ if __name__ == '__main__':
 
     # Input arguments
     parser = argparse.ArgumentParser(description='Study minor allele frequency')
+    parser.add_argument('--run', type=int, required=True,
+                        help='MiSeq run to analyze (e.g. 28, 37)')
     parser.add_argument('--adaIDs', nargs='*', type=int,
                         help='Adapter IDs to analyze (e.g. 2 16)')
     parser.add_argument('--fragments', nargs='*',
@@ -160,11 +150,16 @@ if __name__ == '__main__':
                         help='Execute the script in parallel on the cluster')
 
     args = parser.parse_args()
+    miseq_run = args.run
     adaIDs = args.adaIDs
     fragments = args.fragments
     VERBOSE = args.verbose
     subsample = args.subsample
     submit = args.submit
+
+    # Specify the dataset
+    dataset = MiSeq_runs[miseq_run]
+    data_folder = dataset['folder']
 
     # If the script is called with no adaID, iterate over all
     if not adaIDs:

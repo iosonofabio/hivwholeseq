@@ -7,30 +7,17 @@ content:    Reconstruct the primers coordinates (approx.) from the edges of the
 '''
 # Modules
 import os
-import sys
 import argparse
-import cPickle as pickle
-from operator import itemgetter
-from collections import defaultdict
-from itertools import izip
 import pysam
 import numpy as np
 from Bio import SeqIO
 
-
-# Horizontal import of modules from this folder
-from mapping.adapter_info import load_adapter_table, foldername_adapter
-from mapping.miseq import alpha, read_types
-from mapping.filenames import get_consensus_filename, get_mapped_filename
-from mapping.mapping_utils import get_ind_good_cigars, convert_sam_to_bam,\
-        pair_generator, get_range_good_cigars
-
-
-
-# Globals
-# FIXME
-from mapping.datasets import dataset_testmiseq as dataset
-data_folder = dataset['folder']
+from mapping.datasets import MiSeq_runs
+from mapping.adapter_info import load_adapter_table
+from mapping.miseq import read_types
+from mapping.filenames import get_consensus_filename, get_mapped_filename, \
+        get_coverage_filename
+from mapping.mapping_utils import convert_sam_to_bam, pair_generator
 
 
 
@@ -39,13 +26,21 @@ if __name__ == '__main__':
 
     # Input arguments
     parser = argparse.ArgumentParser(description='Extract linkage information')
+    parser.add_argument('--run', type=int, required=True,
+                        help='MiSeq run to analyze (e.g. 28, 37)')
     parser.add_argument('--adaIDs', nargs='*', type=int,
                         help='Adapter IDs to analyze (e.g. 2 16)')
     parser.add_argument('--verbose', type=int, default=0,
                         help=('Verbosity level [0-3]'))
+
     args = parser.parse_args()
+    miseq_run = args.run
     adaIDs = args.adaIDs
     VERBOSE = args.verbose
+
+    # Specify the dataset
+    dataset = MiSeq_runs[miseq_run]
+    data_folder = dataset['folder']
 
     # If the script is called with no adaID, iterate over all
     if not adaIDs:

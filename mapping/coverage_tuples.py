@@ -8,21 +8,16 @@ content:    Calculate the number of reads that cover a certain set of positions.
             actually covered both such that they could have given rise to such a
             signal?
 '''
+# FIXME: modernize!
 # Modules
 import os
-import sys
 import argparse
-import cPickle as pickle
-from collections import defaultdict
 from itertools import izip
 import pysam
 import numpy as np
 from Bio import SeqIO
 
-
-# Horizontal import of modules from this folder
-from mapping.adapter_info import load_adapter_table, foldername_adapter
-from mapping.miseq import alpha, read_types
+from mapping.adapter_info import load_adapter_table
 from mapping.filenames import get_last_reference, get_last_mapped
 from mapping.mapping_utils import get_ind_good_cigars, pair_generator
 

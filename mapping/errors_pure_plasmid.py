@@ -5,15 +5,13 @@ date:       05/08/13
 content:    Check sequencing/PCR erros in pure plasmid HIV samples (they appear
             as minor variants).
 '''
+# FIXME: modernize!
+# TODO: check allele frequencies in overlapping regions
 # Modules
-import os
 import sys
-from collections import defaultdict
 from itertools import izip
-import pysam
 import numpy as np
 import matplotlib.pyplot as plt
-from Bio import SeqIO
 from map_HIV_HXB2 import load_adapter_table
 from minor_allele_frequency import get_minor_allele_counts
 

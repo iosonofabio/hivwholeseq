@@ -5,34 +5,25 @@ author:     Fabio Zanini
 date:       21/08/13
 content:    Call SNPs from reads.
 '''
+# TODO: finish up this mess!
 # Modules
 import os
 import sys
 import argparse
-import cPickle as pickle
-from collections import defaultdict
 from itertools import izip
 import pysam
 import numpy as np
 from Bio import SeqIO
 
-
-# Horizontal import of modules from this folder
+from mapping.datasets import MiSeq_runs
 from mapping.adapter_info import load_adapter_table
-from mapping.miseq import alpha, read_types
 from mapping.filenames import get_last_reference, get_last_mapped
 from mapping.mapping_utils import get_ind_good_cigars, pair_generator
 
 
 
 # Globals
-VERBOSE = 1
-
-# FIXME
-from mapping.datasets import dataset_testmiseq as dataset
-data_folder = dataset['folder']
-
-maxreads = 50000    #FIXME
+maxreads = 50000
 match_len_min = 30
 trim_bad_cigars = 3
 
@@ -48,7 +39,7 @@ vmem = '8G'
 
 
 # Functions
-def fork_self(data_folder, adaID):
+def fork_self(miseq_run, adaID):
     '''Fork self for each adapter ID'''
     import subprocess as sp
 
@@ -61,6 +52,7 @@ def fork_self(data_folder, adaID):
                  '-l', 'h_rt='+cluster_time,
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
+                 '--run', miseq_run,
                  '--adaID', adaID,
                 ]
     qsub_list = map(str, qsub_list)
@@ -75,13 +67,24 @@ if __name__ == '__main__':
 
     # Input arguments
     parser = argparse.ArgumentParser(description='Extract linkage information')
+    parser.add_argument('--run', type=int, required=True,
+                        help='MiSeq run to analyze (e.g. 28, 37)')
     parser.add_argument('--adaID', metavar='00', type=int, required=True,
                         help='Adapter ID sample to analyze')
+    parser.add_argument('--verbose', type=int, default=0,
+                        help='Verbosity level [0-3]')
     parser.add_argument('--submit', action='store_true', default=False,
                         help='Submit the job to the cluster via qsub')
+
     args = parser.parse_args()
+    miseq_run = args.run
     adaID = args.adaID
+    VERBOSE = args.verbose
     submit = args.submit
+
+    # Specify the dataset
+    dataset = MiSeq_runs[miseq_run]
+    data_folder = dataset['folder']
 
     # Branch to the cluster if required
     if submit:
@@ -91,7 +94,7 @@ if __name__ == '__main__':
         else:
             adaIDs = [adaID]
             for adaID in adaIDs:
-                fork_self(data_folder, adaID) 
+                fork_self(miseq_run, adaID) 
         sys.exit()
 
     ###########################################################################

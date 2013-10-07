@@ -7,12 +7,8 @@ content:    Get the joint counts of two alleles (2-site statistics).
 '''
 # Modules
 import os
-import sys
 import argparse
 import subprocess as sp
-import cPickle as pickle
-from operator import itemgetter
-from collections import defaultdict
 from itertools import izip
 import pysam
 import numpy as np
@@ -23,8 +19,7 @@ from mapping.adapter_info import load_adapter_table
 from mapping.miseq import alpha, alphal, read_pair_types
 from mapping.filenames import get_mapped_filename, get_allele_counts_filename, \
         get_coallele_counts_filename, get_consensus_filename
-from mapping.mapping_utils import get_ind_good_cigars, get_trims_from_good_cigars, \
-        pair_generator
+from mapping.mapping_utils import pair_generator
 from mapping.get_allele_counts import get_allele_counts
 
 
@@ -80,7 +75,6 @@ def get_coallele_counts(data_folder, adaID, fragment, subsample=False, VERBOSE=0
     reffilename = get_consensus_filename(data_folder, adaID, fragment,
                                          subsample=subsample, trim_primers=True)
     refseq = SeqIO.read(reffilename, 'fasta')
-    ref = np.array(refseq)
     
     # Allele counts and inserts (TODO: compress this data?)
     # Note: the pair is of 2 types only, while the single reads usually are of 4

@@ -1,6 +1,6 @@
 # vim: fdm=indent
 '''
-author:     Fabio Zanini
+author:     Fabio Zanini, Richard Neher
 date:       11/08/13
 content:    Info on the illumina adapters.
 '''
@@ -33,7 +33,6 @@ adapters_LT = {1: 'ATCACG',
 
 
 adapters_table_file = 'table_adapters.dat'
-
 
 
 

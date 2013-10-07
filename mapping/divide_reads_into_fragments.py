@@ -12,40 +12,23 @@ content:    Classify the reads into the 6 fragments via a rough mapping before
 '''
 # Modules
 import os
-import sys
 import subprocess as sp
-import time
 import argparse
-import re
-from operator import *
-from itertools import izip
-from collections import defaultdict
-from collections import Counter
 import numpy as np
 import pysam
-import Bio.SeqIO as SeqIO
-from Bio.Seq import Seq
-from Bio.SeqRecord import SeqRecord
 from Bio.Seq import reverse_complement
 
-# Horizontal import of modules from this folder
-from mapping.adapter_info import load_adapter_table, foldername_adapter
-from mapping.miseq import alpha, read_types
-from mapping.reference import load_HXB2
+from mapping.datasets import MiSeq_runs
+from mapping.adapter_info import load_adapter_table
 from mapping.filenames import get_HXB2_entire, get_HXB2_index_file,\
         get_HXB2_hash_file, get_read_filenames, get_premapped_file
 from mapping.mapping_utils import stampy_bin, subsrate, bwa_bin,\
-        convert_sam_to_bam, get_read_start_end, get_range_good_cigars,\
-        pair_generator
+        convert_sam_to_bam, get_range_good_cigars, pair_generator
 from mapping.primer_info import primers_coordinates_HXB2_inner as pci
 
 
 
 # Globals
-# FIXME
-from mapping.datasets import dataset_2 as dataset
-data_folder = dataset['folder']
-
 # Cluster submit
 import mapping
 JOBDIR = mapping.__path__[0].rstrip('/')+'/'
@@ -58,6 +41,34 @@ vmem = '8G'
 
 
 # Functions
+def fork_self(miseq_run, adaID, VERBOSE=0, subsample=False, bwa=False):
+    '''Fork self for each adapter ID'''
+    if VERBOSE:
+        print 'Forking to the cluster: adaID '+'{:02d}'.format(adaID)
+
+    qsub_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'divide '+'{:02d}'.format(adaID),
+                 '-l', 'h_rt='+cluster_time[subsample],
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--run', miseq_run,
+                 '--adaIDs', adaID,
+                 '--verbose', VERBOSE,
+                ]
+    if subsample:
+        qsub_list.append('--subsample')
+    if bwa:
+        qsub_list.append('--bwa')
+    qsub_list = map(str, qsub_list)
+    if VERBOSE >= 2:
+        print ' '.join(qsub_list)
+    sp.call(qsub_list)
+
+
 def make_index_and_hash(data_folder, cropped=True, VERBOSE=0):
     '''Make index and hash files for reference or consensus'''
     if VERBOSE:
@@ -189,33 +200,6 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, subsample=False, bwa=False):
     sp.call(call_list)
 
 
-def fork_self(data_folder, adaID, VERBOSE=0, subsample=False, bwa=False):
-    '''Fork self for each adapter ID'''
-    if VERBOSE:
-        print 'Forking to the cluster: adaID '+'{:02d}'.format(adaID)
-
-    qsub_list = ['qsub','-cwd',
-                 '-b', 'y',
-                 '-S', '/bin/bash',
-                 '-o', JOBLOGOUT,
-                 '-e', JOBLOGERR,
-                 '-N', 'divide '+'{:02d}'.format(adaID),
-                 '-l', 'h_rt='+cluster_time[subsample],
-                 '-l', 'h_vmem='+vmem,
-                 JOBSCRIPT,
-                 '--adaIDs', adaID,
-                 '--verbose', VERBOSE,
-                ]
-    if subsample:
-        qsub_list.append('--subsample')
-    if bwa:
-        qsub_list.append('--bwa')
-    qsub_list = map(str, qsub_list)
-    if VERBOSE >= 2:
-        print ' '.join(qsub_list)
-    sp.call(qsub_list)
-
-
 def write_read_pair(reads, ranges, fileouts):
     '''Write read pair into FASTQ files'''
 
@@ -245,9 +229,6 @@ def divide_into_fragments(data_folder, adaID, VERBOSE=0, subsample=False,
     if VERBOSE:
         print 'Divide into fragments: adaID '+'{:02d}'.format(adaID)
 
-    # Load reference
-    seq = load_HXB2(data_folder)
-
     # Extract fragments
     frags_sort = ['F1', 'F2', 'F3', 'F4', F5_type, 'F6']
     frags_pos = []
@@ -271,7 +252,6 @@ def divide_into_fragments(data_folder, adaID, VERBOSE=0, subsample=False,
                                   premapped=True)
     
     # Iterate over the mapped reads and assign fragments
-    fragments = []
     n_mapped = 0
     n_unmapped = 0
     n_ambiguous = 0
@@ -378,6 +358,8 @@ if __name__ == '__main__':
 
     # Parse input args
     parser = argparse.ArgumentParser(description='Divide HIV reads into fragments')
+    parser.add_argument('--run', type=int, required=True,
+                        help='MiSeq run to analyze (e.g. 28, 37)')
     parser.add_argument('--adaIDs', nargs='*', type=int,
                         help='Adapter IDs to analyze (e.g. 2 16)')
     parser.add_argument('--verbose', type=int, default=0,
@@ -390,11 +372,16 @@ if __name__ == '__main__':
                         help='Use BWA for premapping?')
 
     args = parser.parse_args()
+    miseq_run = args.run
     adaIDs = args.adaIDs
     VERBOSE = args.verbose
     subsample = args.subsample
     submit = args.submit
     bwa = args.bwa
+
+    # Specify the dataset
+    dataset = MiSeq_runs[miseq_run]
+    data_folder = dataset['folder']
 
     # If the script is called with no adaID, iterate over all
     if not adaIDs:
@@ -411,7 +398,7 @@ if __name__ == '__main__':
 
         # Submit to the cluster self if requested
         if submit:
-            fork_self(data_folder, adaID, VERBOSE=VERBOSE, subsample=subsample,
+            fork_self(miseq_run, adaID, VERBOSE=VERBOSE, subsample=subsample,
                       bwa=bwa)
             continue
 

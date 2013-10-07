@@ -5,21 +5,14 @@ date:       29/09/13
 content:    Trim the inner PCR primers from a consensus sequence
 '''
 # Modules
-import os
 import argparse
 from Bio import SeqIO
 from Bio import pairwise2
 
+from mapping.datasets import MiSeq_runs
 from mapping.filenames import get_consensus_filename
 from mapping.adapter_info import load_adapter_table
 from mapping.primer_info import primers_inner
-
-
-
-# Globals
-# FIXME
-from mapping.datasets import dataset_testmiseq as dataset
-data_folder = dataset['folder']
 
 
 
@@ -81,6 +74,8 @@ if __name__ == '__main__':
 
     # Input arguments
     parser = argparse.ArgumentParser(description='Study minor allele frequency')
+    parser.add_argument('--run', type=int, required=True,
+                        help='MiSeq run to analyze (e.g. 28, 37)')
     parser.add_argument('--adaIDs', nargs='*', type=int,
                         help='Adapter IDs to analyze (e.g. 2 16)')
     parser.add_argument('--fragments', nargs='*',
@@ -91,10 +86,15 @@ if __name__ == '__main__':
                         help='Apply only to a subsample of the reads')
 
     args = parser.parse_args()
+    miseq_run = args.run
     adaIDs = args.adaIDs
     fragments = args.fragments
     VERBOSE = args.verbose
     subsample = args.subsample
+
+    # Specify the dataset
+    dataset = MiSeq_runs[miseq_run]
+    data_folder = dataset['folder']
 
     # If the script is called with no adaID, iterate over all
     if not adaIDs:

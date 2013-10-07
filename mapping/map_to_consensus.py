@@ -20,12 +20,6 @@ from mapping.filenames import get_consensus_filename, get_mapped_filename,\
 
 
 # Globals
-VERBOSE = 1
-# FIXME
-from mapping.datasets import dataset_2 as dataset
-data_folder = dataset['folder']
-
-
 # Cluster submit
 import mapping
 JOBDIR = mapping.__path__[0].rstrip('/')+'/'
@@ -38,6 +32,32 @@ vmem = '8G'
 
 
 # Functions
+def fork_self(miseq_run, adaID, fragment, subsample=False, VERBOSE=3, bwa=False):
+    '''Fork self for each adapter ID and fragment'''
+    qsub_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'map '+'{:02d}'.format(adaID)+' '+fragment,
+                 '-l', 'h_rt='+cluster_time[subsample],
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--run', miseq_run,
+                 '--adaIDs', adaID,
+                 '--fragments', fragment,
+                 '--verbose', VERBOSE,
+                ]
+    if subsample:
+        qsub_list.append('--subsample')
+    if bwa:
+        qsub_list.append('--bwa')
+    qsub_list = map(str, qsub_list)
+    if VERBOSE:
+        print ' '.join(qsub_list)
+    sp.call(qsub_list)
+
+
 def get_index_file(data_folder, adaID, fragment, subsample=False, ext=True):
     '''Get the index filename, with or w/o extension'''
     filename = 'consensus_'+fragment
@@ -203,39 +223,15 @@ def map_stampy(data_folder, adaID, fragment, subsample=False, VERBOSE=0, bwa=Fal
         print ' '.join(call_list)
     sp.call(call_list)
 
-             
-
-def fork_self(data_folder, adaID, fragment, subsample=False, VERBOSE=3, bwa=False):
-    '''Fork self for each adapter ID and fragment'''
-    qsub_list = ['qsub','-cwd',
-                 '-b', 'y',
-                 '-S', '/bin/bash',
-                 '-o', JOBLOGOUT,
-                 '-e', JOBLOGERR,
-                 '-N', 'map '+'{:02d}'.format(adaID)+' '+fragment,
-                 '-l', 'h_rt='+cluster_time[subsample],
-                 '-l', 'h_vmem='+vmem,
-                 JOBSCRIPT,
-                 '--adaIDs', adaID,
-                 '--fragments', fragment,
-                 '--verbose', VERBOSE,
-                ]
-    if subsample:
-        qsub_list.append('--subsample')
-    if bwa:
-        qsub_list.append('--bwa')
-    qsub_list = map(str, qsub_list)
-    if VERBOSE:
-        print ' '.join(qsub_list)
-    sp.call(qsub_list)
-
-    
+ 
 
 # Script
 if __name__ == '__main__':
 
     # Parse input args
     parser = argparse.ArgumentParser(description='Divide HIV reads into fragments')
+    parser.add_argument('--run', type=int, required=True,
+                        help='MiSeq run to analyze (e.g. 28, 37)')
     parser.add_argument('--adaIDs', nargs='*', type=int,
                         help='Adapter IDs to analyze (e.g. 2 16)')
     parser.add_argument('--fragments', nargs='*',
@@ -250,12 +246,17 @@ if __name__ == '__main__':
                         help='Use BWA for premapping?')
 
     args = parser.parse_args()
+    miseq_run = args.run
     adaIDs = args.adaIDs
     fragments = args.fragments
     VERBOSE = args.verbose
     subsample = args.subsample
     submit = args.submit
     bwa = args.bwa
+
+    # Specify the dataset
+    dataset = MiSeq_runs[miseq_run]
+    data_folder = dataset['folder']
 
     # If the script is called with no adaID, iterate over all
     if not adaIDs:
@@ -279,7 +280,7 @@ if __name__ == '__main__':
 
             # Submit to the cluster self if requested
             if submit:
-                fork_self(data_folder, adaID, fragment,
+                fork_self(miseq_run, adaID, fragment,
                           subsample=subsample, VERBOSE=VERBOSE, bwa=bwa)
                 continue
 

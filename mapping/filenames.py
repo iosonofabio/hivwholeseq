@@ -233,6 +233,12 @@ def get_read_unpaired_filename(data_folder, adaID, subsample=False):
     return fn
 
 
+def get_phix_filename():
+    '''Get the phiX sequence filename'''
+    filename = '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/reference/phiX_genome.fasta'
+    return filename
+
+
 def get_mapped_phix_filename(data_folder, type='bam', filtered=False, sort=False):
     '''Get the filename of the mapped reads onto PhiX'''
     filename = 'mapped_to_phix'
@@ -249,10 +255,14 @@ def get_mapped_phix_filename(data_folder, type='bam', filtered=False, sort=False
     return data_folder+'phix/'+filename
 
 
-def get_phix_filename():
-    '''Get the phiX sequence filename'''
-    filename = '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/phiX_genome.fasta'
-    return filename
+def get_allele_counts_phix_filename(data_folder):
+    '''Get the filename of the allele counts of PhiX'''
+    return data_folder+'phix/'+'allele_counts.npy'
+
+
+def get_insert_counts_phix_filename(data_folder):
+    '''Get the filename of the insert counts of PhiX'''
+    return data_folder+'phix/'+'insert_counts.pickle'
 
 
 def get_unclassified_reads_filenames(data_folder, filtered=False):

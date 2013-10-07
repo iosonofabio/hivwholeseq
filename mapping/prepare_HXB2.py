@@ -7,22 +7,12 @@ content:    Chop HXB2 into the 6 fragments, which are used as "chromosomes" for
 '''
 # Modules
 import os
-import sys
 import re
-from itertools import izip
-import numpy as np
 import Bio.SeqIO as SeqIO
 
 from mapping.reference import load_HXB2
 from mapping.primer_info import primers_coordinates_HXB2_inner as pci
 from mapping.filenames import get_HXB2_fragmented, get_HXB2_entire
-
-
-
-# Globals
-# FIXME
-from mapping.datasets import dataset_2 as dataset
-data_folder = dataset['folder']
 
 
 
@@ -50,7 +40,7 @@ if __name__ == '__main__':
     seq_cropped.description = seq.description+' (cropped to fragments F1-F6)'
 
     # Make output folder if necessary
-    dirname = os.path.dirname(get_HXB2_entire(data_folder))
+    dirname = os.path.dirname(get_HXB2_entire())
     if not os.path.isdir(dirname):
         os.mkdir(dirname)
 

@@ -19,13 +19,10 @@ content:    Map a subsample to HXB2 first, then build a consensus, then map
 #TODO: tidy up the F5a/b mess.
 # Modules
 import os
-import sys
 import subprocess as sp
-import time
 import argparse
 import re
-from operator import *
-from itertools import izip
+from operator import itemgetter
 from collections import defaultdict
 from collections import Counter
 import numpy as np
@@ -35,6 +32,7 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
 # Horizontal import of modules from this folder
+from mapping.datasets import MiSeq_runs
 from mapping.adapter_info import load_adapter_table, foldername_adapter
 from mapping.miseq import alpha, read_types
 from mapping.mapping_utils import stampy_bin, subsrate, convert_sam_to_bam,\
@@ -44,11 +42,6 @@ from mapping.filenames import get_HXB2_fragmented, get_read_filenames,\
 
 
 # Globals
-VERBOSE = 3
-# FIXME
-from mapping.datasets import dataset_2 as dataset
-data_folder = dataset['folder']
-
 # Consensus building
 maxreads = 10000
 match_len_min = 30
@@ -68,6 +61,29 @@ interval_check = 10
 
 
 # Functions
+def fork_self(miseq_run, adaID, fragment, iterations_max=0, VERBOSE=0):
+    '''Fork self for each adapter ID and fragment'''
+    qsub_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'bci '+'{:02d}'.format(adaID)+' '+fragment,
+                 '-l', 'h_rt='+cluster_time,
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--run', miseq_run,
+                 '--adaIDs', adaID,
+                 '--fragments', fragment,
+                 '--verbose', VERBOSE,
+                 '--iterations', iterations_max,
+                ]
+    qsub_list = map(str, qsub_list)
+    if VERBOSE:
+        print ' '.join(qsub_list)
+    sp.call(qsub_list)
+
+
 def get_ref_file(data_folder, adaID, fragment, n_iter, ext=True):
     '''Get the reference filename'''
     if n_iter == 0:
@@ -201,28 +217,6 @@ def map_stampy(data_folder, adaID, fragment, n_iter, VERBOSE=0):
     if VERBOSE >=2:
         print ' '.join(call_list)
     sp.call(call_list)
-
-
-def fork_self(data_folder, adaID, fragment, iterations_max=0, VERBOSE=0):
-    '''Fork self for each adapter ID and fragment'''
-    qsub_list = ['qsub','-cwd',
-                 '-b', 'y',
-                 '-S', '/bin/bash',
-                 '-o', JOBLOGOUT,
-                 '-e', JOBLOGERR,
-                 '-N', 'bci '+'{:02d}'.format(adaID)+' '+fragment,
-                 '-l', 'h_rt='+cluster_time,
-                 '-l', 'h_vmem='+vmem,
-                 JOBSCRIPT,
-                 '--adaIDs', adaID,
-                 '--fragments', fragment,
-                 '--verbose', VERBOSE,
-                 '--iterations', iterations_max,
-                ]
-    qsub_list = map(str, qsub_list)
-    if VERBOSE:
-        print ' '.join(qsub_list)
-    sp.call(qsub_list)
 
 
 def make_consensus(data_folder, adaID, fragment, n_iter, VERBOSE=0):
@@ -521,6 +515,8 @@ if __name__ == '__main__':
 
     # Parse input args: this is used to call itself recursively
     parser = argparse.ArgumentParser(description='Map HIV reads recursively')
+    parser.add_argument('--run', type=int, required=True,
+                        help='MiSeq run to analyze (e.g. 28, 37)')
     parser.add_argument('--adaIDs', nargs='*', type=int,
                         help='Adapter IDs to analyze (e.g. 2 16)')
     parser.add_argument('--fragments', nargs='*',
@@ -533,11 +529,16 @@ if __name__ == '__main__':
                         help='Execute the script in parallel on the cluster')
 
     args = parser.parse_args()
+    miseq_run = args.run
     adaIDs = args.adaIDs
     fragments = args.fragments
     iterations_max = args.iterations
     VERBOSE = args.verbose
     submit = args.submit
+
+    # Specify the dataset
+    dataset = MiSeq_runs[miseq_run]
+    data_folder = dataset['folder']
 
     # If the script is called with no adaID, iterate over all
     if not adaIDs:
@@ -561,7 +562,7 @@ if __name__ == '__main__':
 
             # Submit to the cluster self if requested
             if submit:
-                fork_self(data_folder, adaID, fragment, iterations_max, VERBOSE=VERBOSE)
+                fork_self(miseq_run, adaID, fragment, iterations_max, VERBOSE=VERBOSE)
                 continue
 
             # Iterate the consensus building until convergence

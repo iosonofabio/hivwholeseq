@@ -13,17 +13,14 @@ import sys
 import argparse
 from Bio import SeqIO
 from itertools import izip
-import numpy as np
 from Bio.SeqIO.QualityIO import FastqGeneralIterator as FGI
 
+from mapping.datasets import MiSeq_runs
 from mapping.filenames import get_raw_read_files
 from mapping.adapter_info import adapters_LT, adapters_table_file, foldername_adapter
 
 
 # Globals
-# FIXME
-from mapping.datasets import dataset_2 as dataset
-
 # Cluster submit
 import mapping
 JOBDIR = mapping.__path__[0].rstrip('/')+'/'
@@ -36,7 +33,7 @@ vmem = '8G'
 
 
 # Functions
-def fork_self(VERBOSE=0):
+def fork_self(miseq_run, VERBOSE=0):
     '''Fork self for each adapter ID'''
     import subprocess as sp
 
@@ -49,6 +46,7 @@ def fork_self(VERBOSE=0):
                  '-l', 'h_rt='+cluster_time,
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
+                 '--run', miseq_run,
                  '--verbose', VERBOSE,
                 ]
     qsub_list = map(str, qsub_list)
@@ -63,22 +61,28 @@ if __name__ == '__main__':
 
     # Parse input args
     parser = argparse.ArgumentParser(description='Demultiplex HIV reads')
+    parser.add_argument('--run', type=int, required=True,
+                        help='MiSeq run to analyze (e.g. 28, 37)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
     parser.add_argument('--submit', action='store_true', default=False,
                         help='Submit the job to the cluster via qsub')
 
     args = parser.parse_args()
+    miseq_run = args.run
     VERBOSE = args.verbose
     submit = args.submit
 
     # If submit, outsource to the cluster
     if submit:
-        fork_self(VERBOSE=VERBOSE)
+        fork_self(miseq_run, VERBOSE=VERBOSE)
         sys.exit()
 
-    # Create adapter table file
+    # Specify the dataset
+    dataset = MiSeq_runs[miseq_run]
     data_folder = dataset['folder']
+
+    # Create adapter table file
     with open(data_folder+adapters_table_file, 'w') as f:
         f.write('\t'.join(['# adapter sequence', 'adapter ID'])+'\n')
     

@@ -10,16 +10,13 @@ import os
 import subprocess as sp
 import argparse
 
+from mapping.datasets import MiSeq_runs
 from mapping.filenames import get_mapped_phix_filename, get_phix_filename, \
         get_unclassified_reads_filenames
 from mapping.mapping_utils import stampy_bin
 
 
 # Globals
-# FIXME
-from mapping.datasets import dataset_testmiseq as dataset
-data_folder = dataset['folder']
-
 # Submit vars
 JOBSUBMIT = os.path.realpath(__file__)      # This file
 JOBDIR = os.path.dirname(JOBSUBMIT)+'/'
@@ -69,15 +66,21 @@ if __name__ == '__main__':
 
     # Input arguments
     parser = argparse.ArgumentParser(description='Map reads to PhiX')
+    parser.add_argument('--run', type=int, required=True,
+                        help='MiSeq run to analyze (e.g. 28, 37)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
     parser.add_argument('--submit', action='store_true',
                         help='Execute the script in parallel on the cluster')
 
     args = parser.parse_args()
+    miseq_run = args.run
     VERBOSE = args.verbose
     submit = args.submit
 
+    # Specify the dataset
+    dataset = MiSeq_runs[miseq_run]
+    data_folder = dataset['folder']
 
     # Make output folder
     make_output_folders(data_folder)

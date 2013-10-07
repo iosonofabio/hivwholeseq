@@ -10,23 +10,18 @@ content:    Filter and trim demultiplexed reads.
             Note: we must take both members of a paired-end!
 '''
 # Modules
-import os
-import sys
 import argparse
 import numpy as np
 from Bio import SeqIO
 from itertools import izip
 
-from mapping.adapter_info import load_adapter_table, foldername_adapter
+from mapping.datasets import MiSeq_runs
+from mapping.adapter_info import load_adapter_table
 from mapping.filenames import get_read_filenames, get_read_unpaired_filename
 
 
 
 # Globals
-# FIXME
-from mapping.datasets import dataset_2 as dataset
-data_folder = dataset['folder']
-
 # Quality threshold
 phred_min = 20
 block_len_min = 100
@@ -44,7 +39,7 @@ vmem = '8G'
 
 
 # Functions
-def fork_self(data_folder, adaID, VERBOSE=0):
+def fork_self(miseq_run, adaID, VERBOSE=0):
     '''Fork self for each adapter ID'''
     import subprocess as sp
 
@@ -57,6 +52,7 @@ def fork_self(data_folder, adaID, VERBOSE=0):
                  '-l', 'h_rt='+cluster_time,
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
+                 '--run', miseq_run,
                  '--adaIDs', adaID,
                  '--verbose', VERBOSE,
                 ]
@@ -71,9 +67,6 @@ def filter_trim_reads(data_folder, adaID, VERBOSE=0):
 
     # Prepare temporary data structures
     read_good = np.zeros(2, bool)
-    
-    # Directory to read
-    dirname = foldername_adapter(adaID)
     
     # Scroll read files with demultiplexed raw reads
     readfiles = get_read_filenames(data_folder, adaID,
@@ -148,13 +141,13 @@ def filter_trim_reads(data_folder, adaID, VERBOSE=0):
 
 
 
-
-
 # Script
 if __name__ == '__main__':
 
     # Parse input arguments
     parser = argparse.ArgumentParser(description='Filter & trim demultiplexed reads.')
+    parser.add_argument('--run', type=int, required=True,
+                        help='MiSeq run to analyze (e.g. 28, 37)')
     parser.add_argument('--adaIDs', nargs='*', type=int,
                         help='Adapter IDs to analyze (e.g. 2 16)')
     parser.add_argument('--verbose', type=int, default=0,
@@ -163,9 +156,14 @@ if __name__ == '__main__':
                         help='Submit the job to the cluster via qsub')
 
     args = parser.parse_args()
+    miseq_run = args.run
     adaIDs = args.adaIDs
     VERBOSE = args.verbose
     submit = args.submit
+
+    # Specify the dataset
+    dataset = MiSeq_runs[miseq_run]
+    data_folder = dataset['folder']
 
     # If the script is called with no adaID, iterate over all
     if not adaIDs:
@@ -178,7 +176,7 @@ if __name__ == '__main__':
 
         # Submit to the cluster self if requested
         if submit:
-            fork_self(data_folder, adaID, VERBOSE=VERBOSE)
+            fork_self(miseq_run, adaID, VERBOSE=VERBOSE)
             continue
 
         # Filter ad trim
