@@ -27,7 +27,7 @@ def pair_generator(iterable):
             raise
 
 
-def get_ind_good_cigars(cigar, match_len_min=30, full_output=False):
+def get_ind_good_cigars(cigar, match_len_min=20, full_output=False):
     '''Keep only CIGAR blocks between two long matches'''
     from numpy import array
 
@@ -68,7 +68,7 @@ def get_range_good_cigars(cigar, pos, match_len_min=30,
 
         # Get the start
         start_read = 0
-        start_ref = pos
+        start_ref = pos	# pysam already switches to the 0-start system
         for (block_type, block_len) in cigar[:first_good_cigar]:
             if block_type == 0:
                 start_read += block_len
@@ -146,11 +146,11 @@ def convert_sam_to_bam(bamfilename, samfilename=None):
 def convert_bam_to_sam(samfilename, bamfilename=None):
     '''Convert BAM file to SAM file format'''
     import pysam
-    if samfilename is None:
-        samfilename = bamfilename[:-3]+'bam'
+    if bamfilename is None:
+        bamfilename = samfilename[:-3]+'bam'
 
-    bamfile = pysam.Samfile(samfilename, 'rb')
-    samfile = pysam.Samfile(bamfilename, 'w', template=bamfile)
+    bamfile = pysam.Samfile(bamfilename, 'rb')
+    samfile = pysam.Samfile(samfilename, 'w', template=bamfile)
     for s in bamfile: samfile.write(s)
     bamfile.close()
     samfile.close()

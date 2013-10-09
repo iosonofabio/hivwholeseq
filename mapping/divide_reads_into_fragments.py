@@ -12,6 +12,7 @@ content:    Classify the reads into the 6 fragments via a rough mapping before
 '''
 # Modules
 import os
+import time
 import subprocess as sp
 import argparse
 import numpy as np
@@ -23,7 +24,8 @@ from mapping.adapter_info import load_adapter_table
 from mapping.filenames import get_HXB2_entire, get_HXB2_index_file,\
         get_HXB2_hash_file, get_read_filenames, get_premapped_file
 from mapping.mapping_utils import stampy_bin, subsrate, bwa_bin,\
-        convert_sam_to_bam, get_range_good_cigars, pair_generator
+        convert_sam_to_bam, get_range_good_cigars, pair_generator, \
+        convert_bam_to_sam
 from mapping.primer_info import primers_coordinates_HXB2_inner as pci
 
 
@@ -67,6 +69,16 @@ def fork_self(miseq_run, adaID, VERBOSE=0, subsample=False, bwa=False):
     if VERBOSE >= 2:
         print ' '.join(qsub_list)
     sp.call(qsub_list)
+
+
+def make_output_folders(data_folder, adaID, VERBOSE=0):
+    '''Make output folders'''
+    output_filename = get_premapped_file(data_folder, adaID, subsample=subsample)
+    dirname = os.path.dirname(output_filename)
+    if not os.path.isdir(dirname):
+        os.mkdir(dirname)
+        if VERBOSE:
+            print 'Folder created:', dirname
 
 
 def make_index_and_hash(data_folder, cropped=True, VERBOSE=0):
@@ -141,11 +153,6 @@ def premap_bwa(data_folder, adaID, VERBOSE=0, subsample=False, cropped=True):
     output_filename = get_premapped_file(data_folder, adaID,
                                          type='sam', subsample=subsample,
                                          bwa=True)
-    # Make folder if necessary
-    dirname = os.path.dirname(output_filename)
-    if not os.path.isdir(dirname):
-        os.mkdir(dirname)
-
     # Map
     with open(output_filename, 'w') as f:
         call_list = [bwa_bin,
@@ -156,7 +163,8 @@ def premap_bwa(data_folder, adaID, VERBOSE=0, subsample=False, cropped=True):
         sp.call(call_list, stdout=f)
 
 
-def premap_stampy(data_folder, adaID, VERBOSE=0, subsample=False, bwa=False):
+def premap_stampy(data_folder, adaID, VERBOSE=0, subsample=False, bwa=False,
+                  threads=1):
     '''Call stampy for actual mapping'''
     if VERBOSE:
         print 'Map: adaID '+'{:02d}'.format(adaID)
@@ -176,28 +184,106 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, subsample=False, bwa=False):
         readfiles = get_read_filenames(data_folder, adaID,
                                        subsample=subsample,
                                        filtered=True)
-    # Get output filename
-    output_filename =  get_premapped_file(data_folder, adaID, type='sam',
-                                          subsample=subsample)
-    # Make folder if necessary
-    dirname =  os.path.dirname(output_filename)
-    if not os.path.isdir(dirname):
-        os.mkdir(dirname)
+
+    # parallelize if requested
+    if threads == 1:
+
+        # Get output filename
+        output_filename =  get_premapped_file(data_folder, adaID, type='sam',
+                                              subsample=True)
+        # Map
+        call_list = [stampy_bin,
+                     '-g', get_HXB2_index_file(ext=False),
+                     '-h', get_HXB2_hash_file(ext=False), 
+                     '-o', output_filename,
+                     '--substitutionrate='+subsrate]
+        if bwa:
+            call_list.append('--bamkeepgoodreads')
+        call_list = call_list + ['-M'] + readfiles
+        call_list = map(str, call_list)
+        if VERBOSE >= 2:
+            print ' '.join(call_list)
+        sp.call(call_list)
+
+    else:
+
+        jobs_done = np.zeros(threads, bool)
+        job_IDs = np.zeros(threads, 'S30')
+
+        # Submit map script
+        for j in xrange(threads):
     
-    # Map
-    # Note: no --solexa option as of 2013 (illumina v1.8)
-    call_list = [stampy_bin,
-                 '-g', get_HXB2_index_file(ext=False),
-                 '-h', get_HXB2_hash_file(ext=False), 
-                 '-o', output_filename,
-                 '--substitutionrate='+subsrate]
-    if bwa:
-        call_list.append('--bamkeepgoodreads')
-    call_list = call_list + ['-M'] + readfiles
-    call_list = map(str, call_list)
-    if VERBOSE >= 2:
-        print ' '.join(call_list)
-    sp.call(call_list)
+            # Get output filename
+            output_filename =  get_premapped_file(data_folder, adaID, type='sam',
+                                                  subsample=subsample, part=(j+1))
+            # Map
+            call_list = ['qsub','-cwd',
+                         '-b', 'y',
+                         '-S', '/bin/bash',
+                         '-o', JOBLOGOUT,
+                         '-e', JOBLOGERR,
+                         '-N', 'divi p'+str(j+1)+' '+'{:02d}'.format(adaID),
+                         '-l', 'h_rt='+cluster_time[subsample],
+                         '-l', 'h_vmem='+vmem,
+                         stampy_bin,
+                         '-g', get_HXB2_index_file(ext=False),
+                         '-h', get_HXB2_hash_file(ext=False), 
+                         '-o', output_filename,
+                         '--processpart='+str(j+1)+'/'+str(threads),
+                         '--substitutionrate='+subsrate]
+            if bwa:
+                call_list.append('--bamkeepgoodreads')
+            call_list = call_list + ['-M'] + readfiles
+            call_list = map(str, call_list)
+            if VERBOSE >= 2:
+                print ' '.join(call_list)
+            job_ID = sp.check_output(call_list)
+            job_ID = job_ID.split()[2]
+            job_IDs[j] = job_ID
+
+        # Check output
+        while not jobs_done.all():
+
+            # Sleep 10 secs
+            time.sleep(10)
+
+            # Get the output of qstat to check the status of jobs
+            qstat_output = sp.check_output(['qstat'])
+            qstat_output = qstat_output.split('\n')[:-1] # The last is an empty line
+            if len(qstat_output) < 3:
+                jobs_done[:] = True
+                break
+            else:
+                qstat_output = [line.split()[0] for line in qstat_output[2:]]
+
+            for j in xrange(threads):
+                if jobs_done[j]:
+                    continue
+
+                if job_IDs[j] not in qstat_output:
+                    jobs_done[j] = True
+
+        # Merge output files
+        output_file_parts = [get_premapped_file(data_folder, adaID, type='bam',
+                                                 subsample=subsample, part=(j+1))
+                              for j in xrange(threads)]
+        for output_file in output_file_parts:
+            convert_sam_to_bam(output_file)
+        output_filename = get_premapped_file(data_folder, adaID, type='bam',
+                                             subsample=subsample, unsorted=True)
+        pysam.merge(output_filename, *output_file_parts)
+
+        # Sort the file by read names (to ensure the pair_generator)
+        output_filename_sorted = get_premapped_file(data_folder, adaID, type='bam',
+                                                    subsample=subsample,
+                                                    unsorted=False)
+        pysam.sort('-n', '-f', output_filename, output_filename_sorted)
+
+        # Make SAM out of the BAM for checking
+        output_filename = get_premapped_file(data_folder, adaID, type='sam',
+                                             subsample=subsample)
+        convert_bam_to_sam(output_filename)
+
 
 
 def write_read_pair(reads, ranges, fileouts):
@@ -223,8 +309,7 @@ def write_read_pair(reads, ranges, fileouts):
     fileouts[1].write("@%s\n%s\n+\n%s\n" % (reads[1].qname, fq2, qual2))
 
 
-def divide_into_fragments(data_folder, adaID, VERBOSE=0, subsample=False,
-                          F5_type='F5b'):
+def divide_into_fragments(data_folder, adaID, F5_type, VERBOSE=0, subsample=False):
     '''Divide mapped reads into fastq files for the fragments'''
     if VERBOSE:
         print 'Divide into fragments: adaID '+'{:02d}'.format(adaID)
@@ -238,7 +323,7 @@ def divide_into_fragments(data_folder, adaID, VERBOSE=0, subsample=False,
     frags_pos = np.array(frags_pos, int).T
     # Since the reference is cropped, subtract from the positions F1 start
     frags_pos -= frags_pos.min()
-    # Note: now we are in the reference of the CROPPED HXB2!
+    # Note: now we are in the reference of the CROPPED HXB2, and start from 0!
 
     # Get the premapped reads
     bamfilename = get_premapped_file(data_folder, adaID, type='bam',
@@ -296,7 +381,13 @@ def divide_into_fragments(data_folder, adaID, VERBOSE=0, subsample=False,
             ranges_read = []
             ranges_ref = []
             for read in reads:
-                (rread, rref) = get_range_good_cigars(read.cigar, read.pos)
+                # Get the range of the good chunk, but with lenient criteria
+                # (we want to keep the primers, but HXB2 might be quite distant
+                # from our sequences hence generate lots of indels)
+                (rread, rref) = get_range_good_cigars(read.cigar, read.pos,
+                                                      match_len_min=10,
+                                                      trim_left=0,
+                                                      trim_right=0)
                 ranges_read.append(rread)
                 ranges_ref.append(rref)
 
@@ -319,6 +410,10 @@ def divide_into_fragments(data_folder, adaID, VERBOSE=0, subsample=False,
             
             # Find the fragment(s) good for the whole pair
             frags_pair = np.intersect1d(*frags_reads)
+
+            #FIXME
+            if read1.qname == 'HWI-M01346-37:1:1114:24924:9604':
+                import ipdb; ipdb.set_trace()
             
             # A few cases can happen
             # 1. If the intersection is a single fragment, good
@@ -347,6 +442,8 @@ def divide_into_fragments(data_folder, adaID, VERBOSE=0, subsample=False,
                                 ((0, read1.rlen), (0, read2.rlen)),
                                 (fo1_um, fo2_um))
 
+
+
     if VERBOSE >= 3:
         print 'Mapped: '+str(n_mapped)+', ambiguous: '+str(n_ambiguous)+\
                 ', unmapped: '+str(n_unmapped)
@@ -370,6 +467,8 @@ if __name__ == '__main__':
                         help='Execute the script in parallel on the cluster')
     parser.add_argument('--bwa', action='store_true',
                         help='Use BWA for premapping?')
+    parser.add_argument('--threads', type=int, default=1,
+                        help='Number of threads to use for mapping')
 
     args = parser.parse_args()
     miseq_run = args.run
@@ -378,6 +477,7 @@ if __name__ == '__main__':
     subsample = args.subsample
     submit = args.submit
     bwa = args.bwa
+    threads = args.threads
 
     # Specify the dataset
     dataset = MiSeq_runs[miseq_run]
@@ -401,14 +501,21 @@ if __name__ == '__main__':
             fork_self(miseq_run, adaID, VERBOSE=VERBOSE, subsample=subsample,
                       bwa=bwa)
             continue
+        
+        # Make output folders
+        make_output_folders(data_folder, adaID, VERBOSE=VERBOSE)
 
         # Map roughly to HXB2
         if bwa:
             premap_bwa(data_folder, adaID,
                        VERBOSE=VERBOSE, subsample=subsample)
         premap_stampy(data_folder, adaID,
-                      VERBOSE=VERBOSE, subsample=subsample, bwa=bwa)
+                      VERBOSE=VERBOSE, subsample=subsample, bwa=bwa,
+                      threads=threads)
+
+        # Set the primers for fragment 5
+        F5_type = dataset['primerF5'][dataset['adapters'].index(adaID)]
 
         # Divide into fragments and unclassified
-        divide_into_fragments(data_folder, adaID,
+        divide_into_fragments(data_folder, adaID, F5_type,
                               VERBOSE=VERBOSE, subsample=subsample)

@@ -15,6 +15,7 @@ from Bio import SeqIO
 
 
 # Horizontal import of modules from this folder
+from mapping.datasets import MiSeq_runs
 from mapping.adapter_info import load_adapter_table
 from mapping.filenames import get_consensus_filename, get_mapped_filename
 from mapping.mapping_utils import get_ind_good_cigars, convert_sam_to_bam,\
@@ -24,7 +25,7 @@ from mapping.primer_info import primers_inner
 
 
 # Globals
-maxreads = 1e9
+maxreads = 1e2
 match_len_min = 30
 trim_bad_cigars = 3
 
@@ -170,14 +171,18 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0):
     len_localali = 30
     ref_fwd = str(refseq.seq)[:len_localali]
     ref_rev = str(refseq.seq)[-len_localali:]
-    ali_fwd = pairwise2.align.localms(ref_fwd, primer_fwd, 2, -1, -0.5, -0.1)[0][:2]
+    ali_fwd = pairwise2.align.localms(ref_fwd, primer_fwd, 2, -1, -1.5, -0.1)[0][:2]
     primer_fwd_end = len(ref_fwd) - ali_fwd[1][::-1].index(primer_fwd[-1])
     primer_fwd_end -= ali_fwd[0][:primer_fwd_end].count('-')
 
     # The reverse primer works, well, the other way around
-    ali_rev = pairwise2.align.localms(ref_rev, primer_rev, 2, -1, -0.5, -0.1)[0][:2]
+    ali_rev = pairwise2.align.localms(ref_rev, primer_rev, 2, -1, -1.5, -0.1)[0][:2]
     primer_rev_start = len(ref) - len(ref_rev) + ali_rev[1].index(primer_rev[0])
     primer_rev_start += ref_rev[len(ref_rev) - len(ref) + primer_rev_start:].count('-')
+
+    if VERBOSE >= 3:
+        print 'consensus:', ali_fwd[0], '|', ali_rev[0]
+        print 'primers:  ', ali_fwd[1], '|', ali_rev[1]
 
     # Give decent names
     start_nonprimer = primer_fwd_end
@@ -303,7 +308,7 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0):
 
 
     if VERBOSE >= 1:
-        print 'Reads: '+str(n_good)+' good, '+str(n_unmapped)+' unmapped, '+\
+        print 'Read pairs: '+str(n_good)+' good, '+str(n_unmapped)+' unmapped, '+\
                 str(n_unpaired)+' unpaired, '+str(n_mismapped_edge)+' edge, '+\
                 str(n_mutator)+' many-mutations, '+str(n_badcigar)+' bad CIGAR.'
 

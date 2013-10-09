@@ -7,7 +7,7 @@ content:    Map the unclassified reads to phiX as a control.
 '''
 # Modules
 import os
-import subprocess as sp
+import sys
 import argparse
 
 from mapping.datasets import MiSeq_runs
@@ -17,18 +17,40 @@ from mapping.mapping_utils import stampy_bin
 
 
 # Globals
-# Submit vars
-JOBSUBMIT = os.path.realpath(__file__)      # This file
-JOBDIR = os.path.dirname(JOBSUBMIT)+'/'
+# Cluster submit
+import mapping
+JOBDIR = mapping.__path__[0].rstrip('/')+'/'
 JOBLOGERR = JOBDIR+'logerr'
 JOBLOGOUT = JOBDIR+'logout'
-
-# Cluster parameters
+JOBSCRIPT = JOBDIR+'map_PhiX.py'
 cluster_time = '23:59:59'
 vmem = '8G'
+
     
 
 # Functions
+def fork_self(miseq_run, VERBOSE=0):
+    '''Fork self'''
+    import subprocess as sp
+
+    qsub_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'map phiX',
+                 '-l', 'h_rt='+cluster_time,
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--run', miseq_run,
+                 '--verbose', VERBOSE,
+                ]
+    qsub_list = map(str, qsub_list)
+    if VERBOSE:
+        print ' '.join(qsub_list)
+    sp.call(qsub_list)
+
+
 def get_phix_index_filename(data_folder, ext=True):
     '''Get index file for phiX'''
     dirname = os.path.dirname(get_mapped_phix_filename(data_folder)).rstrip('/')+'/'
@@ -60,6 +82,43 @@ def make_output_folders(data_folder, VERBOSE=0):
                 print 'Folder created:', dirname
 
 
+def make_index_and_hash(data_folder, VERBOSE=0):
+    '''Make index and hash for PhiX'''
+    import subprocess as sp
+
+    # 1. Make genome index file
+    if not os.path.isfile(get_phix_index_filename(data_folder)):
+        sp.call([stampy_bin,
+                 '--species=phiX',
+                 '-G', get_phix_index_filename(data_folder, ext=False),
+                 get_phix_filename(),
+                 ])
+    
+    # 2. Build a hash file
+    if not os.path.isfile(get_phix_hash_filename(data_folder)):
+        sp.call([stampy_bin,
+                 '-g', get_phix_index_filename(data_folder, ext=False),
+                 '-H', get_phix_hash_filename(data_folder, ext=False),
+                 ])
+
+
+def map_stampy(data_folder, VERBOSE=0):
+    '''Map using stampy'''
+    import subprocess as sp
+
+    input_filenames = get_unclassified_reads_filenames(data_folder, filtered=True)[:2]
+    call_list = [stampy_bin,
+                 '-g', get_phix_index_filename(data_folder, ext=False),
+                 '-h', get_phix_hash_filename(data_folder, ext=False), 
+                 '-o', get_mapped_phix_filename(data_folder, type='sam'),
+                 '-M'] + input_filenames
+
+    call_list = map(str, call_list)
+    if VERBOSE:
+        print ' '.join(call_list)
+    sp.call(call_list)
+
+
 
 # Script
 if __name__ == '__main__':
@@ -78,6 +137,11 @@ if __name__ == '__main__':
     VERBOSE = args.verbose
     submit = args.submit
 
+    # If submit, outsource to the cluster
+    if submit:
+        fork_self(miseq_run, VERBOSE=VERBOSE)
+        sys.exit()
+
     # Specify the dataset
     dataset = MiSeq_runs[miseq_run]
     data_folder = dataset['folder']
@@ -85,41 +149,8 @@ if __name__ == '__main__':
     # Make output folder
     make_output_folders(data_folder)
 
-    # Get reference sequence filename
-    ref_filename = get_phix_filename()
+    # Make index and hash
+    make_index_and_hash(data_folder, VERBOSE=VERBOSE)
 
-    # 1. Make genome index file
-    if not os.path.isfile(get_phix_index_filename(data_folder)):
-        sp.call([stampy_bin,
-                 '--species=phiX',
-                 '-G', get_phix_index_filename(data_folder, ext=False),
-                 ref_filename,
-                 ])
-    
-    # 2. Build a hash file
-    if not os.path.isfile(get_phix_hash_filename(data_folder)):
-        sp.call([stampy_bin,
-                 '-g', get_phix_index_filename(data_folder, ext=False),
-                 '-H', get_phix_hash_filename(data_folder, ext=False),
-                 ])
-    
-    # 3. Map using stampy
-    input_filenames = get_unclassified_reads_filenames(data_folder, filtered=True)[:2]
-    call_list = [stampy_bin,
-                 '-g', get_phix_index_filename(data_folder, ext=False),
-                 '-h', get_phix_hash_filename(data_folder, ext=False), 
-                 '-o', get_mapped_phix_filename(data_folder, type='sam'),
-                 '-M'] + input_filenames
-
-    if submit:
-        call_list = ['qsub','-cwd',
-                     '-o',JOBLOGOUT,
-                     '-e',JOBLOGERR,
-                     '-N', 'map phiX',
-                     '-l', 'h_rt='+cluster_time,
-                     '-l', 'h_vmem='+vmem] + call_list
-
-    call_list = map(str, call_list)
-    if VERBOSE:
-        print ' '.join(call_list)
-    sp.call(call_list)
+    # Map using stampy
+    map_stampy(data_folder, VERBOSE=VERBOSE)

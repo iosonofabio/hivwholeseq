@@ -34,7 +34,7 @@ vmem = '8G'
 
 # Functions
 def fork_self(miseq_run, VERBOSE=0):
-    '''Fork self for each adapter ID'''
+    '''Fork self'''
     import subprocess as sp
 
     qsub_list = ['qsub','-cwd',

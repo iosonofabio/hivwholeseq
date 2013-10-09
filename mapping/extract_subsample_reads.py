@@ -44,7 +44,7 @@ def fork_self(miseq_run, adaID, n_reads, VERBOSE=0, filtered=True):
                  '-S', '/bin/bash',
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
-                 '-N', 'subsam_'+'{:02d}'.format(adaID),
+                 '-N', 'subsam '+'{:02d}'.format(adaID),
                  '-l', 'h_rt='+cluster_time,
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
@@ -114,7 +114,7 @@ def extract_subsample(data_folder, adaID, n_reads, VERBOSE=0, filtered=True,
     read2_subsample = []
 
     if VERBOSE >= 2:
-        print 'Getting the reads...',
+        print 'Getting the reads...'
         sys.stdout.flush()
 
     # Iterate over the pair of files with a fast iterator
@@ -154,6 +154,8 @@ def extract_subsample(data_folder, adaID, n_reads, VERBOSE=0, filtered=True,
 
     if VERBOSE >= 2:
         print 'done.'
+        print 'File written:', out_filenames[0]
+        print 'File written:', out_filenames[1]
         sys.stdout.flush()
 
 

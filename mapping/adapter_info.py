@@ -48,4 +48,8 @@ def load_adapter_table(data_folder):
 
 def foldername_adapter(adaID):
     '''Convert an adapter number in a folder name'''
-    return 'adapterID_'+'{:02d}'.format(adaID)+'/'
+    if adaID == -1:
+        return 'unclassified_reads/'
+    else:
+        return 'adapterID_'+'{:02d}'.format(adaID)+'/'
+

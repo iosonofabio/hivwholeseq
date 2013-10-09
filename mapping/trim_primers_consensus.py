@@ -2,10 +2,14 @@
 '''
 author:     Fabio Zanini
 date:       29/09/13
-content:    Trim the inner PCR primers from a consensus sequence
+content:    Trim the inner PCR primers from a consensus sequence.
+
+            Note: sometimes, the consensus sequences do not include the full
+            primer!
 '''
 # Modules
 import argparse
+import numpy as np
 from Bio import SeqIO
 from Bio import pairwise2
 
@@ -42,19 +46,37 @@ def trim_primers(data_folder, adaID, fragment, subsample=False, VERBOSE=0):
 
     # 1. FWD
     ref_fwd = str(refseq.seq)[:len_localali]
-    ali_fwd = pairwise2.align.localms(ref_fwd, primer_fwd, 2, -1, -0.5, -0.1)[0][:2]
-    primer_fwd_end = len(ref_fwd) - ali_fwd[1][::-1].index(primer_fwd[-1])
-    primer_fwd_end -= ali_fwd[0][:primer_fwd_end].count('-')
+    ali_fwd = pairwise2.align.localms(ref_fwd, primer_fwd, 2, -1, -1.5, -0.1)[0][:2]
+    # Check whether there is a chunk of primer at all
+    alinp = np.array(map(list, ali_fwd))[:, -len(ali_fwd[0].lstrip('-')):len(ali_fwd[1].rstrip('-'))]
+    frac_diff = (alinp[0] != alinp[1]).mean()
+    if frac_diff > 0.3:
+        # There is nothing to trim
+        primer_fwd_end = 0
+        if VERBOSE >= 1:
+            'Fwd: nothing to trim'
+    else:
+        primer_fwd_end = len(ref_fwd) - ali_fwd[1][::-1].index(primer_fwd[-1])
+        primer_fwd_end -= ali_fwd[0][:primer_fwd_end].count('-')
 
     # 2. REV
     ref_rev = str(refseq.seq)[-len_localali:]
-    ali_rev = pairwise2.align.localms(ref_rev, primer_rev, 2, -1, -0.5, -0.1)[0][:2]
-    primer_rev_start = len(refseq) - len(ref_rev) + ali_rev[1].index(primer_rev[0])
-    primer_rev_start += ref_rev[len(ref_rev) - len(refseq) + primer_rev_start:].count('-')
+    ali_rev = pairwise2.align.localms(ref_rev, primer_rev, 2, -1, -1.5, -0.1)[0][:2]
+    # Check whether there is a chunk of primer at all
+    alinp = np.array(map(list, ali_rev))[:, -len(ali_rev[1].lstrip('-')):len(ali_rev[0].rstrip('-'))]
+    frac_diff = (alinp[0] != alinp[1]).mean()
+    if frac_diff > 0.3:
+        # There is nothing to trim
+        primer_rev_start = len(refseq)
+        if VERBOSE >= 1:
+            'Rev: nothing to trim'
+    else:
+        primer_rev_start = len(refseq) - len(ref_rev) + ali_rev[1].index(primer_rev[0])
+        primer_rev_start += ref_rev[len(ref_rev) - len(refseq) + primer_rev_start:].count('-')
 
     if VERBOSE >= 1:
-        print 'Length of fwd primer in ref:', primer_fwd_end, \
-                'length of rev primer in ref:', len(refseq) - primer_rev_start
+        print 'Length of fwd primer in ref:', str(primer_fwd_end)+'/'+str(len(primer_fwd)), \
+              'length of rev primer in ref:', str(len(refseq) - primer_rev_start)+'/'+str(len(primer_rev))
 
     # Trim
     refseq_new = refseq[primer_fwd_end: primer_rev_start]
@@ -109,10 +131,11 @@ if __name__ == '__main__':
         print 'fragments', fragments
 
     # Iterate over all requested samples
-    for i, adaID in enumerate(adaIDs):
-        for fragment in fragments:
-
+    for fragment in fragments:
+        for adaID in adaIDs:
             if fragment == 'F5':
-                fragment = dataset['primerF5'][i]
-            trim_primers(data_folder, adaID, fragment, subsample=subsample,
+                frag_orig = dataset['primerF5'][dataset['adapters'].index(adaID)]
+            else:
+                frag_orig = fragment
+            trim_primers(data_folder, adaID, frag_orig, subsample=subsample,
                          VERBOSE=VERBOSE)

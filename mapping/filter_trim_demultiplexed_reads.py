@@ -67,25 +67,21 @@ def filter_trim_reads(data_folder, adaID, VERBOSE=0):
 
     # Prepare temporary data structures
     read_good = np.zeros(2, bool)
-    
-    # Scroll read files with demultiplexed raw reads
-    readfiles = get_read_filenames(data_folder, adaID,
-                                   filtered=False)
-    read1_it = SeqIO.parse(readfiles[0], 'fastq')
-    read2_it = SeqIO.parse(readfiles[1], 'fastq')
-
-    # Open output files
-    outfiles = get_read_filenames(data_folder, adaID, filtered=True)
-    outfile_unpaired = get_read_unpaired_filename(data_folder, adaID)
     reads_out = 0
     reads_unpaired = 0
     reads_missed = 0
+    
+    # Open output files
+    outfiles = get_read_filenames(data_folder, adaID, filtered=True)
+    outfile_unpaired = get_read_unpaired_filename(data_folder, adaID)
     with open(outfiles[0], 'w') as fr1_h, \
          open(outfiles[1], 'w') as fr2_h, \
          open(outfile_unpaired, 'w') as fru_h:
 
         # Iterate over read pairs
-        for reads in izip(read1_it, read2_it):
+        readfiles = get_read_filenames(data_folder, adaID, filtered=False)
+        for reads in izip(SeqIO.parse(readfiles[0], 'fastq'),
+                          SeqIO.parse(readfiles[1], 'fastq')):
 
             read_good[:] = False
             reads_trimmed = []
@@ -149,7 +145,8 @@ if __name__ == '__main__':
     parser.add_argument('--run', type=int, required=True,
                         help='MiSeq run to analyze (e.g. 28, 37)')
     parser.add_argument('--adaIDs', nargs='*', type=int,
-                        help='Adapter IDs to analyze (e.g. 2 16)')
+                        help='Adapter IDs to analyze (e.g. 2 16). Use -1 for\
+                        unclassified reads.')
     parser.add_argument('--verbose', type=int, default=0,
                         help=('Verbosity level [0-3]'))
     parser.add_argument('--submit', action='store_true', default=False,

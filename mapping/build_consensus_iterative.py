@@ -17,6 +17,7 @@ content:    Map a subsample to HXB2 first, then build a consensus, then map
 
 '''
 #TODO: tidy up the F5a/b mess.
+# FIXME: something goes wrong for the fragment edges and run 37, adaIDs 2, 6, F1
 # Modules
 import os
 import subprocess as sp
@@ -44,8 +45,10 @@ from mapping.filenames import get_HXB2_fragmented, get_read_filenames,\
 # Globals
 # Consensus building
 maxreads = 10000
-match_len_min = 30
-trim_bad_cigars = 3
+# Use short match and no trimming, it's only consensus and we are mapping far away
+# to HXB2
+match_len_min = 10
+trim_bad_cigars = 0
 coverage_min = 10
 
 # Cluster submit
@@ -96,6 +99,18 @@ def get_ref_file(data_folder, adaID, fragment, n_iter, ext=True):
         fn = data_folder+'subsample/'+foldername_adapter(adaID)+'map_iter/'+fn
         if ext:
             fn = fn+'.fasta'
+    return fn
+
+
+def get_refcum_file(data_folder, adaID, fragment, ext=True):
+    '''Get the file with the cumulated consensi'''
+    # There are two sets of primers for fragment F5
+    if 'F5' in fragment:
+        fragment = 'F5'
+    fn = '_'.join(['consensus', 'alliters', fragment])
+    fn = data_folder+'subsample/'+foldername_adapter(adaID)+'map_iter/'+fn
+    if ext:
+        fn = fn+'.fasta'
     return fn
 
 
@@ -235,6 +250,7 @@ def make_consensus(data_folder, adaID, fragment, n_iter, VERBOSE=0):
     reffilename = get_ref_file(data_folder, adaID, fragment, n_iter)
     refseq = SeqIO.read(reffilename, 'fasta')
     ref = np.array(refseq)
+    refs = str(refseq.seq)
     
     # Allele counts and inserts
     counts = np.zeros((len(read_types), len(alpha), len(ref)), int)
@@ -482,6 +498,9 @@ def make_consensus(data_folder, adaID, fragment, n_iter, VERBOSE=0):
     consensus_final = ''.join(consensus_final).strip('N')
     consensus_final = re.sub('-', '', consensus_final)
 
+    ## FIXME
+    #import ipdb; ipdb.set_trace()
+
     return refseq, consensus_final
 
 
@@ -497,16 +516,27 @@ def write_consensus(data_folder, adaID, fragment, n_iter, consensus, final=False
 
     # There are two sets of primers for fragment F5
     if 'F5' in fragment:
-        fragment = 'F5'
+        frag_out = 'F5'
+    else:
+        frag_out = fragment
 
-    name = 'adaID_'+'{:02d}'.format(adaID)+'_'+fragment+'_consensus'
+    name = 'adaID_'+'{:02d}'.format(adaID)+'_'+frag_out+'_consensus'
     consensusseq = SeqRecord(Seq(consensus),
                              id=name, name=name)
     if final:
-        outfile = get_consensus_filename(data_folder, adaID, fragment)
+        outfile = get_consensus_filename(data_folder, adaID, frag_out)
     else:
-        outfile = get_ref_file(data_folder, adaID, fragment, n_iter+1)
+        outfile = get_ref_file(data_folder, adaID, frag_out, n_iter+1)
     SeqIO.write(consensusseq, outfile, 'fasta')
+
+    # In addition, cumulate all consensi in one file for checking purposes
+    if not final:
+        outfile = get_refcum_file(data_folder, adaID, frag_out)
+        if n_iter == 0:
+            SeqIO.write(SeqIO.read(get_ref_file(data_folder, adaID, fragment, 0), 'fasta'),
+                        outfile, 'fasta')
+        with open(outfile, 'a') as f:
+            SeqIO.write(consensusseq, f, 'fasta')
 
 
 
