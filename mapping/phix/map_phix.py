@@ -22,7 +22,7 @@ import mapping
 JOBDIR = mapping.__path__[0].rstrip('/')+'/'
 JOBLOGERR = JOBDIR+'logerr'
 JOBLOGOUT = JOBDIR+'logout'
-JOBSCRIPT = JOBDIR+'map_PhiX.py'
+JOBSCRIPT = JOBDIR+'map_phix.py'
 cluster_time = '23:59:59'
 vmem = '8G'
 

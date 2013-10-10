@@ -34,14 +34,14 @@ import mapping
 JOBDIR = mapping.__path__[0].rstrip('/')+'/'
 JOBLOGERR = JOBDIR+'logerr'
 JOBLOGOUT = JOBDIR+'logout'
-JOBSCRIPT = JOBDIR+'filter_mapped_reads.py'
+JOBSCRIPT = JOBDIR+'filter_mapped_reads_phix.py'
 cluster_time = '0:59:59'
 vmem = '8G'
 
 
 
 # Functions
-def fork_self(miseq_run, adaID, fragment, VERBOSE=0):
+def fork_self(miseq_run, VERBOSE=0):
     '''Fork self for each adapter ID'''
     import subprocess as sp
 
@@ -104,89 +104,8 @@ def trim_bad_cigar(read, match_len_min=match_len_min,
     read.cigar = cigar    
 
 
-def trim_primers(read, start_nonprimer, end_nonprimer):
-    '''Trim the fwd and rev inner PCR primers'''
-
-    # Is the read partially in the fwd primer?
-    touches_fwd_primer = read.pos < start_nonprimer
-    if not touches_fwd_primer:
-        read.pos -= start_nonprimer
-    else:
-        # Trim the primer: the read starts with a long match (it has been CIGAR-
-        # trimmed already), so we can just chop the primer off the first block
-        start_read = start_nonprimer - read.pos
-        if start_read > read.cigar[0][1]:
-            raise ValueError('The fwd primer is not within the first CIGAR block!')
-        cigar = read.cigar
-        cigar[0] = (cigar[0][0], cigar[0][1] - start_read)
-        
-        # Reset attributes
-        seq = read.seq
-        qual = read.qual
-        read.seq = seq[start_read:]
-        read.qual = qual[start_read:]
-        read.pos = start_nonprimer
-        read.cigar = cigar
-        
-    # Is the read partially in the rev primer?
-    end_ref = read.pos + sum(bl for (bt, bl) in read.cigar if bt in (0, 2))
-    touches_rev_primer = end_ref > end_nonprimer - start_nonprimer
-    if touches_rev_primer:
-
-        # Trim the primer; the read ends with a long match (it has been CIGAR-
-        # trimmed already), so we can just chop the primer off the last block
-        end_read = read.rlen + end_nonprimer - start_nonprimer - end_ref
-        if read.rlen - end_read > read.cigar[-1][1]:
-            raise ValueError('The rev primer is not within the last CIGAR block!')
-        cigar = read.cigar
-        cigar[-1] = (cigar[-1][0], cigar[-1][1] - (read.rlen - end_read))
-
-        # Reset attributes
-        # Reset attributes
-        seq = read.seq
-        qual = read.qual
-        read.seq = seq[:end_read]
-        read.qual = qual[:end_read]
-        read.cigar = cigar
-
-
-def filter_reads(data_folder, adaID, fragment, VERBOSE=0):
+def filter_reads(data_folder, VERBOSE=0):
     '''Filter the reads to good chunks'''
-    from Bio import pairwise2
-
-    # Resolve ambiguous fragment primers
-    if fragment in ['F5a', 'F5b']:
-        frag_gen = 'F5'
-    else:
-        frag_gen = fragment
-
-    # Read reference (fragmented)
-    reffilename = get_consensus_filename(data_folder, adaID, frag_gen)
-    refseq = SeqIO.read(reffilename, 'fasta')
-    ref = np.array(refseq)
-
-    # Get the coordinate of the inner PCR primers in this consensus via local
-    # alignment
-    primer_fwd, primer_rev = primers_inner[fragment]
-    len_localali = 30
-    ref_fwd = str(refseq.seq)[:len_localali]
-    ref_rev = str(refseq.seq)[-len_localali:]
-    ali_fwd = pairwise2.align.localms(ref_fwd, primer_fwd, 2, -1, -1.5, -0.1)[0][:2]
-    primer_fwd_end = len(ref_fwd) - ali_fwd[1][::-1].index(primer_fwd[-1])
-    primer_fwd_end -= ali_fwd[0][:primer_fwd_end].count('-')
-
-    # The reverse primer works, well, the other way around
-    ali_rev = pairwise2.align.localms(ref_rev, primer_rev, 2, -1, -1.5, -0.1)[0][:2]
-    primer_rev_start = len(ref) - len(ref_rev) + ali_rev[1].index(primer_rev[0])
-    primer_rev_start += ref_rev[len(ref_rev) - len(ref) + primer_rev_start:].count('-')
-
-    if VERBOSE >= 3:
-        print 'consensus:', ali_fwd[0], '|', ali_rev[0]
-        print 'primers:  ', ali_fwd[1], '|', ali_rev[1]
-
-    # Give decent names
-    start_nonprimer = primer_fwd_end
-    end_nonprimer = primer_rev_start
 
     # Get BAM files
     bamfilename = get_mapped_filename(data_folder, adaID, frag_gen, type='bam')

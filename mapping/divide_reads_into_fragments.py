@@ -43,7 +43,7 @@ vmem = '8G'
 
 
 # Functions
-def fork_self(miseq_run, adaID, VERBOSE=0, subsample=False, bwa=False):
+def fork_self(miseq_run, adaID, VERBOSE=0, subsample=False, bwa=False, threads=1):
     '''Fork self for each adapter ID'''
     if VERBOSE:
         print 'Forking to the cluster: adaID '+'{:02d}'.format(adaID)
@@ -60,6 +60,7 @@ def fork_self(miseq_run, adaID, VERBOSE=0, subsample=False, bwa=False):
                  '--run', miseq_run,
                  '--adaIDs', adaID,
                  '--verbose', VERBOSE,
+                 '--threads', threads,
                 ]
     if subsample:
         qsub_list.append('--subsample')
@@ -222,7 +223,7 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, subsample=False, bwa=False,
                          '-S', '/bin/bash',
                          '-o', JOBLOGOUT,
                          '-e', JOBLOGERR,
-                         '-N', 'divi p'+str(j+1)+' '+'{:02d}'.format(adaID),
+                         '-N', 'div '+'{:02d}'.format(adaID)+' p'+str(j+1),
                          '-l', 'h_rt='+cluster_time[subsample],
                          '-l', 'h_vmem='+vmem,
                          stampy_bin,
@@ -277,13 +278,14 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, subsample=False, bwa=False,
         output_filename_sorted = get_premapped_file(data_folder, adaID, type='bam',
                                                     subsample=subsample,
                                                     unsorted=False)
-        pysam.sort('-n', '-f', output_filename, output_filename_sorted)
+
+        # Note: we exclude the extension and the option -f because of a bug in samtools
+        pysam.sort('-n', output_filename, output_filename_sorted[:-4])
 
         # Make SAM out of the BAM for checking
         output_filename = get_premapped_file(data_folder, adaID, type='sam',
                                              subsample=subsample)
         convert_bam_to_sam(output_filename)
-
 
 
 def write_read_pair(reads, ranges, fileouts):
@@ -499,7 +501,7 @@ if __name__ == '__main__':
         # Submit to the cluster self if requested
         if submit:
             fork_self(miseq_run, adaID, VERBOSE=VERBOSE, subsample=subsample,
-                      bwa=bwa)
+                      bwa=bwa, threads=threads)
             continue
         
         # Make output folders

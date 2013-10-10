@@ -10,4 +10,5 @@ __all__ = ['test',
            'sequence_utils',
            'get_allele_counts',
            'minor_allele_frequency',
+           'phix',
           ]

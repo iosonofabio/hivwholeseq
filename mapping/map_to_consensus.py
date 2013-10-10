@@ -12,7 +12,9 @@ import sys
 import argparse
 import numpy as np
 import subprocess as sp
-from adapter_info import load_adapter_table, foldername_adapter
+
+from mapping.datasets import MiSeq_runs
+from mapping.adapter_info import load_adapter_table, foldername_adapter
 from mapping.mapping_utils import stampy_bin, subsrate, bwa_bin, convert_sam_to_bam
 from mapping.filenames import get_consensus_filename, get_mapped_filename,\
         get_read_filenames
