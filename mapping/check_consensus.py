@@ -148,16 +148,13 @@ if __name__ == '__main__':
                 refsf = find_fragment(refseq, seq)
 
                 # Align
-                align = align_via_muscle(refsf, seq)
+                align = align_muscle(refsf, seq)
 
                 # Look for mutations
                 ali = np.array(align)
                 muts = (ali[1] != ali[0]).nonzero()[0]
                 if len(muts):
-                    print adaID, fragment, muts
-
-                #FIXME
-                #import ipdb; ipdb.set_trace()
+                    print 'Reference check:', adaID, fragment, muts
 
         # Check the number of Ns (did we cover enough with 1000 reads?)
         for fragment in fragments:
