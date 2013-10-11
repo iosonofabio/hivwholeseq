@@ -54,6 +54,7 @@ def fork_self(miseq_run, adaID, fragment, VERBOSE=0):
                  '-l', 'h_rt='+cluster_time,
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
+                 '--run', miseq_run,
                  '--adaIDs', adaID,
                  '--fragments', fragment,
                  '--verbose', VERBOSE,
@@ -354,7 +355,7 @@ if __name__ == '__main__':
         print 'fragments', fragments
 
     # Iterate over all requested samples
-    for i, adaID in enumerate(adaIDs):
+    for adaID in adaIDs:
         for fragment in fragments:
 
             # Submit to the cluster self if requested
@@ -364,5 +365,5 @@ if __name__ == '__main__':
 
             # or else, perform the filtering
             if fragment == 'F5':
-                fragment = dataset['primerF5'][i]
+                fragment = dataset['primerF5'][dataset['adapters'].index(adaID)]
             filter_reads(data_folder, adaID, fragment, VERBOSE=VERBOSE)

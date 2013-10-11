@@ -250,7 +250,7 @@ if __name__ == '__main__':
 
             # Submit to the cluster self if requested
             if submit:
-                fork_self(data_folder, adaID, fragment,
+                fork_self(miseq_run, adaID, fragment,
                           subsample=subsample, VERBOSE=VERBOSE)
                 continue
 
