@@ -233,3 +233,22 @@ def index_bam(bamfilename_sorted):
     import pysam
 
     pysam.index(bamfilename_sorted)
+
+
+def align_muscle(*seqs):
+    '''Global alignment of sequences via MUSCLE'''
+    import subprocess as sp
+    from Bio.Align.Applications import MuscleCommandline
+    muscle_cline = MuscleCommandline(diags=True)
+    child = sp.Popen(str(muscle_cline),
+                     stdin=sp.PIPE,
+                     stdout=sp.PIPE,
+                     stderr=sp.PIPE,
+                     shell=True)
+    SeqIO.write(seqs, child.stdin, "fasta")
+    child.stdin.close()
+    child.stderr.close()
+    align = AlignIO.read(child.stdout, "fasta")
+    child.stdout.close()
+    return align
+

@@ -11,4 +11,5 @@ __all__ = ['test',
            'get_allele_counts',
            'minor_allele_frequency',
            'phix',
+           'check_consensus',
           ]

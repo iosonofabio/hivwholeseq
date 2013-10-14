@@ -15,6 +15,7 @@ from mapping.datasets import MiSeq_runs
 from mapping.primer_info import primers_inner as pri
 from mapping.adapter_info import load_adapter_table
 from mapping.filenames import get_consensus_filename
+from mapping.mapping_utils import align_miscle
 
 
 
@@ -73,24 +74,6 @@ def find_overlap(seq1, seq2):
     end = len(ali2[0][0].rstrip('-'))
 
     return (seq1[start:], seq2[:end])
-
-
-def align_muscle(refseq, seq):
-    '''Align two sequences via MUSCLE'''
-    from Bio.Align.Applications import MuscleCommandline
-    muscle_cline = MuscleCommandline(diags=True)
-    import subprocess as sp
-    child = sp.Popen(str(muscle_cline),
-                     stdin=sp.PIPE,
-                     stdout=sp.PIPE,
-                     stderr=sp.PIPE,
-                     shell=True)
-    SeqIO.write([refseq, seq], child.stdin, "fasta")
-    child.stdin.close()
-    child.stderr.close()
-    align = AlignIO.read(child.stdout, "fasta")
-    child.stdout.close()
-    return align
 
 
 

@@ -3,20 +3,64 @@
 author:     Fabio Zanini
 date:       10/10/13
 content:    Characterize errors in phiX.
+
+            Most can be done on allele frequencies without going down to the
+            reads, but fwd and rev must be separated.
 '''
 # Modules
 import argparse
+from operator import itemgetter
 from collections import defaultdict, Counter
 import numpy as np
 from Bio import SeqIO
+from Bio.Seq import reverse_complement as rc
 
 from mapping.datasets import MiSeq_runs
-from mapping.miseq import alpha, read_types
+from mapping.miseq import alpha, read_types, alphal
 from mapping.filenames import get_phix_filename, get_allele_counts_phix_filename
 
 
 
+# Globals
+rcf = {'fwd': lambda x: x, 'rev': rc}
+colors = {'fwd': 'b', 'rev': 'g'}
+
+
+
 # Functions
+def get_count(counts):
+    count = {'fwd': counts[0] + counts[2], 'rev': counts[1] + counts[3]}
+    return count
+
+
+def get_consensus(count):
+    consensus = {key: alpha[[cou.argmax() for cou in count[key].T]] for key in count}
+    return consensus
+
+
+def get_minor_counts(count):
+    minor_counts = {key: np.zeros(count[key].shape[-1], int) for key in count}
+    for key in count:
+        for i in xrange(len(minor_counts['fwd'])):
+            cou = np.sort(count[key][:, i])[-2]
+            minor_counts[key][i] = cou
+    return minor_counts
+
+
+def get_minor_nus(count):
+    minor_nus = {key: np.zeros(counts.shape[-1]) for key in count}
+    for key in count:
+        for i in xrange(len(minor_nus['fwd'])):
+            cou = np.sort(count[key][:, i])[-2]
+            minor_nus[key][i] = 1.0 * cou / (count[key][:, i].sum() + 1e-6)
+    return minor_nus
+
+
+def get_coverage(count):
+    coverage = {key: count[key].sum(axis=0) for key in count}
+    return coverage
+
+
 def load_allele_counts(data_folder, VERBOSE=0):
     '''Load the precomputer allele counts'''
     allele_count_filename = get_allele_counts_phix_filename(data_folder)
@@ -27,11 +71,11 @@ def load_allele_counts(data_folder, VERBOSE=0):
 def consensus_vs_reference(miseq_run, counts=None, VERBOSE=0):
     '''Check the consensus sequence VS the phiX reference'''
     if counts is None:
-        counts = load_allele_counts(datasets[miseq_run]['folder'], VERBOSE=VERBOSE)
+        counts = load_allele_counts(MiSeq_runs[miseq_run]['folder'], VERBOSE=VERBOSE)
 
     # Calculate consensus
-    count = counts.sum(axis=0)
-    consensus = alpha[[cou.argmax() for cou in count.T]]
+    count = get_count(counts)
+    consensus = get_consensus(count)
 
     if VERBOSE >= 1:
         # Get reference
@@ -39,56 +83,65 @@ def consensus_vs_reference(miseq_run, counts=None, VERBOSE=0):
         ref = np.array(refseq)
 
         # Check differences
-        ind = (consensus != ref).nonzero()[0]
-        if len(ind):
-            print 'PhiX run', miseq_run, 'differences from reference:'
-            print 'Pos  Ref   Cons  Mutation'
-            print '-------------------------'
-            for i in ind:
-                i0 = max(i-2, 0)
-                i1 = min(i+3, len(refseq))
-                print '{:4d}'.format(i), ''.join(ref[i0: i1]), ''.join(consensus[i0: i1]),\
-                        ref[i], '->', consensus[i]
-            print ''
+        ind = {key: (con != ref).nonzero()[0] for key, con in consensus.iteritems()}
+        for key, indo in ind.iteritems():
+            if len(indo):
+                print 'PhiX run', miseq_run, 'differences from reference ('+key+'):'
+                print 'Pos  Ref   Cons  Mutation'
+                print '-------------------------'
+                for i in indo:
+                    i0 = max(i-2, 0)
+                    i1 = min(i+3, len(refseq))
+                    print '{:4d}'.format(i), \
+                            rcf[key](''.join(ref[i0: i1])), \
+                            rcf[key](''.join(consensus[key][i0: i1])),\
+                            rcf[key](ref[i]), '->', rcf[key](consensus[key][i])
+                print ''
 
-    return ''.join(consensus)
+    return {key: ''.join(value) for key, value in consensus.iteritems()}
 
 
 def minor_alleles_along_genome(miseq_run, counts=None, VERBOSE=0, plot=False):
     '''Show the minor alleles along the phiX genome'''
     if counts is None:
-        counts = load_allele_counts(datasets[miseq_run]['folder'], VERBOSE=VERBOSE)
+        counts = load_allele_counts(MiSeq_runs[miseq_run]['folder'], VERBOSE=VERBOSE)
 
     # Study the minor alleles (sequencing errors)
-    count = counts.sum(axis=0)
-    minor_counts = np.zeros(counts.shape[-1], int)
-    minor_nus = np.zeros(counts.shape[-1])
-    for i in xrange(len(minor_counts)):
-        cou = np.sort(count[:, i])[-2]
-        minor_counts[i] = cou
-        minor_nus[i] = 1.0 * cou / (count[:, i].sum() + 1e-6)
+    count = get_count(counts)
+    minor_counts = get_minor_counts(count)
+    minor_nus = get_minor_nus(count)
+
+    # Mean error frequency
+    cov = get_coverage(count)
+    print 'Average error frequency:',
+    for key in count:
+        print key, '{:1.1e}'.format(minor_counts[key][300:].mean() / cov[key][300:].mean()),
+    print ''
 
     # Plot
     if plot:
         import matplotlib.pyplot as plt
         fig, axs = plt.subplots(1, 2, figsize=(13, 7))
-        axs[0].plot(minor_counts, lw=2)
-        axs[0].scatter(np.arange(len(minor_counts)), minor_counts, s=20, c='b',
-                       edgecolor='none')
+        for key in count:
+            axs[0].plot(minor_counts[key], lw=2, c=colors[key], alpha=0.5)
+            axs[0].scatter(np.arange(len(minor_counts[key])), minor_counts[key],
+                           s=20, c=colors[key], edgecolor='none', label=key)
         axs[0].set_xlabel('Position in phiX')
         axs[0].set_title('Sequencing errors')
-        axs[0].set_xlim(-100, len(minor_counts) + 100)
+        axs[0].set_xlim(-100, len(minor_counts['fwd']) + 100)
         axs[0].set_yscale('log')
+        axs[0].legend()
     
-        # Plot coverage first
-        axs[1].plot(1.0 / count.sum(axis=0), lw=1.5, c='grey', label='coverage')
-    
-        axs[1].plot(minor_nus, lw=2, c='b')
-        axs[1].scatter(np.arange(len(minor_nus)), minor_nus, s=20, c='b',
-                       edgecolor='none')
+        for key in count:
+            # Plot coverage first 
+            axs[1].plot(1.0 / count[key].sum(axis=0), lw=0.5,
+                        c=colors[key], ls='--', label='coverage '+key)
+            axs[1].plot(minor_nus[key], lw=2, c=colors[key], alpha=0.5)
+            axs[1].scatter(np.arange(len(minor_nus[key])), minor_nus[key],
+                           s=20, c=colors[key], edgecolor='none')
         axs[1].set_xlabel('Position in phiX')
         axs[1].set_title('Sequencing errors frequencies')
-        axs[1].set_xlim(-100, len(minor_counts) + 100)
+        axs[1].set_xlim(-100, len(minor_counts['fwd']) + 100)
         axs[1].set_yscale('log')
     
     
@@ -101,109 +154,246 @@ def minor_alleles_along_genome(miseq_run, counts=None, VERBOSE=0, plot=False):
     return minor_counts, minor_nus
 
 
-def characterize_motifs(miseq_run, counts=None, consensus=None, minor_counts=None, VERBOSE=0):
-    '''Find the DNA motifs of the errors'''
-    if counts is None:
-        counts = load_allele_counts(datasets[miseq_run]['folder'], VERBOSE=VERBOSE)
-    count = counts.sum(axis=0)
-
-    if consensus is None:
-        consensus = alpha[[cou.argmax() for cou in count.T]]
-        consensus = ''.join(consensus)
-
-    if minor_counts is None: 
-        minor_counts = np.zeros(counts.shape[-1], int)
-        for i in xrange(len(minor_counts)):
-            minor_counts[i] = np.sort(count[:, i])[-2]
-
-    pos_errors = (minor_counts > 0).nonzero()[0]
-    if not len(pos_errors):
-        return
-
-    # Note: skip the first 300 positions, they are strange somehow (maybe mapping)
-    pos_errors = pos_errors[pos_errors >= 300]
-
-    motifs = [defaultdict(int) for l in xrange(1, 5)]
-    for pos in pos_errors:
-        muts = alpha[count[:, pos] == minor_counts[pos]]
-        for mut in muts:
-            # 1-mer motifs
-            mot1 = (consensus[pos], mut)
-            motifs[0][mot1] += 1
-
-            # 2+ mer motifs
-            for le in xrange(2, 5):
-                if pos > le - 2:
-                    wt = consensus[pos-le+1:pos+1]
-                    mutm = list(wt)
-                    mutm[le-1] = mut
-                    mot = (wt, ''.join(mutm))
-                motifs[le-1][mot] += 1
-
-    # Normalize by nucleotide content in the consensus
-    # Note: for longer motifs, we renormalize by all nucleotides in the consensus motif
-    cons = np.array(list(consensus))
-    abus = {a: (cons == a).mean() for a in alpha}
-    for mots in motifs:
-        for key in mots:
-            for j in xrange(len(key[0])):
-                mots[key] = 1.0 * mots[key] / (abus[key[0][j]] / 0.25)
-
-    # Sort by abundance
-    from operator import itemgetter
-    motifs = [sorted(mots.iteritems(), key=itemgetter(1), reverse=True)
-              for mots in motifs]
-
-    if VERBOSE >= 1:
-        print 'Motifs: run', miseq_run
-        print 'Motif occurrences (rinormalized by abundance)'
-        for i in xrange(len(motifs)):
-            for (m, c) in motifs[i][:5]:
-                print m[0], '->', m[1], '{:10f}'.format(c)
-
-    return motifs
-
-
-def spikes_motifs(miseq_run, counts=None, consensus=None, minor_counts=None, VERBOSE=0):
+def spikes_motifs(miseq_run, counts=None, consensus=None, minor_counts=None,
+                  VERBOSE=0, plot=False):
     '''Find the motifs around thes pikes in error rates'''
     if counts is None:
-        counts = load_allele_counts(datasets[miseq_run]['folder'], VERBOSE=VERBOSE)
-    count = counts.sum(axis=0)
-
-    if consensus is None:
-        consensus = alpha[[cou.argmax() for cou in count.T]]
-        consensus = ''.join(consensus)
+        counts = load_allele_counts(MiSeq_runs[miseq_run]['folder'], VERBOSE=VERBOSE)
+    count = get_count(counts)
 
     if minor_counts is None: 
-        minor_counts = np.zeros(counts.shape[-1], int)
-        for i in xrange(len(minor_counts)):
-            minor_counts[i] = np.sort(count[:, i])[-2]
+        minor_counts = get_minor_counts(count)
 
-    # Pick the spikes with p < 0.001 or so
+    # Get consensus
+    if consensus is None:
+        consensus = {key: ''.join(c) for key, c in get_consensus(count).iteritems()}
+
+    # Pick the spikes, i.e. the positions with error rates in the tail of the
+    # binomial, p < 0.001 or so
     # Note: skip the first 300 positions, they are strange somehow (maybe mapping)
-    n = count[:, 300:].sum(axis=0).mean()
-    p = 1.0 * minor_counts[300:].mean() / n
     from scipy.stats import binom
-    k_crit = binom.ppf(0.999, n, p)
-    ind = (minor_counts[300:] > k_crit).nonzero()[0]
-    spikes = []
-    if len(ind):
-        ind += 300
-        print 'Spikes: run', miseq_run
-        print ' Pos WT Motifs'
-        print '----------------------'
-        for pos in ind:
-            print '{:4d}'.format(pos),
-            print '{:>2s}'.format(consensus[pos]),
-            for le in xrange(1, 5):
-                if pos > le - 2:
-                    mutm = list(consensus[pos - le + 1: pos + 1])
-                    mutm[le - 1] = alpha[count[:, pos] == minor_counts[pos]][0]
-                    print ''.join(mutm),
-            print
-            spikes.append((pos, (consensus[pos - le + 1: pos + 1], ''.join(mutm))))
+    spikes = defaultdict(list)
+    for key in count:
+        n = count[key][:, 300:].sum(axis=0).mean()
+        p = 1.0 * minor_counts[key][300:].mean() / n
+        k_crit = binom.ppf(0.999, n, p)
+        ind = (minor_counts[key][300:] > k_crit).nonzero()[0] + 300
+        if len(ind):
+            print 'Spikes: run', miseq_run, '('+key+')'
+            print ' Pos WT Motifs'
+            print '----------------------'
+            for pos in ind:
+                print '{:4d}'.format(pos),
+                print '{:>2s}'.format(consensus[key][pos]),
+                for le in xrange(1, 5):
+                    if pos > le - 2:
+                        mutm = list(consensus[key][pos - le + 1: pos + 1])
+                        mutm[le - 1] = alpha[count[key][:, pos] == minor_counts[key][pos]][0]
+                        print ''.join(mutm),
+                print
+                spikes[key].append((pos,
+                                    (consensus[key][pos - le + 1: pos + 1], ''.join(mutm)),
+                                    1.0 * minor_counts[key][pos] / count[key][:, pos].sum(axis=0)))
+
+    # Order spikes by frequency
+    from operator import itemgetter
+    for key in spikes:
+        spikes[key].sort(key=itemgetter(2), reverse=True)
+
+    # Plot the error histogram and the binomial if requested
+    if plot:
+        import matplotlib.pyplot as plt
+        fig, axs = plt.subplots(1, 2, figsize=(11.1, 6.8))
+        xf = lambda x: np.logspace(-5, np.log10(0.5), x)
+
+        for i, key in enumerate(count):
+            ax = axs[i]
+            ax.hist(1.0 * minor_counts[key][300:] / count[key][:, 300:].sum(axis=0),
+                    bins=xf(60), normed=True, label='Errors')
+            yb = binom.pmf(np.floor(n * xf(200)), n, p)
+            ax.plot(xf(200), yb / yb.max() * 0.9 * ax.get_ylim()[1], lw=2, c='r',
+                    label='Binomial')
+            ax.set_xlabel('Error frequency')
+            ax.set_xscale('log')
+            ax.set_xlim(1e-5, 0.5)
+            ax.set_ylabel('Density (A.U.)')
+            ax.legend(loc=1, fontsize=12)
+            ax.set_title(key, fontsize=18)
+    
+            ym = 0.3 * ax.get_ylim()[1]
+            for j, (pos, trans, nu_spike) in enumerate(spikes[key]):
+                ar = ax.arrow(nu_spike,
+                              ym * 1.08**j, 0, -(ym * 1.08**j - 500),
+                              edgecolor='k',
+                              facecolor='k',
+                              width=nu_spike / 100,
+                              head_length=400,
+                              overhang=0.4)
+                txt = ax.text(nu_spike * 1.05, ym * 1.05 * 1.08**j, str(pos), fontsize=12)
+
+        fig.suptitle('run '+str(miseq_run), fontsize=18)
+        plt.tight_layout()
+        plt.ion()
+        plt.show()
+
+        #fig.savefig('/ebio/ag-neher/home/fzanini/phd/sequencing/figures/phix_run'+str(miseq_run)+'_spikes.png')
 
     return spikes
+
+
+def characterize_motifs(miseq_run, spikes=None, counts=None, consensus=None, minor_counts=None,
+                        VERBOSE=0, plot=False):
+    '''Find the DNA motifs of the errors'''
+    if counts is None:
+        counts = load_allele_counts(MiSeq_runs[miseq_run]['folder'], VERBOSE=VERBOSE)
+    count = get_count(counts)
+    cov = get_coverage(count)
+
+    if consensus is None:
+        consensus = get_consensus(count)
+
+    # Calculate the whole transition table for single mutations
+    M1 = {key: np.zeros((4, 5)) for key in count}
+    for ia1, a1 in enumerate(alpha[:4]):
+        # FWD
+        cons_a1 = (consensus['fwd'] == a1).nonzero()[0]
+        # Exclude positions before 300
+        cons_a1 = cons_a1[cons_a1 >= 300]
+
+        # Exclude spikes if provided
+        if spikes is not None:
+            pos_spikes = map(itemgetter(0), spikes['fwd'])
+            cons_a1 = np.array(list((set(cons_a1) - set(pos_spikes))), int)
+    
+        for ia2, a2 in enumerate(alpha[:5]):
+            M1['fwd'][ia1, ia2] = 1.0 * count['fwd'][ia2][cons_a1].sum() / \
+                    cov['fwd'][cons_a1].sum()
+
+        # REV
+        cons_a1 = (consensus['rev'] == a1).nonzero()[0]
+        # Exclude positions before 300
+        cons_a1 = cons_a1[cons_a1 >= 300]
+
+        # Exclude spikes if provided
+        if spikes is not None:
+            pos_spikes = map(itemgetter(0), spikes['fwd'])
+            cons_a1 = np.array(list((set(cons_a1) - set(pos_spikes))), int)
+
+        ira1 = alphal.index(rc(a1))
+        for ia2, a2 in enumerate(alpha[:5]):
+            ira2 = alphal.index(rc(a2))
+            M1['rev'][ira1, ira2] = 1.0 * count['rev'][ia2][cons_a1].sum() / \
+                    cov['rev'][cons_a1].sum()
+
+    # Plot
+    if plot:
+        import matplotlib.pyplot as plt
+        fig, axs = plt.subplots(1, 2, figsize=(14, 5))
+        for i, key in enumerate(count):
+            im = axs[i].imshow(np.log10(M1[key]), interpolation='nearest',
+                               vmin=-6, vmax=-3)
+
+            axs[i].set_xticks(np.arange(5))
+            axs[i].set_yticks(np.arange(4))
+            axs[i].set_xticklabels(alphal[:5])
+            axs[i].set_yticklabels(alphal[:4])
+            axs[i].set_title(key)
+
+
+        fig.subplots_adjust(right=0.8)
+        cbar_ax = fig.add_axes([0.85, 0.2, 0.05, 0.6])
+        fig.colorbar(im, cax=cbar_ax)
+        fig.suptitle('Mutation matrix for MiSeq (phiX, run'+str(miseq_run)+')',
+                     fontsize=18)
+        plt.figtext(0.05, 0.5, 'from', rotation=90, fontsize=18)
+        plt.figtext(0.45, 0.04, 'to', fontsize=18)
+        plt.figtext(0.88, 0.85, '10^-x', fontsize=18)
+
+        plt.ion()
+        plt.show()
+
+    # Calculate transition table for higher order motifs (assuming independence)
+    M2 = {key: np.zeros((4, 4, 5)) for key in count}
+    for ia11, a11 in enumerate(alpha[:4]):
+        for ia12, a12 in enumerate(alpha[:4]):
+            # FWD
+            cons_a1 = ((consensus['fwd'][:-1] == a11) & \
+                       (consensus['fwd'][1:] == a12)).nonzero()[0]
+            # Exclude positions before 300
+            cons_a1 = cons_a1[cons_a1 >= 300]
+            # Exclude spikes if provided
+            if spikes is not None:
+                pos_spikes = map(itemgetter(0), spikes['fwd'])
+                cons_a1 = np.array(list((set(cons_a1) - set(pos_spikes))), int)
+
+            # Focus on the last allele
+            cons_a1 += 1
+            if VERBOSE >= 3:
+                print a11+a12, len(cons_a1)
+
+            for ia2, a2 in enumerate(alpha[:5]):
+                M2['fwd'][ia11, ia12, ia2] = 1.0 * count['fwd'][ia2][cons_a1].sum() / \
+                        cov['fwd'][cons_a1].sum()
+
+            # REV
+            cons_a1 = ((consensus['rev'][:-1] == a11) & \
+                       (consensus['rev'][1:] == a12)).nonzero()[0]
+            # Exclude positions before 300
+            cons_a1 = cons_a1[cons_a1 >= 300]
+            # Exclude spikes if provided
+            if spikes is not None:
+                pos_spikes = map(itemgetter(0), spikes['fwd'])
+                cons_a1 = np.array(list((set(cons_a1) - set(pos_spikes))), int)
+
+            # We already are at the last allele (see fwd)
+            if VERBOSE >= 3:
+                print a11+a12, len(cons_a1)
+
+            ira11 = alphal.index(rc(a11))
+            ira12 = alphal.index(rc(a12))
+            for ia2, a2 in enumerate(alpha[:5]):
+                ira2 = alphal.index(rc(a2))
+                M2['rev'][ira12, ira11, ira2] = 1.0 * count['rev'][ia2][cons_a1].sum() / \
+                        cov['rev'][cons_a1].sum()
+
+
+    # Flatten first two dimensions
+    Ma = np.array([[a1+a2 for a2 in alpha[:4]] for a1 in alpha[:4]]).T.ravel()
+    M2f = {key: M.swapaxes(0,1).reshape((M.shape[0] * M.shape[1], M.shape[2]))
+           for key, M in M2.iteritems()}
+
+    # Plot
+    if plot:
+        import matplotlib.pyplot as plt
+        fig2, axs = plt.subplots(1, 2, figsize=(10, 12))
+        for i, key in enumerate(count):
+            im = axs[i].imshow(np.log10(M2f[key]), interpolation='nearest',
+                               vmin=-6, vmax=-3)
+
+            axs[i].set_xticks(np.arange(5))
+            axs[i].set_yticks(np.arange(4**2))
+            axs[i].set_xticklabels(alphal[:5])
+            axs[i].set_yticklabels(Ma)
+            axs[i].set_title(key)
+
+
+        fig2.subplots_adjust(right=0.8)
+        cbar_ax = fig2.add_axes([0.85, 0.1, 0.05, 0.8])
+        fig2.colorbar(im, cax=cbar_ax)
+        fig2.suptitle('Double mutation matrix for MiSeq (phiX, run'+str(miseq_run)+')',
+                     fontsize=18)
+        plt.figtext(0.05, 0.5, 'from', rotation=90, fontsize=18)
+        plt.figtext(0.45, 0.04, 'to', fontsize=18)
+        plt.figtext(0.88, 0.92, '10^-x', fontsize=18)
+
+        plt.ion()
+        plt.show()
+
+        fig.savefig('/ebio/ag-neher/home/fzanini/phd/sequencing/figures/phix_run'+str(miseq_run)+'_mutmatrix.png')
+        fig2.savefig('/ebio/ag-neher/home/fzanini/phd/sequencing/figures/phix_run'+str(miseq_run)+'_mutmatrix2.png')
+
+
+    return M1, M2
 
 
 def minor_nus_crossrun(data_runs, VERBOSE=0):
@@ -234,6 +424,7 @@ def minor_nus_crossrun(data_runs, VERBOSE=0):
     plt.ion()
     plt.show()
 
+
 def spikes_crossrun(data_runs, VERBOSE=0):
     '''Check the spikes across runs'''
     runs = sorted(data_runs.keys())
@@ -253,8 +444,6 @@ def spikes_crossrun(data_runs, VERBOSE=0):
                 for share in shared:
                     print share,
                 print
-
-
 
 
 
@@ -285,32 +474,34 @@ if __name__ == '__main__':
         dataset = MiSeq_runs[miseq_run]
         data_folder = dataset['folder']
     
-        # Get allele counts
-        counts = load_allele_counts(data_folder, VERBOSE=VERBOSE)
-        data_runs[miseq_run]['counts'] = counts
-    
-        # Check consensus
-        consensus = consensus_vs_reference(miseq_run, counts, VERBOSE=0)
-        data_runs[miseq_run]['consensus'] = consensus
-
-        # Along genome
-        minor_counts, minor_nus = minor_alleles_along_genome(miseq_run, counts, VERBOSE=VERBOSE,
-                                                             plot=plot)
-        data_runs[miseq_run]['minor_counts'] = minor_counts
-        data_runs[miseq_run]['minor_nus'] = minor_nus
-
-        # Error frequency
-        print 'Average error frequency:', '{:1.1e}'.format(minor_counts[300:].mean() / counts.sum(axis=0).sum(axis=0).mean())
-
-        # Motifs
-        motifs = characterize_motifs(miseq_run, counts, minor_counts=minor_counts, VERBOSE=VERBOSE)
-        data_runs[miseq_run]['motifs'] = motifs
+#        # Get allele counts
+#        counts = load_allele_counts(data_folder, VERBOSE=VERBOSE)
+#        data_runs[miseq_run]['counts'] = counts
+#    
+#        # Check consensus
+#        consensus = consensus_vs_reference(miseq_run, counts, VERBOSE=VERBOSE)
+#        data_runs[miseq_run]['consensus'] = consensus
+#
+#        # Along genome
+#        minor_counts, \
+#        minor_nus = minor_alleles_along_genome(miseq_run, counts,
+#                                               VERBOSE=VERBOSE,
+#                                               plot=plot)
+#        data_runs[miseq_run]['minor_counts'] = minor_counts
+#        data_runs[miseq_run]['minor_nus'] = minor_nus
 
         # Spikes
-        spikes = spikes_motifs(miseq_run, counts, minor_counts=minor_counts, VERBOSE=VERBOSE)
+        spikes = spikes_motifs(miseq_run, VERBOSE=VERBOSE, plot=False)
         data_runs[miseq_run]['spikes'] = spikes
 
-    # Check consistency across runs
-    if len(data_runs) > 1:
-        minor_nus_crossrun(data_runs)
-        spikes_crossrun(data_runs)
+        # Motifs
+        motifs = characterize_motifs(miseq_run,
+                                     spikes=spikes,
+                                     VERBOSE=VERBOSE,
+                                     plot=plot)
+        data_runs[miseq_run]['motifs'] = motifs
+
+#    # Check consistency across runs
+#    if len(data_runs) > 1:
+#        minor_nus_crossrun(data_runs)
+#        spikes_crossrun(data_runs)
