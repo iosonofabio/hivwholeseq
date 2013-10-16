@@ -25,7 +25,7 @@ from mapping.primer_info import primers_inner
 
 
 # Globals
-maxreads = 1e2
+maxreads = 1e10
 match_len_min = 30
 trim_bad_cigars = 3
 
@@ -74,27 +74,39 @@ def trim_bad_cigar(read, match_len_min=match_len_min,
             get_ind_good_cigars(read.cigar, match_len_min=match_len_min,
                                 full_output=True)
 
+    # If no good CIGARs, give up
     if not good_cigars.any():
         read = None
         return
+    
+    # FIXME: trim also good reads of a few bases, just for testing
+    elif good_cigars.all():
+        cigar = list(read.cigar)
+        cigar[0] = (cigar[0][0], cigar[0][1] - 5)
+        cigar[-1] = (cigar[-1][0], cigar[-1][1] - 5)
+        start_read = 5
+        end_read = start_read + sum(bl for (bt, bl) in cigar if bt in (0, 1))
+        start_ref = read.pos + start_read
 
-    # Get the good CIGARs coordinates
-    ((start_read, end_read),
-     (start_ref, end_ref)) = \
-            get_range_good_cigars(read.cigar, read.pos,
-                                  match_len_min=match_len_min,
-                                  trim_left=trim_left,
-                                  trim_right=trim_right)
+    else:
 
-    # Trim CIGAR because of bad CIGARs at the edges
-    cigar = read.cigar[first_good_cigar: last_good_cigar + 1]
-    # Trim cigar block lengths
-    if first_good_cigar != 0:
-        cigar[0] = (cigar[0][0],
-                    cigar[0][1] - trim_left)
-    if last_good_cigar != len(read.cigar) - 1:
-        cigar[-1] = (cigar[-1][0],
-                     cigar[-1][1] - trim_right)
+        # Get the good CIGARs coordinates
+        ((start_read, end_read),
+         (start_ref, end_ref)) = \
+                get_range_good_cigars(read.cigar, read.pos,
+                                      match_len_min=match_len_min,
+                                      trim_left=trim_left,
+                                      trim_right=trim_right)
+
+        # Trim CIGAR because of bad CIGARs at the edges
+        cigar = read.cigar[first_good_cigar: last_good_cigar + 1]
+        # Trim cigar block lengths
+        if first_good_cigar != 0:
+            cigar[0] = (cigar[0][0],
+                        cigar[0][1] - trim_left)
+        if last_good_cigar != len(read.cigar) - 1:
+            cigar[-1] = (cigar[-1][0],
+                         cigar[-1][1] - trim_right)
 
     # Reset attributes
     seq = read.seq
@@ -107,10 +119,10 @@ def trim_bad_cigar(read, match_len_min=match_len_min,
 
 def trim_primers(read, start_nonprimer, end_nonprimer):
     '''Trim the fwd and rev inner PCR primers'''
-
     # Is the read partially in the fwd primer?
     touches_fwd_primer = read.pos < start_nonprimer
     if not touches_fwd_primer:
+        # The trimmed consensus LACKS the primers => we shift everything to the left
         read.pos -= start_nonprimer
     else:
         # Trim the primer: the read starts with a long match (it has been CIGAR-
@@ -126,8 +138,10 @@ def trim_primers(read, start_nonprimer, end_nonprimer):
         qual = read.qual
         read.seq = seq[start_read:]
         read.qual = qual[start_read:]
-        read.pos = start_nonprimer
         read.cigar = cigar
+        # Note: this is the position in the trimmed consensus, which LACKS the primers
+        # Hence, if you touched the fwd primer, your new position is 0
+        read.pos = 0
         
     # Is the read partially in the rev primer?
     end_ref = read.pos + sum(bl for (bt, bl) in read.cigar if bt in (0, 2))
@@ -190,7 +204,8 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0):
     end_nonprimer = primer_rev_start
 
     # Get BAM files
-    bamfilename = get_mapped_filename(data_folder, adaID, frag_gen, type='bam')
+    bamfilename = get_mapped_filename(data_folder, adaID, frag_gen, type='bam',
+                                      filtered=False)
     # Try to convert to BAM if needed
     if not os.path.isfile(bamfilename):
         convert_sam_to_bam(bamfilename)
@@ -244,7 +259,7 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0):
                     # Mismappings are often characterized by many mutations:
                     # check the number of mismatches and skip reads with too many
                     mm = (dict(read1.tags)['NM'], dict(read2.tags)['NM'])
-                    if (max(mm) > 50) or (sum(mm) > 50):
+                    if (max(mm) > 20) or (sum(mm) > 20):
                         if VERBOSE >= 2:
                             print 'Read pair '+read1.qname+': too many mismatches '+\
                                     '('+str(mm[0])+' + '+str(mm[1])+')'

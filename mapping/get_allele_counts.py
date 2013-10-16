@@ -20,7 +20,7 @@ from mapping.adapter_info import load_adapter_table
 from mapping.miseq import alpha, read_types
 from mapping.filenames import get_mapped_filename, get_allele_counts_filename, \
         get_insert_counts_filename, get_coverage_filename, get_consensus_filename
-from mapping.mapping_utils import get_ind_good_cigars, convert_sam_to_bam
+from mapping.mapping_utils import convert_sam_to_bam
 
 
 # Globals
@@ -91,6 +91,7 @@ def get_allele_counts(data_folder, adaID, fragment, subsample=False, VERBOSE=0,
         # Iterate over single reads (no linkage info needed)
         for i, read in enumerate(bamfile):
 
+            # Max number of reads
             if i > maxreads:
                 if VERBOSE >= 2:
                     print 'Max reads reached:', maxreads
@@ -104,16 +105,10 @@ def get_allele_counts(data_folder, adaID, fragment, subsample=False, VERBOSE=0,
             js = 2 * read.is_read2 + read.is_reverse
         
             # Read CIGARs (they should be clean by now)
-            cigar = read.cigar
-            len_cig = len(cigar)
-            (good_cigars, first_good_cigar, last_good_cigar) = \
-                    get_ind_good_cigars(cigar, match_len_min=match_len_min,
-                                        full_output=True)
-            
-            # Sequence and position
-            # Note: stampy takes the reverse complement already
             seq = read.seq
             pos = read.pos
+            cigar = read.cigar
+            len_cig = len(cigar)            
 
             # Iterate over CIGARs
             for ic, (block_type, block_len) in enumerate(cigar):
@@ -124,26 +119,12 @@ def get_allele_counts(data_folder, adaID, fragment, subsample=False, VERBOSE=0,
             
                 # Inline block
                 if block_type == 0:
-                    # Exclude bad CIGARs
-                    if good_cigars[ic]: 
-            
-                        # The first and last good CIGARs are matches:
-                        # trim them (unless they end the read)
-                        if (ic == first_good_cigar) and (ic != 0):
-                            trim_left = trim_bad_cigars
-                        else:
-                            trim_left = 0
-                        if (ic == last_good_cigar) and (ic != len_cig - 1):
-                            trim_right = trim_bad_cigars
-                        else:
-                            trim_right = 0
-            
-                        seqb = np.array(list(seq[trim_left:block_len - trim_right]), 'S1')
+                        seqb = np.array(list(seq), 'S1')
                         # Increment counts
                         for j, a in enumerate(alpha):
                             posa = (seqb == a).nonzero()[0]
                             if len(posa):
-                                counts[js, j, pos + trim_left + posa] += 1
+                                counts[js, j, pos + posa] += 1
             
                     # Chop off this block
                     if ic != len_cig - 1:
@@ -152,10 +133,8 @@ def get_allele_counts(data_folder, adaID, fragment, subsample=False, VERBOSE=0,
             
                 # Deletion
                 elif block_type == 2:
-                    # Exclude bad CIGARs
-                    if good_cigars[ic]: 
-                        # Increment gap counts
-                        counts[js, 4, pos:pos + block_len] += 1
+                    # Increment gap counts
+                    counts[js, 4, pos:pos + block_len] += 1
             
                     # Chop off pos, but not sequence
                     pos += block_len
@@ -164,10 +143,8 @@ def get_allele_counts(data_folder, adaID, fragment, subsample=False, VERBOSE=0,
                 # an insert @ pos 391 means that seq[:391] is BEFORE the insert,
                 # THEN the insert, FINALLY comes seq[391:]
                 elif block_type == 1:
-                    # Exclude bad CIGARs
-                    if good_cigars[ic]: 
-                        seqb = seq[:block_len]
-                        inserts[pos][seqb][js] += 1
+                    seqb = seq[:block_len]
+                    inserts[pos][seqb][js] += 1
             
                     # Chop off seq, but not pos
                     if ic != len_cig - 1:

@@ -50,9 +50,6 @@ def get_insert_size_distribution(data_folder, adaID, fragment, bins=None,
             # reads (check that we tamper correctly with insert sizes)
             insert_sizes[i] = np.abs(reads[0].isize)
 
-    ##FIXME
-    #import ipdb; ipdb.set_trace()
-
     insert_sizes = insert_sizes[:i]
     insert_sizes.sort()
 

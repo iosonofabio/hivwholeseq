@@ -21,10 +21,10 @@ params = {'axes.labelsize': 20,
 matplotlib.rcParams.update(params)
 import matplotlib.pyplot as plt
 
+from mapping.datasets import MiSeq_runs
 from mapping.miseq import alpha, read_types
 from mapping.filenames import get_allele_counts_filename, get_coverage_filename
 from mapping.adapter_info import load_adapter_table
-from mapping.datasets import MiSeq_runs
 
 
 

@@ -99,8 +99,28 @@ def get_allele_frequencies_filename(data_folder, adaID, fragment, subsample=Fals
 
 
 def get_HXB2_fragmented(fragment, ext=True):
-    '''Get the filename of the reference HXB2 alignment, divided in fragments'''
+    '''Get the filename of the reference HXB2 sequence, divided in fragments'''
     filename = 'HXB2_'+fragment
+    if ext:
+        filename = filename+'.fasta'
+    return reference_folder+filename
+
+
+def get_NL43_fragmented(fragment, ext=True, trim_primers=False):
+    '''Get the filename of the reference NL4-3 sequence, divided in fragments'''
+    filename = 'NL4-3_'+fragment
+    if trim_primers:
+        filename = filename+'_trim_primers'
+    if ext:
+        filename = filename+'.fasta'
+    return reference_folder+filename
+
+
+def get_F10_fragmented(fragment, ext=True, trim_primers=False):
+    '''Get the filename of the reference F10 sequence, divided in fragments'''
+    filename = 'F10_'+fragment
+    if trim_primers:
+        filename = filename+'_trim_primers'
     if ext:
         filename = filename+'.fasta'
     return reference_folder+filename
@@ -118,6 +138,13 @@ def get_HXB2_entire(cropped=False):
 def get_NL43_entire():
     '''Get the filename of the reference NL4-3 sequence, in one piece'''
     filename = 'NL4-3'
+    filename = filename+'.fasta'
+    return reference_folder+filename
+
+
+def get_F10_entire():
+    '''Get the filename of the reference F10 (ZM246F) sequence, in one piece'''
+    filename = 'F10'
     filename = filename+'.fasta'
     return reference_folder+filename
 
@@ -198,7 +225,7 @@ def get_premapped_file(data_folder, adaID, type='bam', subsample=False, bwa=Fals
 
 
 def get_mapped_filename(data_folder, adaID, fragment, type='bam', subsample=False,
-                        bwa=False, filtered=False, sort=False):
+                        bwa=False, filtered=False, sort=False, part=None, unsorted=False):
     '''Get the filename of the mapped reads onto consensus'''
     filename = fragment
     if bwa:
@@ -207,6 +234,10 @@ def get_mapped_filename(data_folder, adaID, fragment, type='bam', subsample=Fals
         filename = filename + '_filtered'
     if sort:
         filename = filename + '_sorted'
+    elif part is not None:
+        filename = filename+'_part'+str(part)
+    elif unsorted:
+        filename = filename+'_unsorted'
 
     if type == 'sam':
         filename = filename + '.sam'

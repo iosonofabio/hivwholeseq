@@ -9,19 +9,28 @@ content:    Map the reads to their own consensus, produced with an iterative
 # Modules
 import os
 import sys
+import time
 import argparse
+import pysam
 import numpy as np
 import subprocess as sp
 
 from mapping.datasets import MiSeq_runs
 from mapping.adapter_info import load_adapter_table, foldername_adapter
-from mapping.mapping_utils import stampy_bin, subsrate, bwa_bin, convert_sam_to_bam
+from mapping.mapping_utils import stampy_bin, subsrate, bwa_bin, convert_sam_to_bam, \
+        convert_bam_to_sam
 from mapping.filenames import get_consensus_filename, get_mapped_filename,\
         get_read_filenames
 
 
 
 # Globals
+# Stampy parameters
+stampy_gapopen = 60	        # Default: 40
+stampy_gapextend = 5 	    # Default: 3
+stampy_sensitive = True    # Default: False
+
+
 # Cluster submit
 import mapping
 JOBDIR = mapping.__path__[0].rstrip('/')+'/'
@@ -34,7 +43,8 @@ vmem = '8G'
 
 
 # Functions
-def fork_self(miseq_run, adaID, fragment, subsample=False, VERBOSE=3, bwa=False):
+def fork_self(miseq_run, adaID, fragment, subsample=False, VERBOSE=3, bwa=False,
+              threads=1):
     '''Fork self for each adapter ID and fragment'''
     qsub_list = ['qsub','-cwd',
                  '-b', 'y',
@@ -49,6 +59,7 @@ def fork_self(miseq_run, adaID, fragment, subsample=False, VERBOSE=3, bwa=False)
                  '--adaIDs', adaID,
                  '--fragments', fragment,
                  '--verbose', VERBOSE,
+                 '--threads', threads,
                 ]
     if subsample:
         qsub_list.append('--subsample')
@@ -183,7 +194,8 @@ def map_bwa(data_folder, adaID, fragment, subsample=False, VERBOSE=0):
         sp.call(call_list, stdout=f)
 
 
-def map_stampy(data_folder, adaID, fragment, subsample=False, VERBOSE=0, bwa=False):
+def map_stampy(data_folder, adaID, fragment, subsample=False, VERBOSE=0, bwa=False,
+               threads=1):
     '''Map using stampy, either directly or after BWA'''
     # Get input filenames
     if bwa:
@@ -205,27 +217,123 @@ def map_stampy(data_folder, adaID, fragment, subsample=False, VERBOSE=0, bwa=Fal
         readfiles = get_read_filenames(data_folder, adaID, fragment=fragment,
                                        subsample=subsample, premapped=True)
 
-    # Get output filename
-    output_filename = get_mapped_filename(data_folder, adaID, fragment,
+    # parallelize if requested
+    if threads == 1:
+
+        # Get output filename
+        output_filename = get_mapped_filename(data_folder, adaID, fragment,
+                                              type='sam', subsample=subsample)
+
+        # Map
+        call_list = [stampy_bin,
+                     '-g', get_index_file(data_folder, adaID, fragment,
+                                          subsample=subsample, ext=False),
+                     '-h', get_hash_file(data_folder, adaID, fragment,
+                                         subsample=subsample, ext=False), 
+                     '-o', output_filename,
+                     '--substitutionrate='+subsrate,
+                     '--gapopen', stampy_gapopen,
+                     '--gapextend', stampy_gapextend]
+        if bwa:
+            call_list.append('--bamkeepgoodreads')
+        if stampy_sensitive:
+            call_list.append('--sensitive')
+        call_list = call_list + ['-M'] + readfiles
+        call_list = map(str, call_list)
+        if VERBOSE >=2:
+            print ' '.join(call_list)
+        sp.call(call_list)
+
+    else:
+
+        # Submit map script
+        jobs_done = np.zeros(threads, bool)
+        job_IDs = np.zeros(threads, 'S30')
+        for j in xrange(threads):
+    
+            # Get output filename
+            output_filename =  get_mapped_filename(data_folder, adaID, fragment,
+                                               type='sam', subsample=subsample,
+                                               part=(j+1))
+            # Map
+            call_list = ['qsub','-cwd',
+                         '-b', 'y',
+                         '-S', '/bin/bash',
+                         '-o', JOBLOGOUT,
+                         '-e', JOBLOGERR,
+                         '-N', 'm '+'{:02d}'.format(adaID)+fragment+' p'+str(j+1),
+                         '-l', 'h_rt='+cluster_time[subsample],
+                         '-l', 'h_vmem='+vmem,
+                         stampy_bin,
+                         '-g', get_index_file(data_folder, adaID, fragment,
+                                              subsample=subsample, ext=False),
+                         '-h', get_hash_file(data_folder, adaID, fragment,
+                                             subsample=subsample, ext=False), 
+                         '-o', output_filename,
+                         '--processpart='+str(j+1)+'/'+str(threads),
+                         '--substitutionrate='+subsrate,
+                         '--gapopen', stampy_gapopen,
+                         '--gapextend', stampy_gapextend]
+            if bwa:
+                call_list.append('--bamkeepgoodreads')
+            if stampy_sensitive:
+                call_list.append('--sensitive')
+            call_list = call_list + ['-M'] + readfiles
+            call_list = map(str, call_list)
+            if VERBOSE >= 2:
+                print ' '.join(call_list)
+            job_ID = sp.check_output(call_list)
+            job_ID = job_ID.split()[2]
+            job_IDs[j] = job_ID
+
+        # Check output
+        while not jobs_done.all():
+
+            # Sleep 10 secs
+            time.sleep(10)
+
+            # Get the output of qstat to check the status of jobs
+            qstat_output = sp.check_output(['qstat'])
+            qstat_output = qstat_output.split('\n')[:-1] # The last is an empty line
+            if len(qstat_output) < 3:
+                jobs_done[:] = True
+                break
+            else:
+                qstat_output = [line.split()[0] for line in qstat_output[2:]]
+
+            for j in xrange(threads):
+                if jobs_done[j]:
+                    continue
+
+                if job_IDs[j] not in qstat_output:
+                    jobs_done[j] = True
+
+        # Merge output files
+        output_file_parts = [get_mapped_filename(data_folder, adaID, fragment,
+                                             type='bam', subsample=subsample,
+                                             part=(j+1))
+                              for j in xrange(threads)]
+        for output_file in output_file_parts:
+            convert_sam_to_bam(output_file)
+        output_filename = get_mapped_filename(data_folder, adaID, fragment, type='bam',
+                                              subsample=subsample, unsorted=True)
+        pysam.merge(output_filename, *output_file_parts)
+
+        # Sort the file by read names (to ensure the pair_generator)
+        output_filename_sorted = get_mapped_filename(data_folder, adaID, fragment,
+                                                     type='bam',
+                                                     subsample=subsample,
+                                                     unsorted=False)
+
+        # Note: we exclude the extension and the option -f because of a bug in samtools
+        pysam.sort('-n', output_filename, output_filename_sorted[:-4])
+
+        # Make SAM out of the BAM for checking
+        output_filename = get_mapped_filename(data_folder, adaID, fragment,
                                           type='sam', subsample=subsample)
+        convert_bam_to_sam(output_filename)
 
-    # Map
-    call_list = [stampy_bin,
-                 '-g', get_index_file(data_folder, adaID, fragment,
-                                      subsample=subsample, ext=False),
-                 '-h', get_hash_file(data_folder, adaID, fragment,
-                                     subsample=subsample, ext=False), 
-                 '-o', output_filename,
-                 '--substitutionrate='+subsrate]
-    if bwa:
-        call_list.append('--bamkeepgoodreads')
-    call_list = call_list + ['-M'] + readfiles
-    call_list = map(str, call_list)
-    if VERBOSE >=2:
-        print ' '.join(call_list)
-    sp.call(call_list)
 
- 
 
 # Script
 if __name__ == '__main__':
@@ -246,6 +354,8 @@ if __name__ == '__main__':
                         help='Execute the script in parallel on the cluster')
     parser.add_argument('--bwa', action='store_true',
                         help='Use BWA for premapping?')
+    parser.add_argument('--threads', type=int, default=1,
+                        help='Number of threads to use for mapping')
 
     args = parser.parse_args()
     miseq_run = args.run
@@ -255,6 +365,7 @@ if __name__ == '__main__':
     subsample = args.subsample
     submit = args.submit
     bwa = args.bwa
+    threads = args.threads
 
     # Specify the dataset
     dataset = MiSeq_runs[miseq_run]
@@ -283,7 +394,8 @@ if __name__ == '__main__':
             # Submit to the cluster self if requested
             if submit:
                 fork_self(miseq_run, adaID, fragment,
-                          subsample=subsample, VERBOSE=VERBOSE, bwa=bwa)
+                          subsample=subsample, VERBOSE=VERBOSE, bwa=bwa,
+                          threads=threads)
                 continue
 
             if bwa:
@@ -301,5 +413,6 @@ if __name__ == '__main__':
             
             # Map via stampy afterwards
             map_stampy(data_folder, adaID, fragment,
-                       subsample=subsample, VERBOSE=VERBOSE, bwa=bwa)
+                       subsample=subsample, VERBOSE=VERBOSE, bwa=bwa,
+                       threads=threads)
     

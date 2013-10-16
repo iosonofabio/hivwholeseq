@@ -238,6 +238,7 @@ def index_bam(bamfilename_sorted):
 def align_muscle(*seqs):
     '''Global alignment of sequences via MUSCLE'''
     import subprocess as sp
+    from Bio import AlignIO, SeqIO
     from Bio.Align.Applications import MuscleCommandline
     muscle_cline = MuscleCommandline(diags=True)
     child = sp.Popen(str(muscle_cline),
