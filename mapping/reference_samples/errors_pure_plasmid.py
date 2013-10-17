@@ -158,8 +158,8 @@ def minor_alleles_along_genome(miseq_run, adaID, fragment, VERBOSE=0, plot=False
         plt.suptitle(sample+', fragment '+fragment, fontsize=20)
         plt.tight_layout(rect=(0, 0, 1, 0.95))
     
-        plt.ion()
-        plt.show()
+        #plt.ion()
+        #plt.show()
 
         if savefig:
             fig.savefig(figures_folder+sample+'_minornu_'+fragment+'.png')
@@ -218,7 +218,7 @@ def spikes_motifs(miseq_run, adaID, fragment, VERBOSE=0, plot=False, savefig=Fal
     # Plot the error histogram and the binomial if requested
     if plot:
         import matplotlib.pyplot as plt
-        fig, axs = plt.subplots(1, 2, figsize=(11.1, 6.8))
+        fig, axs = plt.subplots(2, 1, figsize=(7, 12))
         xf = lambda x: np.logspace(-5, np.log10(0.5), x)
 
         for i, key in enumerate(count):
@@ -303,5 +303,5 @@ if __name__ == '__main__':
             #consensus_vs_reference(miseq_run, adaID, fragment, VERBOSE=VERBOSE)
             minor_alleles_along_genome(miseq_run, adaID, fragment,
                                        VERBOSE=VERBOSE, plot=True, savefig=False)
-            spikes_motifs(miseq_run, adaID, fragment,
-                          VERBOSE=VERBOSE, plot=True, savefig=False)
+            #spikes_motifs(miseq_run, adaID, fragment,
+            #              VERBOSE=VERBOSE, plot=True, savefig=False)

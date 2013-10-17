@@ -54,7 +54,7 @@ def fork_self(miseq_run, adaID, VERBOSE=0, subsample=False, bwa=False, threads=1
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
                  '-N', 'divide '+'{:02d}'.format(adaID),
-                 '-l', 'h_rt='+cluster_time[subsample],
+                 '-l', 'h_rt='+cluster_time[subsample or (threads >= 30)],
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
                  '--run', miseq_run,
@@ -224,7 +224,7 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, subsample=False, bwa=False,
                          '-o', JOBLOGOUT,
                          '-e', JOBLOGERR,
                          '-N', 'div '+'{:02d}'.format(adaID)+' p'+str(j+1),
-                         '-l', 'h_rt='+cluster_time[subsample],
+                         '-l', 'h_rt='+cluster_time[subsample or (threads >= 30)],
                          '-l', 'h_vmem='+vmem,
                          stampy_bin,
                          '-g', get_HXB2_index_file(ext=False),
@@ -311,7 +311,8 @@ def write_read_pair(reads, ranges, fileouts):
     fileouts[1].write("@%s\n%s\n+\n%s\n" % (reads[1].qname, fq2, qual2))
 
 
-def divide_into_fragments(data_folder, adaID, F5_type, VERBOSE=0, subsample=False):
+def divide_into_fragments(data_folder, adaID, F5_type, n_cycles=500,
+                          VERBOSE=0, subsample=False):
     '''Divide mapped reads into fastq files for the fragments'''
     if VERBOSE:
         print 'Divide into fragments: adaID '+'{:02d}'.format(adaID)
@@ -385,11 +386,14 @@ def divide_into_fragments(data_folder, adaID, F5_type, VERBOSE=0, subsample=Fals
             for read in reads:
                 # Get the range of the good chunk, but with lenient criteria
                 # (we want to keep the primers, but HXB2 might be quite distant
-                # from our sequences hence generate lots of indels)
+                # from our sequences hence generate lots of indels). These criteria
+                # must include a bit of trimming, otherwise we read back into the
+                # first 1-2 bases of the adapter (this happens only for short inserts).
+                trim_both = 5 * (np.abs(read.isize) < n_cycles / 2 + 20)
                 (rread, rref) = get_range_good_cigars(read.cigar, read.pos,
                                                       match_len_min=10,
-                                                      trim_left=0,
-                                                      trim_right=0)
+                                                      trim_left=trim_both,
+                                                      trim_right=trim_both)
                 ranges_read.append(rread)
                 ranges_ref.append(rref)
 
@@ -401,22 +405,18 @@ def divide_into_fragments(data_folder, adaID, F5_type, VERBOSE=0, subsample=Fals
                                 (fo1_um, fo2_um))
                 continue
 
-            # Is the good CIGAR reagion is mapped within a single fragment?
+            # Find the fragment(s) compatible with each single read
             frags_reads = []
-            for loc in ranges_ref:
-                ind = ((loc[0] >= frags_pos[0]) &
-                       (loc[0] < frags_pos[1]) &
-                       (loc[1] > frags_pos[0]) &
-                       (loc[1] <= frags_pos[1]))
+            for (start_ref, end_ref) in ranges_ref:
+                ind = ((start_ref >= frags_pos[0]) &
+                       (start_ref < frags_pos[1]) &
+                       (end_ref > frags_pos[0]) &
+                       (end_ref <= frags_pos[1]))
                 frags_reads.append(ind.nonzero()[0])
             
             # Find the fragment(s) good for the whole pair
             frags_pair = np.intersect1d(*frags_reads)
 
-            #FIXME
-            if read1.qname == 'HWI-M01346-37:1:1114:24924:9604':
-                import ipdb; ipdb.set_trace()
-            
             # A few cases can happen
             # 1. If the intersection is a single fragment, good
             if len(frags_pair) == 1:
@@ -485,6 +485,9 @@ if __name__ == '__main__':
     dataset = MiSeq_runs[miseq_run]
     data_folder = dataset['folder']
 
+    # Set the number of cycles of the kit (for trimming adapters in short inserts)
+    n_cycles = dataset['n_cycles']
+
     # If the script is called with no adaID, iterate over all
     if not adaIDs:
         adaIDs = load_adapter_table(data_folder)['ID']
@@ -520,4 +523,5 @@ if __name__ == '__main__':
 
         # Divide into fragments and unclassified
         divide_into_fragments(data_folder, adaID, F5_type,
-                              VERBOSE=VERBOSE, subsample=subsample)
+                              VERBOSE=VERBOSE, subsample=subsample,
+                              n_cycles=n_cycles)

@@ -24,9 +24,6 @@ from mapping.mapping_utils import convert_sam_to_bam
 
 
 # Globals
-match_len_min = 30
-trim_bad_cigars = 3
-
 # Cluster submit
 import mapping
 JOBDIR = mapping.__path__[0].rstrip('/')+'/'
@@ -34,7 +31,7 @@ JOBSCRIPT = JOBDIR+'get_allele_counts.py'
 JOBLOGERR = JOBDIR+'logerr'
 JOBLOGOUT = JOBDIR+'logout'
 # Different times based on subsample flag
-cluster_time = ['23:59:59', '0:59:59']
+cluster_time = '0:59:59'
 vmem = '4G'
 
 
@@ -48,7 +45,7 @@ def fork_self(miseq_run, adaID, fragment, subsample=False, VERBOSE=3):
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
                  '-N', 'acn '+'{:02d}'.format(adaID)+' '+fragment,
-                 '-l', 'h_rt='+cluster_time[subsample],
+                 '-l', 'h_rt='+cluster_time,
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
                  '--run', miseq_run,
@@ -88,7 +85,7 @@ def get_allele_counts(data_folder, adaID, fragment, subsample=False, VERBOSE=0,
         convert_sam_to_bam(bamfilename)
     with pysam.Samfile(bamfilename, 'rb') as bamfile:
 
-        # Iterate over single reads (no linkage info needed)
+        # Iterate over single reads
         for i, read in enumerate(bamfile):
 
             # Max number of reads
@@ -119,12 +116,12 @@ def get_allele_counts(data_folder, adaID, fragment, subsample=False, VERBOSE=0,
             
                 # Inline block
                 if block_type == 0:
-                        seqb = np.array(list(seq), 'S1')
-                        # Increment counts
-                        for j, a in enumerate(alpha):
-                            posa = (seqb == a).nonzero()[0]
-                            if len(posa):
-                                counts[js, j, pos + posa] += 1
+                    seqb = np.array(list(seq[:block_len]), 'S1')
+                    # Increment counts
+                    for j, a in enumerate(alpha):
+                        posa = (seqb == a).nonzero()[0]
+                        if len(posa):
+                            counts[js, j, pos + posa] += 1
             
                     # Chop off this block
                     if ic != len_cig - 1:

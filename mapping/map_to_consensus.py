@@ -28,7 +28,7 @@ from mapping.filenames import get_consensus_filename, get_mapped_filename,\
 # Stampy parameters
 stampy_gapopen = 60	        # Default: 40
 stampy_gapextend = 5 	    # Default: 3
-stampy_sensitive = True    # Default: False
+stampy_sensitive = True     # Default: False
 
 
 # Cluster submit
@@ -52,7 +52,7 @@ def fork_self(miseq_run, adaID, fragment, subsample=False, VERBOSE=3, bwa=False,
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
                  '-N', 'map '+'{:02d}'.format(adaID)+' '+fragment,
-                 '-l', 'h_rt='+cluster_time[subsample],
+                 '-l', 'h_rt='+cluster_time[subsample or (threads >= 10)],
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
                  '--run', miseq_run,
@@ -262,7 +262,7 @@ def map_stampy(data_folder, adaID, fragment, subsample=False, VERBOSE=0, bwa=Fal
                          '-o', JOBLOGOUT,
                          '-e', JOBLOGERR,
                          '-N', 'm '+'{:02d}'.format(adaID)+fragment+' p'+str(j+1),
-                         '-l', 'h_rt='+cluster_time[subsample],
+                         '-l', 'h_rt='+cluster_time[subsample or (threads >= 10)],
                          '-l', 'h_vmem='+vmem,
                          stampy_bin,
                          '-g', get_index_file(data_folder, adaID, fragment,

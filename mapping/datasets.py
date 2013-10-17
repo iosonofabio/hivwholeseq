@@ -17,7 +17,9 @@ dataset_testmiseq = {'description': 'Test run for the MiSeq and the PCR',
                      'primerF5': tuple('F5b' for s in xrange(6)),
                      'raw_data': {'read1': 'lane1_NoIndex_L001_R1_001.fastq',
                                   'adapter': 'lane1_NoIndex_L001_R2_001.fastq',
-                                  'read2': 'lane1_NoIndex_L001_R3_001.fastq'}}
+                                  'read2': 'lane1_NoIndex_L001_R3_001.fastq'},
+                     'n_cycles': 500,
+                    }
 
 dataset_2 = {'description': 'Second library (first patient-only)',
              'adapters': (2, 4, 5, 6, 7, 12, 13, 14, 15),
@@ -31,7 +33,9 @@ dataset_2 = {'description': 'Second library (first patient-only)',
                           'F5a', 'F5a', 'F5a', 'F5a', 'F5a'),
              'raw_data': {'read1': 'read1.fastq',
                           'adapter': 'barcode.fastq',
-                          'read2': 'read2.fastq'}}
+                          'read2': 'read2.fastq'},
+             'n_cycles': 500,
+            }
 
 # MiSeq runs
 MiSeq_runs = {28: dataset_testmiseq,

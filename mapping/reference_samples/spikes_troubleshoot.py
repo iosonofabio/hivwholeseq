@@ -63,6 +63,7 @@ def troubleshoot_spike(miseq_run, adaID, fragment, spike, reads=None, key=None,
     data_folder = MiSeq_runs[miseq_run]['folder']
     consensus =  SeqIO.read(get_consensus_filename(data_folder, adaID, fragment,
                                                    trim_primers=True), 'fasta')
+    cons = np.array(consensus)
 
     # Get allele counts and coverage for testing
     counts = np.load(get_allele_counts_filename(data_folder, adaID, fragment))
@@ -101,11 +102,13 @@ def troubleshoot_spike(miseq_run, adaID, fragment, spike, reads=None, key=None,
     #                break
     #            pos += bl
 
+    #return al_WT, counts_pos
     ## OK, the error frequency is correct.
 
     # 2. see where the error is in the read
     pos_read = np.zeros((len(alpha), 250), int)
     pos_read_end = np.zeros_like(pos_read)
+    read_names = []
     for read in reads:
         # if only fwd/rev are requested, do so
         if (key is not None) and (read.is_reverse != (key == 'rev')): continue
@@ -119,6 +122,9 @@ def troubleshoot_spike(miseq_run, adaID, fragment, spike, reads=None, key=None,
             if bt == 0:
                 if pos + bl > pos_spike:
                     al = seq[pos_spike - pos]
+                    if al != al_WT:
+                        if read.isize < 250:
+                            read_names.append(read.qname)
                     pos_read[(al == alpha).nonzero()[0][0], \
                              posr + pos_spike - pos] += 1
                     pos_read_end[(al == alpha).nonzero()[0][0], \
@@ -154,12 +160,65 @@ def troubleshoot_spike(miseq_run, adaID, fragment, spike, reads=None, key=None,
             1.0 * pos_read[(alpha == al_min).nonzero()[0][0]].sum() / pos_read.sum(), \
             str(consensus.seq)[pos_spike-3: pos_spike+4], pos_read_end[ail_min].argmax()
 
-    import ipdb; ipdb.set_trace()
+    read_names = np.array(read_names, 'S100')
+    read_names.dump('test.npy')
 
+    import ipdb; ipdb.set_trace()
     return al_WT, (pos_read, pos_read_end)
                 
+    ## 3. Do those reads contain many mutations?
+    #n_muts = []
+    #pos_muts = defaultdict(int)
+    #for read in reads:
+    #    # if only fwd/rev are requested, do so
+    #    if (key is not None) and (read.is_reverse != (key == 'rev')): continue
 
+    #    # reads are filtered, hence we can proceed to CIGARs
+    #    n_mut = 0
+    #    pos_mut = set()
+    #    pos = read.pos
+    #    posr = 0
+    #    seq = read.seq
+    #    cl = len(read.cigar)
+    #    for ic, (bt, bl) in enumerate(read.cigar):
+    #        if bt == 0:
+    #            if pos + bl > pos_spike:
+    #                al = seq[pos_spike - pos]
+    #                if al == al_WT:
+    #                    n_mut = -1
+    #                    break
 
+    #            consloc = cons[pos: pos + bl]
+    #            seqb = np.array(list(seq[:bl]))
+    #            pos_mut_block = (seqb != consloc).nonzero()[0] + pos
+    #            n_mut = len(pos_mut_block)
+    #            pos_mut |= set(pos_mut_block)
+
+    #            if ic != cl - 1:
+    #                pos += bl
+    #                posr += bl
+    #                seq = seq[bl:]
+    #        
+    #        elif bt == 1:
+    #            n_mut += 1
+    #            pos_mut.add(pos)
+    #            if ic != cl - 1:
+    #                seq = seq[bl:]
+    #                posr += bl
+
+    #        elif bt == 2:
+    #            n_mut += bl
+    #            pos_mut |= 
+    #            pos += bl
+
+    #    if n_mut >= 0:
+    #        n_muts.append(n_mut)
+    #        for pm in pos_mut:
+    #            pos_muts[pm] += 1
+
+    #print fragment, pos_spike, key, al_WT
+    #import ipdb; ipdb.set_trace()
+    #return al_WT, n_muts
 
 
 
