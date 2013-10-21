@@ -32,6 +32,7 @@ adapters_LT = {1: 'ATCACG',
                27: 'ATTCCT'}
 
 adapter_universal = 'AATGATACGGCGACCACCGAGATCTACACTCTTTCCCTACACGACGCTCTTCCGATCT'
+adapter_prefix = 'GATCGGAAGAGCACACGTCTGAACTCCAGTCAC'
 
 adapters_table_file = 'table_adapters.dat'
 

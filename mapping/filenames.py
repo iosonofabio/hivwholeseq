@@ -224,6 +224,24 @@ def get_premapped_file(data_folder, adaID, type='bam', subsample=False, bwa=Fals
     return data_folder+filename
 
 
+def get_divided_filenames(data_folder, adaID, fragments, type='bam'):
+    '''Get the filenames of the BAM files divided by fragment'''
+    filename = 'divided_on_HXB2'
+    filename = 'divided/'+filename
+    filename = data_folder+foldername_adapter(adaID)+filename
+    filenames = []
+    for fragment in (list(fragments) + ['ambiguous', 'unmapped', 'low_quality']):
+        fnf = filename+'_'+fragment
+        if type == 'sam':
+            fnf = fnf + '.sam'
+        elif type == 'bam':
+            fnf = fnf + '.bam'
+        else:
+            raise ValueError('Type of mapped reads file not recognized')
+        filenames.append(fnf)
+    return filenames
+
+
 def get_mapped_filename(data_folder, adaID, fragment, type='bam', subsample=False,
                         bwa=False, filtered=False, sort=False, part=None, unsorted=False):
     '''Get the filename of the mapped reads onto consensus'''
