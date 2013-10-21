@@ -98,9 +98,11 @@ def get_allele_frequencies_filename(data_folder, adaID, fragment, subsample=Fals
     return data_folder+filename
 
 
-def get_HXB2_fragmented(fragment, ext=True):
+def get_HXB2_fragmented(fragment, ext=True, trim_primers=False):
     '''Get the filename of the reference HXB2 sequence, divided in fragments'''
     filename = 'HXB2_'+fragment
+    if trim_primers:
+        filename = filename+'_trim_primers'
     if ext:
         filename = filename+'.fasta'
     return reference_folder+filename

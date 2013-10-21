@@ -25,12 +25,24 @@ if __name__ == '__main__':
     # Extract fragments coordinates and sequences (this is sample specific)
     frag_coos = {f: [co[0][0], co[1][1]] for f, co in pci.iteritems()}
     frag_seqs = {f: seq[co[0]: co[1]] for f, co in frag_coos.iteritems()}
+    
+    # Extract fragments without the inner primers
+    frag_coos_trimmed = {f: [co[0][1], co[1][0]] for f, co in pci.iteritems()}
+    frag_seqs_trimmed = {f: seq[co[0]: co[1]] for f, co in frag_coos_trimmed.iteritems()}
 
     # Relabel sequences
-    for (f, fs) in frag_seqs.iteritems():
+    for f in frag_seqs:
+        # Relabel fragments with primers
+        fs = frag_seqs[f]
         fs.name = 'HXB2_reference_'+f
         fs.id = fs.name
         fs.description = re.sub('_', ' ', fs.id)
+
+        # Relabel fragments without primers
+        fs_trimmed = frag_seqs_trimmed[f]
+        fs_trimmed.name = 'HXB2_reference_'+f+'_trim_primers'
+        fs_trimmed.id = fs_trimmed.name
+        fs_trimmed.description = re.sub('_', ' ', fs_trimmed.id)
 
     # Make a cropped sequence from F1 to F6, to reduce LTR degeneracy problems
     start_F1 = frag_coos['F1'][0]
@@ -47,6 +59,8 @@ if __name__ == '__main__':
     # Write to file both the entire, the cropped, and the fragmented (in separated files)
     SeqIO.write(seq, get_HXB2_entire(), 'fasta')
     SeqIO.write(seq_cropped, get_HXB2_entire(cropped=True), 'fasta')
-    for (f, fs) in frag_seqs.iteritems():
-        SeqIO.write(fs, get_HXB2_fragmented(f), 'fasta')
+    for f in frag_seqs:
+        SeqIO.write(frag_seqs[f], get_HXB2_fragmented(f), 'fasta')
+        SeqIO.write(frag_seqs_trimmed[f],
+                    get_HXB2_fragmented(f, trim_primers=True), 'fasta')
         print f

@@ -40,7 +40,7 @@ vmem = '8G'
 
 
 # Functions
-def fork_self(miseq_run, adaID, VERBOSE=0):
+def fork_self(miseq_run, adaID, VERBOSE=0, maxreads=-1):
     '''Fork self for each adapter ID'''
     if VERBOSE:
         print 'Forking to the cluster: adaID '+'{:02d}'.format(adaID)
@@ -57,6 +57,7 @@ def fork_self(miseq_run, adaID, VERBOSE=0):
                  '--run', miseq_run,
                  '--adaIDs', adaID,
                  '--verbose', VERBOSE,
+                 '--maxreads', maxreads,
                 ]
     qsub_list = map(str, qsub_list)
     if VERBOSE >= 2:
@@ -80,6 +81,11 @@ def test_integrity(reads, VERBOSE=True):
     i_rev = not i_fwd
 
     # Check read integrity
+    if reads[i_fwd].pos < 0:
+        if VERBOSE:
+            print 'Read fwd starts before 0 ('+str(reads[i_fwd].pos)+'):', reads[0].qname
+        return True
+
     if (reads[0].mpos != reads[1].pos) or (reads[1].mpos != reads[0].pos):
         if VERBOSE:
             print 'Read pair not integer (mpos):', reads[0].qname
@@ -113,7 +119,22 @@ def test_crossoverhang(reads, VERBOSE=True):
         return False
 
 
-def test_sanity(reads):
+def test_fragment_assignment(reads, n_frag, len_frag, VERBOSE=True):
+    '''Test assignment of the read pair to a fragment'''
+    # Let's assume the read is integet and has no cross-overhangs
+    i_fwd = reads[0].is_reverse
+    i_rev = not i_fwd
+
+    if (reads[i_fwd].pos <  0) or \
+       (reads[i_fwd].pos + reads[i_fwd].isize > len_frag):
+        if VERBOSE:
+            print 'Read pair is misassigned to fragment:', reads[0].qname, n_frag
+        return True
+
+    return False
+
+
+def test_sanity(reads, n_frag, len_frag):
     '''Perform sanity checks on supposedly good reads'''
     # Check read integrity
     if test_integrity(reads):
@@ -121,6 +142,10 @@ def test_sanity(reads):
 
     # Check cross-overhangs
     if test_crossoverhang(reads):
+        return True
+
+    # Check fragment assignment
+    if test_fragment_assignment(reads, n_frag, len_frag):
         return True
 
     return False
@@ -382,13 +407,13 @@ def trim_inner_primers(reads, frag_pos, pri, include_tests=False):
             import ipdb; ipdb.set_trace()
 
 
-def trim_low_quality(reads, phred_min=20, read_len_min=50, include_tests=False,
+def main_block_low_quality(reads, phred_min=20, read_len_min=50, include_tests=False,
                      VERBOSE=0):
     '''Trim low-quality stretches'''
 
     if include_tests:
         if test_integrity(reads):
-            print 'trim_low_quality (entry):'
+            print 'main_block_quality (entry):'
             import ipdb; ipdb.set_trace()
 
     tampered = False
@@ -504,21 +529,21 @@ def trim_low_quality(reads, phred_min=20, read_len_min=50, include_tests=False,
 
     if include_tests:
         if test_integrity(reads):
-            print 'trim_low_quality (exit):'
+            print 'main_block_low_quality (exit):'
             import ipdb; ipdb.set_trace()
 
     return False
 
 
-def trim_exclude_low_quality(reads, phred_min=20, read_len_min=50, include_tests=False,
-                             VERBOSE=0):
+def trim_low_quality(reads, phred_min=20, read_len_min=50, include_tests=False,
+                     VERBOSE=0):
     '''Strip loq-q from left and right, but leave in the middle'''
     # The rationale of this approach is that we still have the Qs later for
     # more detailed exclusions (e.g. for minor allele frequencies)
 
     if include_tests:
         if test_integrity(reads):
-            print 'trim_exclude_low_quality (entry):'
+            print 'trim_low_quality (entry):'
             import ipdb; ipdb.set_trace()
 
     tampered = False
@@ -645,6 +670,15 @@ def trim_exclude_low_quality(reads, phred_min=20, read_len_min=50, include_tests
         reads[i_rev].mpos = reads[i_fwd].pos
         isize = reads[i_rev].pos + sum(bl for bt, bl in reads[i_rev].cigar
                                        if bt in (0, 2)) - reads[i_fwd].pos
+
+        # If extremely rare cases, we trim so much that the read becomes fully
+        # cross-overhanging
+        #                ------->
+        #    <-----
+        # we should dump the pair in this case (short inserts are dumped later anyway)
+        if isize <= 0:
+            return True
+
         reads[i_fwd].isize = isize
         reads[i_rev].isize = -isize
 
@@ -691,23 +725,23 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, F5_primer, VERBOSE=0,
     input_filename = get_premapped_file(data_folder, adaID, type='bam')
     if not os.path.isfile(input_filename):
         convert_sam_to_bam(input_filename)
-    output_filenames = get_divided_filenames(data_folder, adaID, fragments, type='sam')
+    output_filenames = get_divided_filenames(data_folder, adaID, fragments, type='bam')
     with pysam.Samfile(input_filename, 'rb') as bamfile:
-        with pysam.Samfile(output_filenames[0], 'w', template=bamfile) as fo_F1,\
-             pysam.Samfile(output_filenames[1], 'w', template=bamfile) as fo_F2,\
-             pysam.Samfile(output_filenames[2], 'w', template=bamfile) as fo_F3,\
-             pysam.Samfile(output_filenames[3], 'w', template=bamfile) as fo_F4,\
-             pysam.Samfile(output_filenames[4], 'w', template=bamfile) as fo_F5,\
-             pysam.Samfile(output_filenames[5], 'w', template=bamfile) as fo_F6,\
-             pysam.Samfile(output_filenames[6], 'w', template=bamfile) as fo_am,\
-             pysam.Samfile(output_filenames[7], 'w', template=bamfile) as fo_um,\
-             pysam.Samfile(output_filenames[8], 'w', template=bamfile) as fo_lq:
+        with pysam.Samfile(output_filenames[0], 'wb', template=bamfile) as fo_F1,\
+             pysam.Samfile(output_filenames[1], 'wb', template=bamfile) as fo_F2,\
+             pysam.Samfile(output_filenames[2], 'wb', template=bamfile) as fo_F3,\
+             pysam.Samfile(output_filenames[3], 'wb', template=bamfile) as fo_F4,\
+             pysam.Samfile(output_filenames[4], 'wb', template=bamfile) as fo_F5,\
+             pysam.Samfile(output_filenames[5], 'wb', template=bamfile) as fo_F6,\
+             pysam.Samfile(output_filenames[6], 'wb', template=bamfile) as fo_am,\
+             pysam.Samfile(output_filenames[7], 'wb', template=bamfile) as fo_um,\
+             pysam.Samfile(output_filenames[8], 'wb', template=bamfile) as fo_lq:
 
             # Collect the file handles
             file_handles = (fo_F1, fo_F2, fo_F3, fo_F4, fo_F5, fo_F6)
 
             # Iterate over the mapped reads and assign fragments
-            n_mapped = 0
+            n_mapped = [0 for fragment in fragments]
             n_unmapped = 0
             n_ambiguous = 0
             n_outer = 0
@@ -728,9 +762,8 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, F5_primer, VERBOSE=0,
                     if VERBOSE >= 3:
                         print 'Read pair unmapped/unpaired/tiny:', reads[0].qname
                     n_unmapped += 1
-                    #FIXME
-                    #fo_um.write(reads[0])
-                    #fo_um.write(reads[1])
+                    fo_um.write(reads[0])
+                    fo_um.write(reads[1])
                     continue
 
                 # If the insert is a misamplification from the outer primers,
@@ -745,9 +778,8 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, F5_primer, VERBOSE=0,
                     if VERBOSE >= 3:
                         print 'Read pair from outer primer:', reads[0].qname
                     n_outer += 1
-                    #FIXME
-                    #fo_um.write(reads[0])
-                    #fo_um.write(reads[1])
+                    fo_um.write(reads[0])
+                    fo_um.write(reads[1])
                     continue
 
                 # Assign to a fragment now, so that primer trimming is faster 
@@ -757,9 +789,8 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, F5_primer, VERBOSE=0,
                 # fragment boundary, they map to different fragments), dump it
                 if len(frags_pair) == 0:
                     n_unmapped += 1
-                    #FIXME
-                    #fo_um.write(reads[0])
-                    #fo_um.write(reads[1])
+                    fo_um.write(reads[0])
+                    fo_um.write(reads[1])
                     continue
 
                 # 2. If 2+ fragments are possible (tie), put into a special bucket
@@ -767,9 +798,8 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, F5_primer, VERBOSE=0,
                 # in the overlapping region, but we might want to recover them)
                 elif len(frags_pair) > 1:
                     n_ambiguous += 1
-                    #FIXME
-                    #fo_am.write(reads[0])
-                    #fo_am.write(reads[1])
+                    fo_am.write(reads[0])
+                    fo_am.write(reads[1])
                     continue
 
                 # 3. If the intersection is a single fragment, good
@@ -782,15 +812,15 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, F5_primer, VERBOSE=0,
                 # at least!)
 
                 # Quality trimming: if no decently long pair survives, trash
-                #trashed_quality = trim_low_quality(reads, phred_min=20, include_tests=include_tests)
-                trashed_quality = trim_exclude_low_quality(reads, phred_min=20, include_tests=include_tests)
-                if trashed_quality or (np.abs(reads[0].isize) < 100):
+                #trashed_quality = main_block_low_quality(reads, phred_min=20, include_tests=include_tests)
+                trashed_quality = trim_low_quality(reads, phred_min=20, include_tests=include_tests)
+                i_fwd = reads[0].is_reverse
+                if trashed_quality or (reads[i_fwd].isize < 100):
                     n_lowq += 1
                     if VERBOSE >= 3:
                         print 'Read pair has low phred quality:', reads[0].qname
-                    #FIXME
-                    #fo_lq.write(reads[0])
-                    #fo_lq.write(reads[1])
+                    fo_lq.write(reads[0])
+                    fo_lq.write(reads[1])
                     continue
 
                 # Check for cross-overhangs (reading into the adapters)
@@ -808,20 +838,19 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, F5_primer, VERBOSE=0,
 
                 # Here the tests
                 if include_tests:
-                    if test_sanity(reads):
+                    if test_sanity(reads, n_frag, frags_pos[2, 1, n_frag] - frags_pos[2, 0, n_frag]):
+                        print 'Tests failed:', reads[0].qname
                         import ipdb; ipdb.set_trace()
-                        #raise ValueError('Tests failed: '+reads[0].qname)
 
                 # There we go!
-                n_mapped += 1
-                #FIXME
-                #file_handles[n_frag].write(reads[0])
-                #file_handles[n_frag].write(reads[1])
+                n_mapped[n_frag] += 1
+                file_handles[n_frag].write(reads[0])
+                file_handles[n_frag].write(reads[1])
 
     if VERBOSE:
         print 'Trim and divide results: adaID '+'{:02d}'.format(adaID)
         print 'Total:\t\t', irp
-        print 'Mapped:\t\t', n_mapped
+        print 'Mapped:\t\t', sum(n_mapped), n_mapped
         print 'Unmapped:\t', n_unmapped
         print 'Outer primer\t', n_outer
         print 'Ambiguous:\t', n_ambiguous
@@ -871,7 +900,9 @@ if __name__ == '__main__':
 
         # Submit to the cluster self if requested
         if submit:
-            fork_self(miseq_run, adaID, VERBOSE=VERBOSE)
+            if include_tests:
+                raise ValueError('Tests require an interactive shell')
+            fork_self(miseq_run, adaID, VERBOSE=VERBOSE, maxreads=maxreads)
             continue
 
         # Make output folders
@@ -880,15 +911,8 @@ if __name__ == '__main__':
         # Set the primers for fragment 5
         F5_primer = dataset['primerF5'][dataset['adapters'].index(adaID)]
 
-        # FIXME
-        import time
-        t0 = time.time()
-
         # Trim reads and assign them to a fragment (or discard)
         # Note: we pass over the file only once
         trim_and_divide_reads(data_folder, adaID, n_cycles, F5_primer,
                               maxreads=maxreads, VERBOSE=VERBOSE,
                               include_tests=include_tests)
-
-        t1 = time.time()
-        print 'Runtime:\t', '{:<5.1f}'.format(t1 - t0)

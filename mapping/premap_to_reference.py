@@ -197,12 +197,12 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1):
                     time_wait = 0
                     jobs_done[j] = True
 
-        # Merge output files
+        # Concatenate output files
         output_filename = get_premapped_file(data_folder, adaID, type='bam',
                                              unsorted=True)
         if VERBOSE >= 1:
             print 'Merge premapped reads: adaID '+'{:02d}'.format(adaID)
-        pysam.merge(output_filename, *output_file_parts)
+        pysam.cat(output_filename, *output_file_parts)
 
         # Sort the file by read names (to ensure the pair_generator)
         output_filename_sorted = get_premapped_file(data_folder, adaID, type='bam',
@@ -212,6 +212,11 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1):
         if VERBOSE >= 1:
             print 'Sort premapped reads: adaID '+'{:02d}'.format(adaID)
         pysam.sort('-n', output_filename, output_filename_sorted[:-4])
+
+        # Reheader the file without BAM -> SAM -> BAM
+        #FIXME: do we need this crap?
+        header_filename = get_premapped_file(data_folder, adaID, type='sam', part=1)
+        pysam.reheader(header_filename, output_filename_sorted)
 
         # Make SAM out of the BAM for checking
         if VERBOSE >= 1:

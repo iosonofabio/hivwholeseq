@@ -3,7 +3,7 @@
 '''
 author:     Fabio Zanini
 date:       12/08/13
-content:    Map a subsample to HXB2 first, then build a consensus, then map
+content:    Take reads mapped to HXB2, then build a consensus, then map
             recursively againt consensi until the latter do not change anymore.
 
             This elaborate scheme is necessary to cope with indel-rich regions
@@ -11,10 +11,6 @@ content:    Map a subsample to HXB2 first, then build a consensus, then map
 
             Note that mismapping is a serious problem for us, so maximal care
             must be taken here.
-
-            Note: this script can call itself in a parallel fashion with the
-            flag --submit as a cluster job.
-
 '''
 #TODO: tidy up the F5a/b mess.
 # FIXME: something goes wrong for the fragment edges and run 37, adaIDs 2, 6, F1
@@ -39,16 +35,15 @@ from mapping.miseq import alpha, read_types
 from mapping.mapping_utils import stampy_bin, subsrate, convert_sam_to_bam,\
         pair_generator, get_ind_good_cigars
 from mapping.filenames import get_HXB2_fragmented, get_read_filenames,\
-        get_HXB2_index_file, get_HXB2_hash_file, get_consensus_filename
+        get_HXB2_index_file, get_HXB2_hash_file, get_consensus_filename, \
+        get_divided_filenames
 
 
 # Globals
 # Consensus building
 maxreads = 10000
-# Use short match and no trimming, it's only consensus and we are mapping far away
-# to HXB2
-match_len_min = 10
-trim_bad_cigars = 0
+match_len_min = 20
+trim_bad_cigars = 3
 coverage_min = 10
 
 # Cluster submit
@@ -58,13 +53,13 @@ JOBLOGERR = JOBDIR+'logerr'
 JOBLOGOUT = JOBDIR+'logout'
 JOBSCRIPT = JOBDIR+'build_consensus_iterative.py'
 cluster_time = '0:59:59'
-vmem = '8G'
+vmem = '2G'
 interval_check = 10
 
 
 
 # Functions
-def fork_self(miseq_run, adaID, fragment, iterations_max=0, VERBOSE=0):
+def fork_self(miseq_run, adaID, fragment, n_reads=1000, iterations_max=0, VERBOSE=0):
     '''Fork self for each adapter ID and fragment'''
     qsub_list = ['qsub','-cwd',
                  '-b', 'y',
@@ -78,8 +73,9 @@ def fork_self(miseq_run, adaID, fragment, iterations_max=0, VERBOSE=0):
                  '--run', miseq_run,
                  '--adaIDs', adaID,
                  '--fragments', fragment,
-                 '--verbose', VERBOSE,
+                 '-n', n_reads,
                  '--iterations', iterations_max,
+                 '--verbose', VERBOSE,
                 ]
     qsub_list = map(str, qsub_list)
     if VERBOSE:
@@ -90,13 +86,13 @@ def fork_self(miseq_run, adaID, fragment, iterations_max=0, VERBOSE=0):
 def get_ref_file(data_folder, adaID, fragment, n_iter, ext=True):
     '''Get the reference filename'''
     if n_iter == 0:
-        fn = get_HXB2_fragmented(fragment, ext=ext)
+        fn = get_HXB2_fragmented(fragment, ext=ext, trim_primers=True)
     else:
         # There are two sets of primers for fragment F5
         if 'F5' in fragment:
             fragment = 'F5'
         fn = '_'.join(['consensus', str(n_iter-1), fragment])
-        fn = data_folder+'subsample/'+foldername_adapter(adaID)+'map_iter/'+fn
+        fn = data_folder+foldername_adapter(adaID)+'map_iter/'+fn
         if ext:
             fn = fn+'.fasta'
     return fn
@@ -108,7 +104,7 @@ def get_refcum_file(data_folder, adaID, fragment, ext=True):
     if 'F5' in fragment:
         fragment = 'F5'
     fn = '_'.join(['consensus', 'alliters', fragment])
-    fn = data_folder+'subsample/'+foldername_adapter(adaID)+'map_iter/'+fn
+    fn = data_folder+foldername_adapter(adaID)+'map_iter/'+fn
     if ext:
         fn = fn+'.fasta'
     return fn
@@ -157,7 +153,55 @@ def get_mapped_filename(data_folder, adaID, fragment, n_iter, type='bam'):
     else:
         raise ValueError('Type of mapped reads file not recognized')
  
-    return data_folder+'subsample/'+foldername_adapter(adaID)+'map_iter/'+filename
+    return data_folder+foldername_adapter(adaID)+'map_iter/'+filename
+
+
+def extract_reads_subsample(data_folder, adaID, fragment, n_reads, VERBOSE=0):
+    '''Extract a subsample of reads from the initial sample mapped to HXB2'''
+    # Count the number of reads first
+    input_filename = get_divided_filenames(data_folder, adaID, [fragment], type='bam')[0]
+    with pysam.Samfile(input_filename, 'rb') as bamfile_in:
+        n_reads_tot = sum(1 for read in bamfile_in) / 2
+
+    # Pick random numbers among those
+    # Get the random indices of the reads to store
+    # (only from the middle of the file)
+    ind_store = np.arange(int(0.05 * n_reads_tot), int(0.95 * n_reads_tot))
+    np.random.shuffle(ind_store)
+    ind_store = ind_store[:n_reads]
+    ind_store.sort()
+
+    if VERBOSE >= 2:
+        print 'Random indices between '+str(ind_store[0])+' and '+str(ind_store[-1])
+
+
+    # Output file
+    output_filename = get_mapped_filename(data_folder, adaID, fragment, 0, type='bam')
+    # Make folder if necessary
+    dirname = os.path.dirname(output_filename)
+    if not os.path.isdir(dirname):
+        os.mkdir(dirname)
+
+    # Copy those to subsample
+    with pysam.Samfile(input_filename, 'rb') as bamfile_in:
+        with pysam.Samfile(output_filename, 'wb', template=bamfile_in) as bamfile_out:
+
+            n_written = 0
+            for i, (read1, read2) in enumerate(pair_generator(bamfile_in)):
+                # Log activity
+                if VERBOSE >= 3:
+                    if not ((i+1) % 10000):
+                        print i+1, n_written, ind_store[n_written]
+    
+                # If you hit a read, write them
+                if i == ind_store[n_written]:
+                    bamfile_out.write(read1)
+                    bamfile_out.write(read2)
+                    n_written += 1
+    
+                # Break after the last one
+                if n_written >= n_reads:
+                    break
 
 
 def make_index_and_hash(data_folder, adaID, fragment, n_iter, VERBOSE=0):
@@ -209,14 +253,13 @@ def map_stampy(data_folder, adaID, fragment, n_iter, VERBOSE=0):
         print 'Map via stampy: '+'{:02d}'.format(adaID)+' '+fragment\
                 +' iteration '+str(n_iter)
 
-    read_filenames = get_read_filenames(data_folder, adaID, subsample=True,
-                                        premapped=True, fragment=frag_out)
-
-    mapped_filename = get_mapped_filename(data_folder, adaID, frag_out,
+    # Input and output files
+    input_filename = get_mapped_filename(data_folder, adaID, frag_out,
+                                          n_iter - 1, type='bam')
+    output_filename = get_mapped_filename(data_folder, adaID, frag_out,
                                           n_iter, type='sam')
-
     # Make folder if necessary
-    dirname = os.path.dirname(mapped_filename)
+    dirname = os.path.dirname(output_filename)
     if not os.path.isdir(dirname):
         os.mkdir(dirname)
 
@@ -226,9 +269,9 @@ def map_stampy(data_folder, adaID, fragment, n_iter, VERBOSE=0):
                                       n_iter, ext=False),
                  '-h', get_hash_file(data_folder, adaID, fragment,
                                      n_iter, ext=False), 
-                 '-o', mapped_filename,
+                 '-o', output_filename,
                  '--substitutionrate='+subsrate,
-                 '-M'] + read_filenames
+                 '-M', input_filename]
     if VERBOSE >=2:
         print ' '.join(call_list)
     sp.call(call_list)
@@ -251,7 +294,7 @@ def make_consensus(data_folder, adaID, fragment, n_iter, VERBOSE=0):
     refseq = SeqIO.read(reffilename, 'fasta')
     ref = np.array(refseq)
     refs = str(refseq.seq)
-    
+
     # Allele counts and inserts
     counts = np.zeros((len(read_types), len(alpha), len(ref)), int)
     # Note: the data structure for inserts is a nested dict with:
@@ -498,9 +541,6 @@ def make_consensus(data_folder, adaID, fragment, n_iter, VERBOSE=0):
     consensus_final = ''.join(consensus_final).strip('N')
     consensus_final = re.sub('-', '', consensus_final)
 
-    ## FIXME
-    #import ipdb; ipdb.set_trace()
-
     return refseq, consensus_final
 
 
@@ -524,7 +564,7 @@ def write_consensus(data_folder, adaID, fragment, n_iter, consensus, final=False
     consensusseq = SeqRecord(Seq(consensus),
                              id=name, name=name)
     if final:
-        outfile = get_consensus_filename(data_folder, adaID, frag_out)
+        outfile = get_consensus_filename(data_folder, adaID, frag_out, trim_primers=True)
     else:
         outfile = get_ref_file(data_folder, adaID, frag_out, n_iter+1)
     SeqIO.write(consensusseq, outfile, 'fasta')
@@ -551,6 +591,8 @@ if __name__ == '__main__':
                         help='Adapter IDs to analyze (e.g. 2 16)')
     parser.add_argument('--fragments', nargs='*',
                         help='Fragment to map (e.g. F1 F6)')
+    parser.add_argument('-n', type=int, default=1000,
+                        help='Number of (random) reads used for the consensus')
     parser.add_argument('--iterations', type=int, default=5,
                         help=('Maximal number of map/consensus iterations'))
     parser.add_argument('--verbose', type=int, default=0,
@@ -562,6 +604,7 @@ if __name__ == '__main__':
     miseq_run = args.run
     adaIDs = args.adaIDs
     fragments = args.fragments
+    n_reads = args.n
     iterations_max = args.iterations
     VERBOSE = args.verbose
     submit = args.submit
@@ -592,11 +635,23 @@ if __name__ == '__main__':
 
             # Submit to the cluster self if requested
             if submit:
-                fork_self(miseq_run, adaID, fragment, iterations_max, VERBOSE=VERBOSE)
+                fork_self(miseq_run, adaID, fragment, n_reads, iterations_max,
+                          VERBOSE=VERBOSE)
                 continue
 
+            # Extract subsample of reads mapped to HXB2
+            extract_reads_subsample(data_folder, adaID, fragment, n_reads,
+                                    VERBOSE=VERBOSE)
+            # Build first consensus and save to file
+            refseq, consensus = make_consensus(data_folder, adaID, fragment, 0,
+                                               VERBOSE=VERBOSE)
+            write_consensus(data_folder, adaID, fragment, 0, consensus, final=False)
+
+            # NOTE: we assume the consensus is different from HXB2, so we do not
+            # check any further and do at least one more iteration
+
             # Iterate the consensus building until convergence
-            n_iter = 0
+            n_iter = 1
             while True:
             
                 # Make hashes of consensus (the reference is hashed earlier)
