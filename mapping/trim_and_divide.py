@@ -102,6 +102,12 @@ def test_integrity(reads, VERBOSE=True):
             print 'Read pair not integer (insert size):', reads[0].qname
         return True
 
+    if (sum(bl for (bt, bl) in reads[0].cigar if bt in (0, 1)) != reads[0].rlen) or \
+       (sum(bl for (bt, bl) in reads[1].cigar if bt in (0, 1)) != reads[1].rlen):
+        if VERBOSE:
+            print 'Read pair not integer (CIGAR <-> seq):', reads[0].qname
+        return True
+
     return False
 
 
@@ -605,6 +611,11 @@ def trim_low_quality(reads, phred_min=20, read_len_min=50, include_tests=False,
         # or else, we have to tamper
         tampered = True
 
+        ##FIXME
+        #if read.qname == 'HWI-M01346:28:000000000-A53RP:1:1101:2303:16467':
+        #    print read.qname
+        #    import ipdb; ipdb.set_trace()
+
         # rewrite read such that CIGARs are fine
         # START
         ref_start = read.pos
@@ -647,9 +658,10 @@ def trim_low_quality(reads, phred_min=20, read_len_min=50, include_tests=False,
                     cigar_new.append((bt, bl))
                     read_pos += bl
                 elif bt == 2:
-                    # Note: a read cannot end with a deletion, so we do nothing
-                    if read_pos + bl >= read_end:
-                        break
+                    # we cannot reach read_end via a deletion, because read_pos
+                    # does not increase, so there's going to be a new cigar after
+                    # this (in any case, the read did never and will never end
+                    # with a deletion
                     cigar_new.append((bt, bl))
 
             cigar = cigar_new

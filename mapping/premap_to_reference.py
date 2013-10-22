@@ -127,6 +127,9 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1):
             print ' '.join(call_list)
         sp.call(call_list)
 
+        # Convert to compressed BAM
+        convert_sam_to_bam(get_premapped_file(data_folder, adaID, type='bam'))
+
     # Multithreading works as follows: call qsub + stampy, monitor the process
     # IDs with qstat at regular intervals, and finally merge results with pysam
     else:
@@ -214,7 +217,8 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1):
         pysam.sort('-n', output_filename, output_filename_sorted[:-4])
 
         # Reheader the file without BAM -> SAM -> BAM
-        #FIXME: do we need this crap?
+        if VERBOSE >= 1:
+            print 'Reheader premapped reads: adaID '+'{:02d}'.format(adaID)
         header_filename = get_premapped_file(data_folder, adaID, type='sam', part=1)
         pysam.reheader(header_filename, output_filename_sorted)
 
