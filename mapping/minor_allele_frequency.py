@@ -58,7 +58,7 @@ def get_minor_allele_counts(counts, n_minor=1):
     return all_sorted
 
 
-def filter_nus(counts, coverage):
+def filter_nus(counts, coverage, VERBOSE=0):
     '''Filter allele frequencies from the four read types'''
     pvals = np.zeros((len(alpha), counts.shape[-1]))
 

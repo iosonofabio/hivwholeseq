@@ -385,6 +385,15 @@ def get_coverage_figure_filename(data_folder, adaID, fragment, ext='png'):
     return filename
     
 
+def get_overlap_nu_figure_filename(data_folder, adaID, fragments, ext='png'):
+    '''Get the filename of the coverage report figure'''
+    filename = 'overlap_nu_'+fragments
+    filename = 'overlap/'+filename
+    filename = filename+'.'+ext
+    filename = data_folder+foldername_adapter(adaID)+filename
+    return filename
+    
+
 def get_patient_foldername(patient, root_data_folder=root_data_folder):
     '''Get the folder name of the data from a patient'''
     foldername = 'patients/'+patient+'/'

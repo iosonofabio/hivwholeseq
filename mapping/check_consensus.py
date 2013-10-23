@@ -15,7 +15,7 @@ from mapping.datasets import MiSeq_runs
 from mapping.primer_info import primers_inner as pri
 from mapping.adapter_info import load_adapter_table
 from mapping.filenames import get_consensus_filename
-from mapping.mapping_utils import align_miscle
+from mapping.mapping_utils import align_muscle
 
 
 

@@ -6,8 +6,6 @@ date:       02/08/13
 content:    Map the reads to their own consensus, produced with an iterative
             mapping of HIV onto itself (HXB2 at first). This is the final mapping.
 '''
-# NOTE: it would be better to merge mapping and filtering because both need to be
-# done all the times, but it might take longer than 1h, so for now do not.
 # Modules
 import os
 import sys
