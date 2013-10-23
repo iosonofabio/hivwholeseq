@@ -24,7 +24,7 @@ from collections import defaultdict
 from collections import Counter
 import numpy as np
 import pysam
-import Bio.SeqIO as SeqIO
+from Bio import SeqIO, AlignIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
@@ -33,7 +33,7 @@ from mapping.datasets import MiSeq_runs
 from mapping.adapter_info import load_adapter_table, foldername_adapter
 from mapping.miseq import alpha, read_types
 from mapping.mapping_utils import stampy_bin, subsrate, convert_sam_to_bam,\
-        pair_generator, get_ind_good_cigars
+        pair_generator, get_ind_good_cigars, align_muscle
 from mapping.filenames import get_HXB2_fragmented, get_read_filenames,\
         get_HXB2_index_file, get_HXB2_hash_file, get_consensus_filename, \
         get_divided_filenames
@@ -53,7 +53,7 @@ JOBLOGERR = JOBDIR+'logerr'
 JOBLOGOUT = JOBDIR+'logout'
 JOBSCRIPT = JOBDIR+'build_consensus_iterative.py'
 cluster_time = '0:59:59'
-vmem = '2G'
+vmem = '1G'
 interval_check = 10
 
 
@@ -158,6 +158,12 @@ def get_mapped_filename(data_folder, adaID, fragment, n_iter, type='bam'):
 
 def extract_reads_subsample(data_folder, adaID, fragment, n_reads, VERBOSE=0):
     '''Extract a subsample of reads from the initial sample mapped to HXB2'''
+    # There are two sets of primers for fragment F5
+    if 'F5' in fragment:
+        frag_out = 'F5'
+    else:
+        frag_out = fragment
+
     # Count the number of reads first
     input_filename = get_divided_filenames(data_folder, adaID, [fragment], type='bam')[0]
     with pysam.Samfile(input_filename, 'rb') as bamfile_in:
@@ -174,9 +180,8 @@ def extract_reads_subsample(data_folder, adaID, fragment, n_reads, VERBOSE=0):
     if VERBOSE >= 2:
         print 'Random indices between '+str(ind_store[0])+' and '+str(ind_store[-1])
 
-
     # Output file
-    output_filename = get_mapped_filename(data_folder, adaID, fragment, 0, type='bam')
+    output_filename = get_mapped_filename(data_folder, adaID, frag_out, 0, type='bam')
     # Make folder if necessary
     dirname = os.path.dirname(output_filename)
     if not os.path.isdir(dirname):
@@ -224,6 +229,7 @@ def make_index_and_hash(data_folder, adaID, fragment, n_iter, VERBOSE=0):
         call_list = [stampy_bin,
                      '--species="HIV adaID '+'{:02d}'.format(adaID)+' fragment '+fragment+'"',
                      '-G', get_index_file(data_folder, adaID, fragment, n_iter, ext=False),
+                     '--overwrite',
                      get_ref_file(data_folder, adaID, fragment, n_iter),
                     ]
         if VERBOSE >= 3:
@@ -235,6 +241,7 @@ def make_index_and_hash(data_folder, adaID, fragment, n_iter, VERBOSE=0):
         call_list = [stampy_bin,
                      '-g', get_index_file(data_folder, adaID, fragment, n_iter, ext=False),
                      '-H', get_hash_file(data_folder, adaID, fragment, n_iter, ext=False),
+                     '--overwrite',
                     ]
         if VERBOSE >= 3:
             print ' '.join(call_list)
@@ -271,13 +278,14 @@ def map_stampy(data_folder, adaID, fragment, n_iter, VERBOSE=0):
                                      n_iter, ext=False), 
                  '-o', output_filename,
                  '--substitutionrate='+subsrate,
+                 '--overwrite',
                  '-M', input_filename]
     if VERBOSE >=2:
         print ' '.join(call_list)
     sp.call(call_list)
 
 
-def make_consensus(data_folder, adaID, fragment, n_iter, VERBOSE=0):
+def make_consensus(data_folder, adaID, fragment, n_iter, qual_min=20, VERBOSE=0):
     '''Make consensus sequence from the mapped reads'''
     # There are two sets of primers for fragment F5
     if 'F5' in fragment:
@@ -349,7 +357,8 @@ def make_consensus(data_folder, adaID, fragment, n_iter, VERBOSE=0):
             
                 # Sequence and position
                 # Note: stampy takes the reverse complement already
-                seq = read.seq
+                seq = np.fromstring(read.seq, 'S1')
+                qual = np.fromstring(read.qual, np.int8) - 33
                 pos = read.pos
 
                 # Iterate over CIGARs
@@ -370,16 +379,18 @@ def make_consensus(data_folder, adaID, fragment, n_iter, VERBOSE=0):
                             if (ic == last_good_cigar) and (ic != len_cig - 1): trim_right = trim_bad_cigars
                             else: trim_right = 0
             
-                            seqb = np.array(list(seq[trim_left:block_len - trim_right]), 'S1')
+                            seqb = seq[trim_left:block_len - trim_right]
+                            qualb = qual[trim_left:block_len - trim_right]
                             # Increment counts
                             for j, a in enumerate(alpha):
-                                posa = (seqb == a).nonzero()[0]
+                                posa = ((seqb == a) & (qualb >= qual_min)).nonzero()[0]
                                 if len(posa):
                                     counts[js, j, pos + trim_left + posa] += 1
             
                         # Chop off this block
                         if ic != len_cig - 1:
                             seq = seq[block_len:]
+                            qual = qual[block_len:]
                             pos += block_len
             
                     # Deletion
@@ -399,11 +410,15 @@ def make_consensus(data_folder, adaID, fragment, n_iter, VERBOSE=0):
                         # Exclude bad CIGARs
                         if good_cigars[ic]: 
                             seqb = seq[:block_len]
-                            inserts[pos][seqb][js] += 1
+                            qualb = qual[:block_len]
+                            # Take only high-quality inserts
+                            if (qualb >= qual_min).all():
+                                inserts[pos][seqb.tostring()][js] += 1
             
                         # Chop off seq, but not pos
                         if ic != len_cig - 1:
                             seq = seq[block_len:]
+                            qual = qual[block_len:]
             
                     # Other types of cigar?
                     else:
@@ -553,7 +568,6 @@ def check_new_old_consensi(refseq, consensus):
 
 def write_consensus(data_folder, adaID, fragment, n_iter, consensus, final=False):
     '''Write consensus sequences into FASTA'''
-
     # There are two sets of primers for fragment F5
     if 'F5' in fragment:
         frag_out = 'F5'
@@ -569,14 +583,23 @@ def write_consensus(data_folder, adaID, fragment, n_iter, consensus, final=False
         outfile = get_ref_file(data_folder, adaID, frag_out, n_iter+1)
     SeqIO.write(consensusseq, outfile, 'fasta')
 
-    # In addition, cumulate all consensi in one file for checking purposes
+    # In addition, cumulate all consensi in one file for checking purposes,
     if not final:
         outfile = get_refcum_file(data_folder, adaID, frag_out)
         if n_iter == 0:
             SeqIO.write(SeqIO.read(get_ref_file(data_folder, adaID, fragment, 0), 'fasta'),
                         outfile, 'fasta')
+
+        consensusseq.name = consensusseq.id = consensusseq.name+'_'+str(n_iter)
         with open(outfile, 'a') as f:
             SeqIO.write(consensusseq, f, 'fasta')
+
+    # at the end, align all consensi via muscle
+    else:
+        seqs_iter = SeqIO.parse(get_refcum_file(data_folder, adaID, frag_out),
+                                'fasta')
+        ali = align_muscle(*(list(seqs_iter)))
+        AlignIO.write(ali, get_refcum_file(data_folder, adaID, frag_out), 'fasta')
 
 
 
@@ -684,8 +707,8 @@ if __name__ == '__main__':
                                     final=True)
                     if VERBOSE:
                         if match:
-                            print 'Consensus converged:', adaID, fragment 
+                            print 'Consensus converged at iteration '+str(n_iter)+': adaID', adaID, fragment 
                         else:
-                            print 'Maximal number of iterations reached:', adaID, fragment
+                            print 'Maximal number of iterations reached: adaID', adaID, fragment
                     
                     break 

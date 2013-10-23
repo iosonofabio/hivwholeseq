@@ -17,7 +17,8 @@ from Bio import SeqIO
 # Horizontal import of modules from this folder
 from mapping.datasets import MiSeq_runs
 from mapping.adapter_info import load_adapter_table
-from mapping.filenames import get_consensus_filename, get_mapped_filename
+from mapping.filenames import get_consensus_filename, get_mapped_filename, \
+        get_filter_mapped_summary_filename
 from mapping.mapping_utils import get_ind_good_cigars, convert_sam_to_bam,\
         pair_generator, get_range_good_cigars
 from mapping.primer_info import primers_inner
@@ -36,7 +37,7 @@ JOBLOGERR = JOBDIR+'logerr'
 JOBLOGOUT = JOBDIR+'logout'
 JOBSCRIPT = JOBDIR+'filter_mapped_reads.py'
 cluster_time = '0:59:59'
-vmem = '8G'
+vmem = '1G'
 
 
 
@@ -65,104 +66,80 @@ def fork_self(miseq_run, adaID, fragment, VERBOSE=0):
     sp.call(qsub_list)
 
 
-def trim_bad_cigar(read, match_len_min=match_len_min,
+def trim_bad_cigar(reads, match_len_min=match_len_min,
                    trim_left=trim_bad_cigars, trim_right=trim_bad_cigars):
     '''Trim away bad CIGARs from the sides'''
 
-    # Get good CIGARs
-    (good_cigars, first_good_cigar, last_good_cigar) = \
-            get_ind_good_cigars(read.cigar, match_len_min=match_len_min,
-                                full_output=True)
+    for read in reads:
+        # Get good CIGARs
+        (good_cigars, first_good_cigar, last_good_cigar) = \
+                get_ind_good_cigars(read.cigar, match_len_min=match_len_min,
+                                    full_output=True)
 
-    # If no good CIGARs, give up
-    if not good_cigars.any():
-        read = None
-        return
+        # If no good CIGARs, give up
+        if not good_cigars.any():
+            return True
+        
+        # FIXME: trim also good reads of a few bases, just for testing
+        # FIXME: we do not need this, but leave the code there for now
+        elif good_cigars.all():
+            continue
+            #trim_good = 0
+            #cigar = list(read.cigar)
+            #cigar[0] = (cigar[0][0], cigar[0][1] - trim_good)
+            #cigar[-1] = (cigar[-1][0], cigar[-1][1] - trim_good)
+            #start_read = trim_good
+            #end_read = start_read + sum(bl for (bt, bl) in cigar if bt in (0, 1))
+            #start_ref = read.pos + start_read
+
+        else:
+
+            # Get the good CIGARs coordinates
+            ((start_read, end_read),
+             (start_ref, end_ref)) = \
+                    get_range_good_cigars(read.cigar, read.pos,
+                                          match_len_min=match_len_min,
+                                          trim_left=trim_left,
+                                          trim_right=trim_right)
+
+            # Trim CIGAR because of bad CIGARs at the edges
+            cigar = read.cigar[first_good_cigar: last_good_cigar + 1]
+            # Trim cigar block lengths
+            if first_good_cigar != 0:
+                cigar[0] = (cigar[0][0],
+                            cigar[0][1] - trim_left)
+            if last_good_cigar != len(read.cigar) - 1:
+                cigar[-1] = (cigar[-1][0],
+                             cigar[-1][1] - trim_right)
+
+            # Reset attributes
+            seq = read.seq
+            qual = read.qual
+            read.seq = seq[start_read: end_read]
+            read.qual = qual[start_read: end_read]
+            read.pos = start_ref
+            read.cigar = cigar    
+
+    # Mate pair stuff and insert size
+    reads[0].mpos = reads[1].pos
+    reads[1].mpos = reads[0].pos
+
+    # Insert size
+    i_fwd = reads[0].is_reverse
+    i_rev = not i_fwd
+    isize = reads[i_rev].pos + sum(bl for (bt, bl) in reads[i_rev].cigar
+                                   if bt in (0, 2)) - reads[i_fwd].pos
     
-    # FIXME: trim also good reads of a few bases, just for testing
-    elif good_cigars.all():
-        cigar = list(read.cigar)
-        cigar[0] = (cigar[0][0], cigar[0][1] - 5)
-        cigar[-1] = (cigar[-1][0], cigar[-1][1] - 5)
-        start_read = 5
-        end_read = start_read + sum(bl for (bt, bl) in cigar if bt in (0, 1))
-        start_ref = read.pos + start_read
+    # Trash pair if the insert size is negative (complete cross-overhang)
+    #               ----->
+    #   <------
+    if isize <= 0:
+        return True
 
-    else:
+    reads[i_fwd].isize = isize
+    reads[i_rev].isize = -isize
 
-        # Get the good CIGARs coordinates
-        ((start_read, end_read),
-         (start_ref, end_ref)) = \
-                get_range_good_cigars(read.cigar, read.pos,
-                                      match_len_min=match_len_min,
-                                      trim_left=trim_left,
-                                      trim_right=trim_right)
-
-        # Trim CIGAR because of bad CIGARs at the edges
-        cigar = read.cigar[first_good_cigar: last_good_cigar + 1]
-        # Trim cigar block lengths
-        if first_good_cigar != 0:
-            cigar[0] = (cigar[0][0],
-                        cigar[0][1] - trim_left)
-        if last_good_cigar != len(read.cigar) - 1:
-            cigar[-1] = (cigar[-1][0],
-                         cigar[-1][1] - trim_right)
-
-    # Reset attributes
-    seq = read.seq
-    qual = read.qual
-    read.seq = seq[start_read: end_read]
-    read.qual = qual[start_read: end_read]
-    read.pos = start_ref
-    read.cigar = cigar    
-
-
-def trim_primers(read, start_nonprimer, end_nonprimer):
-    '''Trim the fwd and rev inner PCR primers'''
-    # Is the read partially in the fwd primer?
-    touches_fwd_primer = read.pos < start_nonprimer
-    if not touches_fwd_primer:
-        # The trimmed consensus LACKS the primers => we shift everything to the left
-        read.pos -= start_nonprimer
-    else:
-        # Trim the primer: the read starts with a long match (it has been CIGAR-
-        # trimmed already), so we can just chop the primer off the first block
-        start_read = start_nonprimer - read.pos
-        if start_read > read.cigar[0][1]:
-            raise ValueError('The fwd primer is not within the first CIGAR block!')
-        cigar = read.cigar
-        cigar[0] = (cigar[0][0], cigar[0][1] - start_read)
-        
-        # Reset attributes
-        seq = read.seq
-        qual = read.qual
-        read.seq = seq[start_read:]
-        read.qual = qual[start_read:]
-        read.cigar = cigar
-        # Note: this is the position in the trimmed consensus, which LACKS the primers
-        # Hence, if you touched the fwd primer, your new position is 0
-        read.pos = 0
-        
-    # Is the read partially in the rev primer?
-    end_ref = read.pos + sum(bl for (bt, bl) in read.cigar if bt in (0, 2))
-    touches_rev_primer = end_ref > end_nonprimer - start_nonprimer
-    if touches_rev_primer:
-
-        # Trim the primer; the read ends with a long match (it has been CIGAR-
-        # trimmed already), so we can just chop the primer off the last block
-        end_read = read.rlen + end_nonprimer - start_nonprimer - end_ref
-        if read.rlen - end_read > read.cigar[-1][1]:
-            raise ValueError('The rev primer is not within the last CIGAR block!')
-        cigar = read.cigar
-        cigar[-1] = (cigar[-1][0], cigar[-1][1] - (read.rlen - end_read))
-
-        # Reset attributes
-        # Reset attributes
-        seq = read.seq
-        qual = read.qual
-        read.seq = seq[:end_read]
-        read.qual = qual[:end_read]
-        read.cigar = cigar
+    return False
 
 
 def filter_reads(data_folder, adaID, fragment, VERBOSE=0):
@@ -176,7 +153,7 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0):
         frag_gen = fragment
 
     # Read reference (fragmented)
-    reffilename = get_consensus_filename(data_folder, adaID, frag_gen)
+    reffilename = get_consensus_filename(data_folder, adaID, frag_gen, trim_primers=True)
     refseq = SeqIO.read(reffilename, 'fasta')
     ref = np.array(refseq)
 
@@ -225,10 +202,10 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0):
             n_mutator = 0
             n_mismapped_edge = 0
             n_badcigar = 0
-            for i_pairs, reads in enumerate(pair_generator(bamfile)):
+            for irp, reads in enumerate(pair_generator(bamfile)):
 
                 # Limit to the first reads
-                if 2 * i_pairs >= maxreads: break
+                if 2 * irp >= maxreads: break
             
                 # Assign names
                 (read1, read2) = reads
@@ -238,7 +215,7 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0):
             
                 # Check a few things to make sure we are looking at paired reads
                 if read1.qname != read2.qname:
-                    raise ValueError('Read pair '+str(i_pairs)+': reads have different names!')
+                    raise ValueError('Read pair '+str(irp)+': reads have different names!')
                 # Ignore unmapped reads
                 elif read1.is_unmapped or read2.is_unmapped:
                     if VERBOSE >= 2:
@@ -282,38 +259,18 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0):
 
                 # If the read pair survived, check and trim good cigars
                 if not skip:
-                    for read in reads:
+                    # Trim the bad CIGARs from the sides (in place)
+                    trash = trim_bad_cigar(reads, match_len_min=match_len_min,
+                                           trim_left=trim_bad_cigars,
+                                           trim_right=trim_bad_cigars)
 
-                        # Trim the bad CIGARs from the sides (in place)
-                        trim_bad_cigar(read, match_len_min=match_len_min,
-                                       trim_left=trim_bad_cigars,
-                                       trim_right=trim_bad_cigars)
-
-                        # If there are no good CIGARs, skip
-                        if read is None:
-                            n_badcigar += 1
-                            skip = True
-                            break
-
-                        # Trim inner PCR primers (in place)
-                        trim_primers(read, start_nonprimer, end_nonprimer)
-
-                        # Give up the number of mismatches
-                        read.tags.pop(map(itemgetter(0), read.tags).index('NM'))
-
-                    # Mate pair stuff and insert size
-                    if not skip:
-                        read1.mpos = read2.pos
-                        read2.mpos = read1.pos
-
-                        # Insert size
-                        readf = reads[read1.is_reverse]
-                        readr = reads[read2.is_reverse]
-                        isize = max([read1.pos + read1.rlen,
-                                     read2.pos + read2.rlen]) -\
-                                min([read1.pos, read2.pos])
-                        readf.isize = isize
-                        readr.isize = -isize
+                    # TODO: we might want to incorporate some more stringent
+                    # criterion here, to avoid short reads, cross-overhang, etc.
+                    # If there are no good CIGARs, skip
+                    if trash:
+                        n_badcigar += 1
+                        skip = True
+                        break
 
                 # Write the output
                 if skip:
@@ -322,11 +279,26 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0):
                     n_good += 1
                     map(outfile.write, reads)
 
-
     if VERBOSE >= 1:
-        print 'Read pairs: '+str(n_good)+' good, '+str(n_unmapped)+' unmapped, '+\
-                str(n_unpaired)+' unpaired, '+str(n_mismapped_edge)+' edge, '+\
-                str(n_mutator)+' many-mutations, '+str(n_badcigar)+' bad CIGAR.'
+        print 'Read pairs: '
+        print 'Good:', n_good
+        print 'Unmapped:', n_unmapped
+        print 'Unpaired:', n_unpaired
+        print 'Mispapped at edge:', n_mismapped_edge
+        print 'Many-mutations:', n_mutator
+        print 'Bad CIGARs:', n_badcigar
+
+    # Write summary to file
+    summary_filename = get_filter_mapped_summary_filename(data_folder, adaID, fragment)
+    with open(summary_filename, 'w') as f:
+        f.write('Filter results: adaID '+'{:02d}'.format(adaID)+fragment+'\n')
+        f.write('Total:\t\t'+str(irp)+'\n')
+        f.write('Good:\t\t'+str(n_good)+'\n')
+        f.write('Unmapped:\t'+str(n_unmapped)+'\n')
+        f.write('Unpaired:\t'+str(n_unpaired)+'\n')
+        f.write('Mismapped at edge:\t'+str(n_mismapped_edge)+'\n')
+        f.write('Many-mutations:\t'+str(n_mutator)+'\n')
+        f.write('Bad CIGARs:\t'+str(n_badcigar)+'\n')
 
 
 
@@ -378,7 +350,9 @@ if __name__ == '__main__':
                 fork_self(miseq_run, adaID, fragment, VERBOSE=VERBOSE)
                 continue
 
-            # or else, perform the filtering
+            # Fragment F5 has two sets of primers
             if fragment == 'F5':
                 fragment = dataset['primerF5'][dataset['adapters'].index(adaID)]
+    
+            # Filter reads
             filter_reads(data_folder, adaID, fragment, VERBOSE=VERBOSE)

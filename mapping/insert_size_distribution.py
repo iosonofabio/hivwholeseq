@@ -11,7 +11,9 @@ import pysam
 import numpy as np
 
 from mapping.datasets import MiSeq_runs
-from mapping.filenames import get_mapped_filename
+from mapping.filenames import get_mapped_filename, get_premapped_file, \
+        get_insert_size_distribution_cumulative_filename, \
+        get_insert_size_distribution_filename
 from mapping.mapping_utils import pair_generator, convert_sam_to_bam
 
 
@@ -27,14 +29,20 @@ def get_insert_size_distribution(data_folder, adaID, fragment, bins=None,
         insert_sizes = np.zeros(1e6, np.int16)
 
     # Open BAM file
-    # Note: the reads should already be filtered of unmapped stuff at this point
-    bamfilename = get_mapped_filename(data_folder, adaID, fragment, type='bam',
-                                      filtered=False) # FIXME
+    if fragment == 'premapped':
+        bamfilename = get_premapped_file(data_folder, adaID, type='bam')
+    else:
+        bamfilename = get_mapped_filename(data_folder, adaID, fragment, type='bam',
+                                          filtered=True)
+
+    # Convert from SAM if necessary
     if not os.path.isfile(bamfilename):
         convert_sam_to_bam(bamfilename)
-    with pysam.Samfile(bamfilename, 'rb') as bamfile:
 
+    # Open file
+    with pysam.Samfile(bamfilename, 'rb') as bamfile:
         # Iterate over single reads (no linkage info needed)
+        n_written = 0
         for i, reads in enumerate(pair_generator(bamfile)):
 
             if i == maxreads:
@@ -46,11 +54,17 @@ def get_insert_size_distribution(data_folder, adaID, fragment, bins=None,
             if (VERBOSE >= 3) and (not ((i +1) % 10000)):
                 print (i+1)
 
-            # Everything should be paired and mapped, because we use filtered
-            # reads (check that we tamper correctly with insert sizes)
-            insert_sizes[i] = np.abs(reads[0].isize)
+            # If unmapped or unpaired, mini, or insert size mini, discard
+            if reads[0].is_unmapped or (not reads[0].is_proper_pair) or \
+               reads[1].is_unmapped or (not reads[1].is_proper_pair):
+                continue
+            
+            # Store insert size
+            i_fwd = reads[0].is_reverse
+            insert_sizes[i] = reads[i_fwd].isize
+            n_written += 1
 
-    insert_sizes = insert_sizes[:i]
+    insert_sizes = insert_sizes[:n_written]
     insert_sizes.sort()
 
     # Bin it
@@ -62,21 +76,35 @@ def get_insert_size_distribution(data_folder, adaID, fragment, bins=None,
     return insert_sizes, h
 
 
-def plot_cumulative_histogram(miseq_run, adaID, fragment, insert_sizes, **kwargs):
+def plot_cumulative_histogram(miseq_run, adaID, fragment, insert_sizes,
+                              show=False, savefig=False,
+                              **kwargs):
     '''Plot cumulative histogram of insert sizes'''
     import matplotlib.pyplot as plt
     fig, ax = plt.subplots(1, 1)
     ax.plot(insert_sizes, np.linspace(0, 1, len(insert_sizes)), **kwargs)
     ax.set_xlabel('Insert size')
     ax.set_ylabel('Cumulative fraction')
-    ax.set_title('run '+str(miseq_run)+', adaID '+str(adaID)+', fragment '+fragment)
+    ax.set_title('run '+str(miseq_run)+', adaID '+str(adaID)+', '+fragment)
 
     plt.tight_layout()
-    plt.ion()
-    plt.show()
+
+    if show:
+        plt.ion()
+        plt.show()
+
+    if savefig:
+        dataset = MiSeq_runs[miseq_run]
+        data_folder = dataset['folder']
+        output_filename = get_insert_size_distribution_cumulative_filename(data_folder,
+                                                                           adaID,
+                                                                           fragment)
+        fig.savefig(output_filename)
 
 
-def plot_histogram(miseq_run, adaID, fragment, h, **kwargs):
+def plot_histogram(miseq_run, adaID, fragment, h,
+                   show=False, savefig=False,
+                   **kwargs):
     '''Plot histogram of insert sizes'''
     import matplotlib.pyplot as plt
     fig, ax = plt.subplots(1, 1)
@@ -85,12 +113,20 @@ def plot_histogram(miseq_run, adaID, fragment, h, **kwargs):
     ax.plot(x, y, **kwargs)
     ax.set_xlabel('Insert size')
     ax.set_ylabel('Density')
-    ax.set_title('run '+str(miseq_run)+', adaID '+str(adaID)+', fragment '+fragment)
+    ax.set_title('run '+str(miseq_run)+', adaID '+str(adaID)+', '+fragment)
 
     plt.tight_layout()
-    plt.ion()
-    plt.show()
 
+    if show:
+        plt.ion()
+        plt.show()
+
+    if savefig:
+        dataset = MiSeq_runs[miseq_run]
+        data_folder = dataset['folder']
+        output_filename = get_insert_size_distribution_filename(data_folder, adaID,
+                                                                fragment)
+        fig.savefig(output_filename)
 
 
 

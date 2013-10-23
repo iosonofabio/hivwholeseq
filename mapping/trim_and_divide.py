@@ -23,7 +23,8 @@ from mapping.datasets import MiSeq_runs
 from mapping.primer_info import primers_coordinates_HXB2_inner as pcis
 from mapping.primer_info import primers_coordinates_HXB2_outer as pcos
 from mapping.primer_info import primers_inner, primers_outer
-from mapping.filenames import get_HXB2_entire, get_premapped_file, get_divided_filenames
+from mapping.filenames import get_HXB2_entire, get_premapped_file, \
+        get_divided_filenames, get_divide_summary_filename
 from mapping.mapping_utils import pair_generator
 
 
@@ -34,8 +35,8 @@ JOBDIR = mapping.__path__[0].rstrip('/')+'/'
 JOBLOGERR = JOBDIR+'logerr'
 JOBLOGOUT = JOBDIR+'logout'
 JOBSCRIPT = JOBDIR+'trim_and_divide.py'
-cluster_time = '0:59:59'
-vmem = '8G'
+cluster_time = '2:59:59'
+vmem = '1G'
 
 
 
@@ -574,7 +575,7 @@ def trim_low_quality(reads, phred_min=20, read_len_min=50, include_tests=False,
         win_qual = 0
         while win_qual < win_qual_threshold:
             # If no window ever reaches the quality threshold, trash the pair
-            if read_start + win_size > read.rlen:
+            if read_start > read.rlen - read_size_min:
                 return True
             win_phred = phred[read_start: read_start + win_size]
             win_qual = (win_phred >= phred_min).sum()
@@ -868,6 +869,24 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, F5_primer, VERBOSE=0,
         print 'Ambiguous:\t', n_ambiguous
         print 'Low-quality:\t', n_lowq
 
+    # Write summary to file
+    with open(get_divide_summary_filename(data_folder, adaID), 'w') as f:
+        f.write('Trim and divide results: adaID '+'{:02d}'.format(adaID)+'\n')
+        f.write('Total:\t\t'+str(irp)+'\n')
+        f.write('Mapped:\t\t'+str(sum(n_mapped))+' '+str(n_mapped)+'\n')
+        f.write('Unmapped:\t'+str(n_unmapped)+'\n')
+        f.write('Outer primer\t'+str(n_outer)+'\n')
+        f.write('Ambiguous:\t'+str(n_ambiguous)+'\n')
+        f.write('Low-quality:\t'+str(n_lowq)+'\n')
+
+
+def report_coverage(data_folder, adaID, VERBOSE=0):
+    '''Produce a report on rough coverage on HXB2'''
+    #TODO
+    pass
+
+
+
 
 
 # Script
@@ -887,6 +906,8 @@ if __name__ == '__main__':
                         help='Execute the script in parallel on the cluster')
     parser.add_argument('--test', action='store_true',
                         help='Include sanity checks on mapped reads (slow)')
+    parser.add_argument('--report', action='store_true',
+                        help='Perform quality checks and save into a report')
 
     args = parser.parse_args()
     miseq_run = args.run
@@ -895,6 +916,7 @@ if __name__ == '__main__':
     maxreads = args.maxreads
     submit = args.submit
     include_tests = args.test
+    report = args.report
 
     # Specify the dataset
     dataset = MiSeq_runs[miseq_run]
@@ -928,3 +950,10 @@ if __name__ == '__main__':
         trim_and_divide_reads(data_folder, adaID, n_cycles, F5_primer,
                               maxreads=maxreads, VERBOSE=VERBOSE,
                               include_tests=include_tests)
+
+        # Check quality and report if requested
+        if report:
+
+            # Report rough coverage on HXB2
+            report_coverage(data_folder, adaID, VERBOSE=VERBOSE)
+

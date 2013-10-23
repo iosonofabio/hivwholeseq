@@ -24,6 +24,11 @@ from mapping.mapping_utils import convert_sam_to_bam
 
 
 # Globals
+# Minimal quality required for a base to be considered trustful (i.e. added to 
+# the allele counts), in phred score. Too high: lose coverage, too low: seq errors.
+# Reasonable numbers are between 30 and 36.
+qual_min = 35
+
 # Cluster submit
 import mapping
 JOBDIR = mapping.__path__[0].rstrip('/')+'/'
@@ -102,7 +107,8 @@ def get_allele_counts(data_folder, adaID, fragment, subsample=False, VERBOSE=0,
             js = 2 * read.is_read2 + read.is_reverse
         
             # Read CIGARs (they should be clean by now)
-            seq = read.seq
+            seq = np.fromstring(read.seq, 'S1')
+            qual = np.fromstring(read.qual, np.int8) - 33
             pos = read.pos
             cigar = read.cigar
             len_cig = len(cigar)            
@@ -116,16 +122,18 @@ def get_allele_counts(data_folder, adaID, fragment, subsample=False, VERBOSE=0,
             
                 # Inline block
                 if block_type == 0:
-                    seqb = np.array(list(seq[:block_len]), 'S1')
+                    seqb = seq[:block_len]
+                    qualb = qual[:block_len]
                     # Increment counts
                     for j, a in enumerate(alpha):
-                        posa = (seqb == a).nonzero()[0]
+                        posa = ((seqb == a) & (qualb >= qual_min)).nonzero()[0]
                         if len(posa):
                             counts[js, j, pos + posa] += 1
             
                     # Chop off this block
                     if ic != len_cig - 1:
                         seq = seq[block_len:]
+                        qual = qual[block_len:]
                         pos += block_len
             
                 # Deletion
@@ -141,11 +149,15 @@ def get_allele_counts(data_folder, adaID, fragment, subsample=False, VERBOSE=0,
                 # THEN the insert, FINALLY comes seq[391:]
                 elif block_type == 1:
                     seqb = seq[:block_len]
-                    inserts[pos][seqb][js] += 1
+                    qualb = qual[:block_len]
+                    # Accept only high-quality inserts
+                    if (qualb >= qual_min).all():
+                        inserts[pos][seqb.tostring()][js] += 1
             
                     # Chop off seq, but not pos
                     if ic != len_cig - 1:
                         seq = seq[block_len:]
+                        qual = qual[block_len:]
             
                 # Other types of cigar?
                 else:

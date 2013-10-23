@@ -12,7 +12,8 @@ from mapping.adapter_info import foldername_adapter
 
 
 # Globals
-reference_folder = '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/reference/'
+root_data_folder = '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/'
+reference_folder = root_data_folder+'reference/'
 
 
 
@@ -328,3 +329,83 @@ def get_unclassified_reads_filenames(data_folder, filtered=False):
         filenames = [f+'_filtered_trimmed' if 'read' in f else f for f in filenames]
     filenames = [data_folder+'unclassified_reads/'+f+'.fastq' for f in filenames]
     return filenames
+
+
+def get_insert_size_distribution_cumulative_filename(data_folder, adaID, fragment,
+                                                     ext='png'):
+    '''Get filename of the cumulative distribution of insert sizes'''
+    filename = 'insert_size_cumulative_distribution'
+    if fragment == 'premapped':
+        filename = 'premapped/'+filename
+    else:
+        filename = 'mapped/'+filename+'_'+fragment
+    filename = filename+'.'+ext
+    filename = data_folder+foldername_adapter(adaID)+filename
+    return filename
+
+
+def get_insert_size_distribution_filename(data_folder, adaID, fragment,
+                                          ext='png'):
+    '''Get filename of the distribution of insert sizes'''
+    filename = 'insert_size_distribution'
+    if fragment == 'premapped':
+        filename = 'premapped/'+filename
+    else:
+        filename = 'mapped/'+filename+'_'+fragment
+    filename = filename+'.'+ext
+    filename = data_folder+foldername_adapter(adaID)+filename
+    return filename
+
+
+def get_divide_summary_filename(data_folder, adaID):
+    '''Get the filename of the summary of the division into fragments'''
+    filename = 'summary_divide.txt'
+    filename = 'divided/'+filename
+    filename = data_folder+foldername_adapter(adaID)+filename
+    return filename
+
+
+def get_filter_mapped_summary_filename(data_folder, adaID, fragment):
+    '''Get the filename of the summary of the division into fragments'''
+    filename = 'summary_filter_'+fragment+'.txt'
+    filename = 'mapped/'+filename
+    filename = data_folder+foldername_adapter(adaID)+filename
+    return filename
+
+
+def get_coverage_figure_filename(data_folder, adaID, fragment, ext='png'):
+    '''Get the filename of the coverage report figure'''
+    filename = 'coverage'
+    if fragment == 'premapped':
+        filename = 'premapped/'+filename
+    else:
+        filename = 'divided/'+filename+'_'+fragment
+    filename = filename+'.'+ext
+    filename = data_folder+foldername_adapter(adaID)+filename
+    return filename
+    
+
+def get_patient_foldername(patient, root_data_folder=root_data_folder):
+    '''Get the folder name of the data from a patient'''
+    foldername = 'patients/'+patient+'/'
+    foldername = root_data_folder+foldername
+    return foldername
+
+
+def get_patient_initial_consensus_filename(patient, fragment,
+                                           root_data_folder=root_data_folder):
+    '''Get the filename of the initial consensus for a patient'''
+    filename = 'consensus_initial_'+fragment+'.fasta'
+    filename = get_patient_foldername(patient, root_data_folder=root_data_folder)+\
+            filename
+    return filename
+
+
+def get_patient_mapped_to_initial_filename(patient, sample, fragment, type='bam',
+                                           root_data_folder=root_data_folder):
+    '''Get the filename of the mapped reads to initial consensus'''
+    filename = sample+'_'+fragment+'.'+type
+    filename = 'mapped_to_initial/'+filename
+    filename = get_patient_foldername(patient, root_data_folder=root_data_folder)+\
+            filename
+    return filename

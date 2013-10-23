@@ -96,7 +96,7 @@ def consensus_vs_reference(miseq_run, adaID, fragment, VERBOSE=0):
     
     errs = ali[0] != ali[1]
     if errs.any():
-        print sample, 'fragment', fragment, 'ref len:', len(refseq)
+        print 'Consensus VS reference', sample, 'fragment', fragment, 'ref len:', len(refseq)
         print 'pos mutation'
         print '---------------------'
         for pos in errs.nonzero()[0]:
@@ -301,7 +301,7 @@ if __name__ == '__main__':
     for adaID in adaIDs:
         for fragment in fragments:
             consensus_vs_reference(miseq_run, adaID, fragment, VERBOSE=VERBOSE)
-            #minor_alleles_along_genome(miseq_run, adaID, fragment,
-            #                           VERBOSE=VERBOSE, plot=True, savefig=False)
-            #spikes_motifs(miseq_run, adaID, fragment,
-            #              VERBOSE=VERBOSE, plot=True, savefig=False)
+            minor_alleles_along_genome(miseq_run, adaID, fragment,
+                                       VERBOSE=VERBOSE, plot=True, savefig=False)
+            spikes_motifs(miseq_run, adaID, fragment,
+                          VERBOSE=VERBOSE, plot=True, savefig=False)

@@ -171,7 +171,7 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1):
         time_wait = 10 # secs
         while not jobs_done.all():
 
-            # Sleep 10 secs
+            # Sleep some time
             time.sleep(time_wait)
 
             # Get the output of qstat to check the status of jobs
@@ -192,7 +192,7 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1):
                     # Convert to BAM for merging
                     if VERBOSE >= 1:
                         print 'Convert premapped reads to BAM for merging: adaID '+\
-                               '{:02d}'.format(adaID)+', part '+str(j+1)+ 'of '+ \
+                               '{:02d}'.format(adaID)+', part '+str(j+1)+ ' of '+ \
                                str(threads)
                     convert_sam_to_bam(output_file_parts[j])
                     # We do not need to wait if we did the conversion (it takes
@@ -204,14 +204,13 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1):
         output_filename = get_premapped_file(data_folder, adaID, type='bam',
                                              unsorted=True)
         if VERBOSE >= 1:
-            print 'Merge premapped reads: adaID '+'{:02d}'.format(adaID)
-        pysam.cat(output_filename, *output_file_parts)
+            print 'Concatenate premapped reads: adaID '+'{:02d}'.format(adaID)
+        pysam.cat('-o', output_filename, *output_file_parts)
 
         # Sort the file by read names (to ensure the pair_generator)
         output_filename_sorted = get_premapped_file(data_folder, adaID, type='bam',
                                                     unsorted=False)
-
-        # Note: we exclude the extension and the option -f because of a bug in samtools
+        # NOTE: we exclude the extension and the option -f because of a bug in samtools
         if VERBOSE >= 1:
             print 'Sort premapped reads: adaID '+'{:02d}'.format(adaID)
         pysam.sort('-n', output_filename, output_filename_sorted[:-4])
@@ -222,12 +221,59 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1):
         header_filename = get_premapped_file(data_folder, adaID, type='sam', part=1)
         pysam.reheader(header_filename, output_filename_sorted)
 
-        # Make SAM out of the BAM for checking
-        if VERBOSE >= 1:
-            print 'Convert premapped reads to SAM (for inspection): adaID '+\
-                    '{:02d}'.format(adaID)
-        output_filename = get_premapped_file(data_folder, adaID, type='sam')
-        convert_bam_to_sam(output_filename)
+
+def report_insert_size_distribution(data_folder, adaID,  VERBOSE=0):
+    '''Produce figures of the insert size distribution'''
+    from mapping.insert_size_distribution import get_insert_size_distribution, \
+            plot_cumulative_histogram, plot_histogram
+
+    bins = np.linspace(0, 1000, 100)
+    isz, h = get_insert_size_distribution(data_folder, adaID, 'premapped',
+                                          bins=bins, maxreads=10000,
+                                          VERBOSE=VERBOSE)
+    plot_cumulative_histogram(miseq_run, adaID, 'premapped', isz, savefig=True,
+                              lw=2, c='b')
+    plot_histogram(miseq_run, adaID, 'premapped', h, savefig=True,
+                   lw=2, color='b')
+
+
+def report_coverage(data_folder, adaID, VERBOSE=0):
+    '''Produce a report on rough coverage on reference (ignore inserts)'''
+    # Get the reference sequence
+    from reference import load_HXB2
+    refseq = load_HXB2(cropped=True)
+
+    # Prepare data structures
+    coverage = np.zeros(len(refseq), int)
+    
+    # Parse the BAM file
+    output_filename = get_premapped_file(data_folder, adaID, type='bam')
+    with pysam.Samfile(output_filename, 'rb') as bamfile:
+        for read in bamfile:
+            if read.is_unmapped or (not read.is_proper_pair):
+                continue
+
+            # Proceed along CIGARs
+            ref_pos = read.pos
+            for (bt, bl) in read.cigar:
+                if bt not in (0, 2):
+                    continue
+                # Treat deletions as 'covered'
+                coverage[ref_pos: ref_pos+bl] += 1
+                ref_pos += bl
+
+    # Save results
+    from mapping.filenames import get_coverage_figure_filename
+    import matplotlib.pyplot as plt
+    plt.plot(np.arange(len(refseq)), coverage + 1, lw=2, c='b')
+    plt.xlabel('Position in cropped HXB2')
+    plt.ylabel('Coverage')
+    plt.yscale('log')
+    plt.title('adaID '+'{:02d}'.format(adaID)+', premapped to HXB2',
+              fontsize=18)
+
+    plt.tight_layout()
+    plt.savefig(get_coverage_figure_filename(data_folder, adaID, 'premapped'))
 
 
 
@@ -246,6 +292,8 @@ if __name__ == '__main__':
                         help='Execute the script in parallel on the cluster')
     parser.add_argument('--threads', type=int, default=1,
                         help='Number of threads to use for mapping')
+    parser.add_argument('--report', action='store_true',
+                        help='Perform quality checks and save into a report')
 
     args = parser.parse_args()
     miseq_run = args.run
@@ -253,6 +301,7 @@ if __name__ == '__main__':
     VERBOSE = args.verbose
     submit = args.submit
     threads = args.threads
+    report = args.report
 
     # Specify the dataset
     dataset = MiSeq_runs[miseq_run]
@@ -280,3 +329,11 @@ if __name__ == '__main__':
         # Map roughly to HXB2
         premap_stampy(data_folder, adaID, VERBOSE=VERBOSE, threads=threads)
 
+        # Check quality and report if requested
+        if report:
+
+            # Report distribution of insert sizes
+            report_insert_size_distribution(data_folder, adaID, VERBOSE=VERBOSE)
+
+            # Report rough coverage of reference
+            report_coverage(data_folder, adaID, VERBOSE=VERBOSE)

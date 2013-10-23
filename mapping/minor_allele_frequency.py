@@ -28,6 +28,11 @@ from mapping.adapter_info import load_adapter_table
 
 
 
+# Globals
+plot_grid = [(1, 1), (1, 2), (1, 3), (2, 2), (1, 5), (2, 3)]
+
+
+
 # Functions
 def get_minor_allele_counts(counts, n_minor=1):
     '''Extract the minor allele counts
@@ -158,70 +163,108 @@ if __name__ == '__main__':
     # Iterate over all requested samples
     for adaID in adaIDs:
 
+        covs = {}
         nus_minor = {}
         alls_minor = {}
         nus_filtered = {}
         nus_minor_filtered = {}
         for fragment in fragments:
+            counts = np.load(get_allele_counts_filename(data_folder, adaID, fragment))
+            coverage = np.load(get_coverage_filename(data_folder, adaID, fragment))
 
-            try:
-                counts = np.load(get_allele_counts_filename(data_folder, adaID, fragment))
-                coverage = np.load(get_coverage_filename(data_folder, adaID, fragment))
+            # Store coverage
+            covs[fragment] = coverage
     
+            (counts_major,
+             counts_minor,
+             counts_minor2) = get_minor_allele_counts(counts, n_minor=2)
     
-                # TODO: study insertions
+            # Get minor allele frequencies and identities
+            nu_minor = 1.0 * counts_minor[:, :, 1] / (coverage + 1e-6)
+            nus_minor[fragment] = nu_minor
+            all_minor = counts_minor[:, :, 0]
+            alls_minor[fragment] = all_minor
     
-                (counts_major,
-                 counts_minor,
-                 counts_minor2) = get_minor_allele_counts(counts, n_minor=2)
-    
-                # Get minor allele frequencies and identities
-                nu_minor = 1.0 * counts_minor[:, :, 1] / (coverage + 1e-6)
-                nus_minor[fragment] = nu_minor
-                all_minor = counts_minor[:, :, 0]
-                alls_minor[fragment] = all_minor
-    
-                # Filter the minor frequencies by comparing the read types
-                nu_filtered = filter_nus(counts, coverage)
-                nut = np.zeros(nu_filtered.shape[-1])
-                for pos, nupos in enumerate(nu_filtered.T):
-                    nut[pos] = np.sort(nupos)[-2]
-                
-                nus_filtered[fragment] = nu_filtered
-                nus_minor_filtered[fragment] = nut
-
-            except IOError:
-               pass 
+            # Filter the minor frequencies by comparing the read types
+            nu_filtered = filter_nus(counts, coverage)
+            nut = np.zeros(nu_filtered.shape[-1])
+            for pos, nupos in enumerate(nu_filtered.T):
+                nut[pos] = np.sort(nupos)[-2]
+            
+            nus_filtered[fragment] = nu_filtered
+            nus_minor_filtered[fragment] = nut
 
         # Plot them
-        fig, axs = plt.subplots(2, 3, figsize=(13, 8))
+        (n_plots_y, n_plots_x) = plot_grid[len(fragments) - 1]
+        fig, axs = plt.subplots(n_plots_y, n_plots_x, figsize=(13, 8))
+        if len(fragments) > 1:
+            axs = axs.ravel()
+        else:
+            axs = [axs]
         fig.suptitle('adapterID '+'{:02d}'.format(adaID), fontsize=20)
-        axs = axs.ravel()
         for i, fragment in enumerate(fragments):
-            try:
-                ax = axs[i]
-                ax.set_yscale('log')
-                ax.set_title(fragment)
-                if i in [0, 3]:
-                    ax.set_ylabel(r'$\nu$')
-                if i > 2:
-                    ax.set_xlabel('Position')
+            ax = axs[i]
+            ax.set_yscale('log')
+            ax.set_title(fragment)
+            if i in [0, 3]:
+                ax.set_ylabel(r'$\nu$')
+            if i > 2:
+                ax.set_xlabel('Position')
     
-                for js, nu_minorjs in enumerate(nus_minor[fragment]):
-                    color = cm.jet(int(255.0 * js / len(read_types)))
-                    ax.plot(nu_minorjs, lw=1.5, c=color, label=read_types[js])
-                    ax.scatter(np.arange(len(nu_minorjs)), nu_minorjs, lw=1.5,
-                               color=color)
-                
-                # Plot filtered
-                ax.plot(nus_minor_filtered[fragment] + 1e-6, lw=1.5, c='k',
-                        alpha=0.5, label='Filtered')
+            for js, nu_minorjs in enumerate(nus_minor[fragment]):
+                color = cm.jet(int(255.0 * js / len(read_types)))
+                ax.plot(nu_minorjs, lw=1.5, c=color, label=read_types[js])
+                ax.scatter(np.arange(len(nu_minorjs)), nu_minorjs, lw=1.5,
+                           color=color)
+            
+            # Plot filtered
+            ax.plot(nus_minor_filtered[fragment], lw=1.5, c='k',
+                    alpha=0.5, label='Filtered')
+            ax.scatter(np.arange(len(nus_minor_filtered[fragment])),
+                       nus_minor_filtered[fragment], lw=1.5, c='k',
+                       alpha=0.5)
 
-                ax.set_xlim(-100, len(nu_minorjs) + 100)
-            except:
-                pass
+            # Plot 1/max(coverage)
+            coverage = covs[fragment]
+            cov_tot = coverage.sum(axis=0)
+            ax.plot(1.0 / cov_tot, lw=1.2, c='r', label='1/sum(coverage)')
+
+            ax.set_xlim(-100, len(nu_minorjs) + 100)
     
         plt.legend(loc='upper center')
+        plt.tight_layout(rect=(0, 0, 1, 0.95))
+
+        plt.ion()
+        plt.show() 
+
+        # Plot distribution of minor allele frequencies (filtered)
+        (n_plots_y, n_plots_x) = plot_grid[len(fragments) - 1]
+        fig, axs = plt.subplots(n_plots_y, n_plots_x, figsize=(13, 8))
+        if len(fragments) > 1:
+            axs = axs.ravel()
+        else:
+            axs = [axs]
+        fig.suptitle('adapterID '+'{:02d}'.format(adaID), fontsize=20)
+        for i, fragment in enumerate(fragments):
+            ax = axs[i]
+            ax.set_xscale('log')
+            ax.set_title(fragment)
+            if i >= (n_plots_y - 1) * n_plots_x:
+                ax.set_xlabel(r'$\nu$')
+    
+            h = np.histogram(nus_minor_filtered[fragment] + 1e-6,
+                             bins = np.logspace(-6, 0, 50),
+                             # This can be switched
+                             density=False)
+            x = np.sqrt(h[1][1:] * h[1][:-1])
+            y = 1e-6 + h[0]
+
+            ax.plot(x, y,
+                    lw=2,
+                    color='grey',
+                    label='Filtered')
+
+        plt.legend(loc='upper right')
         plt.tight_layout(rect=(0, 0, 1, 0.95))
 
         plt.ion()
