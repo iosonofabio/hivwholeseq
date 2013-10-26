@@ -25,7 +25,17 @@ from mapping.minor_allele_frequency import filter_nus
 
 
 # Functions
-def find_overlap(data_folder, adaID, frag1, frag2, VERBOSE=0):
+def get_overlapping_fragments(fragments):
+    '''Get the overlapping pairs from a list of fragments'''
+    possible_pairs = [('F'+str(i+1), 'F'+str(i+2)) for i in xrange(5)]
+    pairs = []
+    for pair in possible_pairs:
+        if (pair[0] in fragments) and (pair[1] in fragments):
+            pairs.append(pair)
+    return pairs
+
+
+def get_overlap(data_folder, adaID, frag1, frag2, VERBOSE=0):
     '''Find the overlap coordinates for the two fragments'''
     seq1 = SeqIO.read(get_consensus_filename(data_folder, adaID, frag1,
                                              trim_primers=True), 'fasta')
@@ -79,14 +89,14 @@ def check_overlap_consensus(data_folder, adaID, frag1, frag2, overlap, VERBOSE=0
     # Check for an overlap at all
     if overlap is None:
         print 'adaID', adaID, frag1, frag2, 'no overlap found!'
-        return
+        return True
 
     # Check for indels in the consensus
     (start_s2, end_s1, ali) = overlap
     alim = np.array(ali)
     if (alim == '-').any():
         print 'adaID', adaID, frag1, frag2, 'Indels in the overlap'
-        return
+        return True
 
     # Check for mismatches
     if (alim[0] != alim[1]).any():
@@ -95,7 +105,9 @@ def check_overlap_consensus(data_folder, adaID, frag1, frag2, overlap, VERBOSE=0
             pos1 = start_s2 + pos2
             print str(frag1)+':', pos1, str(frag2)+':', pos2, \
                     alim[0, pos2], alim[1, pos2]
-        return
+        return True
+
+    return False
 
 
 def check_overlap_allele_frequencies(data_folder, adaID, frag1, frag2, overlap,
@@ -120,8 +132,22 @@ def check_overlap_allele_frequencies(data_folder, adaID, frag1, frag2, overlap,
     nu1 = filter_nus(cou1, cov1)
     nu2 = filter_nus(cou2, cov2)
 
+    # Print table of called polymorphisms
+    print 'adaID', adaID, frag1, frag2, 'polymorphism matrix (NO | YES)'
+    print 3 * ' ', '|', '{:^10s}'.format(frag1)
+    print 15 * '-'
+    print 3 * ' ', '|', \
+            '{:3d}'.format(((nu1 < 1e-6) & (nu2 < 1e-6)).sum()), '|', \
+            '{:3d}'.format(((nu1 > 3e-3) & (nu2 < 1e-6)).sum())
+    print '{:3s}'.format(frag2), '+'+(5*'-')+'+'+(4*'-')
+    print 3 * ' ', '|', \
+            '{:3d}'.format(((nu1 < 1e-6) & (nu2 > 3e-3)).sum()), '|', \
+            '{:3d}'.format(((nu1 > 3e-6) & (nu2 > 3e-3)).sum())
+         
+
     # Plot scatter
     import matplotlib.pyplot as plt
+    from matplotlib import cm
     if ax is None:
         show_plot = True
         fig, ax = plt.subplots(1, 1, figsize=(6, 6))
@@ -131,15 +157,16 @@ def check_overlap_allele_frequencies(data_folder, adaID, frag1, frag2, overlap,
     else:
         show_plot = False
         ax.set_title(str(frag1)+' - '+str(frag2), fontsize=18)
-    ax.scatter(nu1 + 1e-6, nu2 + 1e-6, s=30, c='b')
+    ax.scatter(np.abs(nu1 - 1e-5), np.abs(nu2 - 1e-5), s=30,
+               c=cm.jet([int(255.0 * i / len(nu1)) for i in xrange(len(nu1))]))
     # Plot diagonal
     ax.plot([1e-7, 2], [1e-7, 2], lw=1, c='k', ls='--')
     ax.set_xlabel(r'$\nu_1$', fontsize=20)
     ax.set_ylabel(r'$\nu_2$', fontsize=20)
     ax.set_xscale('log')
     ax.set_yscale('log')
-    ax.set_xlim(0.7e-6, 1.2)
-    ax.set_ylim(0.7e-6, 1.2)
+    ax.set_xlim(0.7e-5, 1.2)
+    ax.set_ylim(0.7e-5, 1.2)
 
     if show_plot:
         plt.tight_layout()
@@ -151,8 +178,8 @@ def check_overlap_allele_frequencies(data_folder, adaID, frag1, frag2, overlap,
 # Script
 if __name__ == '__main__':
 
-    # Parse input args: this is used to call itself recursively
-    parser = argparse.ArgumentParser(description='Map HIV reads recursively')
+    # Parse input args
+    parser = argparse.ArgumentParser(description='Check overlap regions')
     parser.add_argument('--run', type=int, required=True,
                         help='MiSeq run to analyze (e.g. 28, 37)')
     parser.add_argument('--adaIDs', nargs='*', type=int,
@@ -174,7 +201,7 @@ if __name__ == '__main__':
 
     # If the script is called with no adaID, iterate over all
     if not adaIDs:
-        adaIDs = load_adapter_table(data_folder)['ID']
+        adaIDs = MiSeq_runs[miseq_run]['adapters']
     if VERBOSE >= 3:
         print 'adaIDs', adaIDs
 
@@ -186,24 +213,19 @@ if __name__ == '__main__':
 
     for adaID in adaIDs:
         # Find overlap pairs
-        possible_pairs = [('F'+str(i+1), 'F'+str(i+2)) for i in xrange(5)]
-        pairs = []
-        for pair in possible_pairs:
-            if (pair[0] in fragments) and (pair[1] in fragments):
-                pairs.append(pair)
-
+        pairs = get_overlapping_fragments(fragments)
 
         # Iterate over overlaps
         overlaps = []
         for (frag1, frag2) in pairs:
 
             # Determine the overlap
-            overlap = find_overlap(data_folder, adaID,
-                                   frag1, frag2, VERBOSE=VERBOSE)
+            overlap = get_overlap(data_folder, adaID,
+                                  frag1, frag2, VERBOSE=VERBOSE)
 
             # Check consensus
-            check_overlap_consensus(data_folder, adaID, frag1, frag2, overlap,
-                                    VERBOSE=VERBOSE)
+            is_diff = check_overlap_consensus(data_folder, adaID, frag1, frag2, overlap,
+                                              VERBOSE=VERBOSE)
 
             if overlap is None:
                 continue
@@ -227,7 +249,7 @@ if __name__ == '__main__':
         plt.show()
 
         # Save the figure
-        if True:
+        if False:
             fig_filename = get_overlap_nu_figure_filename(data_folder, adaID,
                                                           '-'.join(fragments))
             # Create the folder if necessary

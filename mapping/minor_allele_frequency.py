@@ -14,7 +14,7 @@ import matplotlib.cm as cm
 import matplotlib
 params = {'axes.labelsize': 20, 
           'text.fontsize': 20,
-          'legend.fontsize': 18,
+          'legend.fontsize': 8,
           'xtick.labelsize': 16,
           'ytick.labelsize': 16,
           'text.usetex': False}
@@ -60,58 +60,69 @@ def get_minor_allele_counts(counts, n_minor=1):
 
 def filter_nus(counts, coverage, VERBOSE=0):
     '''Filter allele frequencies from the four read types'''
-    pvals = np.zeros((len(alpha), counts.shape[-1]))
+    from scipy.stats import chi2_contingency
 
     # Divide binarily
     nocounts = (coverage - counts.swapaxes(0, 1)).swapaxes(0, 1)
 
-    # Sum read1 and read2
+    # Set counts and similia: sum read1 and read2
     counts_f = counts[0] + counts[2]
     counts_b = counts[1] + counts[3]
     nocounts_f = nocounts[0] + nocounts[2]
     nocounts_b = nocounts[1] + nocounts[3]
-    nus_f = 1.0 * counts_f / (coverage[0] + coverage[2] + 1)
-    nus_b = 1.0 * counts_b / (coverage[1] + coverage[3] + 1)
+    cov_f = coverage[0] + coverage[2]
+    cov_b = coverage[1] + coverage[3]
+    ind_low_cov_f = cov_f < 10
+    ind_low_cov_b = cov_b < 10
+    ind_high_cov_both = (-ind_low_cov_f) & (-ind_low_cov_b)
 
-    # Test chi^2 for consistency across read 1 and read2,
-    # using pseudocounts
-    from scipy.stats import chi2_contingency
-    for j in xrange(len(alpha)):
-        for i in xrange(counts.shape[-1]):
-            cm = np.array([[counts_f[j, i], nocounts_f[j, i]],
-                           [counts_b[j, i], nocounts_b[j, i]]], int)
-            chi2, pval = chi2_contingency(cm + 1)[:2]
-            pvals[j, i] = pval
-
-    errs = zip(*(((pvals < 1e-6) & (np.abs(nus_f - nus_b) > 1e-4)).nonzero()))
-    errs.sort(key=itemgetter(1))
-
-    # Take the mean of the two fed and rev for non-errors
+    # Set filtered allele frequencies
     nu_filtered = np.ma.masked_all((len(alpha), counts.shape[-1]))
-    covtot = coverage.sum(axis=0)
-    ind = covtot > 0
-    # Geometric mean? Not much changes
-    #nu_filtered[:, ind] = 1.0 * (counts_f + counts_b)[:, ind] / covtot[ind]
-    nu_filtered[:, ind] = np.sqrt(nus_f * nus_b)[:, ind]
 
-    # Insert corrections
-    if VERBOSE:
-        print '{:4s}'.format('pos'), '{:3s}'.format('nuc'), \
-                '{:5s}'.format('cov fw'), '{:10s}'.format('nu fw'), \
-                '{:10s}'.format('nu re'), '{:5s}'.format('cov rv')
-    for ai, pos in errs:
-        # Take the allele farthest away from 0.5
-        # (the sum to 1 is not guaranteed!)
-        nu_tmp = np.array([nus_f[ai, pos], nus_b[ai, pos]])
-        ind_tmp = np.argmax(np.abs(nu_tmp - 0.5))
-        nu_filtered[ai, pos] = nu_tmp[ind_tmp]
+    # Iterate over positions
+    for i in xrange(counts.shape[-1]):
+        
+        # 1. if we cover neither fwd nor rev, keep masked
+        if ind_low_cov_f[i] and ind_low_cov_b[i]:
+            if VERBOSE >= 4:
+                print 'pos', i, 'base', alpha[j], 'not covered'
+            pass
 
-        if VERBOSE and ((nus_f[ai, pos] < 0.5) or (nus_b[ai, pos] < 0.5)):
-            print '{:4d}'.format(pos), alpha[ai], \
-                    '{:7d}'.format(coverage[[0, 2], pos].sum()), \
-                    '{:1.1e}'.format(nus_f[ai, pos]), \
-                    '{:1.1e}'.format(nus_b[ai, pos]), \
-                    '{:7d}'.format(coverage[[1, 3], pos].sum())
+        # 2. if we cover only one of them, well, just take the
+        # arithmetic sum of counts
+        elif ind_low_cov_f[i] != ind_low_cov_b[i]:
+            nu_filtered[:, i] = 1.0 * counts[:, :, i].sum(axis=0) / coverage[:, i].sum()
+            if VERBOSE >= 4:
+                print 'pos', i, 'base', alpha[j], 'covered only once'
+                
+        # 3. If we cover both, check whether the counts are significantly different
+        else:
+
+            # Check all alleles
+            for j in xrange(len(alpha)):
+                # To make a table, you must have coverage for both
+                cm = np.array([[counts_f[j, i], nocounts_f[j, i]],
+                               [counts_b[j, i], nocounts_b[j, i]]], int)
+                chi2, pval = chi2_contingency(cm + 1)[:2]
+    
+                # If they are not significantly different, sum the counts
+                if (pval > 1e-6):
+                    nu_filtered[j, i] = 1.0 * counts[:, j, i].sum(axis=0) / coverage[:, i].sum()
+                # If they are different by a significant and reasonable amount, take
+                # the value further away from 0.5
+                else:
+                    nu_f = 1.0 * counts_f[j, i] / cov_f[i]
+                    nu_b = 1.0 * counts_b[j, i] / cov_b[i]
+                    if np.abs(nu_f - 0.5) > np.abs(nu_b - 0.5):
+                        nu_filtered[j, i] = nu_f
+                    else:
+                        nu_filtered[j, i] = nu_b
+
+                    if VERBOSE >= 3:
+                        print 'pos', i, 'base', alpha[j], 'nu_f', nu_f, 'nu_b', nu_b
+
+    # Renormalize to 1
+    nu_filtered /= nu_filtered.sum(axis=0)
 
     # Get rid of the mask if not needed
     if not nu_filtered.mask.any():
@@ -134,15 +145,12 @@ if __name__ == '__main__':
                         help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
-    parser.add_argument('--subsample', action='store_true',
-                        help='Apply only to a subsample of the reads')
 
     args = parser.parse_args()
     miseq_run = args.run
     adaIDs = args.adaIDs
     fragments = args.fragments
     VERBOSE = args.verbose
-    subsample = args.subsample
 
     # Specify the dataset
     dataset = MiSeq_runs[miseq_run]

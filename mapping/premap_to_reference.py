@@ -32,7 +32,9 @@ JOBDIR = mapping.__path__[0].rstrip('/')+'/'
 JOBLOGERR = JOBDIR+'logerr'
 JOBLOGOUT = JOBDIR+'logout'
 JOBSCRIPT = JOBDIR+'premap_to_reference.py'
-cluster_time = ['23:59:59', '0:59:59']
+# It is hard to tell whether 1h is sufficient, because the final sorting takes
+# quite some time. So for now give up and require 2h.
+cluster_time = ['23:59:59', '1:59:59']
 vmem = '8G'
 
 

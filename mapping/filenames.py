@@ -18,16 +18,23 @@ reference_folder = root_data_folder+'reference/'
 
 
 # Functions
-def get_consensus_filename(data_folder, adaID, fragment, subsample=False,
-                           trim_primers=False):
+def get_consensus_filename(data_folder, adaID, fragment, trim_primers=True):
     '''Find the filename of the final consensus'''
     filename = 'consensus_'+fragment
     if trim_primers:
         filename = filename+'_trim_primers'
     filename = filename+'.fasta'
     filename = foldername_adapter(adaID)+filename
-    if subsample:
-        filename = 'subsample/'+filename
+    return data_folder+filename
+
+
+def get_consensus_old_filename(data_folder, adaID, fragment, trim_primers=True):
+    '''Find the filename of the final consensus'''
+    filename = 'consensus_old_'+fragment
+    if trim_primers:
+        filename = filename+'_trim_primers'
+    filename = filename+'.fasta'
+    filename = foldername_adapter(adaID)+filename
     return data_folder+filename
 
 
@@ -37,7 +44,7 @@ def get_last_consensus_number(data_folder, adaID):
     dirname = foldername_adapter(adaID)
 
     # Find the last (fragmented) consensus
-    g = os.walk(data_folder+'subsample/'+dirname)
+    g = os.walk(data_folder+dirname)
     fns = g.next()[2]
     fns = filter(lambda x: ('consensus' in x) and ('fragmented.fasta' in x), fns)
     consensus_numbers = map(lambda x: int(x.split('_')[1]), fns)
@@ -45,57 +52,45 @@ def get_last_consensus_number(data_folder, adaID):
     return cons_max
 
 
-def get_mutations_file(data_folder, adaID, fragment, subsample=False):
+def get_mutations_file(data_folder, adaID, fragment):
     '''Get the filename with the mutations for all reads'''
     filename = 'mutations_'+fragment+'.pickle'
     filename = foldername_adapter(adaID)+filename
-    if subsample:
-        filename = 'subsample/'+filename
     return data_folder+filename
 
 
-def get_allele_counts_filename(data_folder, adaID, fragment, subsample=False):
+def get_allele_counts_filename(data_folder, adaID, fragment):
     '''Get the filename with the allele counts for all reads'''
     filename = 'allele_counts_'+fragment+'.npy'
     filename = foldername_adapter(adaID)+filename
-    if subsample:
-        filename = 'subsample/'+filename
     return data_folder+filename
 
 
-def get_coallele_counts_filename(data_folder, adaID, fragment, subsample=False):
+def get_coallele_counts_filename(data_folder, adaID, fragment):
     '''Get the filename with the allele counts for all reads'''
     filename = 'coallele_counts_'+fragment+'.npy'
     filename = foldername_adapter(adaID)+filename
-    if subsample:
-        filename = 'subsample/'+filename
     return data_folder+filename
 
 
-def get_insert_counts_filename(data_folder, adaID, fragment, subsample=False):
+def get_insert_counts_filename(data_folder, adaID, fragment):
     '''Get the filename with the insert counts for all reads'''
     filename = 'insert_counts_'+fragment+'.pickle'
     filename = foldername_adapter(adaID)+filename
-    if subsample:
-        filename = 'subsample/'+filename
     return data_folder+filename
 
 
-def get_coverage_filename(data_folder, adaID, fragment, subsample=False):
+def get_coverage_filename(data_folder, adaID, fragment):
     '''Get the filename with the coverage'''
     filename = 'coverage_'+fragment+'.npy'
     filename = foldername_adapter(adaID)+filename
-    if subsample:
-        filename = 'subsample/'+filename
     return data_folder+filename
 
 
-def get_allele_frequencies_filename(data_folder, adaID, fragment, subsample=False):
+def get_allele_frequencies_filename(data_folder, adaID, fragment):
     '''Get the filename with the corrected allele frequencies'''
     filename = 'allele_frequencies_'+fragment+'.npy'
     filename = foldername_adapter(adaID)+filename
-    if subsample:
-        filename = 'subsample/'+filename
     return data_folder+filename
 
 
@@ -174,7 +169,7 @@ def get_HXB2_hash_file(fragment='F0', ext=True):
     return filename
 
 
-def get_read_filenames(data_folder, adaID, fragment=None, subsample=False,
+def get_read_filenames(data_folder, adaID, fragment=None,
                        filtered=True, premapped=False, suffix=''):
     '''Get the filenames of the demultiplexed reads'''
     filenames = ['read1', 'read2']
@@ -184,8 +179,6 @@ def get_read_filenames(data_folder, adaID, fragment=None, subsample=False,
         elif filtered:
             fn = fn+'_filtered_trimmed'
         fn = foldername_adapter(adaID)+fn
-        if subsample:
-            fn = 'subsample/'+fn
         fn = data_folder+fn
         
         # If there was a premap, 6 files have to be made for each orientation
@@ -202,14 +195,12 @@ def get_read_filenames(data_folder, adaID, fragment=None, subsample=False,
     return filenames
 
 
-def get_premapped_file(data_folder, adaID, type='bam', subsample=False, bwa=False,
+def get_premapped_file(data_folder, adaID, type='bam', bwa=False,
                        part=None, unsorted=False):
     '''Get the filename of the readed mapped to HXB2 to split into fragments'''
     filename = 'premapped_to_HXB2'
     filename = 'premapped/'+filename
     filename = foldername_adapter(adaID)+filename
-    if subsample:
-        filename = 'subsample/'+filename
     if part is not None:
         filename = filename+'_part'+str(part)
     elif unsorted:
@@ -245,7 +236,7 @@ def get_divided_filenames(data_folder, adaID, fragments, type='bam'):
     return filenames
 
 
-def get_mapped_filename(data_folder, adaID, fragment, type='bam', subsample=False,
+def get_mapped_filename(data_folder, adaID, fragment, type='bam', 
                         bwa=False, filtered=False, sort=False, part=None, unsorted=False):
     '''Get the filename of the mapped reads onto consensus'''
     filename = fragment
@@ -268,8 +259,6 @@ def get_mapped_filename(data_folder, adaID, fragment, type='bam', subsample=Fals
         raise ValueError('Type of mapped reads file not recognized')
     filename = 'mapped/'+filename
     filename = foldername_adapter(adaID)+filename
-    if subsample:
-        filename = 'subsample/'+filename
     return data_folder+filename
 
 
@@ -280,12 +269,10 @@ def get_raw_read_files(dataset):
             for key, subdir in dataset['raw_data'].iteritems()}
 
 
-def get_read_unpaired_filename(data_folder, adaID, subsample=False):
+def get_read_unpaired_filename(data_folder, adaID):
     '''Get the reads pairs for which one read is low quality'''
     fn = 'reads_unpaired.fastq'
     fn = foldername_adapter(adaID)+fn
-    if subsample:
-        fn = 'subsample/'+fn
     fn = data_folder+fn
     return fn
 
@@ -394,27 +381,9 @@ def get_overlap_nu_figure_filename(data_folder, adaID, fragments, ext='png'):
     return filename
     
 
-def get_patient_foldername(patient, root_data_folder=root_data_folder):
-    '''Get the folder name of the data from a patient'''
-    foldername = 'patients/'+patient+'/'
-    foldername = root_data_folder+foldername
-    return foldername
-
-
-def get_patient_initial_consensus_filename(patient, fragment,
-                                           root_data_folder=root_data_folder):
-    '''Get the filename of the initial consensus for a patient'''
-    filename = 'consensus_initial_'+fragment+'.fasta'
-    filename = get_patient_foldername(patient, root_data_folder=root_data_folder)+\
-            filename
+def get_merged_consensus_filename(data_folder, adaID, fragments):
+    '''Get the merged consensus of several fragments'''
+    filename = 'consensus_'+'-'.join(fragments)+'.fasta'
+    filename = data_folder+foldername_adapter(adaID)+filename
     return filename
 
-
-def get_patient_mapped_to_initial_filename(patient, sample, fragment, type='bam',
-                                           root_data_folder=root_data_folder):
-    '''Get the filename of the mapped reads to initial consensus'''
-    filename = sample+'_'+fragment+'.'+type
-    filename = 'mapped_to_initial/'+filename
-    filename = get_patient_foldername(patient, root_data_folder=root_data_folder)+\
-            filename
-    return filename

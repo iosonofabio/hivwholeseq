@@ -240,7 +240,7 @@ def align_muscle(*seqs):
     import subprocess as sp
     from Bio import AlignIO, SeqIO
     from Bio.Align.Applications import MuscleCommandline
-    muscle_cline = MuscleCommandline(diags=True)
+    muscle_cline = MuscleCommandline(diags=True, quiet=True)
     child = sp.Popen(str(muscle_cline),
                      stdin=sp.PIPE,
                      stdout=sp.PIPE,
@@ -248,8 +248,8 @@ def align_muscle(*seqs):
                      shell=True)
     SeqIO.write(seqs, child.stdin, "fasta")
     child.stdin.close()
-    child.stderr.close()
     align = AlignIO.read(child.stdout, "fasta")
+    child.stderr.close()
     child.stdout.close()
     return align
 

@@ -70,8 +70,7 @@ if __name__ == '__main__':
         for fragment in fragments:
 
             # Read reference
-            reffilename = get_consensus_filename(data_folder, adaID, fragment,
-                                                 trim_primers=False)
+            reffilename = get_consensus_filename(data_folder, adaID, fragment)
             refseq = SeqIO.read(reffilename, 'fasta')
             ref = np.array(refseq)
         

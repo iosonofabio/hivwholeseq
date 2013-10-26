@@ -25,7 +25,7 @@ from mapping.primer_info import primers_coordinates_HXB2_outer as pcos
 from mapping.primer_info import primers_inner, primers_outer
 from mapping.filenames import get_HXB2_entire, get_premapped_file, \
         get_divided_filenames, get_divide_summary_filename
-from mapping.mapping_utils import pair_generator
+from mapping.mapping_utils import pair_generator, convert_sam_to_bam
 
 
 # Globals

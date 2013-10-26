@@ -35,14 +35,13 @@ JOBDIR = mapping.__path__[0].rstrip('/')+'/'
 JOBSCRIPT = JOBDIR+'get_allele_counts.py'
 JOBLOGERR = JOBDIR+'logerr'
 JOBLOGOUT = JOBDIR+'logout'
-# Different times based on subsample flag
 cluster_time = '0:59:59'
 vmem = '4G'
 
 
 
 # Functions
-def fork_self(miseq_run, adaID, fragment, subsample=False, VERBOSE=3):
+def fork_self(miseq_run, adaID, fragment, VERBOSE=3):
     '''Fork self for each adapter ID and fragment'''
     qsub_list = ['qsub','-cwd',
                  '-b', 'y',
@@ -58,25 +57,17 @@ def fork_self(miseq_run, adaID, fragment, subsample=False, VERBOSE=3):
                  '--fragments', fragment,
                  '--verbose', VERBOSE,
                 ]
-    if subsample:
-        qsub_list.append('--subsample')
     qsub_list = map(str, qsub_list)
     if VERBOSE:
         print ' '.join(qsub_list)
     sp.call(qsub_list)
 
 
-def get_allele_counts(data_folder, adaID, fragment, subsample=False, VERBOSE=0,
-                      maxreads=1e10):
-    '''Extract allele and insert counts from a bamfile'''
-
-    # Read reference
-    reffilename = get_consensus_filename(data_folder, adaID, fragment,
-                                         subsample=subsample, trim_primers=True)
-    refseq = SeqIO.read(reffilename, 'fasta')
-    
-    # Allele counts and inserts
-    counts = np.zeros((len(read_types), len(alpha), len(refseq)), int)
+def get_allele_counts_insertions_from_file(bamfilename, length,
+                                           maxreads=-1, VERBOSE=0):
+    '''Get the allele counts and insertions'''
+    # Prepare output structures
+    counts = np.zeros((len(read_types), len(alpha), length), int)
     # Note: the data structure for inserts is a nested dict with:
     # position --> string --> read type --> count
     #  (dict)      (dict)       (list)      (int)
@@ -84,17 +75,13 @@ def get_allele_counts(data_folder, adaID, fragment, subsample=False, VERBOSE=0,
 
     # Open BAM file
     # Note: the reads should already be filtered of unmapped stuff at this point
-    bamfilename = get_mapped_filename(data_folder, adaID, fragment, type='bam',
-                                      filtered=True)
-    if not os.path.isfile(bamfilename):
-        convert_sam_to_bam(bamfilename)
     with pysam.Samfile(bamfilename, 'rb') as bamfile:
 
         # Iterate over single reads
         for i, read in enumerate(bamfile):
 
             # Max number of reads
-            if i > maxreads:
+            if i == maxreads:
                 if VERBOSE >= 2:
                     print 'Max reads reached:', maxreads
                 break
@@ -117,7 +104,7 @@ def get_allele_counts(data_folder, adaID, fragment, subsample=False, VERBOSE=0,
             for ic, (block_type, block_len) in enumerate(cigar):
 
                 # Check for pos: it should never exceed the length of the fragment
-                if (block_type in [0, 1, 2]) and (pos > len(refseq)):
+                if (block_type in [0, 1, 2]) and (pos >= length):
                     raise ValueError('Pos exceeded the length of the fragment')
             
                 # Inline block
@@ -163,25 +150,43 @@ def get_allele_counts(data_folder, adaID, fragment, subsample=False, VERBOSE=0,
                 else:
                     raise ValueError('CIGAR type '+str(block_type)+' not recognized')
 
-    return counts, inserts
+    return (counts, inserts)
+
+
+def get_allele_counts(data_folder, adaID, fragment, VERBOSE=0,
+                      maxreads=1e10):
+    '''Extract allele and insert counts from a bamfile'''
+
+    # Read reference
+    reffilename = get_consensus_filename(data_folder, adaID, fragment,
+                                         trim_primers=True)
+    refseq = SeqIO.read(reffilename, 'fasta')
+
+    # Open BAM file
+    # Note: the reads should already be filtered of unmapped stuff at this point
+    bamfilename = get_mapped_filename(data_folder, adaID, fragment, type='bam',
+                                      filtered=True)
+    if not os.path.isfile(bamfilename):
+        convert_sam_to_bam(bamfilename)
+
+    # Call lower-level function
+    return get_allele_counts_insertions_from_file(bamfilename, len(refseq),
+                                                 maxreads=maxreads, VERBOSE=VERBOSE)
 
 
 def write_output_files(data_folder, adaID, fragment,
-                       counts, inserts, coverage, subsample=False, VERBOSE=0):
+                       counts, inserts, coverage, VERBOSE=0):
     '''Write allele counts, inserts, and coverage to file'''
     if VERBOSE >= 1:
         print 'Write to file: '+'{:02d}'.format(adaID)+' '+fragment
 
     # Save counts and coverage
-    counts.dump(get_allele_counts_filename(data_folder, adaID, fragment,
-                                           subsample=subsample))
-    coverage.dump(get_coverage_filename(data_folder, adaID, fragment,
-                                        subsample=subsample))
+    counts.dump(get_allele_counts_filename(data_folder, adaID, fragment))
+    coverage.dump(get_coverage_filename(data_folder, adaID, fragment))
 
     # Convert inserts to normal nested dictionary for pickle
     inserts_dic = {k: dict(v) for (k, v) in inserts.iteritems()}
-    with open(get_insert_counts_filename(data_folder, adaID, fragment,
-                                         subsample=subsample), 'w') as f:
+    with open(get_insert_counts_filename(data_folder, adaID, fragment), 'w') as f:
         pickle.dump(inserts_dic, f, protocol=-1)
 
 
@@ -201,8 +206,6 @@ if __name__ == '__main__':
                         help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
-    parser.add_argument('--subsample', action='store_true',
-                        help='Apply only to a subsample of the reads')
     parser.add_argument('--submit', action='store_true',
                         help='Execute the script in parallel on the cluster')
 
@@ -211,7 +214,6 @@ if __name__ == '__main__':
     adaIDs = args.adaIDs
     fragments = args.fragments
     VERBOSE = args.verbose
-    subsample = args.subsample
     submit = args.submit
 
     # Specify the dataset
@@ -236,13 +238,12 @@ if __name__ == '__main__':
 
             # Submit to the cluster self if requested
             if submit:
-                fork_self(miseq_run, adaID, fragment,
-                          subsample=subsample, VERBOSE=VERBOSE)
+                fork_self(miseq_run, adaID, fragment, VERBOSE=VERBOSE)
                 continue
 
             # Get counts
             counts, inserts = get_allele_counts(data_folder, adaID, fragment,
-                                                subsample=subsample, VERBOSE=VERBOSE)
+                                                VERBOSE=VERBOSE)
 
             # Get coverage
             coverage = counts.sum(axis=1)
@@ -250,4 +251,4 @@ if __name__ == '__main__':
             # Save to file
             write_output_files(data_folder, adaID, fragment,
                                counts, inserts, coverage,
-                               subsample=subsample, VERBOSE=VERBOSE)
+                               VERBOSE=VERBOSE)

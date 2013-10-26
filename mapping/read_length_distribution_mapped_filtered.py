@@ -30,7 +30,7 @@ from mapping.mapping_utils import convert_sam_to_bam
 
 
 
-def get_read_lengths(data_folder, adaID, fragment, subsample=False, VERBOSE=0):
+def get_read_lengths(data_folder, adaID, fragment, VERBOSE=0):
     '''Get the read lengths'''
 
     # Lengths from 1 to 250
@@ -77,15 +77,12 @@ if __name__ == '__main__':
                         help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
-    parser.add_argument('--subsample', action='store_true',
-                        help='Apply only to a subsample of the reads')
 
     args = parser.parse_args()
     miseq_run = args.run
     adaIDs = args.adaIDs
     fragments = args.fragments
     VERBOSE = args.verbose
-    subsample = args.subsample
 
     # Specify the dataset
     dataset = MiSeq_runs[miseq_run]
@@ -108,8 +105,7 @@ if __name__ == '__main__':
     for adaID in adaIDs:
         for fragment in fragments:
             lengths_all[(adaID, fragment)] = length = \
-                    get_read_lengths(data_folder, adaID, fragment,
-                                     subsample=subsample, VERBOSE=VERBOSE)
+                    get_read_lengths(data_folder, adaID, fragment, VERBOSE=VERBOSE)
 
             # Plot it
             fig, ax = plt.subplots(1, 1)

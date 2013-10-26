@@ -1,9 +1,9 @@
 -------------------------------------------------------------------------------
 PIPELINE FOR HIV MISEQ SEQUENCING DATA
 -------------------------------------------------------------------------------
-Note: this pipeline was updated in 10/2013.
+Note: this pipeline was updated in October 2013.
 
-0. We get three FASTQ files from Joerg (and the Miseq):
+0. We get three FASTQ files from Joerg/Xi (and the Miseq):
  - read1
  - read2
  - barcode/adapter

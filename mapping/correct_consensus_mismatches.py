@@ -1,22 +1,32 @@
 # vim: fdm=marker
 '''
 author:     Fabio Zanini
-date:       24/09/13
-content:    Check iterative consensus with reference (if appropriate) and between
-            fragments at overlaps.
+date:       25/10/13
+content:    Sometimes, an allele has a frequency very close to 0.5 and our initial
+            subsample picks the wrong nucleotide. We correct these cases by using
+            the full dataset.
+
+            NOTE: in principle, we should do the same with insertions. That would,
+            however, force us to remap, so for now ignore that.
 '''
 # Modules
+import os
+import shutil
 import argparse
 import numpy as np
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
 import Bio.SeqIO as SeqIO
 import Bio.AlignIO as AlignIO
 
 from mapping.datasets import MiSeq_runs
 from mapping.miseq import alpha
+from mapping.primer_info import primers_inner as pri
 from mapping.adapter_info import load_adapter_table
-from mapping.filenames import get_consensus_filename, \
+from mapping.filenames import get_consensus_filename, get_consensus_old_filename, \
         get_allele_counts_filename, get_coverage_filename
 from mapping.minor_allele_frequency import filter_nus
+
 
 
 
@@ -69,25 +79,40 @@ if __name__ == '__main__':
             counts = np.load(get_allele_counts_filename(data_folder, adaID, fragment))
             coverage = np.load(get_coverage_filename(data_folder, adaID, fragment))
             nu = filter_nus(counts, coverage, VERBOSE=VERBOSE)
-
-            # Note: not-covered positions are filtered, but argmax cannot work
-            # with masked arrays
             cmat_af = alpha[nu.argmax(axis=0)]
-            if hasattr(nu, 'mask'):
-                cmat_af[nu.mask.all(axis=0)] = 'N'
 
-            # Check for consistency first
             if len(cmat) != len(cmat_af):
-                print 'Consensus has a different length from allele frequency \
-                        matrix... WTF?'
+                raise ValueError('The two consensi have a different length!')
 
-            # Do not actually align, it makes a huge mess (we miss mistakes)
-            ali = [cmat, cmat_af]
-            if (ali[0] != ali[1]).any():
-                print 'adaID', adaID, fragment, 'consensus not self-coherent:'
-                print 'differences (cons -> cons_af),'
-                for pos in (ali[0] != ali[1]).nonzero()[0]:
-                    print pos, ali[0][pos], '->', ali[1][pos], \
-                            ali[1][max(0, pos-10): pos +1].tostring(), \
-                            counts[:, (alpha == ali[0][pos]).nonzero()[0][0], pos], \
-                            counts[:, (alpha == ali[1][pos]).nonzero()[0][0], pos]
+            pos_diff = (cmat != cmat_af).nonzero()[0]
+
+            # If they are the same, do nothing (we do not want useless backup files)
+            if len(pos_diff) == 0:
+                continue
+
+            # Too many differences are a bad sign
+            elif len(pos_diff) > 20:
+                raise ValueError('The two consensi are too different')
+
+            # Copy the consensus into a backup file
+            output_old_filename =  get_consensus_old_filename(data_folder, adaID, fragment)
+            output_filename =  get_consensus_filename(data_folder, adaID, fragment)
+            if os.path.isfile(output_old_filename):
+                os.remove(output_old_filename)
+                if VERBOSE:
+                    print 'Very old consensus removed'
+            shutil.copy(output_filename, output_old_filename)
+            if VERBOSE:
+                print 'Consensus copied to back-up file'
+
+            # Make the new consensus
+            consensus_new = SeqRecord(Seq(cmat_af.tostring(), consensus.seq.alphabet),
+                                      id=consensus.id, name=consensus.name,
+                                      description=consensus.description)
+
+            # Write to file
+            SeqIO.write(consensus_new,
+                        get_consensus_filename(data_folder, adaID, fragment),
+                        'fasta')
+            if VERBOSE:
+                print 'New consensus written'

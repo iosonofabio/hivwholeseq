@@ -26,7 +26,6 @@ JOBDIR = mapping.__path__[0].rstrip('/')+'/'
 JOBSCRIPT = JOBDIR+'filter_allele_frequencies.py'
 JOBLOGERR = JOBDIR+'logerr'
 JOBLOGOUT = JOBDIR+'logout'
-# Different times based on subsample flag
 cluster_time = '0:59:59'
 vmem = '2G'
 
@@ -35,7 +34,7 @@ vmem = '2G'
 
 
 # Functions
-def fork_self(miseq_run, adaID, fragment, subsample=False, VERBOSE=3):
+def fork_self(miseq_run, adaID, fragment, VERBOSE=3):
     '''Fork self for each adapter ID and fragment'''
     qsub_list = ['qsub','-cwd',
                  '-b', 'y',
@@ -51,8 +50,6 @@ def fork_self(miseq_run, adaID, fragment, subsample=False, VERBOSE=3):
                  '--fragments', fragment,
                  '--verbose', VERBOSE,
                 ]
-    if subsample:
-        qsub_list.append('--subsample')
     qsub_list = map(str, qsub_list)
     if VERBOSE:
         print ' '.join(qsub_list)
@@ -121,13 +118,11 @@ def filter_nus(counts, coverage):
     return nu_filtered
 
 
-def write_frequencies(data_folder, adaID, fragment, nu_filtered,
-                      subsample=False, VERBOSE=0):
+def write_frequencies(data_folder, adaID, fragment, nu_filtered, VERBOSE=0):
     '''Write the corrected allele frequencies to file'''
     if VERBOSE:
         print 'Storing allele frequencies to file:', adaID, fragment
-    nu_filtered.dump(get_allele_frequencies_filename(data_folder, adaID, fragment,
-                                                     subsample=subsample))
+    nu_filtered.dump(get_allele_frequencies_filename(data_folder, adaID, fragment))
 
 
 
@@ -144,8 +139,6 @@ if __name__ == '__main__':
                         help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
-    parser.add_argument('--subsample', action='store_true',
-                        help='Apply only to a subsample of the reads')
     parser.add_argument('--submit', action='store_true',
                         help='Execute the script in parallel on the cluster')
 
@@ -154,7 +147,6 @@ if __name__ == '__main__':
     adaIDs = args.adaIDs
     fragments = args.fragments
     VERBOSE = args.verbose
-    subsample = args.subsample
     submit = args.submit
 
     # Specify the dataset
@@ -179,8 +171,7 @@ if __name__ == '__main__':
 
             # Submit to the cluster self if requested
             if submit:
-                fork_self(data_folder, adaID, fragment,
-                          subsample=subsample, VERBOSE=VERBOSE)
+                fork_self(data_folder, adaID, fragment, VERBOSE=VERBOSE)
                 continue
 
             # Get coverage and counts
@@ -192,5 +183,5 @@ if __name__ == '__main__':
 
             # Write output
             write_frequencies(data_folder, adaID, fragment, nu_filtered,
-                              subsample=subsample, VERBOSE=VERBOSE)
+                              VERBOSE=VERBOSE)
 

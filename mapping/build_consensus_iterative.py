@@ -13,7 +13,6 @@ content:    Take reads mapped to HXB2, then build a consensus, then map
             must be taken here.
 '''
 #TODO: tidy up the F5a/b mess.
-# FIXME: something goes wrong for the fragment edges and run 37, adaIDs 2, 6, F1
 # Modules
 import os
 import subprocess as sp
@@ -40,11 +39,20 @@ from mapping.filenames import get_HXB2_fragmented, get_read_filenames,\
 
 
 # Globals
+# Stampy parameters
+stampy_gapopen = 60	        # Default: 40
+stampy_gapextend = 5 	    # Default: 3
+stampy_sensitive = True     # Default: False
+
 # Consensus building
-maxreads = 10000
-match_len_min = 20
+maxreads = 1e5
+match_len_min = 10
 trim_bad_cigars = 3
 coverage_min = 10
+# Minimal quality required for a base to be considered trustful (i.e. added to 
+# the allele counts), in phred score. Too high: lose coverage, too low: seq errors.
+# Reasonable numbers are between 30 and 36.
+qual_min = 30
 
 # Cluster submit
 import mapping
@@ -53,7 +61,7 @@ JOBLOGERR = JOBDIR+'logerr'
 JOBLOGOUT = JOBDIR+'logout'
 JOBSCRIPT = JOBDIR+'build_consensus_iterative.py'
 cluster_time = '0:59:59'
-vmem = '1G'
+vmem = '2G'
 interval_check = 10
 
 
@@ -172,7 +180,7 @@ def extract_reads_subsample(data_folder, adaID, fragment, n_reads, VERBOSE=0):
     # Pick random numbers among those
     # Get the random indices of the reads to store
     # (only from the middle of the file)
-    ind_store = np.arange(int(0.05 * n_reads_tot), int(0.95 * n_reads_tot))
+    ind_store = np.arange(int(0.00 * n_reads_tot), int(1 * n_reads_tot))
     np.random.shuffle(ind_store)
     ind_store = ind_store[:n_reads]
     ind_store.sort()
@@ -229,7 +237,6 @@ def make_index_and_hash(data_folder, adaID, fragment, n_iter, VERBOSE=0):
         call_list = [stampy_bin,
                      '--species="HIV adaID '+'{:02d}'.format(adaID)+' fragment '+fragment+'"',
                      '-G', get_index_file(data_folder, adaID, fragment, n_iter, ext=False),
-                     '--overwrite',
                      get_ref_file(data_folder, adaID, fragment, n_iter),
                     ]
         if VERBOSE >= 3:
@@ -241,7 +248,6 @@ def make_index_and_hash(data_folder, adaID, fragment, n_iter, VERBOSE=0):
         call_list = [stampy_bin,
                      '-g', get_index_file(data_folder, adaID, fragment, n_iter, ext=False),
                      '-H', get_hash_file(data_folder, adaID, fragment, n_iter, ext=False),
-                     '--overwrite',
                     ]
         if VERBOSE >= 3:
             print ' '.join(call_list)
@@ -278,11 +284,130 @@ def map_stampy(data_folder, adaID, fragment, n_iter, VERBOSE=0):
                                      n_iter, ext=False), 
                  '-o', output_filename,
                  '--substitutionrate='+subsrate,
-                 '--overwrite',
-                 '-M', input_filename]
+                 '--gapopen', stampy_gapopen,
+                 '--gapextend', stampy_gapextend]
+    if stampy_sensitive:
+        call_list.append('--sensitive')
+    call_list = call_list + ['-M', input_filename]
+    call_list = map(str, call_list)
     if VERBOSE >=2:
         print ' '.join(call_list)
     sp.call(call_list)
+
+
+def get_allele_counts_insertions_from_file(bamfilename, length,
+                                           maxreads=-1, VERBOSE=0):
+    '''Get the allele counts and insertions'''
+    # Prepare output structures
+    counts = np.zeros((len(read_types), len(alpha), length), int)
+    # Note: the data structure for inserts is a nested dict with:
+    # position --> string --> read type --> count
+    #  (dict)      (dict)       (list)      (int)
+    inserts = defaultdict(lambda: defaultdict(lambda: np.zeros(len(read_types), int)))
+
+    # Open BAM file
+    # Note: the reads should already be filtered of unmapped stuff at this point
+    with pysam.Samfile(bamfilename, 'rb') as bamfile:
+
+        # Iterate over single reads
+        for i, read in enumerate(bamfile):
+
+            # Max number of reads
+            if i == maxreads:
+                if VERBOSE >= 2:
+                    print 'Max reads reached:', maxreads
+                break
+        
+            # Print output
+            if (VERBOSE >= 3) and (not ((i +1) % 10000)):
+                print (i+1)
+
+            # NOTE: since we change the consensus all the time, mapping is never
+            # safe, and we have to filter the results thoroughly.
+
+            # If unmapped/unpaired, trash
+            if read.is_unmapped or (not read.is_proper_pair) or (read.isize == 0):
+                if VERBOSE >= 3:
+                        print 'Read '+read.qname+': unmapped/unpaired/no isize'
+                continue
+
+            # Get good CIGARs
+            (good_cigars, first_good_cigar, last_good_cigar) = \
+                    get_ind_good_cigars(read.cigar, match_len_min=match_len_min,
+                                        full_output=True)
+
+            # If no good CIGARs, give up
+            if not good_cigars.any():
+                continue
+                    
+            # Divide by read 1/2 and forward/reverse
+            js = 2 * read.is_read2 + read.is_reverse
+        
+            # Read CIGARs
+            seq = np.fromstring(read.seq, 'S1')
+            qual = np.fromstring(read.qual, np.int8) - 33
+            pos = read.pos
+            cigar = read.cigar
+            len_cig = len(cigar)            
+
+            # Iterate over CIGARs
+            for ic, (block_type, block_len) in enumerate(cigar):
+
+                # Check for pos: it should never exceed the length of the fragment
+                if (block_type in [0, 1, 2]) and (pos > length):
+                    raise ValueError('Pos exceeded the length of the fragment')
+            
+                # Inline block
+                if block_type == 0:
+                    # Keep only stuff from good CIGARs
+                    if first_good_cigar <= ic <= last_good_cigar:
+                        seqb = seq[:block_len]
+                        qualb = qual[:block_len]
+                        # Increment counts
+                        for j, a in enumerate(alpha):
+                            posa = ((seqb == a) & (qualb >= qual_min)).nonzero()[0]
+                            if len(posa):
+                                counts[js, j, pos + posa] += 1
+            
+                    # Chop off this block
+                    if ic != len_cig - 1:
+                        seq = seq[block_len:]
+                        qual = qual[block_len:]
+                        pos += block_len
+            
+                # Deletion
+                elif block_type == 2:
+                    # Keep only stuff from good CIGARs
+                    if first_good_cigar <= ic <= last_good_cigar:
+
+                        # Increment gap counts
+                        counts[js, 4, pos:pos + block_len] += 1
+            
+                    # Chop off pos, but not sequence
+                    pos += block_len
+            
+                # Insertion
+                # an insert @ pos 391 means that seq[:391] is BEFORE the insert,
+                # THEN the insert, FINALLY comes seq[391:]
+                elif block_type == 1:
+                    # Keep only stuff from good CIGARs
+                    if first_good_cigar <= ic <= last_good_cigar:
+                        seqb = seq[:block_len]
+                        qualb = qual[:block_len]
+                        # Accept only high-quality inserts
+                        if (qualb >= qual_min).all():
+                            inserts[pos][seqb.tostring()][js] += 1
+            
+                    # Chop off seq, but not pos
+                    if ic != len_cig - 1:
+                        seq = seq[block_len:]
+                        qual = qual[block_len:]
+            
+                # Other types of cigar?
+                else:
+                    raise ValueError('CIGAR type '+str(block_type)+' not recognized')
+
+    return (counts, inserts)
 
 
 def make_consensus(data_folder, adaID, fragment, n_iter, qual_min=20, VERBOSE=0):
@@ -314,115 +439,9 @@ def make_consensus(data_folder, adaID, fragment, n_iter, qual_min=20, VERBOSE=0)
     bamfilename = get_mapped_filename(data_folder, adaID, frag_out, n_iter)
     if not os.path.isfile(bamfilename):
         convert_sam_to_bam(bamfilename)
-    with pysam.Samfile(bamfilename, 'rb') as bamfile:
 
-        # Iterate over pairs of reads
-        for i_pairs, reads in enumerate(pair_generator(bamfile)):
-
-            # Set read1 and read2
-            (read1, read2) = reads
-
-            # Check a few things to make sure we are looking at paired reads
-            if read1.qname != read2.qname:
-                raise ValueError('Read pair '+str(i_pairs)+': reads have different names!')
-
-            # Ignore unmapped reads
-            if (read1.is_unmapped or (not read1.is_proper_pair)
-                or read2.is_unmapped or (not read2.is_proper_pair)):
-                continue
-
-            # Limit to the first reads
-            if 2 * i_pairs >= maxreads: break
-
-            # What to do with bad CIGARs? Shall we skip both?
-
-            # Cover both reads of the pair
-            for i_within_pair, read in enumerate(reads):
-            
-                # Divide by read 1/2 and forward/reverse
-                js = 2 * read.is_read2 + read.is_reverse
-            
-                # Read CIGAR code for indels, and anayze each block separately
-                # Note: some reads are weird ligations of HIV and contaminants
-                # (e.g. fosmid plasmids). Those always have crazy CIGARs, because
-                # only the HIV part maps. We hence trim away short indels from the
-                # end of reads (this is still unbiased).
-                cigar = read.cigar
-                len_cig = len(cigar)
-                (good_cigars,
-                 first_good_cigar,
-                 last_good_cigar) = get_ind_good_cigars(cigar,
-                                                        match_len_min=match_len_min,
-                                                        full_output=True)
-            
-                # Sequence and position
-                # Note: stampy takes the reverse complement already
-                seq = np.fromstring(read.seq, 'S1')
-                qual = np.fromstring(read.qual, np.int8) - 33
-                pos = read.pos
-
-                # Iterate over CIGARs
-                for ic, (block_type, block_len) in enumerate(cigar):
-
-                    # Check for pos: it should never exceed the length of the fragment
-                    if (block_type in [0, 1, 2]) and (pos > len(ref)):
-                        raise ValueError('Pos exceeded the length of the fragment')
-            
-                    # Inline block
-                    if block_type == 0:
-                        # Exclude bad CIGARs
-                        if good_cigars[ic]: 
-            
-                            # The first and last good CIGARs are matches: trim them (unless they end the read)
-                            if (ic == first_good_cigar) and (ic != 0): trim_left = trim_bad_cigars
-                            else: trim_left = 0
-                            if (ic == last_good_cigar) and (ic != len_cig - 1): trim_right = trim_bad_cigars
-                            else: trim_right = 0
-            
-                            seqb = seq[trim_left:block_len - trim_right]
-                            qualb = qual[trim_left:block_len - trim_right]
-                            # Increment counts
-                            for j, a in enumerate(alpha):
-                                posa = ((seqb == a) & (qualb >= qual_min)).nonzero()[0]
-                                if len(posa):
-                                    counts[js, j, pos + trim_left + posa] += 1
-            
-                        # Chop off this block
-                        if ic != len_cig - 1:
-                            seq = seq[block_len:]
-                            qual = qual[block_len:]
-                            pos += block_len
-            
-                    # Deletion
-                    elif block_type == 2:
-                        # Exclude bad CIGARs
-                        if good_cigars[ic]: 
-                            # Increment gap counts
-                            counts[js, 4, pos:pos + block_len] += 1
-            
-                        # Chop off pos, but not sequence
-                        pos += block_len
-            
-                    # Insertion
-                    # an insert @ pos 391 means that seq[:391] is BEFORE the insert,
-                    # THEN the insert, FINALLY comes seq[391:]
-                    elif block_type == 1:
-                        # Exclude bad CIGARs
-                        if good_cigars[ic]: 
-                            seqb = seq[:block_len]
-                            qualb = qual[:block_len]
-                            # Take only high-quality inserts
-                            if (qualb >= qual_min).all():
-                                inserts[pos][seqb.tostring()][js] += 1
-            
-                        # Chop off seq, but not pos
-                        if ic != len_cig - 1:
-                            seq = seq[block_len:]
-                            qual = qual[block_len:]
-            
-                    # Other types of cigar?
-                    else:
-                        raise ValueError('CIGAR type '+str(block_type)+' not recognized')
+    # Call lower-level function (NOTE: no CIGAR filtering at this time!)
+    (counts, inserts) = get_allele_counts_insertions_from_file(bamfilename, len(refseq))
 
     # Build consensus
     # Make allele count consensi for each of the four categories
@@ -432,7 +451,7 @@ def make_consensus(data_folder, adaID, fragment, n_iter, qual_min=20, VERBOSE=0)
         # (this should happen only at the ends)
         count.T[(count).sum(axis=0) == 0] = np.array([0, 0, 0, 0, 0, 1])
         consensi[js] = alpha[count.argmax(axis=0)]
-        
+
     # Make final consensus
     # This has two steps: 1. counts; 2. inserts
     # We should check that different read types agree (e.g. forward/reverse) on
@@ -556,6 +575,16 @@ def make_consensus(data_folder, adaID, fragment, n_iter, qual_min=20, VERBOSE=0)
     consensus_final = ''.join(consensus_final).strip('N')
     consensus_final = re.sub('-', '', consensus_final)
 
+
+    ## FIXME
+    #motif = 'TGCCTTGGAA'
+    #pos = consensi[0].tostring().find(motif) + len(motif)
+    #print n_iter
+    #print motif
+    #print consensi[0].tostring()[pos-len(motif): pos + 1]
+    #print counts[:, :, pos]
+    #import ipdb; ipdb.set_trace()
+
     return refseq, consensus_final
 
 
@@ -566,7 +595,7 @@ def check_new_old_consensi(refseq, consensus):
     return match
 
 
-def write_consensus(data_folder, adaID, fragment, n_iter, consensus, final=False):
+def write_consensus_intermediate(data_folder, adaID, fragment, n_iter, consensus):
     '''Write consensus sequences into FASTA'''
     # There are two sets of primers for fragment F5
     if 'F5' in fragment:
@@ -577,37 +606,51 @@ def write_consensus(data_folder, adaID, fragment, n_iter, consensus, final=False
     name = 'adaID_'+'{:02d}'.format(adaID)+'_'+frag_out+'_consensus'
     consensusseq = SeqRecord(Seq(consensus),
                              id=name, name=name)
-    if final:
-        outfile = get_consensus_filename(data_folder, adaID, frag_out, trim_primers=True)
-    else:
-        outfile = get_ref_file(data_folder, adaID, frag_out, n_iter+1)
+    outfile = get_ref_file(data_folder, adaID, frag_out, n_iter+1)
     SeqIO.write(consensusseq, outfile, 'fasta')
 
     # In addition, cumulate all consensi in one file for checking purposes,
-    if not final:
-        outfile = get_refcum_file(data_folder, adaID, frag_out)
-        if n_iter == 0:
-            SeqIO.write(SeqIO.read(get_ref_file(data_folder, adaID, fragment, 0), 'fasta'),
-                        outfile, 'fasta')
+    outfile = get_refcum_file(data_folder, adaID, frag_out)
+    # If it's the first iteration, write the reference too
+    if n_iter == 1:
+        SeqIO.write(SeqIO.read(get_ref_file(data_folder, adaID, fragment, 0), 'fasta'),
+                    outfile, 'fasta')
+    consensusseq.name = consensusseq.id = consensusseq.name+'_'+str(n_iter)
+    with open(outfile, 'a') as f:
+        SeqIO.write(consensusseq, f, 'fasta')
 
-        consensusseq.name = consensusseq.id = consensusseq.name+'_'+str(n_iter)
-        with open(outfile, 'a') as f:
-            SeqIO.write(consensusseq, f, 'fasta')
 
-    # at the end, align all consensi via muscle
+def write_consensus_final(data_folder, adaID, fragment, consensus):
+    '''Write the final consensus'''
+    # There are two sets of primers for fragment F5
+    if 'F5' in fragment:
+        frag_out = 'F5'
     else:
-        seqs_iter = SeqIO.parse(get_refcum_file(data_folder, adaID, frag_out),
-                                'fasta')
-        ali = align_muscle(*(list(seqs_iter)))
-        AlignIO.write(ali, get_refcum_file(data_folder, adaID, frag_out), 'fasta')
+        frag_out = fragment
+
+    # Get the consensus
+    name = 'adaID_'+'{:02d}'.format(adaID)+'_'+frag_out+'_consensus'
+    consensusseq = SeqRecord(Seq(consensus), id=name, name=name)
+
+    # Output file
+    outfile = get_consensus_filename(data_folder, adaID, frag_out, trim_primers=True)
+
+    # Write output
+    SeqIO.write(consensusseq, outfile, 'fasta')
+
+    # Align all consensi via muscle and store
+    seqs = list(SeqIO.parse(get_refcum_file(data_folder, adaID, frag_out), 'fasta'))
+    ali = align_muscle(*seqs)
+    AlignIO.write(ali, get_refcum_file(data_folder, adaID, frag_out), 'fasta')
+
 
 
 
 # Script
 if __name__ == '__main__':
 
-    # Parse input args: this is used to call itself recursively
-    parser = argparse.ArgumentParser(description='Map HIV reads recursively')
+    # Parse input args
+    parser = argparse.ArgumentParser(description='Build consensus, iteratively')
     parser.add_argument('--run', type=int, required=True,
                         help='MiSeq run to analyze (e.g. 28, 37)')
     parser.add_argument('--adaIDs', nargs='*', type=int,
@@ -668,7 +711,7 @@ if __name__ == '__main__':
             # Build first consensus and save to file
             refseq, consensus = make_consensus(data_folder, adaID, fragment, 0,
                                                VERBOSE=VERBOSE)
-            write_consensus(data_folder, adaID, fragment, 0, consensus, final=False)
+            write_consensus_intermediate(data_folder, adaID, fragment, 0, consensus)
 
             # NOTE: we assume the consensus is different from HXB2, so we do not
             # check any further and do at least one more iteration
@@ -685,30 +728,30 @@ if __name__ == '__main__':
                 map_stampy(data_folder, adaID, fragment, n_iter, VERBOSE=VERBOSE)
 
                 # Build consensus
-                refseq, consensus = make_consensus(data_folder, adaID, fragment, n_iter,
-                                                   VERBOSE=VERBOSE)
+                refseq, consensus = make_consensus(data_folder, adaID, fragment,
+                                                   n_iter, VERBOSE=VERBOSE)
 
                 # Save consensus to file
-                write_consensus(data_folder, adaID, fragment, n_iter, consensus,
-                                final=False)
+                write_consensus_intermediate(data_folder, adaID, fragment, n_iter, consensus)
 
                 # Check whether the old and new consensi match
                 match = check_new_old_consensi(refseq, consensus)
 
                 # Start a new round
                 if (not match) and (n_iter + 1 < iterations_max):
-                        n_iter += 1
-                        if VERBOSE:
-                            print 'Starting again for iteration '+str(n_iter) 
+                    n_iter += 1
+                    if VERBOSE:
+                        print 'Starting again for iteration '+str(n_iter) 
 
                 # or terminate
                 else:
-                    write_consensus(data_folder, adaID, fragment, n_iter, consensus,
-                                    final=True)
+                    write_consensus_final(data_folder, adaID, fragment, consensus)
                     if VERBOSE:
                         if match:
-                            print 'Consensus converged at iteration '+str(n_iter)+': adaID', adaID, fragment 
+                            print 'Consensus converged at iteration '+str(n_iter)+\
+                                    ': adaID', adaID, fragment 
                         else:
-                            print 'Maximal number of iterations reached: adaID', adaID, fragment
+                            print 'Maximal number of iterations reached: adaID', \
+                                    adaID, fragment
                     
                     break 

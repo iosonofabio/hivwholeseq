@@ -21,7 +21,6 @@ from mapping.filenames import get_consensus_filename, get_mapped_filename, \
         get_filter_mapped_summary_filename
 from mapping.mapping_utils import get_ind_good_cigars, convert_sam_to_bam,\
         pair_generator, get_range_good_cigars
-from mapping.primer_info import primers_inner
 
 
 
@@ -37,7 +36,7 @@ JOBLOGERR = JOBDIR+'logerr'
 JOBLOGOUT = JOBDIR+'logout'
 JOBSCRIPT = JOBDIR+'filter_mapped_reads.py'
 cluster_time = '0:59:59'
-vmem = '1G'
+vmem = '2G'
 
 
 
@@ -144,8 +143,6 @@ def trim_bad_cigar(reads, match_len_min=match_len_min,
 
 def filter_reads(data_folder, adaID, fragment, VERBOSE=0):
     '''Filter the reads to good chunks'''
-    from Bio import pairwise2
-
     # Resolve ambiguous fragment primers
     if fragment in ['F5a', 'F5b']:
         frag_gen = 'F5'
@@ -156,29 +153,6 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0):
     reffilename = get_consensus_filename(data_folder, adaID, frag_gen, trim_primers=True)
     refseq = SeqIO.read(reffilename, 'fasta')
     ref = np.array(refseq)
-
-    # Get the coordinate of the inner PCR primers in this consensus via local
-    # alignment
-    primer_fwd, primer_rev = primers_inner[fragment]
-    len_localali = 30
-    ref_fwd = str(refseq.seq)[:len_localali]
-    ref_rev = str(refseq.seq)[-len_localali:]
-    ali_fwd = pairwise2.align.localms(ref_fwd, primer_fwd, 2, -1, -1.5, -0.1)[0][:2]
-    primer_fwd_end = len(ref_fwd) - ali_fwd[1][::-1].index(primer_fwd[-1])
-    primer_fwd_end -= ali_fwd[0][:primer_fwd_end].count('-')
-
-    # The reverse primer works, well, the other way around
-    ali_rev = pairwise2.align.localms(ref_rev, primer_rev, 2, -1, -1.5, -0.1)[0][:2]
-    primer_rev_start = len(ref) - len(ref_rev) + ali_rev[1].index(primer_rev[0])
-    primer_rev_start += ref_rev[len(ref_rev) - len(ref) + primer_rev_start:].count('-')
-
-    if VERBOSE >= 3:
-        print 'consensus:', ali_fwd[0], '|', ali_rev[0]
-        print 'primers:  ', ali_fwd[1], '|', ali_rev[1]
-
-    # Give decent names
-    start_nonprimer = primer_fwd_end
-    end_nonprimer = primer_rev_start
 
     # Get BAM files
     bamfilename = get_mapped_filename(data_folder, adaID, frag_gen, type='bam',
@@ -197,6 +171,7 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0):
  
             # Iterate over all pairs
             n_good = 0
+            n_wrongname = 0
             n_unmapped = 0
             n_unpaired = 0
             n_mutator = 0
@@ -215,7 +190,9 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0):
             
                 # Check a few things to make sure we are looking at paired reads
                 if read1.qname != read2.qname:
+                    n_wrongname += 1
                     raise ValueError('Read pair '+str(irp)+': reads have different names!')
+
                 # Ignore unmapped reads
                 elif read1.is_unmapped or read2.is_unmapped:
                     if VERBOSE >= 2:
@@ -270,7 +247,6 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0):
                     if trash:
                         n_badcigar += 1
                         skip = True
-                        break
 
                 # Write the output
                 if skip:

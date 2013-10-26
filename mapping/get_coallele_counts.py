@@ -38,14 +38,13 @@ JOBDIR = mapping.__path__[0].rstrip('/')+'/'
 JOBSCRIPT = JOBDIR+'get_coallele_counts.py'
 JOBLOGERR = JOBDIR+'logerr'
 JOBLOGOUT = JOBDIR+'logout'
-# Different times based on subsample flag
-cluster_time = ['23:59:59', '0:59:59']
+cluster_time = '0:59:59'
 vmem = '8G'
 
 
 
 # Functions
-def fork_self(data_folder, adaID, fragment, subsample=False, VERBOSE=3):
+def fork_self(data_folder, adaID, fragment, VERBOSE=3):
     '''Fork self for each adapter ID and fragment'''
     qsub_list = ['qsub','-cwd',
                  '-b', 'y',
@@ -53,27 +52,25 @@ def fork_self(data_folder, adaID, fragment, subsample=False, VERBOSE=3):
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
                  '-N', 'cac '+'{:02d}'.format(adaID)+' '+fragment,
-                 '-l', 'h_rt='+cluster_time[subsample],
+                 '-l', 'h_rt='+cluster_time,
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
                  '--adaIDs', adaID,
                  '--fragments', fragment,
                  '--verbose', VERBOSE,
                 ]
-    if subsample:
-        qsub_list.append('--subsample')
     qsub_list = map(str, qsub_list)
     if VERBOSE:
         print ' '.join(qsub_list)
     sp.call(qsub_list)
 
 
-def get_coallele_counts(data_folder, adaID, fragment, subsample=False, VERBOSE=0):
+def get_coallele_counts(data_folder, adaID, fragment, VERBOSE=0):
     '''Extract allele and insert counts from a bamfile'''
 
     # Read reference
     reffilename = get_consensus_filename(data_folder, adaID, fragment,
-                                         subsample=subsample, trim_primers=True)
+                                         trim_primers=True)
     refseq = SeqIO.read(reffilename, 'fasta')
     
     # Allele counts and inserts (TODO: compress this data?)
@@ -183,16 +180,14 @@ def get_coallele_counts(data_folder, adaID, fragment, subsample=False, VERBOSE=0
     return counts
 
 
-def write_output_files(data_folder, adaID, fragment,
-                       counts, subsample=False, VERBOSE=0):
+def write_output_files(data_folder, adaID, fragment, counts, VERBOSE=0):
     '''Write coallele counts to file'''
     if VERBOSE >= 1:
         print 'Write to file: '+'{:02d}'.format(adaID)+' '+fragment
 
     # Save counts and coverage
     # TODO: use compressed files?
-    counts.dump(get_coallele_counts_filename(data_folder, adaID, fragment,
-                                             subsample=subsample))
+    counts.dump(get_coallele_counts_filename(data_folder, adaID, fragment))
 
 
 
@@ -207,8 +202,6 @@ if __name__ == '__main__':
                         help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
-    parser.add_argument('--subsample', action='store_true',
-                        help='Apply only to a subsample of the reads')
     parser.add_argument('--submit', action='store_true',
                         help='Execute the script in parallel on the cluster')
 
@@ -216,7 +209,6 @@ if __name__ == '__main__':
     adaIDs = args.adaIDs
     fragments = args.fragments
     VERBOSE = args.verbose
-    subsample = args.subsample
     submit = args.submit
 
     # If the script is called with no adaID, iterate over all
@@ -237,17 +229,16 @@ if __name__ == '__main__':
 
             # Submit to the cluster self if requested
             if submit:
-                fork_self(data_folder, adaID, fragment,
-                          subsample=subsample, VERBOSE=VERBOSE)
+                fork_self(data_folder, adaID, fragment, VERBOSE=VERBOSE)
                 continue
 
             # Get cocounts
             cocounts = get_coallele_counts(data_folder, adaID, fragment,
-                                           subsample=subsample, VERBOSE=VERBOSE)
+                                           VERBOSE=VERBOSE)
 
             ## Check using the allele counts and the diagonal cocounts
             #counts, _ = get_allele_counts(data_folder, adaID, fragment,
-            #                              subsample=subsample, VERBOSE=VERBOSE,
+            #                              VERBOSE=VERBOSE,
             #                              maxreads=2 * maxreads)
 
             #cocount = cocounts.sum(axis=0)
@@ -255,7 +246,7 @@ if __name__ == '__main__':
 
             ## Read reference
             #reffilename = get_consensus_filename(data_folder, adaID, fragment,
-            #                                     subsample=subsample, trim_primers=True)
+            #                                     trim_primers=True)
             #refseq = SeqIO.read(reffilename, 'fasta')
             #ref = np.array(refseq)
             #refi = np.array([(alpha == a).nonzero()[0][0] for a in ref], int)
@@ -267,5 +258,5 @@ if __name__ == '__main__':
 
             # Save to file
             write_output_files(data_folder, adaID, fragment,
-                               cocounts, subsample=subsample, VERBOSE=VERBOSE)
+                               cocounts, VERBOSE=VERBOSE)
 

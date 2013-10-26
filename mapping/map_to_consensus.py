@@ -67,7 +67,7 @@ def fork_self(miseq_run, adaID, fragment, VERBOSE=3, bwa=False, threads=1,
     if bwa:
         qsub_list.append('--bwa')
     if filter_reads:
-        qsub.append('--filter')
+        qsub_list.append('--filter')
     qsub_list = map(str, qsub_list)
     if VERBOSE:
         print ' '.join(qsub_list)
@@ -116,24 +116,28 @@ def make_output_folders(data_folder, adaID, VERBOSE=0, bwa=False):
 
 def make_index_and_hash(data_folder, adaID, fragment, VERBOSE=0):
     '''Make index and hash files for consensus'''
+    # NOTE: we can use --overwrite here, because there is no concurrency (every
+    # job has its own hash)
     # 1. Make genome index file
-    if VERBOSE:
-        print 'Build index: '+'{:02d}'.format(adaID)+' '+fragment
-    sp.call([stampy_bin,
-             '--overwrite',
-             '--species="HIV fragment '+fragment+'"',
-             '-G', get_index_file(data_folder, adaID, fragment, ext=False),
-             get_consensus_filename(data_folder, adaID, fragment, trim_primers=True),
-             ])
+    if not os.path.isfile(get_index_file(data_folder, adaID, fragment, ext=True)):
+        sp.call([stampy_bin,
+                 '--species="HIV fragment '+fragment+'"',
+                 '--overwrite',
+                 '-G', get_index_file(data_folder, adaID, fragment, ext=False),
+                 get_consensus_filename(data_folder, adaID, fragment, trim_primers=True),
+                 ])
+        if VERBOSE:
+            print 'Built index: '+'{:02d}'.format(adaID)+' '+fragment
     
     # 2. Build a hash file
-    if VERBOSE:
-        print 'Build hash: '+'{:02d}'.format(adaID)+' '+fragment
-    sp.call([stampy_bin,
-             '--overwrite',
-             '-g', get_index_file(data_folder, adaID, fragment, ext=False),
-             '-H', get_hash_file(data_folder, adaID, fragment, ext=False),
-             ])
+    if not os.path.isfile(get_hash_file(data_folder, adaID, fragment, ext=True)):
+        sp.call([stampy_bin,
+                 '--overwrite',
+                 '-g', get_index_file(data_folder, adaID, fragment, ext=False),
+                 '-H', get_hash_file(data_folder, adaID, fragment, ext=False),
+                 ])
+        if VERBOSE:
+            print 'Built hash: '+'{:02d}'.format(adaID)+' '+fragment
 
 
 def make_bwa_hash(data_folder, adaID, fragment, VERBOSE=0):
@@ -382,7 +386,7 @@ if __name__ == '__main__':
 
     # If the script is called with no adaID, iterate over all
     if not adaIDs:
-        adaIDs = load_adapter_table(data_folder)['ID']
+        adaIDs = MiSeq_runs[miseq_run]['adapters']
     if VERBOSE >= 3:
         print 'adaIDs', adaIDs
 
@@ -396,8 +400,9 @@ if __name__ == '__main__':
     for adaID in adaIDs:
 
         # Make output folders if necessary
-        make_output_folders(data_folder, adaID)
+        make_output_folders(data_folder, adaID, VERBOSE=VERBOSE)
 
+        # Iterate over fragments
         for fragment in fragments:
 
             # Submit to the cluster self if requested
@@ -424,8 +429,7 @@ if __name__ == '__main__':
                         VERBOSE=VERBOSE)
     
             # Make stampy hashes
-            make_index_and_hash(data_folder, adaID, fragment,
-                                VERBOSE=VERBOSE)
+            make_index_and_hash(data_folder, adaID, fragment, VERBOSE=VERBOSE)
             
             # Map via stampy afterwards
             map_stampy(data_folder, adaID, frag_full,
