@@ -8,7 +8,6 @@ content:    Calculate the number of reads that cover a certain set of positions.
             actually covered both such that they could have given rise to such a
             signal?
 '''
-# FIXME: modernize!
 # Modules
 import os
 import argparse
@@ -17,22 +16,75 @@ import pysam
 import numpy as np
 from Bio import SeqIO
 
+from mapping.datasets import MiSeq_runs
 from mapping.adapter_info import load_adapter_table
-from mapping.filenames import get_last_reference, get_last_mapped
+from mapping.filenames import get_mapped_filename
 from mapping.mapping_utils import get_ind_good_cigars, pair_generator
 
 
 
 # Globals
-VERBOSE = 1
 
-# FIXME
-from mapping.datasets import dataset_testmiseq as dataset
-data_folder = dataset['folder']
 
-maxreads = 5000000    #FIXME
-match_len_min = 30
-trim_bad_cigars = 3
+
+# Functions
+def format_tuples(tuples):
+    '''Format input arguments for tules'''
+    try:
+        # Note: the first element is the fragment
+        mtuples = map(lambda x: np.array(x.split(' '), int), tuples)
+    except ValueError:
+        raise ValueError('Tuple format not recognized. '\
+                         "Example: "+os.path.basename(__file__)+\
+                         " '2 56 78' '5 10 20 30'")
+    return mtuples
+
+
+def get_coverage_tuples(data_folder, adaID, fragment, mtuples,
+                       maxreads=-1, VERBOSE=0):
+    '''Get the joint coverage of a list of positions'''
+    # Prepare data structures
+    mtuples = [np.asarray(tup, int) for tup in mtuples]
+    coverage = np.zeros(len(mtuples), int)
+
+    # TODO: what to do if it is covered multiple times? or only some sites?
+    covs_pair = [np.zeros(len(tup), bool) for tup in mtuples]
+
+    # Open BAM
+    bamfilename = get_mapped_filename(data_folder, adaID, fragment, type='bam',
+                                      filtered=True)
+    if not os.path.isfile(bamfilename):
+        convert_sam_to_bam(bamfilename)
+    with pysam.Samfile(bamfilename, 'rb') as bamfile:
+    
+        # Iterate over all pairs
+        for irp, reads in enumerate(pair_generator(bamfile)):
+
+            # Limit to the first reads
+            if irp == maxreads:
+                if VERBOSE:
+                    print 'Max reads reached:', maxreads
+                break
+
+            # Reinitialize temporary structure
+            for cov_pair in covs_pair: cov_pair[:] = False
+
+            # Look in both reads
+            for read in reads:
+
+                # NOTE: deletions count as covered, because in principle
+                # we see that part of the reference
+                ref_start = read.pos
+                ref_end = ref_start + sum(bl for (bt, bl) in read.cigar if bt in (0, 2))
+                for cov_pair, mtuple in izip(covs_pair, mtuples):
+                    cov_pair[(mtuple >= ref_start) & (mtuple < ref_end)] = True
+
+            # Check which tuples are fully covered
+            for i, cov_pair in enumerate(covs_pair):
+                if cov_pair.all():
+                    coverage[i] += 1
+
+    return coverage 
 
 
 
@@ -40,119 +92,34 @@ trim_bad_cigars = 3
 if __name__ == '__main__':
 
     # Input arguments
-    parser = argparse.ArgumentParser(description='Extract linkage information')
-    parser.add_argument('--adaID', metavar='00', type=int, required=True,
-                        help='Adapter ID sample to analyze')
+    parser = argparse.ArgumentParser(description='Get coverage of multiple sites')
+    parser.add_argument('--run', type=int, required=True,
+                        help='MiSeq run to analyze (e.g. 28, 37)')
+    parser.add_argument('--adaID', type=int, required=True,
+                        help='Adapter ID to analyze (e.g. 2)')
+    parser.add_argument('--fragment', required=True,
+                        help='Fragment to analyze (e.g. F1)')
+    parser.add_argument('-n', type=int, default=-1,
+                        help='Number of read pairs to analyze')
+    parser.add_argument('--verbose', type=int, default=0,
+                        help='Verbosity level [0-3]')
     # Example: coverage_tuples.py --adaID 02 '5 30 56' '58 43 89'
-    parser.add_argument('tuples', nargs='+',
-                        help="'fragment1 tuple1' ['fragment2 tuple2' ...]")
+    parser.add_argument('--tuples', nargs='+', required=True,
+                        metavar=("'pos1 pos2 ...'", "'pos3 pos4 ...'"),
+                        help="Tuples to analyze (e.g. '3 45 98' '54 62'")
+
     args = parser.parse_args()
+    miseq_run = args.run
     adaID = args.adaID
-    try:
-        # Note: the first element is the fragment
-        mtuples = map(lambda x: np.array(x.split(' '), int), args.tuples)
-    except ValueError:
-        raise ValueError('Tuple format not recognized. '\
-                         "Example: "+os.path.basename(__file__)+\
-                         " '2 56 78' '5 10 20 30'")
+    fragment = args.fragment
+    n_pairs = args.n
+    VERBOSE = args.verbose
+    mtuples = format_tuples(args.tuples)
 
-    # Open BAM
-    bamfilename = get_last_mapped(data_folder, adaID, type='bam')
-    # Try to convert to BAM if needed
-    if not os.path.isfile(bamfilename):
-        samfile = pysam.Samfile(bamfilename[:-3]+'sam', 'r')
-        bamfile = pysam.Samfile(bamfilename, 'wb', template=samfile)
-        for s in samfile:
-            bamfile.write(s)
-    bamfile = pysam.Samfile(bamfilename, 'rb')
+    # Specify the dataset
+    dataset = MiSeq_runs[miseq_run]
+    data_folder = dataset['folder']
 
-    # Chromosome list
-    chromosomes = bamfile.references
-    
-    # Read reference (fragmented)
-    refseqs_raw = list(SeqIO.parse(get_last_reference(data_folder, adaID, ext=True),
-                                   'fasta'))
-    # Sort according to the chromosomal ordering
-    refseqs = []
-    for chromosome in chromosomes:
-        for seq in refseqs_raw:
-            if chromosome == seq.id:
-                refseqs.append(seq)
-                break
-    refs = [np.array(refseq) for refseq in refseqs]
-
-    # Prepare data structures
-    coverage = np.zeros(len(mtuples), int)
-
-    # Iterate over all pairs
-    for i_pairs, reads in enumerate(pair_generator(bamfile)):
-
-        # Limit to the first reads
-        if 2 * i_pairs >= maxreads: break
-
-        # Assign names
-        read1 = reads[0]
-        read2 = reads[1]
-
-        # Check a few things to make sure we are looking at paired reads
-        if read1.qname != read2.qname:
-            raise ValueError('Read pair '+str(i_pairs)+': reads have different names!')
-
-        # Ignore unmapped reads
-        if (read1.is_unmapped or (not read1.is_proper_pair)
-            or read2.is_unmapped or (not read2.is_proper_pair)):
-            continue
-
-        # Make a list of covered sites for the read_pair (some might be covered
-        # more than once)
-        covered_read = [np.zeros(len(x) - 1, int) for x in mtuples]
-        for read in reads:
-
-            # Find out on what chromosome the read has been mapped
-            fragment = read.tid
-            ref = refs[fragment]
-
-            seq = read.seq
-            good_cigar = get_ind_good_cigars(read.cigar,
-                                             match_len_min=match_len_min)
-
-            # The following two indices indicate the block position in the read
-            # and in the reference sequence. Because of indels, they are updated
-            # separately
-            pos_read = 0
-            pos_ref = read.pos
-
-            # TODO: include indels as 'mutations'
-            # TODO: include CIGAR trimming (we should really filter them out!)
-            for (block_type, block_len), is_good in izip(read.cigar, good_cigar):
-                # Match
-                if block_type == 0:
-                    if is_good:
-                        for it, (mtuple, covt) in enumerate(izip(mtuples, covered_read)):
-                            covt += (fragment == mtuple[0]) &\
-                                    (pos_ref <= mtuple[1:]) &\
-                                    (pos_ref + block_len > mtuple[1:])
-
-                    pos_read += block_len
-                    pos_ref += block_len
-
-                # Deletion
-                elif block_type == 2:
-                    pos_ref += block_len
-
-                # Insert
-                elif block_type == 1:
-                    pos_read += block_len
-
-                # Other types of cigar?
-                else:
-                    raise ValueError('CIGAR type '+str(block_type)+' not recognized')
-
-            # TODO: the problem is mismapped reads!
-
-
-        # Check which tuples are fully covered
-        for it, covt in enumerate(covered_read):
-            coverage[it] += covt.min()
-
-    print coverage 
+    # Get the coverage
+    coverage = get_coverage_tuples(data_folder, adaID, fragment, mtuples,
+                                   maxreads=n_pairs, VERBOSE=VERBOSE)
