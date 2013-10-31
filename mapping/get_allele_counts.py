@@ -97,11 +97,9 @@ def get_allele_counts_insertions_from_file(bamfilename, length,
             seq = np.fromstring(read.seq, 'S1')
             qual = np.fromstring(read.qual, np.int8) - 33
             pos = read.pos
-            cigar = read.cigar
-            len_cig = len(cigar)            
 
             # Iterate over CIGARs
-            for ic, (block_type, block_len) in enumerate(cigar):
+            for ic, (block_type, block_len) in enumerate(read.cigar):
 
                 # Check for pos: it should never exceed the length of the fragment
                 if (block_type in [0, 1, 2]) and (pos >= length):
@@ -118,7 +116,7 @@ def get_allele_counts_insertions_from_file(bamfilename, length,
                             counts[js, j, pos + posa] += 1
             
                     # Chop off this block
-                    if ic != len_cig - 1:
+                    if ic != len(read.cigar) - 1:
                         seq = seq[block_len:]
                         qual = qual[block_len:]
                         pos += block_len
@@ -142,7 +140,7 @@ def get_allele_counts_insertions_from_file(bamfilename, length,
                         inserts[pos][seqb.tostring()][js] += 1
             
                     # Chop off seq, but not pos
-                    if ic != len_cig - 1:
+                    if ic != len(read.cigar) - 1:
                         seq = seq[block_len:]
                         qual = qual[block_len:]
             
