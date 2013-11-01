@@ -13,8 +13,9 @@ from mapping.datasets import MiSeq_runs
 from mapping.miseq import read_types
 from mapping.reference import load_HXB2
 from mapping.filenames import get_divided_filenames
-from mapping.get_allele_counts import get_allele_counts_insertions_from_file
+from mapping.one_site_statistics import get_allele_counts_insertions_from_file
 from mapping.minor_allele_frequency import get_minor_allele_counts
+
 
 
 # Functions

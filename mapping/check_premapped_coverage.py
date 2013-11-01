@@ -13,7 +13,7 @@ from mapping.datasets import MiSeq_runs
 from mapping.miseq import read_types
 from mapping.reference import load_HXB2
 from mapping.filenames import get_premapped_file
-from mapping.build_consensus_iterative import get_allele_counts_insertions_from_file
+from mapping.one_site_statistics import get_allele_counts_insertions_from_file_unfiltered
 from mapping.minor_allele_frequency import get_minor_allele_counts
 
 
@@ -67,7 +67,7 @@ def check_premap(miseq_run, adaID, qual_min=30,
     input_filename = get_premapped_file(data_folder, adaID, type='bam')
 
     # Get counts
-    counts, inserts = get_allele_counts_insertions_from_file(input_filename,
+    counts, inserts = get_allele_counts_insertions_from_file_unfiltered(input_filename,
                                                              len(refseq),
                                                              qual_min=qual_min,
                                                              maxreads=maxreads,

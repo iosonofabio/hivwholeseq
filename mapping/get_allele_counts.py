@@ -10,17 +10,14 @@ import os
 import argparse
 import subprocess as sp
 import cPickle as pickle
-from collections import defaultdict
-import pysam
-import numpy as np
 from Bio import SeqIO
 
 from mapping.datasets import MiSeq_runs
 from mapping.adapter_info import load_adapter_table
-from mapping.miseq import alpha, read_types
 from mapping.filenames import get_mapped_filename, get_allele_counts_filename, \
         get_insert_counts_filename, get_coverage_filename, get_consensus_filename
 from mapping.mapping_utils import convert_sam_to_bam
+from mapping.one_site_statistics import get_allele_counts_insertions_from_file
 
 
 # Globals
@@ -63,94 +60,6 @@ def fork_self(miseq_run, adaID, fragment, VERBOSE=3):
     sp.call(qsub_list)
 
 
-def get_allele_counts_insertions_from_file(bamfilename, length,
-                                           maxreads=-1, VERBOSE=0):
-    '''Get the allele counts and insertions'''
-    # Prepare output structures
-    counts = np.zeros((len(read_types), len(alpha), length), int)
-    # Note: the data structure for inserts is a nested dict with:
-    # position --> string --> read type --> count
-    #  (dict)      (dict)       (list)      (int)
-    inserts = defaultdict(lambda: defaultdict(lambda: np.zeros(len(read_types), int)))
-
-    # Open BAM file
-    # Note: the reads should already be filtered of unmapped stuff at this point
-    with pysam.Samfile(bamfilename, 'rb') as bamfile:
-
-        # Iterate over single reads
-        for i, read in enumerate(bamfile):
-
-            # Max number of reads
-            if i == maxreads:
-                if VERBOSE >= 2:
-                    print 'Max reads reached:', maxreads
-                break
-        
-            # Print output
-            if (VERBOSE >= 3) and (not ((i +1) % 10000)):
-                print (i+1)
-        
-            # Divide by read 1/2 and forward/reverse
-            js = 2 * read.is_read2 + read.is_reverse
-        
-            # Read CIGARs (they should be clean by now)
-            seq = np.fromstring(read.seq, 'S1')
-            qual = np.fromstring(read.qual, np.int8) - 33
-            pos = read.pos
-
-            # Iterate over CIGARs
-            for ic, (block_type, block_len) in enumerate(read.cigar):
-
-                # Check for pos: it should never exceed the length of the fragment
-                if (block_type in [0, 1, 2]) and (pos >= length):
-                    raise ValueError('Pos exceeded the length of the fragment')
-            
-                # Inline block
-                if block_type == 0:
-                    seqb = seq[:block_len]
-                    qualb = qual[:block_len]
-                    # Increment counts
-                    for j, a in enumerate(alpha):
-                        posa = ((seqb == a) & (qualb >= qual_min)).nonzero()[0]
-                        if len(posa):
-                            counts[js, j, pos + posa] += 1
-            
-                    # Chop off this block
-                    if ic != len(read.cigar) - 1:
-                        seq = seq[block_len:]
-                        qual = qual[block_len:]
-                        pos += block_len
-            
-                # Deletion
-                elif block_type == 2:
-                    # Increment gap counts
-                    counts[js, 4, pos:pos + block_len] += 1
-            
-                    # Chop off pos, but not sequence
-                    pos += block_len
-            
-                # Insertion
-                # an insert @ pos 391 means that seq[:391] is BEFORE the insert,
-                # THEN the insert, FINALLY comes seq[391:]
-                elif block_type == 1:
-                    seqb = seq[:block_len]
-                    qualb = qual[:block_len]
-                    # Accept only high-quality inserts
-                    if (qualb >= qual_min).all():
-                        inserts[pos][seqb.tostring()][js] += 1
-            
-                    # Chop off seq, but not pos
-                    if ic != len(read.cigar) - 1:
-                        seq = seq[block_len:]
-                        qual = qual[block_len:]
-            
-                # Other types of cigar?
-                else:
-                    raise ValueError('CIGAR type '+str(block_type)+' not recognized')
-
-    return (counts, inserts)
-
-
 def get_allele_counts(data_folder, adaID, fragment, VERBOSE=0,
                       maxreads=1e10):
     '''Extract allele and insert counts from a bamfile'''
@@ -169,7 +78,8 @@ def get_allele_counts(data_folder, adaID, fragment, VERBOSE=0,
 
     # Call lower-level function
     return get_allele_counts_insertions_from_file(bamfilename, len(refseq),
-                                                 maxreads=maxreads, VERBOSE=VERBOSE)
+                                                  qual_min=qual_min,
+                                                  maxreads=maxreads, VERBOSE=VERBOSE)
 
 
 def write_output_files(data_folder, adaID, fragment,

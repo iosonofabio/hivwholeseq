@@ -32,10 +32,11 @@ from mapping.datasets import MiSeq_runs
 from mapping.adapter_info import load_adapter_table, foldername_adapter
 from mapping.miseq import alpha, read_types
 from mapping.mapping_utils import stampy_bin, subsrate, convert_sam_to_bam,\
-        pair_generator, get_ind_good_cigars, align_muscle
+        pair_generator, align_muscle
 from mapping.filenames import get_HXB2_fragmented, \
         get_HXB2_index_file, get_HXB2_hash_file, get_consensus_filename, \
         get_divided_filenames
+from mapping.one_site_statistics import get_allele_counts_insertions_from_file_unfiltered
 
 
 # Globals
@@ -295,121 +296,6 @@ def map_stampy(data_folder, adaID, fragment, n_iter, VERBOSE=0):
     sp.call(call_list)
 
 
-def get_allele_counts_insertions_from_file(bamfilename, length, qual_min=qual_min,
-                                           maxreads=-1, VERBOSE=0):
-    '''Get the allele counts and insertions'''
-    # Prepare output structures
-    counts = np.zeros((len(read_types), len(alpha), length), int)
-    # Note: the data structure for inserts is a nested dict with:
-    # position --> string --> read type --> count
-    #  (dict)      (dict)       (list)      (int)
-    inserts = defaultdict(lambda: defaultdict(lambda: np.zeros(len(read_types), int)))
-
-    # Open BAM file
-    # Note: the reads should already be filtered of unmapped stuff at this point
-    with pysam.Samfile(bamfilename, 'rb') as bamfile:
-
-        # Iterate over single reads
-        for i, read in enumerate(bamfile):
-
-            # Max number of reads
-            if i == maxreads:
-                if VERBOSE >= 2:
-                    print 'Max reads reached:', maxreads
-                break
-        
-            # Print output
-            if (VERBOSE >= 3) and (not ((i +1) % 10000)):
-                print (i+1)
-
-            # NOTE: since we change the consensus all the time, mapping is never
-            # safe, and we have to filter the results thoroughly.
-
-            # If unmapped/unpaired, trash
-            if read.is_unmapped or (not read.is_proper_pair) or (read.isize == 0):
-                if VERBOSE >= 3:
-                        print 'Read '+read.qname+': unmapped/unpaired/no isize'
-                continue
-
-            # Get good CIGARs
-            (good_cigars, first_good_cigar, last_good_cigar) = \
-                    get_ind_good_cigars(read.cigar, match_len_min=match_len_min,
-                                        full_output=True)
-
-            # If no good CIGARs, give up
-            if not good_cigars.any():
-                continue
-                    
-            # Divide by read 1/2 and forward/reverse
-            js = 2 * read.is_read2 + read.is_reverse
-        
-            # Read CIGARs
-            seq = np.fromstring(read.seq, 'S1')
-            qual = np.fromstring(read.qual, np.int8) - 33
-            pos = read.pos
-            cigar = read.cigar
-            len_cig = len(cigar)            
-
-            # Iterate over CIGARs
-            for ic, (block_type, block_len) in enumerate(cigar):
-
-                # Check for pos: it should never exceed the length of the fragment
-                if (block_type in [0, 1, 2]) and (pos > length):
-                    raise ValueError('Pos exceeded the length of the fragment')
-            
-                # Inline block
-                if block_type == 0:
-                    # Keep only stuff from good CIGARs
-                    if first_good_cigar <= ic <= last_good_cigar:
-                        seqb = seq[:block_len]
-                        qualb = qual[:block_len]
-                        # Increment counts
-                        for j, a in enumerate(alpha):
-                            posa = ((seqb == a) & (qualb >= qual_min)).nonzero()[0]
-                            if len(posa):
-                                counts[js, j, pos + posa] += 1
-            
-                    # Chop off this block
-                    if ic != len_cig - 1:
-                        seq = seq[block_len:]
-                        qual = qual[block_len:]
-                        pos += block_len
-            
-                # Deletion
-                elif block_type == 2:
-                    # Keep only stuff from good CIGARs
-                    if first_good_cigar <= ic <= last_good_cigar:
-
-                        # Increment gap counts
-                        counts[js, 4, pos:pos + block_len] += 1
-            
-                    # Chop off pos, but not sequence
-                    pos += block_len
-            
-                # Insertion
-                # an insert @ pos 391 means that seq[:391] is BEFORE the insert,
-                # THEN the insert, FINALLY comes seq[391:]
-                elif block_type == 1:
-                    # Keep only stuff from good CIGARs
-                    if first_good_cigar <= ic <= last_good_cigar:
-                        seqb = seq[:block_len]
-                        qualb = qual[:block_len]
-                        # Accept only high-quality inserts
-                        if (qualb >= qual_min).all():
-                            inserts[pos][seqb.tostring()][js] += 1
-            
-                    # Chop off seq, but not pos
-                    if ic != len_cig - 1:
-                        seq = seq[block_len:]
-                        qual = qual[block_len:]
-            
-                # Other types of cigar?
-                else:
-                    raise ValueError('CIGAR type '+str(block_type)+' not recognized')
-
-    return (counts, inserts)
-
-
 def make_consensus(data_folder, adaID, fragment, n_iter, qual_min=20, VERBOSE=0):
     '''Make consensus sequence from the mapped reads'''
     # There are two sets of primers for fragment F5
@@ -426,7 +312,6 @@ def make_consensus(data_folder, adaID, fragment, n_iter, qual_min=20, VERBOSE=0)
     reffilename = get_ref_file(data_folder, adaID, fragment, n_iter)
     refseq = SeqIO.read(reffilename, 'fasta')
     ref = np.array(refseq)
-    refs = str(refseq.seq)
 
     # Allele counts and inserts
     counts = np.zeros((len(read_types), len(alpha), len(ref)), int)
@@ -440,8 +325,10 @@ def make_consensus(data_folder, adaID, fragment, n_iter, qual_min=20, VERBOSE=0)
     if not os.path.isfile(bamfilename):
         convert_sam_to_bam(bamfilename)
 
-    # Call lower-level function (NOTE: no CIGAR filtering at this time!)
-    (counts, inserts) = get_allele_counts_insertions_from_file(bamfilename, len(refseq))
+    # Call lower-level function
+    (counts, inserts) = get_allele_counts_insertions_from_file_unfiltered(bamfilename,
+                                                                          len(refseq),
+                                                                          qual_min=qual_min)
 
     # Build consensus
     # Make allele count consensi for each of the four categories
