@@ -33,7 +33,7 @@ from mapping.adapter_info import load_adapter_table, foldername_adapter
 from mapping.miseq import alpha, read_types
 from mapping.mapping_utils import stampy_bin, subsrate, convert_sam_to_bam,\
         pair_generator, get_ind_good_cigars, align_muscle
-from mapping.filenames import get_HXB2_fragmented, get_read_filenames,\
+from mapping.filenames import get_HXB2_fragmented, \
         get_HXB2_index_file, get_HXB2_hash_file, get_consensus_filename, \
         get_divided_filenames
 
@@ -295,7 +295,7 @@ def map_stampy(data_folder, adaID, fragment, n_iter, VERBOSE=0):
     sp.call(call_list)
 
 
-def get_allele_counts_insertions_from_file(bamfilename, length,
+def get_allele_counts_insertions_from_file(bamfilename, length, qual_min=qual_min,
                                            maxreads=-1, VERBOSE=0):
     '''Get the allele counts and insertions'''
     # Prepare output structures
