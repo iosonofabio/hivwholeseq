@@ -19,9 +19,12 @@ import pysam
 
 from mapping.datasets import MiSeq_runs
 from mapping.filenames import get_HXB2_entire, get_HXB2_index_file,\
+        get_custom_reference_filename, get_custom_index_filename_fun, \
+        get_custom_hash_filename_fun, \
         get_HXB2_hash_file, get_read_filenames, get_premapped_file
 from mapping.mapping_utils import stampy_bin, subsrate, \
         convert_sam_to_bam, convert_bam_to_sam
+from mapping.reference import load_HXB2, load_custom_reference
 
 
 
@@ -40,7 +43,8 @@ vmem = '8G'
 
 
 # Functions
-def fork_self(miseq_run, adaID, VERBOSE=0, bwa=False, threads=1):
+def fork_self(miseq_run, adaID, VERBOSE=0, bwa=False, threads=1, report=0,
+              reference='HXB2'):
     '''Fork self for each adapter ID'''
     if VERBOSE:
         print 'Forking to the cluster: adaID '+'{:02d}'.format(adaID)
@@ -58,7 +62,10 @@ def fork_self(miseq_run, adaID, VERBOSE=0, bwa=False, threads=1):
                  '--adaIDs', adaID,
                  '--verbose', VERBOSE,
                  '--threads', threads,
+                 '--reference', reference,
                 ]
+    if report:
+        qsub_list.append('--report')
     qsub_list = map(str, qsub_list)
     if VERBOSE >= 2:
         print ' '.join(qsub_list)
@@ -75,42 +82,63 @@ def make_output_folders(data_folder, adaID, VERBOSE=0):
             print 'Folder created:', dirname
 
 
-def make_index_and_hash(data_folder, VERBOSE=0):
+def make_index_and_hash(data_folder, reference='HXB2', VERBOSE=0):
     '''Make index and hash files for reference or consensus'''
     if VERBOSE:
         print 'Making index and hash files'
 
+    # Check whether or not the reference is standard
+    # NOTE: this is needed for samples which are far away from HXB2
+    if reference == 'HXB2':
+        ref_filename = get_HXB2_entire(cropped=True)
+        index_filename_fun = get_HXB2_index_file
+        hash_filename_fun = get_HXB2_hash_file
+    else:
+        ref_filename = get_custom_reference_filename(reference)
+        index_filename_fun = get_custom_index_filename_fun(reference)
+        hash_filename_fun = get_custom_hash_filename_fun(reference)
+
     # Make folder if necessary
-    dirname = os.path.dirname(get_HXB2_hash_file())
+    dirname = os.path.dirname(hash_filename_fun())
     if not os.path.isdir(dirname):
         os.mkdir(dirname)
         if VERBOSE:
             print 'Folder created:', dirname
 
-    # 1. Make genome index file for HXB2
-    if not os.path.isfile(get_HXB2_index_file(ext=True)):
+    # 1. Make genome index file for reference
+    if not os.path.isfile(index_filename_fun(ext=True)):
         sp.call([stampy_bin,
                  '--species="HIV"',
-                 '-G', get_HXB2_index_file(ext=False),
-                 get_HXB2_entire(cropped=True),
+                 '-G', index_filename_fun(ext=False),
+                 ref_filename,
                  ])
     
-    # 2. Build a hash file for HXB2
-    if not os.path.isfile(get_HXB2_hash_file(ext=True)):
+    # 2. Build a hash file for reference
+    if not os.path.isfile(hash_filename_fun(ext=True)):
         sp.call([stampy_bin,
-                 '-g', get_HXB2_index_file(ext=False),
-                 '-H', get_HXB2_hash_file(ext=False),
+                 '-g', index_filename_fun(ext=False),
+                 '-H', hash_filename_fun(ext=False),
                  ])
 
 
-def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1):
+def premap_stampy(data_folder, adaID, reference='HXB2', VERBOSE=0, threads=1):
     '''Call stampy for actual mapping'''
     if VERBOSE:
         print 'Map: adaID '+'{:02d}'.format(adaID)
 
+    # Check whether or not the reference is standard
+    # NOTE: this is needed for samples which are far away from HXB2
+    if reference == 'HXB2':
+        ref_filename = get_HXB2_entire(cropped=True)
+        index_filename_fun = get_HXB2_index_file
+        hash_filename_fun = get_HXB2_hash_file
+    else:
+        ref_filename = get_custom_reference_filename(reference)
+        index_filename_fun = get_custom_index_filename_fun(reference)
+        hash_filename_fun = get_custom_hash_filename_fun(reference)
+
     # Get input filenames (raw reads)
-    input_filenames = get_read_filenames(data_folder, adaID,
-                                         filtered=False)
+    input_filenames = get_read_filenames(data_folder, adaID, filtered=False)
 
     # parallelize if requested
     if threads == 1:
@@ -119,8 +147,8 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1):
         output_filename =  get_premapped_file(data_folder, adaID, type='sam')
         # Map
         call_list = [stampy_bin,
-                     '-g', get_HXB2_index_file(ext=False),
-                     '-h', get_HXB2_hash_file(ext=False), 
+                     '-g', index_filename_fun(ext=False),
+                     '-h', hash_filename_fun(ext=False), 
                      '-o', output_filename,
                      '--substitutionrate='+subsrate,
                      '-M'] + input_filenames
@@ -154,8 +182,8 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1):
                          '-l', 'h_rt='+cluster_time[threads >= 30],
                          '-l', 'h_vmem='+vmem,
                          stampy_bin,
-                         '-g', get_HXB2_index_file(ext=False),
-                         '-h', get_HXB2_hash_file(ext=False), 
+                         '-g', index_filename_fun(ext=False),
+                         '-h', hash_filename_fun(ext=False), 
                          '-o', output_filename,
                          '--processpart='+str(j+1)+'/'+str(threads),
                          '--substitutionrate='+subsrate,
@@ -239,11 +267,16 @@ def report_insert_size_distribution(data_folder, adaID,  VERBOSE=0):
                    lw=2, color='b')
 
 
-def report_coverage(data_folder, adaID, VERBOSE=0):
+def report_coverage(data_folder, adaID, reference='HXB2', VERBOSE=0):
     '''Produce a report on rough coverage on reference (ignore inserts)'''
     # Get the reference sequence
-    from reference import load_HXB2
-    refseq = load_HXB2(cropped=True)
+
+    # Check whether or not the reference is standard
+    # NOTE: this is needed for samples which are far away from HXB2
+    if reference == 'HXB2':
+        refseq = load_HXB2(cropped=True)
+    else:
+        refseq = load_custom_reference(reference)
 
     # Prepare data structures
     coverage = np.zeros(len(refseq), int)
@@ -296,6 +329,8 @@ if __name__ == '__main__':
                         help='Number of threads to use for mapping')
     parser.add_argument('--report', action='store_true',
                         help='Perform quality checks and save into a report')
+    parser.add_argument('--reference', default='HXB2',
+                        help='Use alternative reference, e.g. chimeras (the file must exist)')
 
     args = parser.parse_args()
     miseq_run = args.run
@@ -304,6 +339,7 @@ if __name__ == '__main__':
     submit = args.submit
     threads = args.threads
     report = args.report
+    refname = args.reference
 
     # Specify the dataset
     dataset = MiSeq_runs[miseq_run]
@@ -313,23 +349,25 @@ if __name__ == '__main__':
     if not adaIDs:
         adaIDs = MiSeq_runs[miseq_run]['adapters']
 
-    # Make index and hash files for HXB2 (if not present already), using a
+    # Make index and hash files for reference (if not present already), using a
     # cropped reference to reduce mapping ambiguities at LTRs (F1 vs F6)
-    make_index_and_hash(data_folder, VERBOSE=VERBOSE)
+    make_index_and_hash(data_folder, reference=refname, VERBOSE=VERBOSE)
 
     # Iterate over all adaIDs
     for adaID in adaIDs:
 
         # Submit to the cluster self if requested
         if submit:
-            fork_self(miseq_run, adaID, VERBOSE=VERBOSE, threads=threads)
+            fork_self(miseq_run, adaID, VERBOSE=VERBOSE, threads=threads,
+                      report=report, reference=refname)
             continue
 
         # Make output folders if necessary
         make_output_folders(data_folder, adaID, VERBOSE=VERBOSE)
 
-        # Map roughly to HXB2
-        premap_stampy(data_folder, adaID, VERBOSE=VERBOSE, threads=threads)
+        # Map roughly to reference
+        premap_stampy(data_folder, adaID, VERBOSE=VERBOSE, reference=refname,
+                      threads=threads)
 
         # Check quality and report if requested
         if report:
@@ -338,4 +376,4 @@ if __name__ == '__main__':
             report_insert_size_distribution(data_folder, adaID, VERBOSE=VERBOSE)
 
             # Report rough coverage of reference
-            report_coverage(data_folder, adaID, VERBOSE=VERBOSE)
+            report_coverage(data_folder, adaID, reference=refname, VERBOSE=VERBOSE)

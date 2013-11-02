@@ -8,7 +8,8 @@ content:    Manage reference sequences.
 from Bio import SeqIO
 
 from mapping.filenames import get_HXB2_entire, get_NL43_entire, get_F10_entire, \
-        get_HXB2_fragmented, get_NL43_fragmented, get_F10_fragmented
+        get_HXB2_fragmented, get_NL43_fragmented, get_F10_fragmented, \
+        get_custom_reference_filename
 
 
 
@@ -41,3 +42,8 @@ def load_F10(fragment=None):
         return SeqIO.read(get_F10_fragmented(fragment,
                                              trim_primers=trim_primers),
                           'fasta')
+
+
+def load_custom_reference(reference):
+    '''Load a custom reference'''
+    return SeqIO.read(get_custom_reference_filename(reference), 'fasta')

@@ -326,9 +326,9 @@ def make_consensus(data_folder, adaID, fragment, n_iter, qual_min=20, VERBOSE=0)
         convert_sam_to_bam(bamfilename)
 
     # Call lower-level function
-    (counts, inserts) = get_allele_counts_insertions_from_file_unfiltered(bamfilename,
-                                                                          len(refseq),
-                                                                          qual_min=qual_min)
+    (counts, inserts) = get_allele_counts_insertions_from_file_unfiltered(bamfilename,\
+                                len(refseq), qual_min=qual_min,
+                                match_len_min=match_len_min)
 
     # Build consensus
     # Make allele count consensi for each of the four categories

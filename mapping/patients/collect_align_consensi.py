@@ -5,7 +5,6 @@ date:       25/10/13
 content:    Collect and align all consensi from a patient.
 '''
 # Modules
-import os
 import argparse
 from Bio import SeqIO
 from Bio import AlignIO
@@ -13,6 +12,7 @@ from Bio import AlignIO
 from mapping.datasets import MiSeq_runs
 from mapping.filenames import get_merged_consensus_filename
 from mapping.patients.filenames import get_consensi_alignment_genomewide_filename
+from mapping.patients.patients import get_patient, get_sequenced_samples
 from mapping.mapping_utils import align_muscle
 
 
@@ -74,4 +74,4 @@ if __name__ == '__main__':
 
     # Write alignment
     output_filename_genomewide = get_consensi_alignment_genomewide_filename(pname)
-    AlignIO.write(ali_genomewide, outout_filename_genomewide, 'fasta')
+    AlignIO.write(ali_genomewide, output_filename_genomewide, 'fasta')

@@ -387,3 +387,25 @@ def get_merged_consensus_filename(data_folder, adaID, fragments):
     filename = data_folder+foldername_adapter(adaID)+filename
     return filename
 
+
+def get_custom_reference_filename(reference):
+    '''Get the filename of a custom reference sequence, in one piece'''
+    filename = reference
+    filename = filename+'.fasta'
+    return reference_folder+filename
+
+
+def get_custom_index_filename_fun(reference):
+    '''Get the stampy index filename of a custom reference sequence'''
+    filename = reference
+    filename = reference_folder+'hash/'+filename
+    fun = lambda ext: [filename+'.stidx' if ext else filename][0]
+    return fun
+
+
+def get_custom_hash_filename_fun(reference):
+    '''Get the stampy index filename of a custom reference sequence'''
+    filename = reference
+    filename = reference_folder+'hash/'+filename
+    fun = lambda ext=True: [filename+'.sthash' if ext else filename][0]
+    return fun

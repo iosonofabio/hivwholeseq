@@ -5,7 +5,12 @@ date:       25/10/13
 content:    Module containing all filenames for the patient analysis in one place.
 '''
 # Modules
-import os
+
+
+
+# Globals
+# FIXME
+root_data_folder = '/ebio/ag-neher/share/data/MiSeq_data/'
 
 
 
@@ -66,5 +71,14 @@ def get_consensi_alignment_genomewide_filename(pname,
                                                root_data_folder=root_data_folder):
     '''Get the MSA of all consensi of the patient, sorted by time point'''
     filename = 'consensi_alignment_genomewide.fasta'
+    filename = get_foldername(pname, root_data_folder=root_data_folder)+filename
+    return filename
+
+
+def get_allele_frequency_trajectories_filename(pname,
+                                               fragment,
+                                               root_data_folder=root_data_folder):
+    '''Get the matrix with allele frequencies on the initial consensus'''
+    filename = 'allele_frequency_trajectories.npy'
     filename = get_foldername(pname, root_data_folder=root_data_folder)+filename
     return filename

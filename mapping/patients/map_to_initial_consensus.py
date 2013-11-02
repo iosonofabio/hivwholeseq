@@ -8,17 +8,23 @@ content:    Map reads to the initial consensus of the patient (in order to have
 '''
 # Modules
 import os
+import time
 import argparse
+import subprocess as sp
 import numpy as np
 import pysam
 
 from mapping.generic_utils import mkdirs
+from mapping.filenames import get_divided_filenames
 from mapping.datasets import MiSeq_runs
 from mapping.mapping_utils import stampy_bin, subsrate, \
         convert_sam_to_bam, convert_bam_to_sam
+from mapping.samples import samples as samples_seq
 from mapping.patients.patients import get_patient, get_sequenced_samples, \
         get_initial_sequenced_sample
-from mapping.samples import samples as samples_seq
+from mapping.patients.filenames import get_initial_index_filename, \
+        get_initial_hash_filename, get_initial_consensus_filename, \
+        get_mapped_to_initial_filename
 
 
 
@@ -96,7 +102,7 @@ def make_index_and_hash(pname, fragment, VERBOSE=0):
             print 'Built index: '+pname+' '+fragment
     
     # 2. Build a hash file
-    if not os.path.isfile(get_initial_hash_file(pname, fragment)):
+    if not os.path.isfile(get_initial_hash_filename(pname, fragment)):
         sp.call([stampy_bin,
                  '-g', get_initial_index_filename(pname, fragment, ext=False),
                  '-H', get_initial_hash_filename(pname, fragment, ext=False),
@@ -105,8 +111,7 @@ def make_index_and_hash(pname, fragment, VERBOSE=0):
             print 'Built hash: '+pname+' '+fragment
 
 
-def map_stampy(pname, sample, fragment
-               VERBOSE=VERBOSE, threads=threads, n_pairs=n_pairs):
+def map_stampy(pname, sample, fragment, VERBOSE=0, threads=1, n_pairs=-1):
     '''Map using stampy'''
     # Resolve ambiguous fragment primers
     if fragment in ['F5a', 'F5b']:
@@ -337,4 +342,5 @@ if __name__ == '__main__':
             if filter_reads:
                 import warnings
                 warnings.warn('Filtering not implemented yet')
+                #TODO
                 #filter_mapped_reads(pname, sample, fragment, VERBOSE=VERBOSE)
