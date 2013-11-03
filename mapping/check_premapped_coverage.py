@@ -11,7 +11,7 @@ import numpy as np
 
 from mapping.datasets import MiSeq_runs
 from mapping.miseq import read_types
-from mapping.reference import load_HXB2
+from mapping.reference import load_HXB2, load_custom_reference
 from mapping.filenames import get_premapped_file
 from mapping.one_site_statistics import get_allele_counts_insertions_from_file_unfiltered
 from mapping.minor_allele_frequency import get_minor_allele_counts
@@ -83,7 +83,8 @@ def check_premap(miseq_run, adaID, qual_min=30, match_len_min=10,
         print frags_pos
 
     else:
-        raise ValueError('Only HXB2 is implemented as a reference')
+        refseq = load_custom_reference(reference)
+        frags_pos = None
 
     # Open BAM and scan reads
     input_filename = get_premapped_file(data_folder, adaID, type='bam')
@@ -124,12 +125,15 @@ if __name__ == '__main__':
                         help='Number of reads analyzed')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
+    parser.add_argument('--reference', default='HXB2',
+                        help='Use alternative reference, e.g. chimeras (the file must exist)')
 
     args = parser.parse_args()
     miseq_run = args.run
     adaIDs = args.adaIDs
     n_reads = args.n
     VERBOSE = args.verbose
+    refname = args.reference
 
     # Specify the dataset
     dataset = MiSeq_runs[miseq_run]
@@ -146,6 +150,7 @@ if __name__ == '__main__':
 
             check_premap(miseq_run, adaID,
                          maxreads=n_reads,
+                         reference=refname,
                          VERBOSE=VERBOSE)
 
 

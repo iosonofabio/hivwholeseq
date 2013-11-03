@@ -45,8 +45,8 @@ def get_overlap(data_folder, adaID, frag1, frag2, VERBOSE=0):
     sm2 = np.array(seq2)
 
     # Find the beginning of s2 in s1
-    seed_len = 10
-    matches_min = 10
+    seed_len = 20
+    matches_min = 16
     seed = sm2[:seed_len]
     found = False
     trials = 0
@@ -61,6 +61,9 @@ def get_overlap(data_folder, adaID, frag1, frag2, VERBOSE=0):
 
     if not found:
         return None
+
+    if VERBOSE >= 3:
+        print 'Beginning of s2 found in s1'
 
     # In an ideal world, the overlap is a holy place in which no indels happen.
     # We cannot assume that, sadly. However, we can search from the other side
@@ -78,6 +81,9 @@ def get_overlap(data_folder, adaID, frag1, frag2, VERBOSE=0):
             trials += 1
     if not found:
         return None
+
+    if VERBOSE >= 3:
+        print 'End of s1 found in s2'
 
     # Align
     ali = align_muscle(seq1[start_s2:], seq2[:end_s1])
@@ -188,12 +194,15 @@ if __name__ == '__main__':
                         help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
+    parser.add_argument('--savefig', action='store_true',
+                        help='Save the figures to file')
     
     args = parser.parse_args()
     miseq_run = args.run
     adaIDs = args.adaIDs
     fragments = args.fragments
     VERBOSE = args.verbose
+    savefig = args.savefig
 
     # Specify the dataset
     dataset = MiSeq_runs[miseq_run]
@@ -232,6 +241,10 @@ if __name__ == '__main__':
 
             overlaps.append(((frag1, frag2), overlap))
 
+        # Check allele frequencies if present
+        if not os.path.isfile(get_allele_counts_filename(data_folder, adaID, 'F1')):
+            continue
+
         # Make unified figures
         import matplotlib.pyplot as plt
         fig, axs = plt.subplots(1, len(overlaps), figsize=(2+3.6*len(fragments), 6))
@@ -249,7 +262,7 @@ if __name__ == '__main__':
         plt.show()
 
         # Save the figure
-        if False:
+        if savefig:
             fig_filename = get_overlap_nu_figure_filename(data_folder, adaID,
                                                           '-'.join(fragments))
             # Create the folder if necessary

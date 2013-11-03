@@ -10,14 +10,14 @@ content:    Module containing all filenames for the patient analysis in one plac
 
 # Globals
 # FIXME
-root_data_folder = '/ebio/ag-neher/share/data/MiSeq_data/'
+root_data_folder = '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/'
 
 
 
 # Functions
 def get_foldername(pname, root_data_folder=root_data_folder):
     '''Get the folder name of the data from a patient'''
-    foldername = 'patients/'+patient+'/'
+    foldername = 'patients/'+pname+'/'
     foldername = root_data_folder+foldername
     return foldername
 
@@ -64,6 +64,14 @@ def get_initial_hash_filename(pname, fragment, ext=True,
     filename = get_foldername(pname, root_data_folder=root_data_folder)+filename
     if ext:
         filename = filename+'.sthash'
+    return filename
+
+
+def get_consensi_alignment_filename(pname, fragment,
+                                    root_data_folder=root_data_folder):
+    '''Get the MSA of all consensi of the patient, sorted by time point'''
+    filename = 'consensi_alignment_'+fragment+'.fasta'
+    filename = get_foldername(pname, root_data_folder=root_data_folder)+filename
     return filename
 
 

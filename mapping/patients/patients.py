@@ -72,19 +72,19 @@ patients = (pat_20097,
 
 
 # Functions
-def get_patient(patient):
+def get_patient(pname):
     '''Get the patient from the sequences ones'''
     # This is an interface function, so we can change the actual data structure
     # (efficiency is not an issue)
     from operator import itemgetter
     names = map(itemgetter('id'), patients)
-    if patient in names:
-        return patients[names.index(patient)]
+    if pname in names:
+        return patients[names.index(pname)]
     else:
         raise ValueError('Patient with this ID not found')
 
 
-# NOTE: some functions look a lot like an instance method ;-)
+# NOTE: some functions look a lot like instance methods ;-)
 def get_sequenced_samples(patient):
     '''Get only the sequenced samples of a patient'''
     from mapping.samples import samples as samples_seq
