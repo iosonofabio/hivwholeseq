@@ -176,6 +176,7 @@ def test_outer_primer(reads, pr_outs, len_reference):
         return True
 
     # Test all fragments
+    # FIXME: do slightly better by masking ambiguous positions on the primers
     for (pr_fwd, pr_rev) in pr_outs:
         # FWD
         rfwd = np.fromstring(read_fwd.seq[:len(pr_fwd)], 'S1')

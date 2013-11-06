@@ -37,7 +37,20 @@ dataset_2 = {'description': 'Second library (first patient-only)',
              'n_cycles': 500,
             }
 
+
+dataset_nextera = {'description': 'Test run for the Nextera library (Sweden)',
+                   'adapters': (1, 2),
+                   'samples': ('HIV-8262-1: 0.2 ng/ul', 'HIV-8262-2: 0.033 ng/ul'),
+                   'folder': '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/pawel_nextera/',
+                   'date': '2013-10-20',
+                   'comments': 'Library prepared by Lina, sequencing by Pawel Zajac (illumina)',
+                   'primerF5': ('F5a', 'F5a'), # FIXME: Find out about this
+                   'n_cycles': 300,
+                  }
+
+
 # MiSeq runs
 MiSeq_runs = {28: dataset_testmiseq,
               37: dataset_2,
+              -1: dataset_nextera,
              }

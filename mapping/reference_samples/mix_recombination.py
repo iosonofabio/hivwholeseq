@@ -60,9 +60,10 @@ def align_consensi_mix1(fragment):
     return alignment
 
 
-def check_consensus_mix1(fragment):
+def check_consensus_mix1(fragment, alignment=None):
     '''Check the consensus switch for mix1'''
-    alignment = align_consensi_mix1(fragment)
+    if alignment is None:
+        alignment = align_consensi_mix1(fragment)
     ali = np.array(alignment)
 
     # Look for polymorphisms
@@ -79,6 +80,62 @@ def check_consensus_mix1(fragment):
 
     # It jumps depending on the fragment, but it's constant within a single
     # fragment (i.e. there is amplification bias, but no strong recombination)
+
+
+def align_consensi_mix2(fragment):
+    '''Align consensi for mix2'''
+    # Specify the dataset
+    miseq_run = 28
+    dataset = MiSeq_runs[miseq_run]
+    data_folder = dataset['folder']
+
+    # Get the consensus of the mix1, and align it with the two consensi of
+    # the pure strains
+    adaID_mix2 = 19
+    adaIDs = [adaID_mix2] + map(itemgetter(1), mix2_references_adaIDs)
+    consensi = []
+    for adaID in adaIDs:
+        i = dataset['adapters'].index(adaID)
+        sample = dataset['samples'][i]
+        seq = SeqIO.read(get_consensus_filename(data_folder, adaID, fragment),
+                         'fasta')
+        consensi.append((sample, seq))
+
+    alignment = align_muscle(*(map(itemgetter(1), consensi)))
+    resorted = []
+    for i, adaID in enumerate(adaIDs):
+        for seq in alignment:
+            if str(adaID)+'_F' in seq.name:
+                seq.name = consensi[i][0]
+                resorted.append(seq)
+                break
+    alignment = MSA(resorted)
+    return alignment
+
+
+def check_consensus_mix2(fragment, alignment=None):
+    '''Check the consensus switch for mix1'''
+    if alignment is None:
+        alignment = align_consensi_mix2(fragment)
+    ali = np.array(alignment)
+
+    # Look for polymorphisms
+    ind_likea = (ali[0] == ali[1]) & (ali[0] == ali[2]) & (ali[0] == ali[3])
+    ind_like1 = (ali[0] == ali[1]) & (ali[0] != ali[2]) & (ali[0] != ali[3])
+    ind_like2 = (ali[0] != ali[1]) & (ali[0] == ali[2]) & (ali[0] != ali[3])
+    ind_like3 = (ali[0] != ali[1]) & (ali[0] != ali[2]) & (ali[0] == ali[3])
+    ind_liken = (ali[0] != ali[1]) & (ali[0] != ali[2]) & (ali[0] != ali[3])
+    print 'Mix2,', fragment
+    print 'conserved:', ind_likea.sum()
+    print 'like', alignment[1].name+' only:', ind_like1.sum()
+    print 'like', alignment[2].name+' only:', ind_like2.sum()
+    print 'like', alignment[3].name+' only:', ind_like3.sum()
+    print 'like none:', ind_liken.sum()
+    print 
+
+    # It jumps depending on the fragment, but it's constant within a single
+    # fragment (i.e. there is amplification bias, but no strong recombination)
+    # EXCEPTION: F6 (but there's something wrong in that consensus!)
 
 
 def count_cross_reads_mix1(fragment, maxreads=100, markers_min=4):
@@ -234,57 +291,6 @@ def count_cross_reads_mix1(fragment, maxreads=100, markers_min=4):
     
 
     return (reads_identity, switch_counts)
-
-
-def check_consensus_mix2(fragments):
-    '''Check the consensus switch for mix1'''
-
-    # Specify the dataset
-    miseq_run = 28
-    dataset = MiSeq_runs[miseq_run]
-    data_folder = dataset['folder']
-
-    # Study the mix2
-    adaID_mix2 = 19
-    for fragment in fragments:
-
-        # Get the consensus of the mix1, and align it with the two consensi of
-        # the pure strains
-        adaIDs = [adaID_mix2] + map(itemgetter(1), mix2_references_adaIDs)
-        consensi = []
-        for adaID in adaIDs:
-            i = dataset['adapters'].index(adaID)
-            sample = dataset['samples'][i]
-            seq = SeqIO.read(get_consensus_filename(data_folder, adaID, fragment),
-                             'fasta')
-            consensi.append((sample, seq))
-
-        alignment = align_muscle(*(map(itemgetter(1), consensi)))
-        resorted = []
-        for adaID in adaIDs:
-            for seq in alignment:
-                if str(adaID)+'_F' in seq.name:
-                    resorted.append(seq)
-                    break
-        ali = np.array(resorted)
-
-        # Look for polymorphisms
-        ind_likea = (ali[0] == ali[1]) & (ali[0] == ali[2]) & (ali[0] == ali[3])
-        ind_like1 = (ali[0] == ali[1]) & (ali[0] != ali[2]) & (ali[0] != ali[3])
-        ind_like2 = (ali[0] != ali[1]) & (ali[0] == ali[2]) & (ali[0] != ali[3])
-        ind_like3 = (ali[0] != ali[1]) & (ali[0] != ali[2]) & (ali[0] == ali[3])
-        ind_liken = (ali[0] != ali[1]) & (ali[0] != ali[2]) & (ali[0] != ali[3])
-        print 'Mix2,', fragment
-        print 'conserved:', ind_likea.sum()
-        print 'like', consensi[1][0]+' only:', ind_like1.sum()
-        print 'like', consensi[2][0]+' only:', ind_like2.sum()
-        print 'like', consensi[3][0]+' only:', ind_like3.sum()
-        print 'like none:', ind_liken.sum()
-        print 
-
-        # It jumps depending on the fragment, but it's constant within a single
-        # fragment (i.e. there is amplification bias, but no strong recombination)
-        # EXCEPTION: F6 (but there's something wrong in that consensus!)
 
 
 

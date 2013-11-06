@@ -15,6 +15,7 @@ __all__ = ['generic_utils',
            'phix',
            'primer_info',
            'reference',
+           'reference_samples',
            'samples',
            'sequence_utils',
           ]

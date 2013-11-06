@@ -16,11 +16,13 @@ from mapping.filenames import get_premapped_file
 from mapping.one_site_statistics import get_allele_counts_insertions_from_file_unfiltered
 from mapping.minor_allele_frequency import get_minor_allele_counts
 from mapping.primer_info import primers_coordinates_HXB2_inner as pcis_HXB2
+from mapping.primer_info import primers_coordinates_HXB2_outer as pcos_HXB2
 
 
 
 # Functions
-def plot_coverage_minor_allele(counts, frags_pos=None, suptitle=None):
+def plot_coverage_minor_allele(counts, frags_pos=None, frags_pos_out=None,
+                               suptitle=None):
     '''Plot the coverage and the minor allele frequency'''
     cov = counts.sum(axis=1)
     cov_tot = cov.sum(axis=0)
@@ -41,6 +43,10 @@ def plot_coverage_minor_allele(counts, frags_pos=None, suptitle=None):
             axs[0].plot(frag_pos, 2 * [(0.98 - 0.02 * i) * axs[0].get_ylim()[1]],
                         c=cm.jet(int(255.0 * i / len(frags_pos.T))), lw=2)
 
+    if frags_pos_out is not None:
+        for i, frag_pos in enumerate(frags_pos_out.T):
+            axs[0].plot(frag_pos, 2 * [(0.28 - 0.02 * i) * axs[0].get_ylim()[1]],
+                        c=cm.jet(int(255.0 * i / len(frags_pos_out.T))), lw=2)
 
     for i, nu_minor in enumerate(nus_minor):
         color = cm.jet(int(255.0 * i / len(read_types)))
@@ -76,15 +82,21 @@ def check_premap(miseq_run, adaID, qual_min=30, match_len_min=10,
         refseq = load_HXB2(cropped=True)
         # This structure contains the inner primers coordinates in cropped ref
         frags_pos = np.zeros((2, len(fragments)), int)
+        frags_pos_out = np.zeros((2, len(fragments)), int)
         for i, fragment in enumerate(fragments):
             pci = pcis_HXB2[fragment]
             frags_pos[:, i] = (pci[0][0], pci[1][1])
-        frags_pos -= frags_pos.min()
-        print frags_pos
+            pco = pcos_HXB2[fragment]
+            frags_pos_out[:, i] = (pco[0][0], pco[1][1])
+        start = frags_pos.min()
+        frags_pos -= start
+        frags_pos_out -= start
+        print frags_pos, frags_pos_out
 
     else:
         refseq = load_custom_reference(reference)
         frags_pos = None
+        frags_pos_out = None
 
     # Open BAM and scan reads
     input_filename = get_premapped_file(data_folder, adaID, type='bam')
@@ -105,6 +117,7 @@ def check_premap(miseq_run, adaID, qual_min=30, match_len_min=10,
                         ]))
     plot_coverage_minor_allele(counts,
                                frags_pos=frags_pos,
+                               frags_pos_out=frags_pos_out,
                                suptitle=title)
 
 

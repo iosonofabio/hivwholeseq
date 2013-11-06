@@ -669,32 +669,32 @@ if __name__ == '__main__':
         dataset = MiSeq_runs[miseq_run]
         data_folder = dataset['folder']
     
-#        # Get allele counts
-#        counts = load_allele_counts(data_folder, VERBOSE=VERBOSE)
-#        data_runs[miseq_run]['counts'] = counts
-#    
-#        # Check consensus
-#        consensus = consensus_vs_reference(miseq_run, counts, VERBOSE=VERBOSE)
-#        data_runs[miseq_run]['consensus'] = consensus
-#
-#        # Along genome
-#        minor_counts, \
-#        minor_nus = minor_alleles_along_genome(miseq_run, counts,
-#                                               VERBOSE=VERBOSE,
-#                                               plot=plot)
-#        data_runs[miseq_run]['minor_counts'] = minor_counts
-#        data_runs[miseq_run]['minor_nus'] = minor_nus
+        # Get allele counts
+        counts = load_allele_counts(data_folder, VERBOSE=VERBOSE)
+        data_runs[miseq_run]['counts'] = counts
+    
+        # Check consensus
+        consensus = consensus_vs_reference(miseq_run, counts, VERBOSE=VERBOSE)
+        data_runs[miseq_run]['consensus'] = consensus
 
-#        # Spikes
-#        spikes = spikes_motifs(miseq_run, VERBOSE=VERBOSE, plot=False)
-#        data_runs[miseq_run]['spikes'] = spikes
-#
-#        # Motifs
-#        motifs = characterize_motifs(miseq_run,
-#                                     spikes=spikes,
-#                                     VERBOSE=VERBOSE,
-#                                     plot=plot)
-#        data_runs[miseq_run]['motifs'] = motifs
+        # Along genome
+        minor_counts, \
+        minor_nus = minor_alleles_along_genome(miseq_run, counts,
+                                               VERBOSE=VERBOSE,
+                                               plot=plot)
+        data_runs[miseq_run]['minor_counts'] = minor_counts
+        data_runs[miseq_run]['minor_nus'] = minor_nus
+
+        # Spikes
+        spikes = spikes_motifs(miseq_run, VERBOSE=VERBOSE, plot=False)
+        data_runs[miseq_run]['spikes'] = spikes
+
+        # Motifs
+        motifs = characterize_motifs(miseq_run,
+                                     spikes=spikes,
+                                     VERBOSE=VERBOSE,
+                                     plot=plot)
+        data_runs[miseq_run]['motifs'] = motifs
 
         # Phred quality VS errors
         (qual_errs, qual_base) = errors_vs_quality(miseq_run, maxreads=1e6, VERBOSE=VERBOSE,

@@ -129,7 +129,7 @@ def minor_alleles_along_genome(miseq_run, adaID, fragment, VERBOSE=0, plot=False
     # Plot
     if plot:
         import matplotlib.pyplot as plt
-        fig, axs = plt.subplots(2, 1, figsize=(7, 13))
+        fig, axs = plt.subplots(1, 2, figsize=(13, 7))
         for key in count:
             axs[0].plot(minor_counts[key], lw=2, c=colors[key], alpha=0.5)
             axs[0].scatter(np.arange(len(minor_counts[key])), minor_counts[key],
@@ -165,7 +165,9 @@ def minor_alleles_along_genome(miseq_run, adaID, fragment, VERBOSE=0, plot=False
             fig.savefig(figures_folder+sample+'_minornu_'+fragment+'.png')
 
 
-def spikes_motifs(miseq_run, adaID, fragment, VERBOSE=0, plot=False, savefig=False):
+def spikes_motifs(miseq_run, adaID, fragment, VERBOSE=0,
+                  binom_mean=2e-4,
+                  plot=False, savefig=False):
     '''Find the motifs around the spikes in error rates'''
     # Get the counts
     sample = references[(miseq_run, adaID)][0]
@@ -218,7 +220,7 @@ def spikes_motifs(miseq_run, adaID, fragment, VERBOSE=0, plot=False, savefig=Fal
     # Plot the error histogram and the binomial if requested
     if plot:
         import matplotlib.pyplot as plt
-        fig, axs = plt.subplots(2, 1, figsize=(7, 12))
+        fig, axs = plt.subplots(1, 2, figsize=(13, 7))
         xf = lambda x: np.logspace(-5, np.log10(0.5), x)
 
         for i, key in enumerate(count):
@@ -226,7 +228,7 @@ def spikes_motifs(miseq_run, adaID, fragment, VERBOSE=0, plot=False, savefig=Fal
             ax.hist(1.0 * minor_counts[key] / cov[key],
                     bins=xf(60), normed=True, label='Errors')
             for n, c in izip([2e4, 1e5], ('r', 'g')):
-                yb = binom.pmf(np.floor(n * xf(200)), n, 1e-4)
+                yb = binom.pmf(np.floor(n * xf(200)), n, binom_mean)
                 ax.plot(xf(200), yb / yb.max() * 0.9 * ax.get_ylim()[1], lw=2,
                         c=c,
                         label='Binomial ('+str(n)+')')

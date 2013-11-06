@@ -175,7 +175,7 @@ def check_overlap_allele_frequencies(data_folder, adaID, frag1, frag2, overlap,
     ax.set_ylim(0.7e-5, 1.2)
 
     if show_plot:
-        plt.tight_layout()
+        plt.tight_layout(w_pad=0.05)
         plt.ion()
         plt.show()
 
