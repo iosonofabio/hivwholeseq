@@ -253,3 +253,11 @@ def align_muscle(*seqs):
     child.stdout.close()
     return align
 
+
+def get_number_reads(bamfilename, format='bam'):
+    '''Count the reads (not pairs) in a BAM/SAM file'''
+    import pysam
+    file_modes = {'bam': 'rb', 'sam': 'r'}
+    with pysam.Samfile(bamfilename, file_modes[format]) as bamfile:
+        n_reads = sum(1 for read in bamfile)
+    return n_reads

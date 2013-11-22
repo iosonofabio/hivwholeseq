@@ -30,7 +30,7 @@ from mapping.mapping_utils import convert_sam_to_bam
 
 
 
-def get_read_lengths(data_folder, adaID, fragment, VERBOSE=0):
+def get_read_lengths(data_folder, adaID, fragment, VERBOSE=0, maxreads=-1):
     '''Get the read lengths'''
 
     # Lengths from 1 to 250
@@ -46,6 +46,12 @@ def get_read_lengths(data_folder, adaID, fragment, VERBOSE=0):
 
         # Iterate over single reads (no linkage info needed)
         for i, read in enumerate(bamfile):
+
+            # Max number of reads
+            if i == maxreads:
+                if VERBOSE >= 2:
+                    print 'Max reads reached:', maxreads
+                break
         
             # Print output
             if (VERBOSE >= 3) and (not ((i +1) % 10000)):
@@ -62,6 +68,55 @@ def get_read_lengths(data_folder, adaID, fragment, VERBOSE=0):
     return lengths
 
 
+def plot_read_length_distribution(adaID, fragment, length):
+    '''Plot the distribution'''
+    fig, ax = plt.subplots(1, 1)
+    for irt, read_type in enumerate(read_types):
+        color = cm.jet(int(255.0 * irt / len(read_types)))
+        #ax.plot(np.arange(1, 251), length[irt], lw=1.5, c=color)
+        ax.scatter(np.arange(1, 251), length[irt], s=50, c=color, label=read_type)
+    ax.set_xlabel('Read length [bases]')
+    ax.set_ylabel('# reads')
+    ax.set_title('adaID '+'{:02d}'.format(adaID)+', '+fragment)
+    ax.set_yscale('log')
+    ax.legend(loc='lower right', fontsize=10)
+    ax.set_ylim(ymin=1)
+    ax.set_xlim(xmin=-5)
+    plt.tight_layout()
+
+    ax2 = fig.add_axes([0.2, 0.58, 0.27, 0.27])
+    for irt, read_type in enumerate(read_types):
+        color = cm.jet(int(255.0 * irt / len(read_types)))
+        ax2.scatter(np.arange(1, 251), length[irt], s=50, c=color, label=read_type)
+    ax2.set_ylim(ymin=0)
+    ax2.yaxis.get_major_formatter().set_powerlimits((0,1))
+    ax2.set_xticks((0, 250))
+    plt.show()
+
+
+def plot_read_length_distribution_cumulative(adaID, fragment, length):
+    '''Plot the cumulative distribution'''
+    fig, ax = plt.subplots(1, 1)
+    labss = {'read1 f': 'read1 fwd', 'read1 r': 'read1 rev',
+             'read2 f': 'read2 fwd', 'read2 r': 'read2 rev'}
+    for irt, read_type in enumerate(read_types):
+        color = cm.jet(int(255.0 * irt / len(read_types)))
+        ax.plot(np.arange(1, 251), 1.0 - 1.0 * np.cumsum(length[irt]) / length[irt].sum(),
+                lw=1.5, c=color,
+                label=labss[read_type])
+    ax.set_xlabel('Read length [bases]')
+    ax.set_ylabel('fraction of reads longer than x')
+    #ax.set_title('adaID '+'{:02d}'.format(adaID)+', '+fragment)
+    ax.legend(loc='lower left', fontsize=18)
+    ax.set_ylim(-0.05, 1.05)
+    ax.set_xlim(-5, 255)
+    plt.tight_layout()
+    plt.show()
+
+
+
+
+
 
 # Script
 if __name__ == '__main__':
@@ -75,6 +130,8 @@ if __name__ == '__main__':
                         help='Adapter IDs to analyze (e.g. 2 16)')
     parser.add_argument('--fragments', nargs='*',
                         help='Fragment to map (e.g. F1 F6)')
+    parser.add_argument('-n', type=int, default=-1,
+                        help='Number of reads analyzed')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
 
@@ -82,6 +139,7 @@ if __name__ == '__main__':
     miseq_run = args.run
     adaIDs = args.adaIDs
     fragments = args.fragments
+    n_reads = args.n
     VERBOSE = args.verbose
 
     # Specify the dataset
@@ -105,20 +163,10 @@ if __name__ == '__main__':
     for adaID in adaIDs:
         for fragment in fragments:
             lengths_all[(adaID, fragment)] = length = \
-                    get_read_lengths(data_folder, adaID, fragment, VERBOSE=VERBOSE)
+                    get_read_lengths(data_folder, adaID, fragment, VERBOSE=VERBOSE,
+                                     maxreads=n_reads)
 
             # Plot it
-            fig, ax = plt.subplots(1, 1)
-            for irt, read_type in enumerate(read_types):
-                color = cm.jet(int(255.0 * irt / len(read_types)))
-                ax.plot(np.arange(1, 251), length[irt], lw=1.5, c=color)
-                ax.scatter(np.arange(1, 251), length[irt], s=50, c=color)
-            ax.set_xlabel('Read length [bases]')
-            ax.set_ylabel('#')
-            ax.set_title('{:02d}'.format(adaID)+', '+fragment)
-            ax.set_yscale('log')
-            
-            plt.tight_layout()
-            plt.show()
-
+            #plot_read_length_distribution(adaID, fragment, length)
+            plot_read_length_distribution_cumulative(adaID, fragment, length)
 

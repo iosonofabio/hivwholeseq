@@ -40,6 +40,22 @@ def format_tuples(tuples):
     return mtuples
 
 
+from numba import autojit, int_, uint
+@autojit(locals={"l": uint, "lm": uint, "mt": uint})
+def add_read(ref_start, ref_end, mtuples, covs_pair):
+
+    l = len(mtuples)
+    for i in np.arange(l):
+        mtuple = mtuples[i]
+        cov_pair = covs_pair[i]
+        lm = len(mtuple)
+        for j in np.arange(lm):
+            mt = mtuple[j]
+            # Implement comparisons as div between integers
+            if (mt >= ref_start) and (mt < ref_end):
+                cov_pair[j] = True
+
+
 def get_coverage_tuples(data_folder, adaID, fragment, mtuples,
                        maxreads=-1, VERBOSE=0):
     '''Get the joint coverage of a list of positions'''
@@ -66,6 +82,10 @@ def get_coverage_tuples(data_folder, adaID, fragment, mtuples,
                     print 'Max reads reached:', maxreads
                 break
 
+            if VERBOSE >= 3:
+                if not ((irp + 1) % 10000):
+                    print irp + 1
+
             # Reinitialize temporary structure
             for cov_pair in covs_pair: cov_pair[:] = False
 
@@ -74,10 +94,16 @@ def get_coverage_tuples(data_folder, adaID, fragment, mtuples,
 
                 # NOTE: deletions count as covered, because in principle
                 # we see that part of the reference
+                cigar = read.cigar
                 ref_start = read.pos
-                ref_end = ref_start + sum(bl for (bt, bl) in read.cigar if bt in (0, 2))
-                for cov_pair, mtuple in izip(covs_pair, mtuples):
-                    cov_pair[(mtuple >= ref_start) & (mtuple < ref_end)] = True
+                ref_end = ref_start + sum(bl for (bt, bl) in cigar if bt in (0, 2))
+
+                # Use numba to accelerate? better not
+                if False:
+                    add_read(ref_start, ref_end, mtuples, covs_pair)
+                else:
+                    for cov_pair, mtuple in izip(covs_pair, mtuples):
+                        cov_pair[(mtuple >= ref_start) & (mtuple < ref_end)] = True
 
             # Check which tuples are fully covered
             for i, cov_pair in enumerate(covs_pair):

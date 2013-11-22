@@ -17,6 +17,7 @@ from mapping.one_site_statistics import get_allele_counts_insertions_from_file_u
 from mapping.minor_allele_frequency import get_minor_allele_counts
 from mapping.primer_info import primers_coordinates_HXB2_inner as pcis_HXB2
 from mapping.primer_info import primers_coordinates_HXB2_outer as pcos_HXB2
+from mapping.mapping_utils import get_number_reads
 
 
 
@@ -38,15 +39,19 @@ def plot_coverage_minor_allele(counts, frags_pos=None, frags_pos_out=None,
     axs[0].set_ylabel('Coverage')
 
     # If the fragments positions are marked, plot them
+    # Inner primers
     if frags_pos is not None:
         for i, frag_pos in enumerate(frags_pos.T):
-            axs[0].plot(frag_pos, 2 * [(0.98 - 0.02 * i) * axs[0].get_ylim()[1]],
+            axs[0].plot(frag_pos, 2 * [(0.97 - 0.03 * (i % 2)) * axs[0].get_ylim()[1]],
                         c=cm.jet(int(255.0 * i / len(frags_pos.T))), lw=2)
 
+    # Outer primers
     if frags_pos_out is not None:
         for i, frag_pos in enumerate(frags_pos_out.T):
-            axs[0].plot(frag_pos, 2 * [(0.28 - 0.02 * i) * axs[0].get_ylim()[1]],
+            axs[0].plot(frag_pos, 2 * [(0.96 - 0.03 * (i % 2)) * axs[0].get_ylim()[1]],
                         c=cm.jet(int(255.0 * i / len(frags_pos_out.T))), lw=2)
+
+    axs[0].set_xlim(-500, 9500)
 
     for i, nu_minor in enumerate(nus_minor):
         color = cm.jet(int(255.0 * i / len(read_types)))
@@ -100,6 +105,10 @@ def check_premap(miseq_run, adaID, qual_min=30, match_len_min=10,
 
     # Open BAM and scan reads
     input_filename = get_premapped_file(data_folder, adaID, type='bam')
+
+    # Count reads if requested
+    if VERBOSE:
+        print 'N. of reads:', get_number_reads(input_filename)
 
     # Get counts
     counts, inserts = get_allele_counts_insertions_from_file_unfiltered(input_filename,

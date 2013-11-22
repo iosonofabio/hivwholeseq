@@ -138,6 +138,8 @@ if __name__ == '__main__':
         else:
             axs = [axs]
         fig.suptitle('adapterID '+'{:02d}'.format(adaID), fontsize=20)
+        labss = {'read1 f': 'read1 fwd', 'read1 r': 'read1 rev',
+                 'read2 f': 'read2 fwd', 'read2 r': 'read2 rev'}
         for i, fragment in enumerate(fragments):
             ax = axs[i]
             ax.set_yscale('log')
@@ -149,7 +151,7 @@ if __name__ == '__main__':
     
             for js, nu_minorjs in enumerate(nus_minor[fragment]):
                 color = cm.jet(int(255.0 * js / len(read_types)))
-                ax.plot(nu_minorjs, lw=1.5, c=color, label=read_types[js])
+                ax.plot(nu_minorjs, lw=1.5, c=color, label=labss[read_types[js]])
                 ax.scatter(np.arange(len(nu_minorjs)), nu_minorjs, lw=1.5,
                            color=color)
             
@@ -163,11 +165,11 @@ if __name__ == '__main__':
             # Plot 1/max(coverage)
             coverage = covs[fragment]
             cov_tot = coverage.sum(axis=0)
-            ax.plot(1.0 / cov_tot, lw=1.2, c='r', label='1/sum(coverage)')
+            ax.plot(1.0 / cov_tot, lw=1.2, c='r', label='Detection limit')
 
             ax.set_xlim(-100, len(nu_minorjs) + 100)
     
-        plt.legend(loc='upper center')
+        plt.legend(loc='upper right')
         plt.tight_layout(rect=(0, 0, 1, 0.95))
 
         plt.ion()

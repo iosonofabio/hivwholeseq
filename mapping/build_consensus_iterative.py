@@ -313,19 +313,12 @@ def make_consensus(data_folder, adaID, fragment, n_iter, qual_min=20, VERBOSE=0)
     refseq = SeqIO.read(reffilename, 'fasta')
     ref = np.array(refseq)
 
-    # Allele counts and inserts
-    counts = np.zeros((len(read_types), len(alpha), len(ref)), int)
-    # Note: the data structure for inserts is a nested dict with:
-    # position --> string --> read type --> count
-    #  (dict)      (dict)       (list)      (int)
-    inserts = defaultdict(lambda: defaultdict(lambda: np.zeros(len(read_types), int)))
-
     # Open BAM file
     bamfilename = get_mapped_filename(data_folder, adaID, frag_out, n_iter)
     if not os.path.isfile(bamfilename):
         convert_sam_to_bam(bamfilename)
 
-    # Call lower-level function
+    # Call lower-level function for allele counts and inserts
     (counts, inserts) = get_allele_counts_insertions_from_file_unfiltered(bamfilename,\
                                 len(refseq), qual_min=qual_min,
                                 match_len_min=match_len_min)
@@ -461,6 +454,13 @@ def make_consensus(data_folder, adaID, fragment, n_iter, qual_min=20, VERBOSE=0)
     # Strip initial and final Ns and gaps
     consensus_final = ''.join(consensus_final).strip('N')
     consensus_final = re.sub('-', '', consensus_final)
+
+
+    ## FIXME
+    #pos = 979
+    #print n_iter, pos
+    #print counts[:, :, pos]
+    #print consensus[979]
 
 
     ## FIXME

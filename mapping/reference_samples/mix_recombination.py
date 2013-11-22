@@ -8,10 +8,13 @@ content:    Study PCR-mediated recombination from the plasmid mixes.
 import argparse
 import numpy as np
 from collections import Counter
+from itertools import izip
 from operator import itemgetter, attrgetter
 from Bio import SeqIO, AlignIO
 from Bio.Align import MultipleSeqAlignment as MSA
 import pysam
+from matplotlib import cm
+import matplotlib.pyplot as plt
 
 from mapping.miseq import alphal
 from mapping.datasets import MiSeq_runs
@@ -138,10 +141,8 @@ def check_consensus_mix2(fragment, alignment=None):
     # EXCEPTION: F6 (but there's something wrong in that consensus!)
 
 
-def count_cross_reads_mix1(fragment, maxreads=100, markers_min=4):
-    '''Count the number of reads jmping from one haplotype to the other'''
-    if markers_min < 2:
-        raise ValueError('To spot recombnation you need at least 2 markers!')
+def get_SNPs_mix1(fragment):
+    '''Get the SNPs of mix1'''
 
     # Get the positions of private alleles for each of the two references
     alignment = align_consensi_mix1(fragment)
@@ -160,9 +161,27 @@ def count_cross_reads_mix1(fragment, maxreads=100, markers_min=4):
     # should not happen if our consensus building has worked properly)
     poss_ref = np.array([p - (ali[0, :p] == '-').sum() for p in poss], int)
 
+    return poss, poss_ref, alls
+
+
+def count_cross_reads_mix1(fragment, maxreads=100, markers_min=4, VERBOSE=0):
+    '''Count the number of reads jmping from one haplotype to the other
+    
+    This function calculates also the coverage normalization, and the switches
+    between distant markers should not be double counted (we want to observe the
+    saturation).
+    
+    '''
+    if markers_min < 2:
+        raise ValueError('To spot recombnation you need at least 2 markers!')
+
+    # Get SNP positions and alleles
+    poss, poss_ref, alls = get_SNPs_mix1(fragment)
+
     # Go to the reads and ask how often you switch and where
     reads_identity = {'faithful': 0, 'cross': 0, 'borderline': 0}
     switch_counts = Counter()
+    cocoverage = Counter()
 
     # Open BAM file
     adaID = 18
@@ -170,11 +189,17 @@ def count_cross_reads_mix1(fragment, maxreads=100, markers_min=4):
                                       filtered=True)
     with pysam.Samfile(bamfilename, 'rb') as bamfile:
 
+        # Proceed INSERT BY INSERT
+        # (many recombination events are between read_fwd and read_rev)
         for irc, reads in enumerate(pair_generator(bamfile)):
             if irc == maxreads:
                 if VERBOSE:
                     print 'Max reads reached:', maxreads
                 break
+        
+            if VERBOSE >= 3:
+                if not ((irc +1 ) % 10000):
+                    print irc+1
 
             # Get the range of each read
             inds = []
@@ -190,7 +215,7 @@ def count_cross_reads_mix1(fragment, maxreads=100, markers_min=4):
 
             # Assign binary identity to all covered markers
             poss_pair = [[], []]
-            haplo_pair = [[], []]
+            alls_pair = [[], []]
             for i, read in enumerate(reads):
                 # If no markers, skip
                 if len(inds[i]) == 0:
@@ -201,7 +226,7 @@ def count_cross_reads_mix1(fragment, maxreads=100, markers_min=4):
                 alls_read = alls[:, inds[i]]
 
                 # Prepare output structure
-                haplo_read = -np.ones_like(pos_SNP_read)
+                all_read_bin = -np.ones_like(pos_SNP_read)
 
                 # CIGARs are clean, iterate over them
                 i_marker = 0	# Current focal marker
@@ -225,12 +250,12 @@ def count_cross_reads_mix1(fragment, maxreads=100, markers_min=4):
                             if pos_ref + bl > pos_SNP_read[i_marker]:
                                 al = seq[pos_read + pos_SNP_read[i_marker] - pos_ref]
                                 if al == alls_read[0, i_marker]:
-                                    haplo_read[i_marker] = 1
+                                    all_read_bin[i_marker] = 1
                                 elif al == alls_read[1, i_marker]:
-                                    haplo_read[i_marker] = 2
+                                    all_read_bin[i_marker] = 2
     
                                 i_marker += 1
-                                if i_marker == len(haplo_read):
+                                if i_marker == len(all_read_bin):
                                     done = 'all'
 
                             # if we encounter no marker in this CIGAR block, continue
@@ -244,53 +269,63 @@ def count_cross_reads_mix1(fragment, maxreads=100, markers_min=4):
                         pos_ref += bl
                         pos_read += bl
 
-                poss_pair[i] = pos_SNP_read
-                haplo_pair[i] = haplo_read
+                # Third allele and N are not relevant
+                ind_cov_read = all_read_bin != -1
+
+                poss_pair[i] = pos_SNP_read[ind_cov_read]
+                alls_pair[i] = all_read_bin[ind_cov_read]
+
+            # Merge positions and alleles for the whole insert
+            poss_pair = map(list, poss_pair)
+            poss_ins_tmp = np.sort(np.unique(np.concatenate(poss_pair)))
+            poss_ins = []
+            alls_ins_bin = []
+            for pos in poss_ins_tmp:
+                # If covered by one read only, take that allele
+                if (pos in poss_pair[0]) and (pos not in poss_pair[1]):
+                    poss_ins.append(pos)
+                    alls_ins_bin.append(alls_pair[0][poss_pair[0].index(pos)])
+                elif (pos not in poss_pair[0]) and (pos in poss_pair[1]):
+                    poss_ins.append(pos)
+                    alls_ins_bin.append(alls_pair[1][poss_pair[1].index(pos)])
+
+                # If covered by both, take only if they agree
+                else:
+                    all0 = alls_pair[0][poss_pair[0].index(pos)]
+                    all1 = alls_pair[1][poss_pair[1].index(pos)]
+                    if all0 == all1:
+                        poss_ins.append(pos)
+                        alls_ins_bin.append(all0)
+
+            # If too few markers are covered, continue
+            if len(poss_ins) < markers_min:
+                continue
 
             # Check whether the pair is crossing over
-            haplo_all = np.concatenate(haplo_pair)
-            if (1 in haplo_all) != (2 in haplo_all):
+            n_all1 = alls_ins_bin.count(1)
+            n_all2 = alls_ins_bin.count(2)
+            if (n_all1 == 0) or (n_all2 == 0):
                 reads_identity['faithful'] += 1
-            elif ((haplo_all == 1).sum() >= markers_min // 2) and \
-                 ((haplo_all == 2).sum() >= markers_min // 2):
+
+            elif (n_all1 == 1) or (n_all2 == 1):
+                reads_identity['borderline'] += 1
+
+            elif (n_all1 >= 2) and (n_all2 >= 2):
                 reads_identity['cross'] += 1
-                if VERBOSE >= 3:
-                    print map(list, haplo_pair)
-
-                # Check the crossover points
-                poss_pairl = map(list, poss_pair)
-                poss_ins = np.sort(np.unique(np.concatenate(poss_pair)))
-                haplo_ins = -np.ones_like(poss_ins, int)
-                for i, pos in enumerate(poss_ins):
-                    # If that marker is covered by only one of the reads, fine
-                    if (pos in poss_pair[0]) and (pos not in poss_pair[1]):
-                        haplo_ins[i] = haplo_pair[0][poss_pairl[0].index(pos)]
-                    elif (pos not in poss_pair[0]) and (pos in poss_pair[1]):
-                        haplo_ins[i] = haplo_pair[1][poss_pairl[1].index(pos)]
-
-                    # or else, check whether the two reads agree
-                    else:
-                        h0 = haplo_pair[0][poss_pairl[0].index(pos)]
-                        h1 = haplo_pair[1][poss_pairl[1].index(pos)]
-                        if h0 == h1:
-                            haplo_ins[i] = h0
-                        # If they do not agree, skip marker (it stays at -1)
-
-                ind = haplo_ins != -1
-                poss_ins = poss_ins[ind]
-                haplo_ins = haplo_ins[ind]
-
-                # Find switches
-                for i in xrange(len(haplo_ins) - 1):
-                    if haplo_ins[i + 1] != haplo_ins[i]:
-                        switch_counts[(poss_ins[i], poss_ins[i+1])] += 1
+                if VERBOSE >= 4:
+                    print ''.join(map(str, alls_ins_bin))
 
 
-            else:
-                reads_identity['borderline'] +=1
-    
+            # Set the switch counts and coverage, for all pairs
+            for i, posi in enumerate(poss_ins):
+                alli = alls_ins_bin[i]
+                for j, posj in enumerate(poss_ins[:i]):
+                    allj = alls_ins_bin[j]
+                    cocoverage[(posj, posi)] += 1
+                    if alli != allj:
+                        switch_counts[(posj, posi)] += 1    
 
-    return (reads_identity, switch_counts)
+    return (reads_identity, switch_counts, cocoverage)
 
 
 
@@ -301,11 +336,14 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Errors in HIV pure strains')
     parser.add_argument('--fragments', nargs='*',
                         help='Fragment to map (e.g. F1 F6)')
+    parser.add_argument('-n', type=int, default=100,
+                        help='Number of reads analyzed')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
 
     args = parser.parse_args()
     fragments = args.fragments
+    n_reads = args.n
     VERBOSE = args.verbose
 
     # Specify the dataset
@@ -320,29 +358,42 @@ if __name__ == '__main__':
         print 'fragments', fragments
 
     # MIX1
-    for fragment in fragments:
+    fig, axs = plt.subplots(2, 3, figsize=(19, 12))
+    for ax, fragment in izip(axs.ravel(), fragments):
         check_consensus_mix1(fragment)
-        maxreads = 1000
-        (reads_identity, switch_counts) = count_cross_reads_mix1(fragment,
-                                                                maxreads=maxreads)
-
-        mtuples = switch_counts.keys()
-        coverage_tuples = get_coverage_tuples(data_folder, 18, fragment,
-                                              mtuples,
-                                              maxreads=maxreads, VERBOSE=VERBOSE)
-
-        # Get the switch probabilities
-        nu_cross = {tup: 1.0 * switch_counts[tup] / coverage_tuples[i]
-                    for i, tup in enumerate(mtuples)}
-
-        # Get the switch rate per base
-        r_cross = {tup: nu / (np.max(tup) - np.min(tup))
-                   for tup, nu in nu_cross.iteritems()}
-
-        # Get an idea about the crossover rates
-        cross = np.array(r_cross.values())
+        (reads_identity, switch_counts,
+         cocoverage) = count_cross_reads_mix1(fragment, maxreads=n_reads, VERBOSE=VERBOSE)
 
         print reads_identity
-        print 'log10 (crossover rate [per base]):', (np.log10(cross)).mean(), \
-            '+-', (np.log10(cross)).std()
 
+        # Calculate and plot switches VS distance between markers (asinh?)
+        lengths = []
+        n_switch = []
+        pos_frag = []
+        for pair in cocoverage:
+            lengths.append(pair[1] - pair[0])
+            n_switch.append(1.0 * switch_counts[pair] / cocoverage[pair])
+            pos_frag.append(0.5 * (pair[0] + pair[1]))
+
+        # Linear fit
+        m = np.dot(lengths, n_switch) / np.dot(lengths, lengths)
+        q = 0
+
+        # Plot
+        colors = [cm.jet(int(255.0 * p / np.max(pos_frag))) for p in pos_frag]
+        ax.scatter(lengths, n_switch, s=50, c=colors, label='data (color like starting\npos in fragment)')
+        ax.plot([0, np.max(lengths)], [q, q + m * np.max(lengths)], lw=2,
+                 ls='--', c='k', label='Fit: r = '+'{:1.0e}'.format(m)+' / base')
+        ax.set_xlabel('dist [bases]')
+        ax.set_ylabel('N of crossover')
+        #ax.legend(loc=2, fontsize=18)
+        ax.set_title('Mix1, '+fragment, fontsize=20)
+        ax.set_ylim(-0.1, 0.5)
+
+        # Follow along the fragment
+        #TODO
+
+
+    #plt.tight_layout()
+    plt.ion()
+    plt.show()

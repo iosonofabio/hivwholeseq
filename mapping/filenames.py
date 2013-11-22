@@ -224,7 +224,8 @@ def get_divided_filenames(data_folder, adaID, fragments, type='bam'):
     filename = 'divided/'+filename
     filename = data_folder+foldername_adapter(adaID)+filename
     filenames = []
-    for fragment in (list(fragments) + ['ambiguous', 'unmapped', 'low_quality']):
+    for fragment in (list(fragments) + ['ambiguous', 'crossmapped',
+                                        'unmapped', 'low_quality']):
         fnf = filename+'_'+fragment
         if type == 'sam':
             fnf = fnf + '.sam'

@@ -748,8 +748,9 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, F5_primer, VERBOSE=0,
              pysam.Samfile(output_filenames[4], 'wb', template=bamfile) as fo_F5,\
              pysam.Samfile(output_filenames[5], 'wb', template=bamfile) as fo_F6,\
              pysam.Samfile(output_filenames[6], 'wb', template=bamfile) as fo_am,\
-             pysam.Samfile(output_filenames[7], 'wb', template=bamfile) as fo_um,\
-             pysam.Samfile(output_filenames[8], 'wb', template=bamfile) as fo_lq:
+             pysam.Samfile(output_filenames[7], 'wb', template=bamfile) as fo_cm,\
+             pysam.Samfile(output_filenames[8], 'wb', template=bamfile) as fo_um,\
+             pysam.Samfile(output_filenames[9], 'wb', template=bamfile) as fo_lq:
 
             # Collect the file handles
             file_handles = (fo_F1, fo_F2, fo_F3, fo_F4, fo_F5, fo_F6)
@@ -757,6 +758,7 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, F5_primer, VERBOSE=0,
             # Iterate over the mapped reads and assign fragments
             n_mapped = [0 for fragment in fragments]
             n_unmapped = 0
+            n_crossfrag = 0
             n_ambiguous = 0
             n_outer = 0
             n_lowq = 0
@@ -801,10 +803,11 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, F5_primer, VERBOSE=0,
 
                 # 1. If no fragments are possible (e.g. one read crosses the
                 # fragment boundary, they map to different fragments), dump it
+                # into a special bucket
                 if len(frags_pair) == 0:
-                    n_unmapped += 1
-                    fo_um.write(reads[0])
-                    fo_um.write(reads[1])
+                    n_crossfrag += 1
+                    fo_cm.write(reads[0])
+                    fo_cm.write(reads[1])
                     continue
 
                 # 2. If 2+ fragments are possible (tie), put into a special bucket
@@ -844,7 +847,6 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, F5_primer, VERBOSE=0,
                 if test_crossoverhang(reads, VERBOSE=False):
                     trim_crossoverhangs(reads, trim=0, include_tests=include_tests)
 
-                # 1. If no fragments are possible (e.g. one read crosses the
                 # Change coordinates into the fragmented reference (primer-trimmed)
                 for read in reads:
                     read.pos -= frags_pos[2, 0, n_frag]
@@ -867,6 +869,7 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, F5_primer, VERBOSE=0,
         print 'Mapped:\t\t', sum(n_mapped), n_mapped
         print 'Unmapped:\t', n_unmapped
         print 'Outer primer\t', n_outer
+        print 'Crossfrag:\t', n_crossfrag
         print 'Ambiguous:\t', n_ambiguous
         print 'Low-quality:\t', n_lowq
 
@@ -877,6 +880,7 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, F5_primer, VERBOSE=0,
         f.write('Mapped:\t\t'+str(sum(n_mapped))+' '+str(n_mapped)+'\n')
         f.write('Unmapped:\t'+str(n_unmapped)+'\n')
         f.write('Outer primer\t'+str(n_outer)+'\n')
+        f.write('Crossfrag:\t'+str(n_crossfrag)+'\n')
         f.write('Ambiguous:\t'+str(n_ambiguous)+'\n')
         f.write('Low-quality:\t'+str(n_lowq)+'\n')
 
