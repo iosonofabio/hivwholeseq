@@ -49,3 +49,10 @@ primers_coordinates_HXB2_outer = {'F1': [[523, 547], [2323, 2347]],
                                   'F5b': [[6193, 6216], [8009, 8032]],
                                   'F6': [[7784, 7807], [9591, 9614]],
                                  }
+
+
+# Functions
+def get_fragment_positions(fragments):
+    '''Get a dictionary of positions for the selected fragments'''
+    #TODO
+    pass

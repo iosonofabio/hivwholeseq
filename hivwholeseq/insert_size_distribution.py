@@ -99,6 +99,9 @@ def plot_cumulative_histogram(miseq_run, adaID, fragment, insert_sizes,
         output_filename = get_insert_size_distribution_cumulative_filename(data_folder,
                                                                            adaID,
                                                                            fragment)
+        from hivwholeseq.generic_utils import mkdirs
+        from hivwholeseq.filenames import get_figure_folder
+        mkdirs(get_figure_folder(data_folder, adaID))
         fig.savefig(output_filename)
 
 
@@ -126,6 +129,10 @@ def plot_histogram(miseq_run, adaID, fragment, h,
         data_folder = dataset['folder']
         output_filename = get_insert_size_distribution_filename(data_folder, adaID,
                                                                 fragment)
+
+        from hivwholeseq.generic_utils import mkdirs
+        from hivwholeseq.filenames import get_figure_folder
+        mkdirs(get_figure_folder(data_folder, adaID))
         fig.savefig(output_filename)
 
 
@@ -140,11 +147,15 @@ if __name__ == '__main__':
     parser.add_argument('--adaIDs', nargs='*', type=int,
                         help='Adapter IDs to analyze (e.g. 2 16)')
     parser.add_argument('--fragments', nargs='*',
-                        help='Fragment to map (e.g. F1 F6)')
+                        help='Fragments to analyze (e.g. F1 F6)')
+    parser.add_argument('--premapped', action='store_true',
+                        help='Analyze premapped reads')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
     parser.add_argument('--maxreads', type=int, default=-1,
                         help='Maximal number of reads to analyze')
+    parser.add_argument('--savefig', action='store_true',
+                        help='Store figures')
 
     args = parser.parse_args()
     miseq_run = args.run
@@ -152,6 +163,8 @@ if __name__ == '__main__':
     fragments = args.fragments
     VERBOSE = args.verbose
     maxreads = args.maxreads
+    savefig = args.savefig
+    premapped = args.premapped
 
     # Specify the dataset
     dataset = MiSeq_runs[miseq_run]
@@ -164,7 +177,9 @@ if __name__ == '__main__':
         print 'adaIDs', adaIDs
 
     # If the script is called with no fragment, iterate over all
-    if not fragments:
+    if premapped:
+        fragments = ['premapped']
+    elif not fragments:
         fragments = ['F'+str(i) for i in xrange(1, 7)]
     if VERBOSE >= 3:
         print 'fragments', fragments
@@ -179,7 +194,14 @@ if __name__ == '__main__':
             isz, h = get_insert_size_distribution(data_folder, adaID, fragment,
                                              bins=bins, maxreads=maxreads,
                                              VERBOSE=VERBOSE)
-#            plot_cumulative_histogram(miseq_run, adaID, fragment, isz, lw=2, c='b')
-            plot_histogram(miseq_run, adaID, fragment, h, lw=2, color='b')
+            plot_cumulative_histogram(miseq_run, adaID, fragment, isz, lw=2, c='b',
+                                      savefig=savefig)
+            plot_histogram(miseq_run, adaID, fragment, h, lw=2, color='b',
+                          savefig=savefig)
+
+            if not savefig:
+                import matplotlib.pyplot as plt
+                plt.ion()
+                plt.show()
 
 

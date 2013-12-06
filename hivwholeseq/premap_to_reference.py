@@ -308,6 +308,10 @@ def report_coverage(data_folder, adaID, reference='HXB2', VERBOSE=0):
               fontsize=18)
 
     plt.tight_layout()
+
+    from hivwholeseq.generic_utils import mkdirs
+    from hivwholeseq.filenames import get_figure_folder
+    mkdirs(get_figure_folder(data_folder, adaID))
     plt.savefig(get_coverage_figure_filename(data_folder, adaID, 'premapped'))
 
 

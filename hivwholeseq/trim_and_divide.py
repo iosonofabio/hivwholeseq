@@ -314,7 +314,7 @@ def trim_crossoverhangs(reads, trim=5, include_tests=False):
 def trim_inner_primers(reads, frag_pos, pri, include_tests=False):
     '''Trim inner primers
     
-    - frags_pos are the coordinates of the fragments trimmed of inner primers
+    - frag_pos are the coordinates of the fragments trimmed of inner primers
     '''
     # Note: this function is robust against fuzzy ends, i.e. it works also if the
     # insert reads into the adapters and crap like that.
@@ -704,14 +704,16 @@ def trim_low_quality(reads, phred_min=20, read_len_min=50, include_tests=False,
     return False
 
 
-def trim_and_divide_reads(data_folder, adaID, n_cycles, F5_primer, VERBOSE=0,
-                          maxreads=-1, include_tests=False):
+def trim_and_divide_reads(data_folder, adaID, n_cycles, F5_primer, fragments,
+                          VERBOSE=0,
+                          maxreads=-1, include_tests=False,
+                          ):
     '''Trim reads and divide them into fragments'''
     if VERBOSE:
         print 'Trim and divide into fragments: adaID '+'{:02d}'.format(adaID)
 
-    # Extract fragments and primers
-    fragments = ['F1', 'F2', 'F3', 'F4', F5_primer, 'F6']
+    
+
     # This structure contains the fragment coordinates as of
     # - outer primers (row 0)
     # - inner primers (row 1)
@@ -949,12 +951,14 @@ if __name__ == '__main__':
 
         # Set the primers for fragment 5
         F5_primer = dataset['primerF5'][dataset['adapters'].index(adaID)]
+        fragments = dataset['fragments'][dataset['adapters'].index(adaID)]
 
         # Trim reads and assign them to a fragment (or discard)
         # Note: we pass over the file only once
         trim_and_divide_reads(data_folder, adaID, n_cycles, F5_primer,
                               maxreads=maxreads, VERBOSE=VERBOSE,
-                              include_tests=include_tests)
+                              include_tests=include_tests,
+                              fragments=fragments)
 
         # Check quality and report if requested
         if report:

@@ -14,11 +14,13 @@ dataset_testmiseq = {'description': 'Test run for the MiSeq and the PCR',
                      'folder': '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run28_test_samples/',
                      'date': '2013-07-30',
                      'comments': 'MiSeq run28',
-                     'primerF5': tuple('F5b' for s in xrange(6)),
                      'raw_data': {'read1': 'lane1_NoIndex_L001_R1_001.fastq',
                                   'adapter': 'lane1_NoIndex_L001_R2_001.fastq',
                                   'read2': 'lane1_NoIndex_L001_R3_001.fastq'},
                      'n_cycles': 500,
+                     'primerF5': tuple('F5b' for s in xrange(6)),
+                     'fragments': tuple(('F1i', 'F2i', 'F3i', 'F4i', 'F5bi', 'F6i')
+                                        for s in xrange(6))
                     }
 
 dataset_2 = {'description': 'Second library (first patient-only)',
@@ -29,12 +31,21 @@ dataset_2 = {'description': 'Second library (first patient-only)',
              'folder': '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run37/',
              'date': '2013-09-30',
              'comments': 'MiSeq run37',
-             'primerF5': ('F5b', 'F5b', 'F5b', 'F5b',
-                          'F5a', 'F5a', 'F5a', 'F5a', 'F5a'),
              'raw_data': {'read1': 'read1.fastq',
                           'adapter': 'barcode.fastq',
                           'read2': 'read2.fastq'},
              'n_cycles': 500,
+             'primerF5': ('F5b', 'F5b', 'F5b', 'F5b', 'F5a', 'F5a', 'F5a', 'F5a', 'F5a'),
+             'fragments': (('F1i', 'F2i', 'F3i', 'F4i', 'F5bi', 'F6i'),
+                           ('F1i', 'F2i', 'F3i', 'F4i', 'F5bi', 'F6i'),
+                           ('F1i', 'F2i', 'F3i', 'F4i', 'F5bi', 'F6i'),
+                           ('F1i', 'F2i', 'F3i', 'F4i', 'F5bi', 'F6i'),
+                           ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i'),
+                           ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i'),
+                           ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i'),
+                           ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i'),
+                           ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i'),
+                          )
             }
 
 
@@ -44,8 +55,10 @@ dataset_nextera = {'description': 'Test run for the Nextera library (Sweden)',
                    'folder': '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/pawel_nextera/',
                    'date': '2013-10-20',
                    'comments': 'Library prepared by Lina, sequencing by Pawel Zajac (illumina)',
-                   'primerF5': ('F5a', 'F5a'), # FIXME: Find out about this
                    'n_cycles': 300,
+                   'primerF5': ('F5a', 'F5a'), # FIXME: Find out about this
+                   'fragments': (('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i'),
+                                 ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i'))
                   }
 
 

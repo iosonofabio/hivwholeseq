@@ -319,32 +319,6 @@ def get_unclassified_reads_filenames(data_folder, filtered=False):
     return filenames
 
 
-def get_insert_size_distribution_cumulative_filename(data_folder, adaID, fragment,
-                                                     ext='png'):
-    '''Get filename of the cumulative distribution of insert sizes'''
-    filename = 'insert_size_cumulative_distribution'
-    if fragment == 'premapped':
-        filename = 'premapped/'+filename
-    else:
-        filename = 'mapped/'+filename+'_'+fragment
-    filename = filename+'.'+ext
-    filename = data_folder+foldername_adapter(adaID)+filename
-    return filename
-
-
-def get_insert_size_distribution_filename(data_folder, adaID, fragment,
-                                          ext='png'):
-    '''Get filename of the distribution of insert sizes'''
-    filename = 'insert_size_distribution'
-    if fragment == 'premapped':
-        filename = 'premapped/'+filename
-    else:
-        filename = 'mapped/'+filename+'_'+fragment
-    filename = filename+'.'+ext
-    filename = data_folder+foldername_adapter(adaID)+filename
-    return filename
-
-
 def get_divide_summary_filename(data_folder, adaID):
     '''Get the filename of the summary of the division into fragments'''
     filename = 'summary_divide.txt'
@@ -360,27 +334,6 @@ def get_filter_mapped_summary_filename(data_folder, adaID, fragment):
     filename = data_folder+foldername_adapter(adaID)+filename
     return filename
 
-
-def get_coverage_figure_filename(data_folder, adaID, fragment, ext='png'):
-    '''Get the filename of the coverage report figure'''
-    filename = 'coverage'
-    if fragment == 'premapped':
-        filename = 'premapped/'+filename
-    else:
-        filename = 'divided/'+filename+'_'+fragment
-    filename = filename+'.'+ext
-    filename = data_folder+foldername_adapter(adaID)+filename
-    return filename
-    
-
-def get_overlap_nu_figure_filename(data_folder, adaID, fragments, ext='png'):
-    '''Get the filename of the coverage report figure'''
-    filename = 'overlap_nu_'+fragments
-    filename = 'overlap/'+filename
-    filename = filename+'.'+ext
-    filename = data_folder+foldername_adapter(adaID)+filename
-    return filename
-    
 
 def get_merged_consensus_filename(data_folder, adaID, fragments):
     '''Get the merged consensus of several fragments'''
@@ -410,3 +363,60 @@ def get_custom_hash_filename_fun(reference):
     filename = reference_folder+'hash/'+filename
     fun = lambda ext=True: [filename+'.sthash' if ext else filename][0]
     return fun
+
+
+# FIGURES
+def get_figure_folder(data_folder, adaID):
+    '''Get the folder for figures for this sample'''
+    folder = data_folder+foldername_adapter(adaID)+'figures/'
+    return folder
+
+
+def get_insert_size_distribution_cumulative_filename(data_folder, adaID, fragment,
+                                                     ext='png'):
+    '''Get filename of the cumulative distribution of insert sizes'''
+    filename = 'insert_size_cumulative_distribution'
+    if fragment == 'premapped':
+        filename = filename+'_premapped'
+    else:
+        filename = filename+'_mapped_'+fragment
+    filename = filename+'.'+ext
+    filename = get_figure_folder(data_folder, adaID)+filename
+    return filename
+
+
+def get_insert_size_distribution_filename(data_folder, adaID, fragment,
+                                          ext='png'):
+    '''Get filename of the distribution of insert sizes'''
+    filename = 'insert_size_distribution'
+    if fragment == 'premapped':
+        filename = filename+'_premapped'
+    else:
+        filename = filename+'_mapped_'+fragment
+    filename = filename+'.'+ext
+    filename = get_figure_folder(data_folder, adaID)+filename
+    return filename
+
+
+def get_coverage_figure_filename(data_folder, adaID, fragment, ext='png'):
+    '''Get the filename of the coverage report figure'''
+    filename = 'coverage'
+    if fragment == 'premapped':
+        filename = filename+'_premapped'
+    else:
+        filename = filename+'_mapped_'+fragment
+    filename = filename+'.'+ext
+    filename = get_figure_folder(data_folder, adaID)+filename
+    return filename
+    
+
+def get_overlap_nu_figure_filename(data_folder, adaID, fragments, ext='png'):
+    '''Get the filename of the coverage report figure'''
+    filename = 'overlap_nu_'+fragments
+    filename = 'overlap/'+filename
+    filename = filename+'.'+ext
+    filename = get_figure_folder(data_folder, adaID)+filename
+    return filename
+    
+
+
