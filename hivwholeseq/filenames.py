@@ -319,22 +319,6 @@ def get_unclassified_reads_filenames(data_folder, filtered=False):
     return filenames
 
 
-def get_divide_summary_filename(data_folder, adaID):
-    '''Get the filename of the summary of the division into fragments'''
-    filename = 'summary_divide.txt'
-    filename = 'divided/'+filename
-    filename = data_folder+foldername_adapter(adaID)+filename
-    return filename
-
-
-def get_filter_mapped_summary_filename(data_folder, adaID, fragment):
-    '''Get the filename of the summary of the division into fragments'''
-    filename = 'summary_filter_'+fragment+'.txt'
-    filename = 'mapped/'+filename
-    filename = data_folder+foldername_adapter(adaID)+filename
-    return filename
-
-
 def get_merged_consensus_filename(data_folder, adaID, fragments):
     '''Get the merged consensus of several fragments'''
     filename = 'consensus_'+'-'.join(fragments)+'.fasta'
@@ -418,5 +402,28 @@ def get_overlap_nu_figure_filename(data_folder, adaID, fragments, ext='png'):
     filename = get_figure_folder(data_folder, adaID)+filename
     return filename
     
+
+# SUMMARY
+def get_demultiplex_summary_filename(data_folder):
+    '''Get the filename of the summary of demultiplex'''
+    filename = 'summary_demultiplex.txt'
+    filename = data_folder+filename
+    return filename
+
+
+def get_divide_summary_filename(data_folder, adaID):
+    '''Get the filename of the summary of the division into fragments'''
+    filename = 'summary_divide.txt'
+    filename = 'divided/'+filename
+    filename = data_folder+foldername_adapter(adaID)+filename
+    return filename
+
+
+def get_filter_mapped_summary_filename(data_folder, adaID, fragment):
+    '''Get the filename of the summary of the division into fragments'''
+    filename = 'summary_filter_'+fragment+'.txt'
+    filename = 'mapped/'+filename
+    filename = data_folder+foldername_adapter(adaID)+filename
+    return filename
 
 
