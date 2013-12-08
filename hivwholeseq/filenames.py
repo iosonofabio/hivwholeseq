@@ -18,6 +18,31 @@ reference_folder = root_data_folder+'reference/'
 
 
 # Functions
+def get_reference_premap_filename(data_folder, adaID):
+    '''Get the filename of the reference used from premapping'''
+    fn = 'reference.fasta'
+    fn = data_folder+foldername_adapter(adaID)+'premapped/'+fn
+    return fn
+
+
+def get_reference_premap_index_filename(data_folder, adaID, ext=True):
+    '''Get the filename of the stampy index of the reference used for premapping'''
+    fn = 'reference'
+    if ext:
+        fn = fn + '.stidx'
+    fn = data_folder+foldername_adapter(adaID)+'premapped/'+fn
+    return fn
+
+
+def get_reference_premap_hash_filename(data_folder, adaID, ext=True):
+    '''Get the filename of the stampy hash of the reference used for premapping'''
+    fn = 'reference'
+    if ext:
+        fn = fn + '.sthash'
+    fn = data_folder+foldername_adapter(adaID)+'premapped/'+fn
+    return fn
+
+
 def get_consensus_filename(data_folder, adaID, fragment, trim_primers=True):
     '''Find the filename of the final consensus'''
     filename = 'consensus_'+fragment
@@ -408,6 +433,14 @@ def get_demultiplex_summary_filename(data_folder):
     '''Get the filename of the summary of demultiplex'''
     filename = 'summary_demultiplex.txt'
     filename = data_folder+filename
+    return filename
+
+
+def get_premap_summary_filename(data_folder, adaID):
+    '''Get the filename of the premap to reference'''
+    filename = 'summary_premapped.txt'
+    filename = 'premapped/'+filename
+    filename = data_folder+foldername_adapter(adaID)+filename
     return filename
 
 

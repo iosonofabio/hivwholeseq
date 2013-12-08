@@ -30,6 +30,10 @@ primers_outer = {'F1': ['CTCAATAAAGCTTGCCTTGAGTGC', rc('ACTGTATCATCTGCTCCTGTRTCT
                  'F6': ['GGGTTCTTRGGARCAGCAGGAAG', rc('ATTGAGGCTTAAGCAGTGGGTTC')],
                 }
 
+# All primers together (e.g. F5ai is the inner primer for F5, version a)
+primers_PCR = dict([(fi+'i', si) for (fi, si) in primers_inner.iteritems()] + \
+                   [(fo+'o', so) for (fo, so) in primers_outer.iteritems()])
+
 # Note: the reverse are sorted already, and coordinates start from 0 and end at
 # the last nucleotide + 1 (a la Python).
 primers_coordinates_HXB2_inner = {'F1': [[550, 571], [2251, 2272]],

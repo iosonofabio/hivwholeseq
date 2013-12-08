@@ -30,7 +30,7 @@ if __name__ == '__main__':
     # Parse input args
     parser = argparse.ArgumentParser(description='Demultiplex HIV reads')
     parser.add_argument('--run', required=True,
-                        help='MiSeq run to analyze (e.g. 28, 37, test_tiny)')
+                        help='MiSeq run to analyze (e.g. Tue28, test_tiny)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
     parser.add_argument('--submit', action='store_true', default=False,
