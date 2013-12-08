@@ -13,9 +13,11 @@ content:    Trim premapped reads according to:
 '''
 # Modules
 import os
-import subprocess as sp
 import argparse
+from operator import itemgetter
+from itertools import izip
 import numpy as np
+from Bio import SeqIO
 import pysam
 
 from hivwholeseq.miseq import alpha
@@ -24,106 +26,83 @@ from hivwholeseq.primer_info import primers_coordinates_HXB2_inner as pcis
 from hivwholeseq.primer_info import primers_coordinates_HXB2_outer as pcos
 from hivwholeseq.primer_info import primers_inner, primers_outer
 from hivwholeseq.filenames import get_HXB2_entire, get_premapped_file, \
-        get_divided_filenames, get_divide_summary_filename
+        get_divided_filenames, get_divide_summary_filename, \
+        get_reference_premap_filename
 from hivwholeseq.mapping_utils import pair_generator, convert_sam_to_bam
-
-
-# Globals
-# Cluster submit
-import hivwholeseq
-JOBDIR = hivwholeseq.__path__[0].rstrip('/')+'/'
-JOBLOGERR = JOBDIR+'logerr'
-JOBLOGOUT = JOBDIR+'logout'
-JOBSCRIPT = JOBDIR+'trim_and_divide.py'
-cluster_time = '2:59:59'
-vmem = '1G'
+from hivwholeseq.mapping_utils import test_read_pair_integrity as test_integrity
+from hivwholeseq.mapping_utils import test_read_pair_crossoverhang as test_coh
+from hivwholeseq.mapping_utils import main_block_read_pair_low_quality as main_block_low_quality
+from hivwholeseq.mapping_utils import trim_read_pair_low_quality as trim_low_quality
+from hivwholeseq.mapping_utils import trim_read_pair_crossoverhangs as trim_coh
+from hivwholeseq.fork_cluster import fork_trim_and_divide as fork_self
+from hivwholeseq.samples import samples
 
 
 
 # Functions
-def fork_self(miseq_run, adaID, VERBOSE=0, maxreads=-1):
-    '''Fork self for each adapter ID'''
-    if VERBOSE:
-        print 'Forking to the cluster: adaID '+'{:02d}'.format(adaID)
-
-    qsub_list = ['qsub','-cwd',
-                 '-b', 'y',
-                 '-S', '/bin/bash',
-                 '-o', JOBLOGOUT,
-                 '-e', JOBLOGERR,
-                 '-N', 'tr+div '+'{:02d}'.format(adaID),
-                 '-l', 'h_rt='+cluster_time,
-                 '-l', 'h_vmem='+vmem,
-                 JOBSCRIPT,
-                 '--run', miseq_run,
-                 '--adaIDs', adaID,
-                 '--verbose', VERBOSE,
-                 '--maxreads', maxreads,
-                ]
-    qsub_list = map(str, qsub_list)
-    if VERBOSE >= 2:
-        print ' '.join(qsub_list)
-    sp.call(qsub_list)
-
-
 def make_output_folders(data_folder, adaID, VERBOSE=0):
     '''Make output folders'''
+    from hivwholeseq.generic_utils import mkdirs
     output_filename = get_divided_filenames(data_folder, adaID, fragments=['F1'])[0]
     dirname = os.path.dirname(output_filename)
-    if not os.path.isdir(dirname):
-        os.mkdir(dirname)
-        if VERBOSE:
-            print 'Folder created:', dirname
+    mkdirs(dirname)
+    if VERBOSE:
+        print 'Folder created:', dirname
 
 
-def test_integrity(reads, VERBOSE=True):
-    '''Test integrity of read pair (should be valid at every function entry/exit)'''
-    i_fwd = reads[0].is_reverse
-    i_rev = not i_fwd
+def get_primer_positions(smat, fragments, type='both'):
+    '''Get the primer positions for fwd, rev, or both primers'''
+    from hivwholeseq.primer_info import primers_PCR
+    from hivwholeseq.sequence_utils import expand_ambiguous_seq as eas
 
-    # Check read integrity
-    if reads[i_fwd].pos < 0:
-        if VERBOSE:
-            print 'Read fwd starts before 0 ('+str(reads[i_fwd].pos)+'):', reads[0].qname
-        return True
+    # j controls the direction: j = 0 --> FWD, j = 1 --> REV
+    js = {'fwd': [0], 'rev': [1], 'both': [0, 1]}[type]
+    primer_poss = [[], []]
+    for j in js:
+        pr_old_pos = 0
+        pr_old = ''
+        for fragment in fragments:
+            # Expand ambiguous primers in a list of all possible unambiguous ones,
+            # and look for the best approximate match between all primers and a
+            # sliding window in the HIV genome
+            pr = primers_PCR[fragment][j]
+            pr_mat = np.array(map(list, eas(pr)), 'S1')
+            n_matches = [(smat[i: i + len(pr)] == pr_mat).sum(axis=1).max()
+                         for i in xrange(pr_old_pos + len(pr_old), len(smat) - len(pr))]
+            # NOTE: if F6 rev is the only primer, it lies in the LTR, so we risk
+            # reading the other LTR. Treat it as a special case
+            if j and (len(fragments) == 1) and ('F6' in fragments[0]):
+                pr_pos = len(smat) - len(pr) - 1 - np.argmax(n_matches[::-1])
+            else:
+                pr_pos = pr_old_pos + len(pr_old) + np.argmax(n_matches)
+            
+            primer_poss[j].append([pr_pos, pr_pos + len(pr)])
+            pr_old_pos = pr_pos
+            pr_old = pr
 
-    if (reads[0].mpos != reads[1].pos) or (reads[1].mpos != reads[0].pos):
-        if VERBOSE:
-            print 'Read pair not integer (mpos):', reads[0].qname
-        return True
-
-    if (reads[i_fwd].isize <= 0) or (reads[i_rev].isize >= 0):
-        if VERBOSE:
-            print 'Read pair not integer (sign of isize):', reads[0].qname
-        return True
-    
-    if reads[i_fwd].pos + reads[i_fwd].isize != reads[i_rev].pos + \
-        sum(bl for (bt, bl) in reads[i_rev].cigar if bt in (0, 2)):
-        if VERBOSE:
-            print 'Read pair not integer (insert size):', reads[0].qname
-        return True
-
-    if (sum(bl for (bt, bl) in reads[0].cigar if bt in (0, 1)) != reads[0].rlen) or \
-       (sum(bl for (bt, bl) in reads[1].cigar if bt in (0, 1)) != reads[1].rlen):
-        if VERBOSE:
-            print 'Read pair not integer (CIGAR <-> seq):', reads[0].qname
-        return True
-
-    return False
-
-
-def test_crossoverhang(reads, VERBOSE=True):
-    '''Test reads overhanging beyond the insert size'''
-    i_fwd = reads[0].is_reverse
-    i_rev = not i_fwd
-
-    if (sum(bl for (bt, bl) in reads[i_fwd].cigar if bt in (0, 2)) > reads[i_fwd].isize) or \
-       (reads[i_fwd].pos > reads[i_rev].pos):
-        if VERBOSE:
-            print 'Read pair is cross-overhang:', reads[0].qname
-        return True
+    if type != 'both':
+        return np.array(primer_poss[type == 'rev'], int)
     else:
-        return False
+        return np.array(primer_poss, int)
+
+
+def get_fragment_positions(smat, fragments):
+    '''Get the fragment positions in the reference by approximate string match
+    
+    NOTE: this version of the function cannot guarantee that the end of a fragment
+    comes after the start, but exploits that fragments are sorted. The bright
+    side is that the function can be used to get only FWD or REV primers, ignoring
+    the rest of the output.
+    '''
+    primer_poss = get_primer_positions(smat, fragments, type='both')
+
+    fragment_full_poss = [primer_poss[0, :, 0],
+                          primer_poss[1, :, 1]]
+    fragment_trim_poss = [primer_poss[0, :, 1],
+                          primer_poss[1, :, 0]]
+
+    return {'full': np.array(fragment_full_poss, int).T,
+            'trim': np.array(fragment_trim_poss, int).T}
 
 
 def test_fragment_assignment(reads, n_frag, len_frag, VERBOSE=True):
@@ -143,22 +122,19 @@ def test_fragment_assignment(reads, n_frag, len_frag, VERBOSE=True):
 
 def test_sanity(reads, n_frag, len_frag):
     '''Perform sanity checks on supposedly good reads'''
-    # Check read integrity
-    if test_integrity(reads):
-        return True
+    if not test_integrity(reads):
+        return False
 
-    # Check cross-overhangs
-    if test_crossoverhang(reads):
-        return True
+    if not test_coh(reads):
+        return False
 
-    # Check fragment assignment
-    if test_fragment_assignment(reads, n_frag, len_frag):
-        return True
+    if not test_fragment_assignment(reads, n_frag, len_frag):
+        return False
 
-    return False
+    return True
 
 
-def test_outer_primer(reads, pr_outs, len_reference):
+def test_outer_primer(reads, primers_out_pos, primers_out_seq, lref):
     '''Test for reads starting at outer primers
     
     Note: we only test the fwd read for fwd primers, and vice versa.'''
@@ -168,153 +144,68 @@ def test_outer_primer(reads, pr_outs, len_reference):
     read_fwd = reads[i_fwd]
     read_rev = reads[i_rev]
 
-    # The first and last outer primers are special: we can spot that stuff because
+    # The first fwd and last rev outer primers are special: we can spot them for
     # it is mapped at 0 with an insert as first CIGAR (a read never starts with
     # a deletion) or it reaches the end of the reference with a final insert.
-    if ((read_fwd.pos == 0) and (read_fwd.cigar[0][0] == 1)) or \
-       ((read_fwd.pos + read_fwd.isize == len_reference) and (read_rev.cigar[-1][0] == 1)):
+    if (read_fwd.pos == 0) and (read_fwd.cigar[0][0] == 1):
+        return True
+    if (read_fwd.pos + read_fwd.isize == lref) and (read_rev.cigar[-1][0] == 1):
         return True
 
-    # Test all fragments
-    # FIXME: do slightly better by masking ambiguous positions on the primers
-    for (pr_fwd, pr_rev) in pr_outs:
-        # FWD
-        rfwd = np.fromstring(read_fwd.seq[:len(pr_fwd)], 'S1')
-        if (rfwd == pr_fwd).mean() > 0.8:
-            return True
+    # The internal outer primer cannot be checked by positions only, because
+    # there might be little indels in the reads and we want to be conservative;
+    # however, the read start/end must be mapped somewhere close
+    # FWD
+    for pr_pos, pr_mat in izip(primers_out_pos['fwd'], primers_out_seq['fwd']):
+        if np.abs(read_fwd.pos - pr_pos) < 8:
+            rfwd = np.fromstring(read_fwd.seq[:pr_mat.shape[1]], 'S1')
+            if (rfwd == pr_mat).mean(axis=1).max() > 0.9:
+                return True
+            else:
+                # If the read is close to an outer primer, it is far from any other
+                break
 
-        # REV
-        rrev = np.fromstring(read_rev.seq[-len(pr_rev):], 'S1')
-        if (rrev == pr_rev).mean() > 0.8:
-            return True
+    # REV
+    for primer_pos, pr_mat in izip(primers_out_pos['rev'], primers_out_seq['rev']):
+        if np.abs(read_fwd.pos + read_fwd.isize - pr_pos) < 8:
+            rrev = np.fromstring(read_rev.seq[-pr_mat.shape[1]:], 'S1')
+            if (rrev == pr_mat).mean(axis=1).max() > 0.9:
+                return True
+            else:
+                break
 
     return False
 
 
-def assign_to_fragment(reads, fragpri_pos):
+def assign_to_fragment(reads, fragment_full_poss):
     '''Assign read pair to fragments'''
     i_fwd = reads[0].is_reverse
     i_rev = not i_fwd
 
     # Insert coordinates
-    start_fwd = reads[i_fwd].pos
-    end_rev = reads[i_fwd].pos + reads[i_fwd].isize
+    ins_start = reads[i_fwd].pos
+    ins_end = reads[i_fwd].pos + reads[i_fwd].isize
+
+    # Fragment coordinates (including primers)
+    fragment_start, fragment_end = fragment_full_poss.T
 
     # If short inserts are not trimmed yet, we easily have the fwd read going
-    # beyond reads[i_fwd].pos + reads[i_fwd].isize. Ignore that stuff, it's being
-    # trimmed later on. For assignment, check only the insert AS A WHOLE.
-    frags_pair = ((start_fwd >= fragpri_pos[0]) &
-                  (start_fwd < fragpri_pos[1]) &
-                  (end_rev <= fragpri_pos[1])).nonzero()[0]
+    # beyond the "true" beginning of the reverse read, i.e.
+    #                reads[i_fwd].pos + reads[i_fwd].isize
+    # Ignore that stuff, it's being trimmed later on. For assignment, check only
+    # the insert AS A WHOLE.
+    frags_ins = ((ins_start >= fragment_start) &
+                 (ins_start < fragment_end) &
+                 (ins_end <= fragment_end) \
+                ).nonzero()[0]
 
-    return frags_pair
-
-
-def trim_crossoverhangs(reads, trim=5, include_tests=False):
-    '''Trim short inserts so that they do not overhang, minus a few bases'''
-    if include_tests:
-        if test_integrity(reads):
-            print 'trim_crossoverhangs (entry):'
-            import ipdb; ipdb.set_trace()
-
-    i_fwd = reads[0].is_reverse
-    i_rev = not i_fwd
-
-    # FWD
-    end_rev = reads[i_fwd].pos + reads[i_fwd].isize
-    read = reads[i_fwd]
-    ref_pos = read.pos
-    read_pos = 0
-    cigar = []
-    for i, (bt, bl) in enumerate(read.cigar):
-        if bt == 0:
-            if ref_pos + bl >= end_rev - trim:
-                cigar.append((bt, end_rev - ref_pos - trim))
-                read_pos += end_rev - ref_pos - trim
-                break
-
-            cigar.append((bt, bl))
-            ref_pos += bl
-            read_pos += bl
-
-        elif bt == 1:
-            cigar.append((bt, bl))
-            read_pos += bl
-
-        elif bt == 2:
-            if ref_pos + bl >= end_rev - trim:
-                # Do not end with a deletion (stampy would not either)
-                break
-            cigar.append((bt, bl))
-            ref_pos += bl
-
-        else:
-            raise ValueError('CIGAR type '+str(bt)+' not recognized')
-    
-    seq = read.seq
-    qual = read.qual
-    read.seq = seq[:read_pos]
-    read.qual = qual[:read_pos]
-    read.cigar = cigar
-
-    # REV (go backwards, otherwise we do not get the cigar!)
-    start_fwd = reads[i_fwd].pos
-    read = reads[i_rev]
-    ref_pos = end_rev
-    read_pos = read.rlen
-    cigar = []
-    for i, (bt, bl) in enumerate(read.cigar[::-1]):
-        if bt == 0:
-            if ref_pos - bl <= start_fwd + trim:
-                cigar.append((bt, ref_pos - (start_fwd + trim)))
-                read_pos -= ref_pos - (start_fwd + trim)
-                ref_pos = start_fwd + trim
-                break
-
-            cigar.append((bt, bl))
-            ref_pos -= bl
-            read_pos -= bl
-
-        elif bt == 1:
-            cigar.append((bt, bl))
-            read_pos -= bl
-
-        elif bt == 2:
-            if ref_pos - bl <= start_fwd + trim:
-                # Do not end with a deletion (stampy would not either)
-                break
-            cigar.append((bt, bl))
-            ref_pos -= bl
-
-        else:
-            raise ValueError('CIGAR type '+str(bt)+' not recognized')
-    cigar = cigar[::-1]
-
-    seq = read.seq
-    qual = read.qual
-    read.pos = ref_pos
-    read.seq = seq[read_pos:]
-    read.qual = qual[read_pos:]
-    read.cigar = cigar
-
-    # Fix mate pair
-    reads[i_fwd].mpos = reads[i_rev].pos
-    reads[i_rev].mpos = reads[i_fwd].pos
-    isize = reads[i_rev].pos + sum(bl for bt, bl in reads[i_rev].cigar
-                                   if bt in (0, 2)) - reads[i_fwd].pos
-    reads[i_fwd].isize = isize
-    reads[i_rev].isize = -isize
-
-    if include_tests:
-        if test_integrity(reads):
-            print 'trim_crossoverhangs (exit):'
-            import ipdb; ipdb.set_trace()
+    return frags_ins
 
 
-def trim_inner_primers(reads, frag_pos, pri, include_tests=False):
+def trim_primers(reads, frag_pos, include_tests=False):
     '''Trim inner primers
     
-    - frag_pos are the coordinates of the fragments trimmed of inner primers
+    - frag_pos are the coordinates of the fragment trimmed of inner primers
     '''
     # Note: this function is robust against fuzzy ends, i.e. it works also if the
     # insert reads into the adapters and crap like that.
@@ -322,7 +213,7 @@ def trim_inner_primers(reads, frag_pos, pri, include_tests=False):
 
     if include_tests:
         if test_integrity(reads):
-            print 'trim_inner_primers (entry):'
+            print 'trim_primers (entry):'
             import ipdb; ipdb.set_trace()
 
     tampered = False
@@ -411,331 +302,60 @@ def trim_inner_primers(reads, frag_pos, pri, include_tests=False):
 
     if include_tests:
         if test_integrity(reads):
-            print 'trim_inner_primers (exit):'
+            print 'trim_primers (exit):'
             import ipdb; ipdb.set_trace()
 
 
-def main_block_low_quality(reads, phred_min=20, read_len_min=50, include_tests=False,
-                     VERBOSE=0):
-    '''Trim low-quality stretches'''
-
-    if include_tests:
-        if test_integrity(reads):
-            print 'main_block_quality (entry):'
-            import ipdb; ipdb.set_trace()
-
-    tampered = False
-    for read in reads:
-        # Sanger phred score used (illumina 1.8+)
-        phred = np.fromstring(read.qual, np.int8) - 33
-        # get all positions above the cut-off
-        ind = np.asarray(phred >= phred_min, int)
-
-        # If the whole read is below the threshold, trash the pair
-        if not ind.any():
-            return True
-
-        # If the whole read is safe, do not tamper
-        if ind.all():
-            continue
-
-        # We have to tamper
-        tampered = True
-
-        # divide in blocks
-        switch = np.diff(ind).nonzero()[0] + 1
-        ind_block_start = np.insert(switch, 0, 0)
-        ind_block_end = np.append(switch, len(ind))
-    
-        # keep only high-q blocks
-        # If the first block is high-q, even blocks are; else, odd blocks are
-        first_block_good = ind[0]
-        ind_block_start = ind_block_start[not first_block_good::2]
-        ind_block_end = ind_block_end[not first_block_good::2]
-
-        # get largest
-        blocks_len = ind_block_end - ind_block_start
-        ind_largest_block = blocks_len.argmax()
-
-        # Check how much we lost
-        if VERBOSE >= 3:
-            percent_lost = 100 - 100 * (read_end - read_start) / read.rlen
-            print 'Q-trim lost:', percent_lost, '%'
-
-        # Trash tiny reads
-        if blocks_len[ind_largest_block] < read_len_min:
-            return True
-
-        # rewrite read such that CIGARs are fine
-        # START
-        read_start = ind_block_start[ind_largest_block]
-        ref_start = read.pos
-        if read_start == 0:
-            cigar = read.cigar
-        else:
-            read_pos = 0
-            cigar = read.cigar[::-1]
-            for (bt, bl) in read.cigar:
-                # A read CAN start with an insertion
-                if bt in (0, 1):
-                    if read_pos + bl > read_start:
-                        cigar[-1] = (bt, read_pos + bl - read_start)
-                        if bt == 0:
-                            ref_start += read_start - read_pos
-                        break
-                    cigar.pop(-1)
-                    if bt == 0:
-                        ref_start += bl
-                    read_pos += bl
-                elif bt == 2:
-                    # A read cannot start with a deletion
-                    cigar.pop(-1)
-            cigar = cigar[::-1]
-
-        # END (we are operating on the trimmed read now)
-        read_end = ind_block_end[ind_largest_block] - read_start
-        # If we go all the way, no need for trimming the end
-        if read_end + read_start < read.rlen:
-            read_pos = 0
-            # We walk along the read this time, because it's probably faster
-            # than actually trimming from the back
-            cigar_new = []
-            for (bt, bl) in cigar:
-                # A read CAN end with an insertion
-                if bt in (0, 1):
-                    if read_pos + bl >= read_end:
-                        cigar_new.append((bt, read_end - read_pos))
-                        break
-                    cigar_new.append((bt, bl))
-                    read_pos += bl
-                elif bt == 2:
-                    # Note: a read cannot end with a deletion, so we do nothing
-                    if read_pos + bl >= read_end:
-                        break
-                    cigar_new.append((bt, bl))
-
-            cigar = cigar_new
-
-        # Write properties
-        seq = read.seq
-        qual = read.qual
-        read.pos = ref_start
-        read.seq = seq[read_start: read_start + read_end]
-        read.qual = qual[read_start: read_start + read_end]
-        read.cigar = cigar
-
-    # Fix mate pair stuff
-    if tampered:
-        i_fwd = reads[0].is_reverse
-        i_rev = not i_fwd
-        reads[i_fwd].mpos = reads[i_rev].pos
-        reads[i_rev].mpos = reads[i_fwd].pos
-        isize = reads[i_rev].pos + sum(bl for bt, bl in reads[i_rev].cigar
-                                       if bt in (0, 2)) - reads[i_fwd].pos
-        reads[i_fwd].isize = isize
-        reads[i_rev].isize = -isize
-
-    if include_tests:
-        if test_integrity(reads):
-            print 'main_block_low_quality (exit):'
-            import ipdb; ipdb.set_trace()
-
-    return False
-
-
-def trim_low_quality(reads, phred_min=20, read_len_min=50, include_tests=False,
-                     VERBOSE=0):
-    '''Strip loq-q from left and right, but leave in the middle'''
-    # The rationale of this approach is that we still have the Qs later for
-    # more detailed exclusions (e.g. for minor allele frequencies)
-
-    if include_tests:
-        if test_integrity(reads):
-            print 'trim_low_quality (entry):'
-            import ipdb; ipdb.set_trace()
-
-    tampered = False
-    for read in reads:
-        # Sanger phred score used (illumina 1.8+)
-        phred = np.fromstring(read.qual, np.int8) - 33
-        # get all positions above the cut-off
-        ind = np.asarray(phred >= phred_min, int)
-
-        # If the whole read is safe, do not tamper
-        if ind.all():
-            continue
-
-        # Use sliding windows to check for mushy edges (we allow for ONE low-q,
-        # which should cover most cases).
-        read_size_min = 50
-        win_size = 10
-        win_qual_threshold = 9
-        shift = 5
-        # LEFT EDGE
-        read_start = 0
-        win_qual = 0
-        while win_qual < win_qual_threshold:
-            # If no window ever reaches the quality threshold, trash the pair
-            if read_start > read.rlen - read_size_min:
-                return True
-            win_phred = phred[read_start: read_start + win_size]
-            win_qual = (win_phred >= phred_min).sum()
-            read_start += shift
-        read_start -= shift
-        # RIGHT EDGE
-        read_end = read.rlen
-        win_qual = 0
-        while win_qual < win_qual_threshold:
-            # If the high-q read chunk is tiny, trash the pair
-            if read_end < read_start + read_size_min:
-                return True
-            win_phred = phred[read_end - win_size: read_end]
-            win_qual = (win_phred >= phred_min).sum()
-            read_end -= shift
-        read_end += shift
-
-        # If the trimmed read still has widespread low-q, it was not a trimming
-        # problem: trash the pair (this happend almost never)
-        if phred[read_start: read_end].mean() < 0.9:
-            return True
-
-        # If we trim nothing, proceed: this happens if the only low-q bases are
-        # singletons in the middle of the read (this happens a lot, say someone
-        # opened the door of the MiSeq room)
-        if (read_start == 0) and (read_end == read.rlen):
-            continue
-
-        # Check how much we lost
-        if VERBOSE >= 3:
-            percent_lost = 100 - 100 * (read_end - read_start) / read.rlen
-            print 'Q-trim lost:', percent_lost, '%'
-
-        # or else, we have to tamper
-        tampered = True
-
-        ##FIXME
-        #if read.qname == 'HWI-M01346:28:000000000-A53RP:1:1101:2303:16467':
-        #    print read.qname
-        #    import ipdb; ipdb.set_trace()
-
-        # rewrite read such that CIGARs are fine
-        # START
-        ref_start = read.pos
-        if read_start == 0:
-            cigar = read.cigar
-        else:
-            read_pos = 0
-            cigar = read.cigar[::-1]
-            for (bt, bl) in read.cigar:
-                # A read CAN start with an insertion
-                if bt in (0, 1):
-                    if read_pos + bl > read_start:
-                        cigar[-1] = (bt, read_pos + bl - read_start)
-                        if bt == 0:
-                            ref_start += read_start - read_pos
-                        break
-                    cigar.pop(-1)
-                    if bt == 0:
-                        ref_start += bl
-                    read_pos += bl
-                elif bt == 2:
-                    # A read cannot start with a deletion
-                    cigar.pop(-1)
-            cigar = cigar[::-1]
-
-        # END (we are operating on the trimmed read now)
-        read_end -= read_start
-        # If we go all the way, no need for trimming the end
-        if read_end + read_start < read.rlen:
-            read_pos = 0
-            # We walk along the read this time, because it's probably faster
-            # than actually trimming from the back
-            cigar_new = []
-            for (bt, bl) in cigar:
-                # A read CAN end with an insertion
-                if bt in (0, 1):
-                    if read_pos + bl >= read_end:
-                        cigar_new.append((bt, read_end - read_pos))
-                        break
-                    cigar_new.append((bt, bl))
-                    read_pos += bl
-                elif bt == 2:
-                    # we cannot reach read_end via a deletion, because read_pos
-                    # does not increase, so there's going to be a new cigar after
-                    # this (in any case, the read did never and will never end
-                    # with a deletion
-                    cigar_new.append((bt, bl))
-
-            cigar = cigar_new
-
-        # Write properties
-        seq = read.seq
-        qual = read.qual
-        read.pos = ref_start
-        read.seq = seq[read_start: read_start + read_end]
-        read.qual = qual[read_start: read_start + read_end]
-        read.cigar = cigar
-
-    # Fix mate pair stuff
-    if tampered:
-        i_fwd = reads[0].is_reverse
-        i_rev = not i_fwd
-        reads[i_fwd].mpos = reads[i_rev].pos
-        reads[i_rev].mpos = reads[i_fwd].pos
-        isize = reads[i_rev].pos + sum(bl for bt, bl in reads[i_rev].cigar
-                                       if bt in (0, 2)) - reads[i_fwd].pos
-
-        # If extremely rare cases, we trim so much that the read becomes fully
-        # cross-overhanging
-        #                ------->
-        #    <-----
-        # we should dump the pair in this case (short inserts are dumped later anyway)
-        if isize <= 0:
-            return True
-
-        reads[i_fwd].isize = isize
-        reads[i_rev].isize = -isize
-
-    if include_tests:
-        if test_integrity(reads):
-            print 'trim_low_quality (exit):'
-            import ipdb; ipdb.set_trace()
-
-    return False
-
-
-def trim_and_divide_reads(data_folder, adaID, n_cycles, F5_primer, fragments,
-                          VERBOSE=0,
-                          maxreads=-1, include_tests=False,
-                          ):
+def trim_and_divide_reads(data_folder, adaID, n_cycles, fragments,
+                          maxreads=-1, VERBOSE=0,
+                          include_tests=False, summary=True):
     '''Trim reads and divide them into fragments'''
     if VERBOSE:
-        print 'Trim and divide into fragments: adaID '+'{:02d}'.format(adaID)
+        print 'Trim and divide into fragments: adaID '+adaID+', fragments: '+\
+                ' '.join(fragments)
 
-    
+    if summary:
+        with open(get_divide_summary_filename(data_folder, adaID), 'w') as f:
+            f.write('Fragments used: '+' '.join(fragments)+'\n')
 
-    # This structure contains the fragment coordinates as of
-    # - outer primers (row 0)
-    # - inner primers (row 1)
-    # - trimmed of all primers (row 2)
-    frags_pos = np.zeros((3, 2, len(fragments)), int)
-    for i, fragment in enumerate(fragments):
-        pci = pcis[fragment]
-        pco = pcos[fragment]
-        frags_pos[0, :, i] = (pco[0][0], pco[1][1])
-        frags_pos[1, :, i] = (pci[0][0], pci[1][1])
-        frags_pos[2, :, i] = (pci[0][1], pci[1][0])
-    # Since the reference is cropped, subtract from the positions F1 start
-    # Note: now we are in the reference of the CROPPED HXB2, and start from 0!
-    frags_pos -= frags_pos[1].min()
-    # Make primers with masks for ambiguous nucleotides
-    pr_outs = []
-    for fragment in fragments:
-        ptmps = primers_outer[fragment]
-        for i, ptmp in enumerate(ptmps):
-            ptmp = np.ma.array(list(ptmp), mask=[p not in alpha[:4] for p in ptmp])
-            ptmps[i] = ptmp
-        pr_outs.append(ptmps)
+    ref_filename = get_reference_premap_filename(data_folder, adaID)
+    refseq = SeqIO.read(ref_filename, 'fasta')
+    smat = np.array(refseq, 'S1')
+    len_reference = len(refseq)
+
+    # Get the positions of fragment start/end, w/ and w/o primers
+    frags_pos = get_fragment_positions(smat, fragments)
+
+    # Get the positions of the unwanted outer primers (in case we DO nested PCR
+    # for that fragment)
+    # NOTE: the LTRs make no problem, because the rev outer primer of F6
+    # is not in the reference anymore if F6 has undergone nested PCR
+    from re import findall
+    primers_out = {'fwd': [], 'rev': []}
+    for i, fr in enumerate(fragments):
+        if (i != 0) and findall(r'F[2-6][a-z]?i', fr):
+            primers_out['fwd'].append(fr[:-1]+'o')
+        if (i != len(fragments) - 1) and findall(r'F[1-5][a-z]?i', fr):
+            primers_out['rev'].append(fr[:-1]+'o')
+
+    # Get all possible unambiguous primers for the unwanted outer primers
+    from hivwholeseq.primer_info import primers_PCR
+    from hivwholeseq.sequence_utils import expand_ambiguous_seq as eas
+    primers_out_seq = {'fwd': [np.array(map(list, eas(primers_PCR[fr][0])),
+                                        'S1', ndmin=2)
+                               for fr in primers_out['fwd']],
+                       'rev': [np.array(map(list, eas(primers_PCR[fr][1])),
+                                        'S1', ndmin=2)
+                               for fr in primers_out['rev']],
+                      }
+
+    primers_out_pos = {'fwd': get_primer_positions(smat,
+                                                   primers_out['fwd'],
+                                                   'fwd')[:, 0],
+                       'rev': get_primer_positions(smat,
+                                                   primers_out['rev'],
+                                                   'rev')[:, 1],
+                      }
 
     # Input and output files
     input_filename = get_premapped_file(data_folder, adaID, type='bam')
@@ -784,7 +404,8 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, F5_primer, fragments,
                     fo_um.write(reads[1])
                     continue
 
-                # If the insert is a misamplification from the outer primers,
+                # If the insert is a misamplification from the outer primers
+                # in fragments that underwent nested PCR,
                 # trash it (it will have skewed amplification anyway). We cannot
                 # find all of those, rather only the ones still carrying the
                 # primer itself (some others have lost it while shearing). For
@@ -792,7 +413,9 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, F5_primer, fragments,
                 # etc.), ONE of the reads in the pair will start exactly with one
                 # outer primer: if the rev read with a rev primer, if the fwd
                 # with a fwd one. Test all six.
-                if test_outer_primer(reads, pr_outs, frags_pos[1, 1, -1]):
+                if test_outer_primer(reads,
+                                     primers_out_pos, primers_out_seq,
+                                     len_reference):
                     if VERBOSE >= 3:
                         print 'Read pair from outer primer:', reads[0].qname
                     n_outer += 1
@@ -801,7 +424,7 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, F5_primer, fragments,
                     continue
 
                 # Assign to a fragment now, so that primer trimming is faster 
-                frags_pair = assign_to_fragment(reads, frags_pos[1])
+                frags_pair = assign_to_fragment(reads, frags_pos['full'])
 
                 # 1. If no fragments are possible (e.g. one read crosses the
                 # fragment boundary, they map to different fragments), dump it
@@ -821,18 +444,19 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, F5_primer, fragments,
                     fo_am.write(reads[1])
                     continue
 
-                # 3. If the intersection is a single fragment, good
+                # 3. If the intersection is a single fragment, good: trim the primers
                 n_frag = frags_pair[0]
-                trim_inner_primers(reads, frags_pos[2, :, n_frag],
-                                   primers_inner[fragments[n_frag]],
-                                   include_tests=include_tests)
+                trim_primers(reads, frags_pos['trim'][n_frag],
+                             include_tests=include_tests)
                 # Nothing bad can happen here: if the insert is small, it will have
                 # at most one primer, and trimming 30 bases is fine (it is 100
                 # at least!)
 
                 # Quality trimming: if no decently long pair survives, trash
-                #trashed_quality = main_block_low_quality(reads, phred_min=20, include_tests=include_tests)
-                trashed_quality = trim_low_quality(reads, phred_min=20, include_tests=include_tests)
+                #trashed_quality = main_block_low_quality(reads, phred_min=20,
+                #                                         include_tests=include_tests)
+                trashed_quality = trim_low_quality(reads, phred_min=20,
+                                                   include_tests=include_tests)
                 i_fwd = reads[0].is_reverse
                 if trashed_quality or (reads[i_fwd].isize < 100):
                     n_lowq += 1
@@ -842,31 +466,33 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, F5_primer, fragments,
                     fo_lq.write(reads[1])
                     continue
 
-                # Check for cross-overhangs (reading into the adapters)
+                # Check for cross-overhangs or COH (reading into the adapters)
                 #        --------------->
                 #    <-----------
                 # In that case, trim to perfect overlap.
-                if test_crossoverhang(reads, VERBOSE=False):
-                    trim_crossoverhangs(reads, trim=0, include_tests=include_tests)
+                if test_coh(reads, VERBOSE=False):
+                    trim_coh(reads, trim=0, include_tests=include_tests)
 
                 # Change coordinates into the fragmented reference (primer-trimmed)
                 for read in reads:
-                    read.pos -= frags_pos[2, 0, n_frag]
-                    read.mpos -= frags_pos[2, 0, n_frag]
+                    read.pos -= frags_pos['trim'][n_frag, 0]
+                    read.mpos -= frags_pos['trim'][n_frag, 0]
 
                 # Here the tests
                 if include_tests:
-                    if test_sanity(reads, n_frag, frags_pos[2, 1, n_frag] - frags_pos[2, 0, n_frag]):
+                    lfr = frags_pos['trim'][n_frag, 1] - frags_pos['trim'][n_frag, 0]
+                    if test_sanity(reads, n_frag, lfr):
                         print 'Tests failed:', reads[0].qname
                         import ipdb; ipdb.set_trace()
 
                 # There we go!
-                n_mapped[n_frag] += 1
-                file_handles[n_frag].write(reads[0])
-                file_handles[n_frag].write(reads[1])
+                n_frag_all = int(fragments[n_frag][1]) - 1
+                n_mapped[n_frag_all] += 1
+                file_handles[n_frag_all].write(reads[0])
+                file_handles[n_frag_all].write(reads[1])
 
     if VERBOSE:
-        print 'Trim and divide results: adaID '+'{:02d}'.format(adaID)
+        print 'Trim and divide results: adaID '+adaID
         print 'Total:\t\t', irp
         print 'Mapped:\t\t', sum(n_mapped), n_mapped
         print 'Unmapped:\t', n_unmapped
@@ -876,23 +502,17 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, F5_primer, fragments,
         print 'Low-quality:\t', n_lowq
 
     # Write summary to file
-    with open(get_divide_summary_filename(data_folder, adaID), 'w') as f:
-        f.write('Trim and divide results: adaID '+'{:02d}'.format(adaID)+'\n')
-        f.write('Total:\t\t'+str(irp)+'\n')
-        f.write('Mapped:\t\t'+str(sum(n_mapped))+' '+str(n_mapped)+'\n')
-        f.write('Unmapped:\t'+str(n_unmapped)+'\n')
-        f.write('Outer primer\t'+str(n_outer)+'\n')
-        f.write('Crossfrag:\t'+str(n_crossfrag)+'\n')
-        f.write('Ambiguous:\t'+str(n_ambiguous)+'\n')
-        f.write('Low-quality:\t'+str(n_lowq)+'\n')
-
-
-def report_coverage(data_folder, adaID, VERBOSE=0):
-    '''Produce a report on rough coverage on HXB2'''
-    #TODO
-    pass
-
-
+    if summary:
+        with open(get_divide_summary_filename(data_folder, adaID), 'a') as f:
+            f.write('\n')
+            f.write('Trim and divide results: adaID '+adaID+'\n')
+            f.write('Total:\t\t'+str(irp)+'\n')
+            f.write('Mapped:\t\t'+str(sum(n_mapped))+' '+str(n_mapped)+'\n')
+            f.write('Unmapped:\t'+str(n_unmapped)+'\n')
+            f.write('Outer primer\t'+str(n_outer)+'\n')
+            f.write('Crossfrag:\t'+str(n_crossfrag)+'\n')
+            f.write('Ambiguous:\t'+str(n_ambiguous)+'\n')
+            f.write('Low-quality:\t'+str(n_lowq)+'\n')
 
 
 
@@ -901,11 +521,11 @@ if __name__ == '__main__':
 
     # Parse input args
     parser = argparse.ArgumentParser(description='Trim and divide reads into fragments')
-    parser.add_argument('--run', type=int, required=True,
-                        help='MiSeq run to analyze (e.g. 28, 37)')
-    parser.add_argument('--adaIDs', nargs='*', type=int,
-                        help='Adapter IDs to analyze (e.g. 2 16)')
-    parser.add_argument('--verbose', type=int, default=0,
+    parser.add_argument('--run', required=True,
+                        help='Sequencing run to analyze (e.g. Tue28)')
+    parser.add_argument('--adaIDs', nargs='*',
+                        help='Adapter IDs to analyze (e.g. TS2)')
+    parser.add_argument('--verbose', default=0, type=int,
                         help='Verbosity level [0-3]')
     parser.add_argument('--maxreads', type=int, default=-1,
                         help='Maximal number of reads to analyze')
@@ -913,20 +533,21 @@ if __name__ == '__main__':
                         help='Execute the script in parallel on the cluster')
     parser.add_argument('--test', action='store_true',
                         help='Include sanity checks on mapped reads (slow)')
-    parser.add_argument('--report', action='store_true',
-                        help='Perform quality checks and save into a report')
+    parser.add_argument('--no-summary', action='store_false',
+                        dest='summary',
+                        help='Do not save results in a summary file')
 
     args = parser.parse_args()
-    miseq_run = args.run
+    seq_run = args.run
     adaIDs = args.adaIDs
     VERBOSE = args.verbose
     maxreads = args.maxreads
     submit = args.submit
     include_tests = args.test
-    report = args.report
+    summary = args.summary
 
     # Specify the dataset
-    dataset = MiSeq_runs[miseq_run]
+    dataset = MiSeq_runs[seq_run]
     data_folder = dataset['folder']
 
     # Set the number of cycles of the kit (for trimming adapters in short inserts)
@@ -934,7 +555,7 @@ if __name__ == '__main__':
 
     # If the script is called with no adaID, iterate over all
     if not adaIDs:
-        adaIDs = MiSeq_runs[miseq_run]['adapters']
+        adaIDs = MiSeq_runs[seq_run]['adapters']
 
     # Iterate over all adaIDs
     for adaID in adaIDs:
@@ -943,26 +564,19 @@ if __name__ == '__main__':
         if submit:
             if include_tests:
                 raise ValueError('Tests require an interactive shell')
-            fork_self(miseq_run, adaID, VERBOSE=VERBOSE, maxreads=maxreads)
+            fork_self(seq_run, adaID, VERBOSE=VERBOSE, maxreads=maxreads,
+                      summary=summary)
             continue
 
-        # Make output folders
         make_output_folders(data_folder, adaID, VERBOSE=VERBOSE)
 
-        # Set the primers for fragment 5
-        F5_primer = dataset['primerF5'][dataset['adapters'].index(adaID)]
-        fragments = dataset['fragments'][dataset['adapters'].index(adaID)]
+        samplename = dataset['samples'][dataset['adapters'].index(adaID)]
+        fragments = samples[samplename]['fragments']
 
         # Trim reads and assign them to a fragment (or discard)
         # Note: we pass over the file only once
-        trim_and_divide_reads(data_folder, adaID, n_cycles, F5_primer,
+        trim_and_divide_reads(data_folder, adaID, n_cycles, fragments,
                               maxreads=maxreads, VERBOSE=VERBOSE,
                               include_tests=include_tests,
-                              fragments=fragments)
-
-        # Check quality and report if requested
-        if report:
-
-            # Report rough coverage on HXB2
-            report_coverage(data_folder, adaID, VERBOSE=VERBOSE)
-
+                              summary=summary)
+        continue

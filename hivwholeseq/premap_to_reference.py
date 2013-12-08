@@ -39,11 +39,11 @@ from hivwholeseq.samples import samples
 
 
 # Functions
-def make_output_folders(data_folder, adaID, VERBOSE=0, report=False):
+def make_output_folders(data_folder, adaID, VERBOSE=0, summary=True):
     '''Make output folders'''
     from hivwholeseq.generic_utils import mkdirs
     outfiles = [get_premapped_file(data_folder, adaID)]
-    if report:
+    if summary:
         outfiles.append(get_coverage_figure_filename(data_folder, adaID, 'premapped'))
     for outfile in outfiles:
         dirname = os.path.dirname(outfile)
@@ -282,7 +282,7 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
             f.write('\nJoint BAM file reheaded.\n')
 
 
-def report_insert_size(data_folder, adaID,  VERBOSE=0, summary=True):
+def report_insert_size(data_folder, adaID, seq_run, VERBOSE=0, summary=True):
     '''Produce figures of the insert size distribution'''
     from hivwholeseq.insert_size_distribution import get_insert_size_distribution, \
             plot_cumulative_histogram, plot_histogram
@@ -291,9 +291,9 @@ def report_insert_size(data_folder, adaID,  VERBOSE=0, summary=True):
     isz, h = get_insert_size_distribution(data_folder, adaID, 'premapped',
                                           bins=bins, maxreads=10000,
                                           VERBOSE=VERBOSE)
-    plot_cumulative_histogram(miseq_run, adaID, 'premapped', isz, savefig=True,
+    plot_cumulative_histogram(seq_run, adaID, 'premapped', isz, savefig=True,
                               lw=2, c='b')
-    plot_histogram(miseq_run, adaID, 'premapped', h, savefig=True,
+    plot_histogram(seq_run, adaID, 'premapped', h, savefig=True,
                    lw=2, color='b')
 
     if summary:
@@ -371,8 +371,6 @@ if __name__ == '__main__':
                         help='Execute the script in parallel on the cluster')
     parser.add_argument('--threads', type=int, default=1,
                         help='Number of threads to use for mapping')
-    parser.add_argument('--report', action='store_true',
-                        help='Perform quality checks and save into a report')
     parser.add_argument('--reference', default='HXB2',
                         help='Use alternative reference, e.g. chimeras (the file must exist)')
     parser.add_argument('--no-summary', action='store_false',
@@ -380,17 +378,16 @@ if __name__ == '__main__':
                         help='Do not save results in a summary file')
 
     args = parser.parse_args()
-    miseq_run = args.run
+    seq_run = args.run
     adaIDs = args.adaIDs
     VERBOSE = args.verbose
     submit = args.submit
     threads = args.threads
-    report = args.report
     refname = args.reference
     summary = args.summary
 
     # Specify the dataset
-    dataset = MiSeq_runs[miseq_run]
+    dataset = MiSeq_runs[seq_run]
     data_folder = dataset['folder']
 
     # If the script is called with no adaID, iterate over all
@@ -402,11 +399,11 @@ if __name__ == '__main__':
 
         # Submit to the cluster self if requested
         if submit:
-            fork_self(miseq_run, adaID, VERBOSE=VERBOSE, threads=threads,
-                      report=report, reference=refname, summary=summary)
+            fork_self(seq_run, adaID, VERBOSE=VERBOSE, threads=threads,
+                      reference=refname, summary=summary)
             continue
 
-        make_output_folders(data_folder, adaID, VERBOSE=VERBOSE, report=report)
+        make_output_folders(data_folder, adaID, VERBOSE=VERBOSE, summary=summary)
 
         samplename = dataset['samples'][dataset['adapters'].index(adaID)]
         fragments = samples[samplename]['fragments']
@@ -417,7 +414,8 @@ if __name__ == '__main__':
 
         premap_stampy(data_folder, adaID, VERBOSE=VERBOSE, threads=threads, summary=summary)
 
-        if report:
-            report_insert_size(data_folder, adaID, VERBOSE=VERBOSE, summary=summary)
+        if summary:
+            report_insert_size(data_folder, adaID, seq_run,
+                               VERBOSE=VERBOSE, summary=summary)
 
             report_coverage(data_folder, adaID, VERBOSE=VERBOSE, summary=summary)
