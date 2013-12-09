@@ -18,9 +18,12 @@ reference_folder = root_data_folder+'reference/'
 
 
 # Functions
-def get_reference_premap_filename(data_folder, adaID):
+def get_reference_premap_filename(data_folder, adaID, fragment=None):
     '''Get the filename of the reference used from premapping'''
-    fn = 'reference.fasta'
+    fn = 'reference'
+    if fragment is not None:
+        fn = fn+'_'+fragment
+    fn = fn+'.fasta'
     fn = data_folder+foldername_adapter(adaID)+'premapped/'+fn
     return fn
 
@@ -448,6 +451,14 @@ def get_divide_summary_filename(data_folder, adaID):
     '''Get the filename of the summary of the division into fragments'''
     filename = 'summary_divide.txt'
     filename = 'divided/'+filename
+    filename = data_folder+foldername_adapter(adaID)+filename
+    return filename
+
+
+def get_build_consensus_summary_filename(data_folder, adaID, fragment='general'):
+    '''Get the filename of the summary of the iterative consensus'''
+    filename = 'summary_build_consensus_'+fragment+'.txt'
+    filename = 'map_iter/'+filename
     filename = data_folder+foldername_adapter(adaID)+filename
     return filename
 

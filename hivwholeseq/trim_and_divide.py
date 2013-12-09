@@ -50,6 +50,19 @@ def make_output_folders(data_folder, adaID, VERBOSE=0):
         print 'Folder created:', dirname
 
 
+def store_reference_fragmented(data_folder, adaID, refseq, fragment_trim_poss_dict):
+    '''Store FASTA files for the reference in fragments'''
+    for fragment, poss in fragment_trim_poss_dict.iteritems():
+        refseq_frag = refseq[poss[0]: poss[1]]
+        refseq_frag.id = refseq_frag.id+'_'+fragment
+        refseq_frag.name = refseq_frag.name+'_'+fragment
+        refseq_frag.description = refseq_frag.description+', fragment '+fragment
+
+        SeqIO.write(refseq_frag,
+                    get_reference_premap_filename(data_folder, adaID, fragment),
+                    'fasta')
+
+
 def get_primer_positions(smat, fragments, type='both'):
     '''Get the primer positions for fwd, rev, or both primers'''
     from hivwholeseq.primer_info import primers_PCR
@@ -325,6 +338,8 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, fragments,
 
     # Get the positions of fragment start/end, w/ and w/o primers
     frags_pos = get_fragment_positions(smat, fragments)
+    store_reference_fragmented(data_folder, adaID, refseq,
+                               dict(zip(*[fragments, frags_pos['trim']])))
 
     # Get the positions of the unwanted outer primers (in case we DO nested PCR
     # for that fragment)
@@ -533,8 +548,7 @@ if __name__ == '__main__':
                         help='Execute the script in parallel on the cluster')
     parser.add_argument('--test', action='store_true',
                         help='Include sanity checks on mapped reads (slow)')
-    parser.add_argument('--no-summary', action='store_false',
-                        dest='summary',
+    parser.add_argument('--no-summary', action='store_false', dest='summary',
                         help='Do not save results in a summary file')
 
     args = parser.parse_args()

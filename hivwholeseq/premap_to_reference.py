@@ -373,8 +373,7 @@ if __name__ == '__main__':
                         help='Number of threads to use for mapping')
     parser.add_argument('--reference', default='HXB2',
                         help='Use alternative reference, e.g. chimeras (the file must exist)')
-    parser.add_argument('--no-summary', action='store_false',
-                        dest='summary',
+    parser.add_argument('--no-summary', action='store_false', dest='summary',
                         help='Do not save results in a summary file')
 
     args = parser.parse_args()

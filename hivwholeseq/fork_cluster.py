@@ -59,7 +59,7 @@ def fork_premap(seq_run, adaID, VERBOSE=0, bwa=False, threads=1,
                 reference='HXB2', summary=True):
     '''Submit premap script to the cluster for each adapter ID'''
     if VERBOSE:
-        print 'Forking to the cluster: adaID '+'{:02d}'.format(adaID)
+        print 'Forking to the cluster: adaID '+adaID
 
     JOBSCRIPT = JOBDIR+'premap_to_reference.py'
     # It is hard to tell whether 1h is sufficient, because the final sorting takes
@@ -71,7 +71,7 @@ def fork_premap(seq_run, adaID, VERBOSE=0, bwa=False, threads=1,
                  '-S', '/bin/bash',
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
-                 '-N', 'premap '+'{:02d}'.format(adaID),
+                 '-N', 'prem '+adaID,
                  '-l', 'h_rt='+cluster_time[threads >= 30],
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
@@ -91,9 +91,9 @@ def fork_premap(seq_run, adaID, VERBOSE=0, bwa=False, threads=1,
 
 def fork_trim_and_divide(seq_run, adaID, VERBOSE=0, maxreads=-1,
                          summary=True):
-    '''Fork self for each adapter ID'''
+    '''Submit trim and divide script to the cluster for each adapter ID'''
     if VERBOSE:
-        print 'Forking to the cluster: adaID '+'{:02d}'.format(adaID)
+        print 'Forking to the cluster: adaID '+adaID
 
     JOBSCRIPT = JOBDIR+'trim_and_divide.py'
     cluster_time = '2:59:59'
@@ -103,7 +103,7 @@ def fork_trim_and_divide(seq_run, adaID, VERBOSE=0, maxreads=-1,
                  '-S', '/bin/bash',
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
-                 '-N', 'tr+div '+'{:02d}'.format(adaID),
+                 '-N', 'tr+dv '+adaID,
                  '-l', 'h_rt='+cluster_time,
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
@@ -118,3 +118,38 @@ def fork_trim_and_divide(seq_run, adaID, VERBOSE=0, maxreads=-1,
     if VERBOSE >= 2:
         print ' '.join(call_list)
     return sp.check_output(call_list)
+
+
+def fork_build_consensus(seq_run, adaID, fragment, n_reads=1000,
+                         iterations_max=0, VERBOSE=0, summary=True):
+    '''Submit build consensus script to the cluster for each adapter ID and fragment'''
+    if VERBOSE:
+        print 'Forking to the cluster: adaID '+adaID
+
+    JOBSCRIPT = JOBDIR+'build_consensus_iterative.py'
+    cluster_time = '0:59:59'
+    vmem = '2G'
+    call_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'cb '+adaID+' '+fragment,
+                 '-l', 'h_rt='+cluster_time,
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--run', seq_run,
+                 '--adaIDs', adaID,
+                 '--fragments', fragment,
+                 '-n', n_reads,
+                 '--iterations', iterations_max,
+                 '--verbose', VERBOSE,
+                ]
+    if not summary:
+        call_list.append('--no-summary')
+    call_list = map(str, call_list)
+    if VERBOSE:
+        print ' '.join(call_list)
+    sp.call(call_list)
+
+
