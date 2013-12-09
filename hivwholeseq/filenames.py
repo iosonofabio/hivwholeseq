@@ -265,6 +265,15 @@ def get_divided_filenames(data_folder, adaID, fragments, type='bam'):
     return filenames
 
 
+def get_divided_filename(data_folder, adaID, fragment, type='bam'):
+    '''Get the filename of the BAM files divided for a single fragment'''
+    filename = 'divided_on_HXB2'
+    filename = 'divided/'+filename
+    filename = data_folder+foldername_adapter(adaID)+filename
+    filename = filename+'_'+fragment+'.'+type
+    return filename
+
+
 def get_mapped_filename(data_folder, adaID, fragment, type='bam', 
                         bwa=False, filtered=False, sort=False, part=None, unsorted=False):
     '''Get the filename of the mapped reads onto consensus'''
@@ -426,6 +435,14 @@ def get_overlap_nu_figure_filename(data_folder, adaID, fragments, ext='png'):
     '''Get the filename of the coverage report figure'''
     filename = 'overlap_nu_'+fragments
     filename = 'overlap/'+filename
+    filename = filename+'.'+ext
+    filename = get_figure_folder(data_folder, adaID)+filename
+    return filename
+
+
+def get_distance_from_consensus_figure_filename(data_folder, adaID, fragment, ext='png'):
+    '''Get the filename of the figure of distance from fragment consensus'''
+    filename = 'distance_from_consensus_histogram_'+fragment
     filename = filename+'.'+ext
     filename = get_figure_folder(data_folder, adaID)+filename
     return filename

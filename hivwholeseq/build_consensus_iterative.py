@@ -444,7 +444,7 @@ if __name__ == '__main__':
     # Parse input args
     parser = argparse.ArgumentParser(description='Build consensus, iteratively')
     parser.add_argument('--run', required=True,
-                        help='MiSeq run to analyze (e.g. Tue28)')
+                        help='Seq run to analyze (e.g. Tue28)')
     parser.add_argument('--adaIDs', nargs='*',
                         help='Adapter IDs to analyze (e.g. TS2)')
     parser.add_argument('--fragments', nargs='*',

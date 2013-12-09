@@ -21,6 +21,8 @@ from hivwholeseq.filenames import get_consensus_filename, get_mapped_filename, \
         get_filter_mapped_summary_filename
 from hivwholeseq.mapping_utils import get_ind_good_cigars, convert_sam_to_bam,\
         pair_generator, get_range_good_cigars
+from hivwholeseq.fork_cluster import fork_filter_mapped as fork_self
+from hivwholeseq.samples import samples
 
 
 
@@ -29,40 +31,47 @@ maxreads = 1e10
 match_len_min = 30
 trim_bad_cigars = 3
 
-# Cluster submit
-import hivwholeseq
-JOBDIR = hivwholeseq.__path__[0].rstrip('/')+'/'
-JOBLOGERR = JOBDIR+'logerr'
-JOBLOGOUT = JOBDIR+'logout'
-JOBSCRIPT = JOBDIR+'filter_mapped_reads.py'
-cluster_time = '0:59:59'
-vmem = '2G'
-
 
 
 # Functions
-def fork_self(miseq_run, adaID, fragment, VERBOSE=0):
-    '''Fork self for each adapter ID'''
-    import subprocess as sp
+def plot_distance_histogram(data_folder, adaID, fragment, counts, savefig=False):
+    '''Plot the histogram of distance from consensus'''
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(1, 1)
+    ax.plot(np.arange(len(counts)), counts, 'b', lw=2)
+    ax.set_xlabel('Hamming distance')
+    ax.set_ylabel('# read pairs')
+    ax.set_title('adaID '+adaID+', '+fragment)
+    ax.set_xlim(-0.5, 0.5 + counts.nonzero()[0][-1])
 
-    qsub_list = ['qsub','-cwd',
-                 '-b', 'y',
-                 '-S', '/bin/bash',
-                 '-o', JOBLOGOUT,
-                 '-e', JOBLOGERR,
-                 '-N', 'fmr '+'{:02d}'.format(adaID)+' '+fragment,
-                 '-l', 'h_rt='+cluster_time,
-                 '-l', 'h_vmem='+vmem,
-                 JOBSCRIPT,
-                 '--run', miseq_run,
-                 '--adaIDs', adaID,
-                 '--fragments', fragment,
-                 '--verbose', VERBOSE,
-                ]
-    qsub_list = map(str, qsub_list)
-    if VERBOSE:
-        print ' '.join(qsub_list)
-    sp.call(qsub_list)
+    if savefig:
+        from hivwholeseq.filenames import get_distance_from_consensus_figure_filename
+        outputfile = get_distance_from_consensus_figure_filename(data_folder, adaID,
+                                                                 fragment)
+        fig.savefig(outputfile)
+
+
+def get_distance_from_consensus(ref, reads, VERBOSE=0):
+    '''Get the number of mismatches (ins = 1, del = 1) from consensus'''
+    ds = []
+    for read in reads:
+        d = 0
+        pos_ref = read.pos
+        pos_read = 0
+        for (bt, bl) in read.cigar:
+            if bt == 1:
+                d += 1
+                pos_read += bl
+            elif bt == 2:
+                d += 1
+                pos_ref += bl
+            elif bt == 0:
+                seqb = np.fromstring(read.seq[pos_read: pos_read + bl], 'S1')
+                d += (seqb != ref[pos_ref: pos_ref + bl]).sum()
+                pos_ref += bl
+                pos_read += bl
+        ds.append(d)
+    return np.array(ds, int)
 
 
 def trim_bad_cigar(reads, match_len_min=match_len_min,
@@ -141,23 +150,18 @@ def trim_bad_cigar(reads, match_len_min=match_len_min,
     return False
 
 
-def filter_reads(data_folder, adaID, fragment, VERBOSE=0):
+def filter_reads(data_folder, adaID, fragment, VERBOSE=0,
+                 n_cycles=600, max_mismatches=30,
+                 summary=True):
     '''Filter the reads to good chunks'''
-    # Resolve ambiguous fragment primers
-    if fragment in ['F5a', 'F5b']:
-        frag_gen = 'F5'
-    else:
-        frag_gen = fragment
+    frag_gen = fragment[:2]
 
-    # Read reference (fragmented)
     reffilename = get_consensus_filename(data_folder, adaID, frag_gen, trim_primers=True)
     refseq = SeqIO.read(reffilename, 'fasta')
     ref = np.array(refseq)
 
-    # Get BAM files
     bamfilename = get_mapped_filename(data_folder, adaID, frag_gen, type='bam',
                                       filtered=False)
-    # Try to convert to BAM if needed
     if not os.path.isfile(bamfilename):
         convert_sam_to_bam(bamfilename)
 
@@ -177,6 +181,7 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0):
             n_mutator = 0
             n_mismapped_edge = 0
             n_badcigar = 0
+            histogram_distance_from_consensus = np.zeros(n_cycles + 1, int)
             for irp, reads in enumerate(pair_generator(bamfile)):
 
                 # Limit to the first reads
@@ -212,11 +217,12 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0):
 
                     # Mismappings are often characterized by many mutations:
                     # check the number of mismatches and skip reads with too many
-                    mm = (dict(read1.tags)['NM'], dict(read2.tags)['NM'])
-                    if (max(mm) > 20) or (sum(mm) > 20):
+                    dc = get_distance_from_consensus(ref, reads, VERBOSE=VERBOSE)
+                    histogram_distance_from_consensus[dc.sum()] += 1
+                    if (dc.sum() > max_mismatches):
                         if VERBOSE >= 2:
                             print 'Read pair '+read1.qname+': too many mismatches '+\
-                                    '('+str(mm[0])+' + '+str(mm[1])+')'
+                                    '('+str(dc[0])+' + '+str(dc[1])+')'
                         n_mutator += 1
                         skip = True
 
@@ -264,17 +270,21 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0):
         print 'Many-mutations:', n_mutator
         print 'Bad CIGARs:', n_badcigar
 
-    # Write summary to file
-    summary_filename = get_filter_mapped_summary_filename(data_folder, adaID, fragment)
-    with open(summary_filename, 'w') as f:
-        f.write('Filter results: adaID '+'{:02d}'.format(adaID)+fragment+'\n')
-        f.write('Total:\t\t'+str(irp)+'\n')
-        f.write('Good:\t\t'+str(n_good)+'\n')
-        f.write('Unmapped:\t'+str(n_unmapped)+'\n')
-        f.write('Unpaired:\t'+str(n_unpaired)+'\n')
-        f.write('Mismapped at edge:\t'+str(n_mismapped_edge)+'\n')
-        f.write('Many-mutations:\t'+str(n_mutator)+'\n')
-        f.write('Bad CIGARs:\t'+str(n_badcigar)+'\n')
+    if summary:
+        summary_filename = get_filter_mapped_summary_filename(data_folder, adaID, fragment)
+        with open(summary_filename, 'w') as f:
+            f.write('Filter results: adaID '+adaID+fragment+'\n')
+            f.write('Total:\t\t'+str(irp)+'\n')
+            f.write('Good:\t\t'+str(n_good)+'\n')
+            f.write('Unmapped:\t'+str(n_unmapped)+'\n')
+            f.write('Unpaired:\t'+str(n_unpaired)+'\n')
+            f.write('Mismapped at edge:\t'+str(n_mismapped_edge)+'\n')
+            f.write('Many-mutations:\t'+str(n_mutator)+'\n')
+            f.write('Bad CIGARs:\t'+str(n_badcigar)+'\n')
+
+        plot_distance_histogram(data_folder, adaID, frag_gen,
+                                histogram_distance_from_consensus,
+                                savefig=True)
 
 
 
@@ -283,52 +293,68 @@ if __name__ == '__main__':
 
     # Input arguments
     parser = argparse.ArgumentParser(description='Filter mapped reads')
-    parser.add_argument('--run', type=int, required=True,
-                        help='MiSeq run to analyze (e.g. 28, 37)')
-    parser.add_argument('--adaIDs', nargs='*', type=int,
+    parser.add_argument('--run', required=True,
+                        help='Seq run to analyze (e.g. 28, 37)')
+    parser.add_argument('--adaIDs', nargs='*',
                         help='Adapter IDs to analyze (e.g. 2 16)')
     parser.add_argument('--fragments', nargs='*',
                         help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('--verbose', type=int, default=0,
                         help=('Verbosity level [0-3]'))
     parser.add_argument('--submit', action='store_true', default=False,
-                        help='Submit the job to the cluster via qsub')
+                        help='Submit the job to the cluster')
+    parser.add_argument('--no-summary', action='store_false', dest='summary',
+                        help='Do not save results in a summary file')
+    parser.add_argument('--max-mismatches', type=int, default=30,
+                        dest='max_mismatches',
+                        help='Maximal number of mismatches from consensus')
 
     args = parser.parse_args()
-    miseq_run = args.run
+    seq_run = args.run
     adaIDs = args.adaIDs
     fragments = args.fragments
     VERBOSE = args.verbose
     submit = args.submit
+    summary=args.summary
+    max_mismatches = args.max_mismatches
 
     # Specify the dataset
-    dataset = MiSeq_runs[miseq_run]
+    dataset = MiSeq_runs[seq_run]
     data_folder = dataset['folder']
 
     # If the script is called with no adaID, iterate over all
     if not adaIDs:
-        adaIDs = load_adapter_table(data_folder)['ID']
+        adaIDs = dataset['adapters']
     if VERBOSE >= 3:
         print 'adaIDs', adaIDs
 
-    # If the script is called with no fragment, iterate over all
-    if not fragments:
-        fragments = ['F'+str(i) for i in xrange(1, 7)]
-    if VERBOSE >= 3:
-        print 'fragments', fragments
-
     # Iterate over all requested samples
     for adaID in adaIDs:
-        for fragment in fragments:
+
+        # If the script is called with no fragment, iterate over all
+        samplename = dataset['samples'][dataset['adapters'].index(adaID)]
+        if not fragments:
+            fragments_sample = samples[samplename]['fragments']
+        else:
+            from re import findall
+            fragments_all = samples[samplename]['fragments']
+            fragments_sample = []
+            for fragment in fragments:
+                frs = filter(lambda x: fragment in x, fragments_all)
+                if len(frs):
+                    fragments_sample.append(frs[0])
+        if VERBOSE >= 3:
+            print 'adaID '+adaID+': fragments '+' '.join(fragments_sample)
+
+        for fragment in fragments_sample:
 
             # Submit to the cluster self if requested
             if submit:
-                fork_self(miseq_run, adaID, fragment, VERBOSE=VERBOSE)
+                fork_self(seq_run, adaID, fragment, VERBOSE=VERBOSE, summary=summary)
                 continue
 
-            # Fragment F5 has two sets of primers
-            if fragment == 'F5':
-                fragment = dataset['primerF5'][dataset['adapters'].index(adaID)]
-    
             # Filter reads
-            filter_reads(data_folder, adaID, fragment, VERBOSE=VERBOSE)
+            filter_reads(data_folder, adaID, fragment, VERBOSE=VERBOSE,
+                         n_cycles=dataset['n_cycles'],
+                         max_mismatches=max_mismatches,
+                         summary=summary)

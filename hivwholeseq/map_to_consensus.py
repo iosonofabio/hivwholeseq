@@ -18,11 +18,13 @@ import subprocess as sp
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.adapter_info import load_adapter_table, foldername_adapter
 from hivwholeseq.mapping_utils import stampy_bin, subsrate, bwa_bin, convert_sam_to_bam, \
-        convert_bam_to_sam
+        convert_bam_to_sam, get_number_reads
 from hivwholeseq.filenames import get_consensus_filename, get_mapped_filename,\
-        get_read_filenames, get_divided_filenames
+        get_read_filenames, get_divided_filename
 from hivwholeseq.filter_mapped_reads import match_len_min, trim_bad_cigars
 from hivwholeseq.filter_mapped_reads import filter_reads as filter_mapped_reads
+from hivwholeseq.fork_cluster import fork_map_to_consensus as fork_self
+from hivwholeseq.samples import samples
 
 
 
@@ -45,35 +47,6 @@ vmem = '8G'
 
 
 # Functions
-def fork_self(miseq_run, adaID, fragment, VERBOSE=3, bwa=False, threads=1,
-              n_pairs=-1, filter_reads=False):
-    '''Fork self for each adapter ID and fragment'''
-    qsub_list = ['qsub','-cwd',
-                 '-b', 'y',
-                 '-S', '/bin/bash',
-                 '-o', JOBLOGOUT,
-                 '-e', JOBLOGERR,
-                 '-N', 'map '+'{:02d}'.format(adaID)+' '+fragment,
-                 '-l', 'h_rt='+cluster_time[threads >= 10],
-                 '-l', 'h_vmem='+vmem,
-                 JOBSCRIPT,
-                 '--run', miseq_run,
-                 '--adaIDs', adaID,
-                 '--fragments', fragment,
-                 '--verbose', VERBOSE,
-                 '--threads', threads,
-                 '-n', n_pairs
-                ]
-    if bwa:
-        qsub_list.append('--bwa')
-    if filter_reads:
-        qsub_list.append('--filter')
-    qsub_list = map(str, qsub_list)
-    if VERBOSE:
-        print ' '.join(qsub_list)
-    sp.call(qsub_list)
-
-
 def get_index_file(data_folder, adaID, fragment, ext=True):
     '''Get the index filename, with or w/o extension'''
     filename = 'consensus_'+fragment
@@ -116,39 +89,43 @@ def make_output_folders(data_folder, adaID, VERBOSE=0, bwa=False):
 
 def make_index_and_hash(data_folder, adaID, fragment, VERBOSE=0):
     '''Make index and hash files for consensus'''
+    frag_gen = fragment[:2]
+
     # NOTE: we can use --overwrite here, because there is no concurrency (every
     # job has its own hash)
     # 1. Make genome index file
-    if not os.path.isfile(get_index_file(data_folder, adaID, fragment, ext=True)):
+    if not os.path.isfile(get_index_file(data_folder, adaID, frag_gen, ext=True)):
         sp.call([stampy_bin,
-                 '--species="HIV fragment '+fragment+'"',
+                 '--species="HIV fragment '+frag_gen+'"',
                  '--overwrite',
-                 '-G', get_index_file(data_folder, adaID, fragment, ext=False),
-                 get_consensus_filename(data_folder, adaID, fragment, trim_primers=True),
+                 '-G', get_index_file(data_folder, adaID, frag_gen, ext=False),
+                 get_consensus_filename(data_folder, adaID, frag_gen, trim_primers=True),
                  ])
         if VERBOSE:
-            print 'Built index: '+'{:02d}'.format(adaID)+' '+fragment
+            print 'Built index: '+adaID+' '+frag_gen
     
     # 2. Build a hash file
-    if not os.path.isfile(get_hash_file(data_folder, adaID, fragment, ext=True)):
+    if not os.path.isfile(get_hash_file(data_folder, adaID, frag_gen, ext=True)):
         sp.call([stampy_bin,
                  '--overwrite',
-                 '-g', get_index_file(data_folder, adaID, fragment, ext=False),
-                 '-H', get_hash_file(data_folder, adaID, fragment, ext=False),
+                 '-g', get_index_file(data_folder, adaID, frag_gen, ext=False),
+                 '-H', get_hash_file(data_folder, adaID, frag_gen, ext=False),
                  ])
         if VERBOSE:
-            print 'Built hash: '+'{:02d}'.format(adaID)+' '+fragment
+            print 'Built hash: '+adaID+' '+frag_gen
 
 
 def make_bwa_hash(data_folder, adaID, fragment, VERBOSE=0):
     '''Make hash tables for BWA'''
+    frag_gen = fragment[:2]
+
     # Make folder if necessary
     dirname =  os.path.dirname(get_hash_file(data_folder, adaID, 'F0'))
 
     # Call bwa index
-    cons_filename = get_consensus_filename(data_folder, adaID, fragment)
+    cons_filename = get_consensus_filename(data_folder, adaID, frag_gen)
     if VERBOSE:
-        print 'Build BWA index: '+'{:02d}'.format(adaID)+' '+fragment
+        print 'Build BWA index: '+adaID+' '+frag_gen
     sp.call([bwa_bin,
              'index',
              cons_filename,
@@ -166,11 +143,12 @@ def make_bwa_hash(data_folder, adaID, fragment, VERBOSE=0):
 
 def map_bwa(data_folder, adaID, fragment, VERBOSE=0):
     '''Map using BWA'''
-    index_prefix = get_hash_file(data_folder, adaID, fragment, ext=False)+'.fasta'
+    frag_gen = fragment[:2]
+    index_prefix = get_hash_file(data_folder, adaID, frag_gen, ext=False)+'.fasta'
 
     if VERBOSE:
-        print 'Map via BWA: '+'{:02d}'.format(adaID)+' '+fragment
-    output_filename = get_mapped_filename(data_folder, adaID, fragment,
+        print 'Map via BWA: '+adaID+' '+frag_gen
+    output_filename = get_mapped_filename(data_folder, adaID, frag_gen,
                                           type='sam', bwa=True)
 
     # Map
@@ -187,16 +165,11 @@ def map_bwa(data_folder, adaID, fragment, VERBOSE=0):
 
 def map_stampy(data_folder, adaID, fragment, VERBOSE=0, bwa=False, threads=1, n_pairs=-1):
     '''Map using stampy, either directly or after BWA'''
-    # Resolve ambiguous fragment primers
-    if fragment in ['F5a', 'F5b']:
-        frag_gen = 'F5'
-    else:
-        frag_gen = fragment 
-
     # Get input filenames
+    frag_gen = fragment[:2]
     if bwa:
         if VERBOSE:
-            print 'Map via stampy after BWA: '+'{:02d}'.format(adaID)+' '+frag_gen
+            print 'Map via stampy after BWA: '+adaID+' '+frag_gen
 
         bwa_filename = get_mapped_filename(data_folder, adaID, frag_gen,
                                            type='bam', bwa=True)
@@ -208,8 +181,8 @@ def map_stampy(data_folder, adaID, fragment, VERBOSE=0, bwa=False, threads=1, n_
 
     else:
         if VERBOSE:
-            print 'Map via stampy: '+'{:02d}'.format(adaID)+' '+frag_gen
-        input_filename = get_divided_filenames(data_folder, adaID, [fragment], type='bam')[0]
+            print 'Map via stampy: '+adaID+' '+frag_gen
+        input_filename = get_divided_filename(data_folder, adaID, fragment, type='bam')
 
     # parallelize if requested
     if threads == 1:
@@ -233,8 +206,7 @@ def map_stampy(data_folder, adaID, fragment, VERBOSE=0, bwa=False, threads=1, n_
         # Take only a (random) subsample: stampy uses the fraction of reads
         # intead of the number
         if n_pairs > 0:
-            with pysam.Samfile(input_filename, 'rb') as in_bam:
-                n_pairs_tot = sum(1 for read in in_bam) / 2
+            n_pairs_tot = get_number_reads(input_filename, 'bam') / 2
             frac_pairs = 1.0 * n_pairs / n_pairs_tot
             random_seed = np.random.randint(1e5)
             call_list.append('-s', frac_pairs + random_seed)
@@ -261,7 +233,7 @@ def map_stampy(data_folder, adaID, fragment, VERBOSE=0, bwa=False, threads=1, n_
                          '-S', '/bin/bash',
                          '-o', JOBLOGOUT,
                          '-e', JOBLOGERR,
-                         '-N', 'm '+'{:02d}'.format(adaID)+frag_gen+' p'+str(j+1),
+                         '-N', 'm '+adaID+frag_gen+' p'+str(j+1),
                          '-l', 'h_rt='+cluster_time[threads >= 10],
                          '-l', 'h_vmem='+vmem,
                          stampy_bin,
@@ -312,7 +284,7 @@ def map_stampy(data_folder, adaID, fragment, VERBOSE=0, bwa=False, threads=1, n_
                     # Convert to BAM for merging
                     if VERBOSE >= 1:
                         print 'Convert mapped reads to BAM for merging: adaID '+\
-                               '{:02d}'.format(adaID)+', part '+str(j+1)+ ' of '+ \
+                               adaID+', part '+str(j+1)+ ' of '+ \
                                str(threads)
                     convert_sam_to_bam(output_file_parts[j])
                     # We do not need to wait if we did the conversion (it takes
@@ -324,7 +296,7 @@ def map_stampy(data_folder, adaID, fragment, VERBOSE=0, bwa=False, threads=1, n_
         output_filename = get_mapped_filename(data_folder, adaID, frag_gen, type='bam',
                                               unsorted=True)
         if VERBOSE >= 1:
-            print 'Concatenate premapped reads: adaID '+'{:02d}'.format(adaID)
+            print 'Concatenate premapped reads: adaID '+adaID
         pysam.cat('-o', output_filename, *output_file_parts)
 
         # Sort the file by read names (to ensure the pair_generator)
@@ -333,12 +305,12 @@ def map_stampy(data_folder, adaID, fragment, VERBOSE=0, bwa=False, threads=1, n_
                                                      unsorted=False)
         # NOTE: we exclude the extension and the option -f because of a bug in samtools
         if VERBOSE >= 1:
-            print 'Sort mapped reads: adaID '+'{:02d}'.format(adaID)
+            print 'Sort mapped reads: adaID '+adaID
         pysam.sort('-n', output_filename, output_filename_sorted[:-4])
 
         # Reheader the file without BAM -> SAM -> BAM
         if VERBOSE >= 1:
-            print 'Reheader mapped reads: adaID '+'{:02d}'.format(adaID)
+            print 'Reheader mapped reads: adaID '+adaID
         header_filename = get_mapped_filename(data_folder, adaID, frag_gen,
                                               type='sam', part=1)
         pysam.reheader(header_filename, output_filename_sorted)
@@ -350,10 +322,10 @@ if __name__ == '__main__':
 
     # Parse input args
     parser = argparse.ArgumentParser(description='Divide HIV reads into fragments')
-    parser.add_argument('--run', type=int, required=True,
-                        help='MiSeq run to analyze (e.g. 28, 37)')
-    parser.add_argument('--adaIDs', nargs='*', type=int,
-                        help='Adapter IDs to analyze (e.g. 2 16)')
+    parser.add_argument('--run', required=True,
+                        help='Seq run to analyze (e.g. Tue28)')
+    parser.add_argument('--adaIDs', nargs='*',
+                        help='Adapter IDs to analyze (e.g. TS2)')
     parser.add_argument('--fragments', nargs='*',
                         help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('--verbose', type=int, default=0,
@@ -370,7 +342,7 @@ if __name__ == '__main__':
                         help='Filter reads immediately after mapping')
 
     args = parser.parse_args()
-    miseq_run = args.run
+    seq_run = args.run
     adaIDs = args.adaIDs
     fragments = args.fragments
     VERBOSE = args.verbose
@@ -381,20 +353,14 @@ if __name__ == '__main__':
     filter_reads = args.filter
 
     # Specify the dataset
-    dataset = MiSeq_runs[miseq_run]
+    dataset = MiSeq_runs[seq_run]
     data_folder = dataset['folder']
 
     # If the script is called with no adaID, iterate over all
     if not adaIDs:
-        adaIDs = MiSeq_runs[miseq_run]['adapters']
+        adaIDs = dataset['adapters']
     if VERBOSE >= 3:
         print 'adaIDs', adaIDs
-
-    # If the script is called with no fragment, iterate over all
-    if not fragments:
-        fragments = ['F'+str(i) for i in xrange(1, 7)]
-    if VERBOSE >= 3:
-        print 'fragments', fragments
 
     # Iterate over all requested samples
     for adaID in adaIDs:
@@ -402,22 +368,32 @@ if __name__ == '__main__':
         # Make output folders if necessary
         make_output_folders(data_folder, adaID, VERBOSE=VERBOSE)
 
+        # If the script is called with no fragment, iterate over all
+        samplename = dataset['samples'][dataset['adapters'].index(adaID)]
+        if not fragments:
+            fragments_sample = samples[samplename]['fragments']
+        else:
+            from re import findall
+            fragments_all = samples[samplename]['fragments']
+            fragments_sample = []
+            for fragment in fragments:
+                frs = filter(lambda x: fragment in x, fragments_all)
+                if len(frs):
+                    fragments_sample.append(frs[0])
+
+        if VERBOSE >= 3:
+            print 'adaID '+adaID+': fragments '+' '.join(fragments_sample)
+
         # Iterate over fragments
-        for fragment in fragments:
+        for fragment in fragments_sample:
 
             # Submit to the cluster self if requested
             if submit:
-                fork_self(miseq_run, adaID, fragment,
+                fork_self(seq_run, adaID, fragment,
                           VERBOSE=VERBOSE, bwa=bwa,
                           threads=threads, n_pairs=n_pairs,
                           filter_reads=filter_reads)
                 continue
-
-            # Fragment F5 has two sets of primers
-            if fragment == 'F5':
-                frag_full = dataset['primerF5'][dataset['adapters'].index(adaID)]
-            else:
-                frag_full = fragment
 
             if bwa:
                 # Make BWA hashes
@@ -425,17 +401,17 @@ if __name__ == '__main__':
                               VERBOSE=VERBOSE)
     
                 # Map via BWA first
-                map_bwa(data_folder, adaID, frag_full,
+                map_bwa(data_folder, adaID, fragment,
                         VERBOSE=VERBOSE)
     
             # Make stampy hashes
             make_index_and_hash(data_folder, adaID, fragment, VERBOSE=VERBOSE)
             
             # Map via stampy afterwards
-            map_stampy(data_folder, adaID, frag_full,
+            map_stampy(data_folder, adaID, fragment,
                        VERBOSE=VERBOSE, bwa=bwa,
                        threads=threads, n_pairs=n_pairs)
 
             # Filter reads after mapping if requested
             if filter_reads:
-                filter_mapped_reads(data_folder, adaID, frag_full, VERBOSE=VERBOSE)
+                filter_mapped_reads(data_folder, adaID, fragment, VERBOSE=VERBOSE)

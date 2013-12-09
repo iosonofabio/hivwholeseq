@@ -150,6 +150,63 @@ def fork_build_consensus(seq_run, adaID, fragment, n_reads=1000,
     call_list = map(str, call_list)
     if VERBOSE:
         print ' '.join(call_list)
-    sp.call(call_list)
+    return sp.check_output(call_list)
 
 
+def fork_map_to_consensus(seq_run, adaID, fragment, VERBOSE=3, bwa=False,
+                          threads=1, n_pairs=-1, filter_reads=False):
+    '''Submit map script for each adapter ID and fragment'''
+    JOBSCRIPT = JOBDIR+'map_to_consensus.py'
+    cluster_time = ['23:59:59', '0:59:59']
+    vmem = '8G'
+    call_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'm '+adaID+' '+fragment,
+                 '-l', 'h_rt='+cluster_time[threads >= 10],
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--run', seq_run,
+                 '--adaIDs', adaID,
+                 '--fragments', fragment,
+                 '--verbose', VERBOSE,
+                 '--threads', threads,
+                 '-n', n_pairs
+                ]
+    if bwa:
+        call_list.append('--bwa')
+    if filter_reads:
+        call_list.append('--filter')
+    call_list = map(str, call_list)
+    if VERBOSE:
+        print ' '.join(call_list)
+    return sp.check_output(call_list)
+
+
+def fork_filter_mapped(seq_run, adaID, fragment, VERBOSE=0, summary=True):
+    '''Submit filter script for each adapter ID and fragment'''
+    JOBSCRIPT = JOBDIR+'filter_mapped_reads.py'
+    cluster_time = '0:59:59'
+    vmem = '2G'
+    call_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'fmr '+adaID+' '+fragment,
+                 '-l', 'h_rt='+cluster_time,
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--run', seq_run,
+                 '--adaIDs', adaID,
+                 '--fragments', fragment,
+                 '--verbose', VERBOSE,
+                ]
+    if not summary:
+        call_list.append('--no-summary')
+    call_list = map(str, call_list)
+    if VERBOSE:
+        print ' '.join(call_list)
+    return sp.check_output(call_list)

@@ -1,6 +1,6 @@
 # log files
-hivwholeseq/logout/*
-hivwholeseq/logerr/*
+hivwholeseq/logout
+hivwholeseq/logerr
 
 # figure output
 *pdf
