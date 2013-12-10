@@ -480,6 +480,14 @@ def get_build_consensus_summary_filename(data_folder, adaID, fragment='general')
     return filename
 
 
+def get_map_summary_filename(data_folder, adaID, fragment):
+    '''Get the filename of the summary of the division into fragments'''
+    filename = 'summary_map'+fragment+'.txt'
+    filename = 'mapped/'+filename
+    filename = data_folder+foldername_adapter(adaID)+filename
+    return filename
+
+
 def get_filter_mapped_summary_filename(data_folder, adaID, fragment):
     '''Get the filename of the summary of the division into fragments'''
     filename = 'summary_filter_'+fragment+'.txt'

@@ -30,7 +30,7 @@ if __name__ == '__main__':
     # Parse input args
     parser = argparse.ArgumentParser(description='Demultiplex HIV reads')
     parser.add_argument('--run', required=True,
-                        help='MiSeq run to analyze (e.g. Tue28, test_tiny)')
+                        help='Seq run to analyze (e.g. Tue28, test_tiny)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
     parser.add_argument('--submit', action='store_true', default=False,
@@ -40,23 +40,23 @@ if __name__ == '__main__':
                         help='Do not save results in a summary file')
 
     args = parser.parse_args()
-    miseq_run = args.run
+    seq_run = args.run
     VERBOSE = args.verbose
     submit = args.submit
     summary = args.summary
 
     # If submit, outsource to the cluster
     if submit:
-        fork_self(miseq_run, VERBOSE=VERBOSE, summary=summary)
+        fork_self(seq_run, VERBOSE=VERBOSE, summary=summary)
         sys.exit()
 
     # Specify the dataset
-    dataset = MiSeq_runs[miseq_run]
+    dataset = MiSeq_runs[seq_run]
     data_folder = dataset['folder']
 
     if summary:
         with open(get_demultiplex_summary_filename(data_folder), 'w') as f:
-            f.write('Call: python demultiplex.py --run '+miseq_run+' --verbose '+str(VERBOSE)+'\n')
+            f.write('Call: python demultiplex.py --run '+seq_run+' --verbose '+str(VERBOSE)+'\n')
 
     # Get designed adapters
     adapters_designed = tuple((adaID, adapters_illumina[adaID]) for adaID in dataset['adapters'])

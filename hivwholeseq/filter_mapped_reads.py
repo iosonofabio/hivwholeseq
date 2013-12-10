@@ -272,7 +272,7 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0,
 
     if summary:
         summary_filename = get_filter_mapped_summary_filename(data_folder, adaID, fragment)
-        with open(summary_filename, 'w') as f:
+        with open(summary_filename, 'a') as f:
             f.write('Filter results: adaID '+adaID+fragment+'\n')
             f.write('Total:\t\t'+str(irp)+'\n')
             f.write('Good:\t\t'+str(n_good)+'\n')
@@ -352,6 +352,17 @@ if __name__ == '__main__':
             if submit:
                 fork_self(seq_run, adaID, fragment, VERBOSE=VERBOSE, summary=summary)
                 continue
+
+            if summary:
+                sfn = get_filter_mapped_summary_filename(data_folder, adaID, fragment)
+                with open(sfn, 'w') as f:
+                    f.write('Call: python filter_mapped_reads.py'+\
+                            ' --run '+seq_run+\
+                            ' --adaIDs '+adaID+\
+                            ' --fragments '+fragment+\
+                            ' --max-mismatches '+str(max_mismatches)+\
+                            ' --verbose '+str(VERBOSE))
+                    f.write('\n')
 
             # Filter reads
             filter_reads(data_folder, adaID, fragment, VERBOSE=VERBOSE,

@@ -24,20 +24,20 @@ if __name__ == '__main__':
 
     # Parse input args
     parser = argparse.ArgumentParser(description='Trim and divide reads into fragments')
-    parser.add_argument('--run', type=int, required=True,
-                        help='MiSeq run to analyze (e.g. 28, 37)')
-    parser.add_argument('--adaID', type=int, required=True,
-                        help='Adapter ID to analyze (e.g. 4)')
+    parser.add_argument('--run', required=True,
+                        help='Seq run to analyze (e.g. Tue28)')
+    parser.add_argument('--adaID', required=True,
+                        help='Adapter ID to analyze (e.g. TS4)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
 
     args = parser.parse_args()
-    miseq_run = args.run
+    seq_run = args.run
     adaID = args.adaID
     VERBOSE = args.verbose
 
     # Specify the dataset
-    dataset = MiSeq_runs[miseq_run]
+    dataset = MiSeq_runs[seq_run]
     data_folder = dataset['folder']
 
     # Get the BAM filename 

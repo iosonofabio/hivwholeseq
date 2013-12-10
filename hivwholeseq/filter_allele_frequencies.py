@@ -34,18 +34,18 @@ vmem = '2G'
 
 
 # Functions
-def fork_self(miseq_run, adaID, fragment, VERBOSE=3):
+def fork_self(seq_run, adaID, fragment, VERBOSE=3):
     '''Fork self for each adapter ID and fragment'''
     qsub_list = ['qsub','-cwd',
                  '-b', 'y',
                  '-S', '/bin/bash',
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
-                 '-N', 'acn '+'{:02d}'.format(adaID)+' '+fragment,
+                 '-N', 'acn '+adaID+' '+fragment,
                  '-l', 'h_rt='+cluster_time,
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
-                 '--run', miseq_run,
+                 '--run', seq_run,
                  '--adaIDs', adaID,
                  '--fragments', fragment,
                  '--verbose', VERBOSE,
@@ -131,10 +131,10 @@ if __name__ == '__main__':
 
     # Input arguments
     parser = argparse.ArgumentParser(description='Study minor allele frequency')
-    parser.add_argument('--run', type=int, required=True,
-                        help='MiSeq run to analyze (e.g. 28, 37)')
-    parser.add_argument('--adaIDs', nargs='*', type=int,
-                        help='Adapter IDs to analyze (e.g. 2 16)')
+    parser.add_argument('--run', required=True,
+                        help='Seq run to analyze (e.g. Tue28)')
+    parser.add_argument('--adaIDs', nargs='*',
+                        help='Adapter IDs to analyze (e.g. TS2)')
     parser.add_argument('--fragments', nargs='*',
                         help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('--verbose', type=int, default=0,
@@ -143,14 +143,14 @@ if __name__ == '__main__':
                         help='Execute the script in parallel on the cluster')
 
     args = parser.parse_args()
-    miseq_run = args.run
+    seq_run = args.run
     adaIDs = args.adaIDs
     fragments = args.fragments
     VERBOSE = args.verbose
     submit = args.submit
 
     # Specify the dataset
-    dataset = MiSeq_runs[miseq_run]
+    dataset = MiSeq_runs[seq_run]
     data_folder = dataset['folder']
 
     # If the script is called with no adaID, iterate over all

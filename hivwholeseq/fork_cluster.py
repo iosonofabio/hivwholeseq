@@ -124,7 +124,7 @@ def fork_build_consensus(seq_run, adaID, fragment, n_reads=1000,
                          iterations_max=0, VERBOSE=0, summary=True):
     '''Submit build consensus script to the cluster for each adapter ID and fragment'''
     if VERBOSE:
-        print 'Forking to the cluster: adaID '+adaID
+        print 'Forking to the cluster: adaID '+adaID+', fragment '+fragment
 
     JOBSCRIPT = JOBDIR+'build_consensus_iterative.py'
     cluster_time = '0:59:59'
@@ -156,6 +156,9 @@ def fork_build_consensus(seq_run, adaID, fragment, n_reads=1000,
 def fork_map_to_consensus(seq_run, adaID, fragment, VERBOSE=3, bwa=False,
                           threads=1, n_pairs=-1, filter_reads=False):
     '''Submit map script for each adapter ID and fragment'''
+    if VERBOSE:
+        print 'Forking to the cluster: adaID '+adaID+', fragment '+fragment
+
     JOBSCRIPT = JOBDIR+'map_to_consensus.py'
     cluster_time = ['23:59:59', '0:59:59']
     vmem = '8G'
@@ -187,6 +190,9 @@ def fork_map_to_consensus(seq_run, adaID, fragment, VERBOSE=3, bwa=False,
 
 def fork_filter_mapped(seq_run, adaID, fragment, VERBOSE=0, summary=True):
     '''Submit filter script for each adapter ID and fragment'''
+    if VERBOSE:
+        print 'Forking to the cluster: adaID '+adaID+', fragment '+fragment
+
     JOBSCRIPT = JOBDIR+'filter_mapped_reads.py'
     cluster_time = '0:59:59'
     vmem = '2G'
@@ -210,3 +216,34 @@ def fork_filter_mapped(seq_run, adaID, fragment, VERBOSE=0, summary=True):
     if VERBOSE:
         print ' '.join(call_list)
     return sp.check_output(call_list)
+
+
+def fork_get_allele_counts(seq_run, adaID, fragment, VERBOSE=3):
+    '''Submit get allele counts script to the cluster for each adapter ID and fragment'''
+    if VERBOSE:
+        print 'Forking to the cluster: adaID '+adaID+', fragment '+fragment
+
+    JOBSCRIPT = JOBDIR+'get_allele_counts.py'
+    cluster_time = '0:59:59'
+    vmem = '4G'
+    call_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'acn '+adaID+' '+fragment,
+                 '-l', 'h_rt='+cluster_time,
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--run', seq_run,
+                 '--adaIDs', adaID,
+                 '--fragments', fragment,
+                 '--verbose', VERBOSE,
+                ]
+    call_list = map(str, call_list)
+    if VERBOSE:
+        print ' '.join(call_list)
+    return sp.check_output(call_list)
+
+
+

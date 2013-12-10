@@ -72,11 +72,11 @@ def plot_coverage_minor_allele(counts, frags_pos=None, frags_pos_out=None,
     
 
 
-def check_premap(miseq_run, adaID, qual_min=30, match_len_min=10,
+def check_premap(seq_run, adaID, qual_min=30, match_len_min=10,
                    reference='HXB2', maxreads=-1, VERBOSE=0):
     '''Check premap to reference: coverage, etc.'''
     # Specify the dataset
-    dataset = MiSeq_runs[miseq_run]
+    dataset = MiSeq_runs[seq_run]
     data_folder = dataset['folder']
     F5_primer = dataset['primerF5'][dataset['adapters'].index(adaID)]
 
@@ -120,7 +120,7 @@ def check_premap(miseq_run, adaID, qual_min=30, match_len_min=10,
 
     # Plot results
     title=', '.join(map(lambda x: ' '.join([x[0], str(x[1])]),
-                        [['run', miseq_run],
+                        [['run', seq_run],
                          ['adaID', adaID],
                          ['n_reads', maxreads],
                         ]))
@@ -139,10 +139,10 @@ if __name__ == '__main__':
 
     # Parse input args
     parser = argparse.ArgumentParser(description='Check consensus')
-    parser.add_argument('--run', type=int, required=True,
-                        help='MiSeq run to analyze (e.g. 28, 37)')
-    parser.add_argument('--adaIDs', nargs='*', type=int,
-                        help='Adapter IDs to analyze (e.g. 2 16)')
+    parser.add_argument('--run', required=True,
+                        help='Seq run to analyze (e.g. Tue28)')
+    parser.add_argument('--adaIDs', nargs='*',
+                        help='Adapter IDs to analyze (e.g. TS2)')
     parser.add_argument('-n', type=int, default=1000,
                         help='Number of reads analyzed')
     parser.add_argument('--verbose', type=int, default=0,
@@ -151,26 +151,26 @@ if __name__ == '__main__':
                         help='Use alternative reference, e.g. chimeras (the file must exist)')
 
     args = parser.parse_args()
-    miseq_run = args.run
+    seq_run = args.run
     adaIDs = args.adaIDs
     n_reads = args.n
     VERBOSE = args.verbose
     refname = args.reference
 
     # Specify the dataset
-    dataset = MiSeq_runs[miseq_run]
+    dataset = MiSeq_runs[seq_run]
     data_folder = dataset['folder']
 
     # If the script is called with no adaID, iterate over all
     if not adaIDs:
-        adaIDs = MiSeq_runs[miseq_run]['adapters']
+        adaIDs = MiSeq_runs[seq_run]['adapters']
     if VERBOSE >= 3:
         print 'adaIDs', adaIDs
 
     # Iterate over samples
     for adaID in adaIDs:
 
-            check_premap(miseq_run, adaID,
+            check_premap(seq_run, adaID,
                          maxreads=n_reads,
                          reference=refname,
                          VERBOSE=VERBOSE)

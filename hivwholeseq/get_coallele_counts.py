@@ -51,7 +51,7 @@ def fork_self(data_folder, adaID, fragment, VERBOSE=3):
                  '-S', '/bin/bash',
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
-                 '-N', 'cac '+'{:02d}'.format(adaID)+' '+fragment,
+                 '-N', 'ca '+adaID+' '+fragment,
                  '-l', 'h_rt='+cluster_time,
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
@@ -183,7 +183,7 @@ def get_coallele_counts(data_folder, adaID, fragment, VERBOSE=0):
 def write_output_files(data_folder, adaID, fragment, counts, VERBOSE=0):
     '''Write coallele counts to file'''
     if VERBOSE >= 1:
-        print 'Write to file: '+'{:02d}'.format(adaID)+' '+fragment
+        print 'Write to file: '+adaID+' '+fragment
 
     # Save counts and coverage
     # TODO: use compressed files?

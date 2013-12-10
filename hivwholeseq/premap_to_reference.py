@@ -85,7 +85,8 @@ def make_reference(data_folder, adaID, fragments, refname, VERBOSE=0, summary=Tr
         print output
 
     if summary:
-        with open(get_premap_summary_filename(data_folder, adaID), 'w') as f:
+        with open(get_premap_summary_filename(data_folder, adaID), 'a') as f:
+            f.write('\n')
             f.write(output)
             f.write('\n')
 
@@ -194,7 +195,7 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
                      '-S', '/bin/bash',
                      '-o', JOBLOGOUT,
                      '-e', JOBLOGERR,
-                     '-N', 'pre '+'{:02d}'.format(adaID)+' p'+str(j+1),
+                     '-N', 'pre '+adaID+' p'+str(j+1),
                      '-l', 'h_rt='+cluster_time[threads >= 30],
                      '-l', 'h_vmem='+vmem,
                      stampy_bin,
@@ -239,7 +240,7 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
                 # Convert to BAM for merging
                 if VERBOSE >= 1:
                     print 'Convert premapped reads to BAM for merging: adaID '+\
-                           '{:02d}'.format(adaID)+', part '+str(j+1)+ ' of '+ \
+                           adaID+', part '+str(j+1)+ ' of '+ \
                            str(threads)
                 convert_sam_to_bam(output_file_parts[j])
                 # We do not need to wait if we did the conversion (it takes
@@ -265,7 +266,7 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
     # Sort the file by read names (to ensure the pair_generator)
     # NOTE: we exclude the extension and the option -f because of a bug in samtools
     if VERBOSE >= 1:
-        print 'Sort premapped reads: adaID '+'{:02d}'.format(adaID)
+        print 'Sort premapped reads: adaID '+adaID
     output_filename_sorted = get_premapped_file(data_folder, adaID, type='bam', unsorted=False)
     pysam.sort('-n', output_filename, output_filename_sorted[:-4])
     if summary:
@@ -274,7 +275,7 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
 
     # Reheader the file without BAM -> SAM -> BAM
     if VERBOSE >= 1:
-        print 'Reheader premapped reads: adaID '+'{:02d}'.format(adaID)
+        print 'Reheader premapped reads: adaID '+adaID
     header_filename = get_premapped_file(data_folder, adaID, type='sam', part=1)
     pysam.reheader(header_filename, output_filename_sorted)
     if summary:
@@ -403,6 +404,14 @@ if __name__ == '__main__':
             continue
 
         make_output_folders(data_folder, adaID, VERBOSE=VERBOSE, summary=summary)
+
+        if summary:
+            with open(get_premap_summary_filename(data_folder, adaID), 'w') as f:
+                f.write('Call: python premap_to_reference.py --run '+seq_run+\
+                        ' --adaIDs '+adaID+\
+                        ' --threads '+str(threads)+\
+                        ' --reference '+refname+\
+                        ' --verbose '+str(VERBOSE)+'\n')
 
         samplename = dataset['samples'][dataset['adapters'].index(adaID)]
         fragments = samples[samplename]['fragments']

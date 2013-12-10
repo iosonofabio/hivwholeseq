@@ -52,11 +52,11 @@ def plot_coverage_minor_allele(counts, suptitle):
     
 
 
-def check_division(miseq_run, adaID, fragment, qual_min=35,
+def check_division(seq_run, adaID, fragment, qual_min=35,
                    reference='HXB2', maxreads=-1, VERBOSE=0):
     '''Check division into fragments: coverage, etc.'''
     # Specify the dataset
-    dataset = MiSeq_runs[miseq_run]
+    dataset = MiSeq_runs[seq_run]
     data_folder = dataset['folder']
 
     if reference == 'HXB2':
@@ -76,7 +76,7 @@ def check_division(miseq_run, adaID, fragment, qual_min=35,
 
     # Plot results
     title=', '.join(map(lambda x: ' '.join([x[0], str(x[1])]),
-                        [['run', miseq_run],
+                        [['run', seq_run],
                          ['adaID', adaID],
                          ['fragment', fragment],
                          ['n_reads', maxreads],
@@ -94,10 +94,10 @@ if __name__ == '__main__':
 
     # Parse input args
     parser = argparse.ArgumentParser(description='Check consensus')
-    parser.add_argument('--run', type=int, required=True,
-                        help='MiSeq run to analyze (e.g. 28, 37)')
-    parser.add_argument('--adaIDs', nargs='*', type=int,
-                        help='Adapter IDs to analyze (e.g. 2 16)')
+    parser.add_argument('--run', required=True,
+                        help='Seq run to analyze (e.g. Tue28)')
+    parser.add_argument('--adaIDs', nargs='*',
+                        help='Adapter IDs to analyze (e.g. TS2)')
     parser.add_argument('--fragments', nargs='*',
                         help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('-n', type=int, default=1000,
@@ -106,19 +106,19 @@ if __name__ == '__main__':
                         help='Verbosity level [0-3]')
 
     args = parser.parse_args()
-    miseq_run = args.run
+    seq_run = args.run
     adaIDs = args.adaIDs
     fragments = args.fragments
     n_reads = args.n
     VERBOSE = args.verbose
 
     # Specify the dataset
-    dataset = MiSeq_runs[miseq_run]
+    dataset = MiSeq_runs[seq_run]
     data_folder = dataset['folder']
 
     # If the script is called with no adaID, iterate over all
     if not adaIDs:
-        adaIDs = MiSeq_runs[miseq_run]['adapters']
+        adaIDs = MiSeq_runs[seq_run]['adapters']
     if VERBOSE >= 3:
         print 'adaIDs', adaIDs
 
@@ -132,7 +132,7 @@ if __name__ == '__main__':
     for adaID in adaIDs:
         for fragment in fragments:
 
-            check_division(miseq_run, adaID, fragment,
+            check_division(seq_run, adaID, fragment,
                            maxreads=n_reads,
                            VERBOSE=VERBOSE)
 

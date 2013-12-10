@@ -50,22 +50,22 @@ if __name__ == '__main__':
     # Parse input arguments
     parser = argparse.ArgumentParser(description='Filter & trim demultiplexed reads.')
     parser.add_argument('--run', type=int, required=True,
-                        help='MiSeq run to analyze (e.g. 28, 37)')
-    parser.add_argument('--adaIDs', nargs='*', type=int,
-                        help='Adapter IDs to analyze (e.g. 2 16)')
+                        help='Seq run to analyze (e.g. Tue28)')
+    parser.add_argument('--adaIDs', nargs='*',
+                        help='Adapter IDs to analyze (e.g. TS2)')
     parser.add_argument('--verbose', type=int, default=0,
                         help=('Verbosity level [0-3]'))
     parser.add_argument('--submit', action='store_true', default=False,
                         help='Submit the job to the cluster via qsub')
 
     args = parser.parse_args()
-    miseq_run = args.run
+    seq_run = args.run
     adaIDs = args.adaIDs
     VERBOSE = args.verbose
     submit = args.submit
 
     # Specify the dataset
-    dataset = MiSeq_runs[miseq_run]
+    dataset = MiSeq_runs[seq_run]
     data_folder = dataset['folder']
 
     # If the script is called with no adaID, iterate over all
@@ -77,7 +77,7 @@ if __name__ == '__main__':
     # Iterate over adaIDs
     for adaID in adaIDs:
 
-        outdir = os.getcwd()+'/q_control_'+'{:02d}'.format(adaID)
+        outdir = os.getcwd()+'/q_control_'+adaID
         if not os.path.exists(outdir):
             try:
                 os.mkdir(outdir)
@@ -188,7 +188,7 @@ if __name__ == '__main__':
     
         axs[0].set_ylabel('fraction better than q')
 
-        fig.suptitle('adaID '+'{:02d}'.format(adaID), fontsize=18)
+        fig.suptitle('adaID '+adaID, fontsize=18)
         plt.tight_layout(rect=(0, 0, 0.99, 0.95))
 
         plt.ion()

@@ -120,7 +120,7 @@ if __name__ == '__main__':
     # Input arguments
     parser = argparse.ArgumentParser(description='Get coverage of multiple sites')
     parser.add_argument('--run', type=int, required=True,
-                        help='MiSeq run to analyze (e.g. 28, 37)')
+                        help='Seq run to analyze (e.g. Tue28)')
     parser.add_argument('--adaID', type=int, required=True,
                         help='Adapter ID to analyze (e.g. 2)')
     parser.add_argument('--fragment', required=True,
@@ -129,13 +129,13 @@ if __name__ == '__main__':
                         help='Number of read pairs to analyze')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
-    # Example: coverage_tuples.py --adaID 02 '5 30 56' '58 43 89'
+    # Example: coverage_tuples.py --adaID TS2 '5 30 56' '58 43 89'
     parser.add_argument('--tuples', nargs='+', required=True,
                         metavar=("'pos1 pos2 ...'", "'pos3 pos4 ...'"),
                         help="Tuples to analyze (e.g. '3 45 98' '54 62'")
 
     args = parser.parse_args()
-    miseq_run = args.run
+    seq_run = args.run
     adaID = args.adaID
     fragment = args.fragment
     n_pairs = args.n
@@ -143,7 +143,7 @@ if __name__ == '__main__':
     mtuples = format_tuples(args.tuples)
 
     # Specify the dataset
-    dataset = MiSeq_runs[miseq_run]
+    dataset = MiSeq_runs[seq_run]
     data_folder = dataset['folder']
 
     # Get the coverage

@@ -76,7 +76,7 @@ def get_insert_size_distribution(data_folder, adaID, fragment, bins=None,
     return insert_sizes, h
 
 
-def plot_cumulative_histogram(miseq_run, adaID, fragment, insert_sizes,
+def plot_cumulative_histogram(seq_run, adaID, fragment, insert_sizes,
                               show=False, savefig=False,
                               **kwargs):
     '''Plot cumulative histogram of insert sizes'''
@@ -85,7 +85,7 @@ def plot_cumulative_histogram(miseq_run, adaID, fragment, insert_sizes,
     ax.plot(insert_sizes, np.linspace(0, 1, len(insert_sizes)), **kwargs)
     ax.set_xlabel('Insert size')
     ax.set_ylabel('Cumulative fraction')
-    ax.set_title('run '+str(miseq_run)+', adaID '+str(adaID)+', '+fragment)
+    ax.set_title('run '+str(seq_run)+', adaID '+str(adaID)+', '+fragment)
 
     plt.tight_layout()
 
@@ -94,7 +94,7 @@ def plot_cumulative_histogram(miseq_run, adaID, fragment, insert_sizes,
         plt.show()
 
     if savefig:
-        dataset = MiSeq_runs[miseq_run]
+        dataset = MiSeq_runs[seq_run]
         data_folder = dataset['folder']
         output_filename = get_insert_size_distribution_cumulative_filename(data_folder,
                                                                            adaID,
@@ -105,7 +105,7 @@ def plot_cumulative_histogram(miseq_run, adaID, fragment, insert_sizes,
         fig.savefig(output_filename)
 
 
-def plot_histogram(miseq_run, adaID, fragment, h,
+def plot_histogram(seq_run, adaID, fragment, h,
                    show=False, savefig=False,
                    **kwargs):
     '''Plot histogram of insert sizes'''
@@ -116,7 +116,7 @@ def plot_histogram(miseq_run, adaID, fragment, h,
     ax.plot(x, y, **kwargs)
     ax.set_xlabel('Insert size')
     ax.set_ylabel('Density')
-    ax.set_title('run '+str(miseq_run)+', adaID '+str(adaID)+', '+fragment)
+    ax.set_title('run '+str(seq_run)+', adaID '+str(adaID)+', '+fragment)
 
     plt.tight_layout()
 
@@ -125,7 +125,7 @@ def plot_histogram(miseq_run, adaID, fragment, h,
         plt.show()
 
     if savefig:
-        dataset = MiSeq_runs[miseq_run]
+        dataset = MiSeq_runs[seq_run]
         data_folder = dataset['folder']
         output_filename = get_insert_size_distribution_filename(data_folder, adaID,
                                                                 fragment)
@@ -142,10 +142,10 @@ if __name__ == '__main__':
 
     # Input arguments
     parser = argparse.ArgumentParser(description='Get allele counts')
-    parser.add_argument('--run', type=int, required=True,
-                        help='MiSeq run to analyze (e.g. 28, 37)')
-    parser.add_argument('--adaIDs', nargs='*', type=int,
-                        help='Adapter IDs to analyze (e.g. 2 16)')
+    parser.add_argument('--run', required=True,
+                        help='Seq run to analyze (e.g. Tue28)')
+    parser.add_argument('--adaIDs', nargs='*',
+                        help='Adapter IDs to analyze (e.g. TS2)')
     parser.add_argument('--fragments', nargs='*',
                         help='Fragments to analyze (e.g. F1 F6)')
     parser.add_argument('--premapped', action='store_true',
@@ -158,7 +158,7 @@ if __name__ == '__main__':
                         help='Store figures')
 
     args = parser.parse_args()
-    miseq_run = args.run
+    seq_run = args.run
     adaIDs = args.adaIDs
     fragments = args.fragments
     VERBOSE = args.verbose
@@ -167,7 +167,7 @@ if __name__ == '__main__':
     premapped = args.premapped
 
     # Specify the dataset
-    dataset = MiSeq_runs[miseq_run]
+    dataset = MiSeq_runs[seq_run]
     data_folder = dataset['folder']
 
     # If the script is called with no adaID, iterate over all
@@ -194,9 +194,9 @@ if __name__ == '__main__':
             isz, h = get_insert_size_distribution(data_folder, adaID, fragment,
                                              bins=bins, maxreads=maxreads,
                                              VERBOSE=VERBOSE)
-            plot_cumulative_histogram(miseq_run, adaID, fragment, isz, lw=2, c='b',
+            plot_cumulative_histogram(seq_run, adaID, fragment, isz, lw=2, c='b',
                                       savefig=savefig)
-            plot_histogram(miseq_run, adaID, fragment, h, lw=2, color='b',
+            plot_histogram(seq_run, adaID, fragment, h, lw=2, color='b',
                           savefig=savefig)
 
             if not savefig:

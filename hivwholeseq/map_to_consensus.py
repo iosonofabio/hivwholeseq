@@ -20,7 +20,7 @@ from hivwholeseq.adapter_info import load_adapter_table, foldername_adapter
 from hivwholeseq.mapping_utils import stampy_bin, subsrate, bwa_bin, convert_sam_to_bam, \
         convert_bam_to_sam, get_number_reads
 from hivwholeseq.filenames import get_consensus_filename, get_mapped_filename,\
-        get_read_filenames, get_divided_filename
+        get_read_filenames, get_divided_filename, get_map_summary_filename
 from hivwholeseq.filter_mapped_reads import match_len_min, trim_bad_cigars
 from hivwholeseq.filter_mapped_reads import filter_reads as filter_mapped_reads
 from hivwholeseq.fork_cluster import fork_map_to_consensus as fork_self
@@ -340,6 +340,8 @@ if __name__ == '__main__':
                         help='Number of threads to use for mapping')
     parser.add_argument('--filter', action='store_true',
                         help='Filter reads immediately after mapping')
+    parser.add_argument('--no-summary', action='store_false', dest='summary',
+                        help='Do not save results in a summary file')
 
     args = parser.parse_args()
     seq_run = args.run
@@ -351,6 +353,7 @@ if __name__ == '__main__':
     threads = args.threads
     n_pairs = args.n
     filter_reads = args.filter
+    summary = args.summary
 
     # Specify the dataset
     dataset = MiSeq_runs[seq_run]
@@ -394,6 +397,22 @@ if __name__ == '__main__':
                           threads=threads, n_pairs=n_pairs,
                           filter_reads=filter_reads)
                 continue
+
+            if summary:
+                sfn = get_map_summary_filename(data_folder, adaID, fragment)
+                with open(sfn, 'w') as f:
+                    f.write('Call: python map_to_consensus.py'+\
+                            ' --run '+seq_run+\
+                            ' --adaIDs '+adaID+\
+                            ' --fragments '+fragment+\
+                            ' -n '+str(n_pairs)+\
+                            ' --threads '+str(threads)+\
+                            ' --verbose '+str(VERBOSE))
+                    if bwa:
+                        f.write(' --bwa')
+                    if filter_reads:
+                        f.write(' --filter')
+                    f.write('\n')
 
             if bwa:
                 # Make BWA hashes

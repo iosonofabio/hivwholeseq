@@ -328,7 +328,7 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, fragments,
                 ' '.join(fragments)
 
     if summary:
-        with open(get_divide_summary_filename(data_folder, adaID), 'w') as f:
+        with open(get_divide_summary_filename(data_folder, adaID), 'a') as f:
             f.write('Fragments used: '+' '.join(fragments)+'\n')
 
     ref_filename = get_reference_premap_filename(data_folder, adaID)
@@ -583,6 +583,16 @@ if __name__ == '__main__':
             continue
 
         make_output_folders(data_folder, adaID, VERBOSE=VERBOSE)
+
+        if summary:
+            with open(get_divide_summary_filename(data_folder, adaID), 'w') as f:
+                f.write('Call: python trim_and_divide.py --run '+seq_run+\
+                        ' --adaIDs '+adaID+\
+                        ' --maxreads '+str(maxreads)+\
+                        ' --verbose '+str(VERBOSE))
+                if include_tests:
+                    f.write(' --include_tests')
+                f.write('\n')
 
         samplename = dataset['samples'][dataset['adapters'].index(adaID)]
         fragments = samples[samplename]['fragments']

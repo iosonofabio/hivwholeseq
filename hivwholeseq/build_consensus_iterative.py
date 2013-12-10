@@ -12,7 +12,6 @@ content:    Take reads mapped to HXB2, then build a consensus, then map
             Note that mismapping is a serious problem for us, so maximal care
             must be taken here.
 '''
-#TODO: tidy up the F5a/b mess.
 # Modules
 import os
 import subprocess as sp
@@ -35,7 +34,8 @@ from hivwholeseq.mapping_utils import stampy_bin, subsrate, convert_sam_to_bam,\
         pair_generator, align_muscle
 from hivwholeseq.filenames import get_HXB2_fragmented, \
         get_HXB2_index_file, get_HXB2_hash_file, get_consensus_filename, \
-        get_divided_filenames, get_reference_premap_filename
+        get_divided_filenames, get_reference_premap_filename, \
+        get_build_consensus_summary_filename
 from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file_unfiltered
 from hivwholeseq.fork_cluster import fork_build_consensus as fork_self
 from hivwholeseq.filenames import get_build_consensus_summary_filename as get_summary_fn
@@ -160,7 +160,8 @@ def extract_reads_subsample(data_folder, adaID, fragment, n_reads, VERBOSE=0,
                     break
 
     if summary:
-        with open(get_summary_fn(data_folder, adaID, fragment), 'w') as f:
+        with open(get_summary_fn(data_folder, adaID, fragment), 'a') as f:
+            f.write('\n')
             f.write('Subsample of reads copied: '+str(n_written))
             f.write('\n')
 
@@ -507,7 +508,21 @@ if __name__ == '__main__':
             if submit:
                 fork_self(seq_run, adaID, fragment, n_reads, iterations_max,
                           VERBOSE=VERBOSE)
-                continue          
+                continue
+
+            if summary:
+                sfn = get_build_consensus_summary_filename(data_folder, adaID,
+                                                              fragment)
+                with open(sfn, 'w') as f:
+                    f.write('Call: python build_consensus_iterative.py'+\
+                            ' --run '+seq_run+\
+                            ' --adaIDs '+adaID+\
+                            ' --fragments '+fragment+\
+                            ' --iterations '+str(iterations_max)+\
+                            ' -n '+str(n_reads)+\
+                            ' --verbose '+str(VERBOSE))
+                    f.write('\n')
+
 
             # Iterate the consensus building until convergence
             n_iter = 1

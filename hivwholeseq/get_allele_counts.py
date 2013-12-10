@@ -18,6 +18,9 @@ from hivwholeseq.filenames import get_mapped_filename, get_allele_counts_filenam
         get_insert_counts_filename, get_coverage_filename, get_consensus_filename
 from hivwholeseq.mapping_utils import convert_sam_to_bam
 from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file
+from hivwholeseq.fork_cluster import fork_get_allele_counts as fork_self
+from hivwholeseq.samples import samples
+
 
 
 # Globals
@@ -26,40 +29,9 @@ from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_fi
 # Reasonable numbers are between 30 and 36.
 qual_min = 35
 
-# Cluster submit
-import hivwholeseq
-JOBDIR = hivwholeseq.__path__[0].rstrip('/')+'/'
-JOBSCRIPT = JOBDIR+'get_allele_counts.py'
-JOBLOGERR = JOBDIR+'logerr'
-JOBLOGOUT = JOBDIR+'logout'
-cluster_time = '0:59:59'
-vmem = '4G'
-
 
 
 # Functions
-def fork_self(miseq_run, adaID, fragment, VERBOSE=3):
-    '''Fork self for each adapter ID and fragment'''
-    qsub_list = ['qsub','-cwd',
-                 '-b', 'y',
-                 '-S', '/bin/bash',
-                 '-o', JOBLOGOUT,
-                 '-e', JOBLOGERR,
-                 '-N', 'acn '+'{:02d}'.format(adaID)+' '+fragment,
-                 '-l', 'h_rt='+cluster_time,
-                 '-l', 'h_vmem='+vmem,
-                 JOBSCRIPT,
-                 '--run', miseq_run,
-                 '--adaIDs', adaID,
-                 '--fragments', fragment,
-                 '--verbose', VERBOSE,
-                ]
-    qsub_list = map(str, qsub_list)
-    if VERBOSE:
-        print ' '.join(qsub_list)
-    sp.call(qsub_list)
-
-
 def get_allele_counts(data_folder, adaID, fragment, VERBOSE=0,
                       maxreads=1e10):
     '''Extract allele and insert counts from a bamfile'''
@@ -86,7 +58,7 @@ def write_output_files(data_folder, adaID, fragment,
                        counts, inserts, coverage, VERBOSE=0):
     '''Write allele counts, inserts, and coverage to file'''
     if VERBOSE >= 1:
-        print 'Write to file: '+'{:02d}'.format(adaID)+' '+fragment
+        print 'Write to file: '+adaID+' '+fragment
 
     # Save counts and coverage
     counts.dump(get_allele_counts_filename(data_folder, adaID, fragment))
@@ -106,10 +78,10 @@ if __name__ == '__main__':
 
     # Input arguments
     parser = argparse.ArgumentParser(description='Get allele counts')
-    parser.add_argument('--run', type=int, required=True,
-                        help='MiSeq run to analyze (e.g. 28, 37)')
-    parser.add_argument('--adaIDs', nargs='*', type=int,
-                        help='Adapter IDs to analyze (e.g. 2 16)')
+    parser.add_argument('--run', required=True,
+                        help='Seq run to analyze (e.g. Tue28)')
+    parser.add_argument('--adaIDs', nargs='*',
+                        help='Adapter IDs to analyze (e.g. TS2)')
     parser.add_argument('--fragments', nargs='*',
                         help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('--verbose', type=int, default=0,
@@ -118,19 +90,19 @@ if __name__ == '__main__':
                         help='Execute the script in parallel on the cluster')
 
     args = parser.parse_args()
-    miseq_run = args.run
+    seq_run = args.run
     adaIDs = args.adaIDs
     fragments = args.fragments
     VERBOSE = args.verbose
     submit = args.submit
 
     # Specify the dataset
-    dataset = MiSeq_runs[miseq_run]
+    dataset = MiSeq_runs[seq_run]
     data_folder = dataset['folder']
 
     # If the script is called with no adaID, iterate over all
     if not adaIDs:
-        adaIDs = load_adapter_table(data_folder)['ID']
+        adaIDs = dataset['adapters']
     if VERBOSE >= 3:
         print 'adaIDs', adaIDs
 
@@ -142,11 +114,25 @@ if __name__ == '__main__':
 
     # Iterate over all requested samples
     for adaID in adaIDs:
-        for fragment in fragments:
+
+        # If the script is called with no fragment, iterate over all
+        samplename = dataset['samples'][dataset['adapters'].index(adaID)]
+        if not fragments:
+            fragments_sample = [fr[:2] for fr in samples[samplename]['fragments']]
+        else:
+            from re import findall
+            fragments_all = samples[samplename]['fragments']
+            fragments_sample = []
+            for fragment in fragments:
+                frs = filter(lambda x: fragment in x, fragments_all)
+                if len(frs):
+                    fragments_sample.append(frs[0][:2])
+
+        for fragment in fragments_sample:
 
             # Submit to the cluster self if requested
             if submit:
-                fork_self(miseq_run, adaID, fragment, VERBOSE=VERBOSE)
+                fork_self(seq_run, adaID, fragment, VERBOSE=VERBOSE)
                 continue
 
             # Get counts

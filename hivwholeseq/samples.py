@@ -66,10 +66,10 @@ samples = {'VK04-3106': {'run': 'Tue37', 'adaID': 'TS2', 'date': '2004-7-9',
                      'description': 'MIX2 SF162 95% + NL4-3 4.5% + F10 0.5%'},
 
            'Nextera_HIV-8262-1': {'run': 'testnextera_Lina', 'adaID': 'N1', # WE DO NOT KNOW THE ADAID
-                                  'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i'), # WE DO NOT ACTUALLY KNOW!
+                                  'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i'),
                                   'description': 'HIV-8262-1: 0.2 ng/ul'},
            'Nextera_HIV-8262-2': {'run': 'testnextera_Lina', 'adaID': 'N2', # WE DO NOT KNOW THE ADAID
-                                  'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i'), # WE DO NOT ACTUALLY KNOW!
+                                  'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i'),
                                   'description': 'HIV-8262-2: 0.033 ng/ul'},
 }
 

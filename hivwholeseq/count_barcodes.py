@@ -60,16 +60,16 @@ if __name__ == '__main__':
     # Parse input args
     parser = argparse.ArgumentParser(description='Divide HIV reads into fragments')
     parser.add_argument('--run', type=int, required=True,
-                        help='MiSeq run to analyze (e.g. 28, 37)')
+                        help='Seq run to analyze (e.g. Tue28)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
 
     args = parser.parse_args()
-    miseq_run = args.run
+    seq_run = args.run
     VERBOSE = args.verbose
 
     # Specify the dataset
-    dataset = MiSeq_runs[miseq_run]
+    dataset = MiSeq_runs[seq_run]
 
     # Count the barcodes
     count_barcodes(dataset, VERBOSE=VERBOSE)

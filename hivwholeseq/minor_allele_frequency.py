@@ -26,6 +26,7 @@ from hivwholeseq.miseq import alpha, read_types
 from hivwholeseq.filenames import get_allele_counts_filename, get_coverage_filename
 from hivwholeseq.adapter_info import load_adapter_table
 from hivwholeseq.one_site_statistics import filter_nus
+from hivwholeseq.samples import samples
 
 
 
@@ -65,46 +66,55 @@ if __name__ == '__main__':
 
     # Input arguments
     parser = argparse.ArgumentParser(description='Study minor allele frequency')
-    parser.add_argument('--run', type=int, required=True,
-                        help='MiSeq run to analyze (e.g. 28, 37)')
-    parser.add_argument('--adaIDs', nargs='*', type=int,
-                        help='Adapter IDs to analyze (e.g. 2 16)')
+    parser.add_argument('--run', required=True,
+                        help='Seq run to analyze (e.g. Tue28)')
+    parser.add_argument('--adaIDs', nargs='*',
+                        help='Adapter IDs to analyze (e.g. TS2)')
     parser.add_argument('--fragments', nargs='*',
                         help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
 
     args = parser.parse_args()
-    miseq_run = args.run
+    seq_run = args.run
     adaIDs = args.adaIDs
     fragments = args.fragments
     VERBOSE = args.verbose
 
     # Specify the dataset
-    dataset = MiSeq_runs[miseq_run]
+    dataset = MiSeq_runs[seq_run]
     data_folder = dataset['folder']
 
     # If the script is called with no adaID, iterate over all
     if not adaIDs:
-        adaIDs = load_adapter_table(data_folder)['ID']
+        adaIDs = dataset['adapters']
     if VERBOSE >= 3:
         print 'adaIDs', adaIDs
-
-    # If the script is called with no fragment, iterate over all
-    if not fragments:
-        fragments = ['F'+str(i) for i in xrange(1, 7)]
-    if VERBOSE >= 3:
-        print 'fragments', fragments
 
     # Iterate over all requested samples
     for adaID in adaIDs:
 
+        # If the script is called with no fragment, iterate over all
+        samplename = dataset['samples'][dataset['adapters'].index(adaID)]
+        if not fragments:
+            fragments_sample = [fr[:2] for fr in samples[samplename]['fragments']]
+        else:
+            from re import findall
+            fragments_all = samples[samplename]['fragments']
+            fragments_sample = []
+            for fragment in fragments:
+                frs = filter(lambda x: fragment in x, fragments_all)
+                if len(frs):
+                    fragments_sample.append(frs[0][:2])
+
+        # Store in globals structures
         covs = {}
         nus_minor = {}
         alls_minor = {}
         nus_filtered = {}
         nus_minor_filtered = {}
-        for fragment in fragments:
+
+        for fragment in fragments_sample:
             counts = np.load(get_allele_counts_filename(data_folder, adaID, fragment))
             coverage = np.load(get_coverage_filename(data_folder, adaID, fragment))
 
@@ -131,16 +141,16 @@ if __name__ == '__main__':
             nus_minor_filtered[fragment] = nut
 
         # Plot them
-        (n_plots_y, n_plots_x) = plot_grid[len(fragments) - 1]
+        (n_plots_y, n_plots_x) = plot_grid[len(fragments_sample) - 1]
         fig, axs = plt.subplots(n_plots_y, n_plots_x, figsize=(13, 8))
-        if len(fragments) > 1:
+        if len(fragments_sample) > 1:
             axs = axs.ravel()
         else:
             axs = [axs]
-        fig.suptitle('adapterID '+'{:02d}'.format(adaID), fontsize=20)
+        fig.suptitle('adapterID '+adaID, fontsize=20)
         labss = {'read1 f': 'read1 fwd', 'read1 r': 'read1 rev',
                  'read2 f': 'read2 fwd', 'read2 r': 'read2 rev'}
-        for i, fragment in enumerate(fragments):
+        for i, fragment in enumerate(fragments_sample):
             ax = axs[i]
             ax.set_yscale('log')
             ax.set_title(fragment)
@@ -176,14 +186,14 @@ if __name__ == '__main__':
         plt.show() 
 
         # Plot distribution of minor allele frequencies (filtered)
-        (n_plots_y, n_plots_x) = plot_grid[len(fragments) - 1]
+        (n_plots_y, n_plots_x) = plot_grid[len(fragments_sample) - 1]
         fig, axs = plt.subplots(n_plots_y, n_plots_x, figsize=(13, 8))
-        if len(fragments) > 1:
+        if len(fragments_sample) > 1:
             axs = axs.ravel()
         else:
             axs = [axs]
-        fig.suptitle('adapterID '+'{:02d}'.format(adaID), fontsize=20)
-        for i, fragment in enumerate(fragments):
+        fig.suptitle('adapterID '+adaID, fontsize=20)
+        for i, fragment in enumerate(fragments_sample):
             ax = axs[i]
             ax.set_xscale('log')
             ax.set_title(fragment)

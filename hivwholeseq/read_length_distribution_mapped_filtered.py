@@ -77,7 +77,7 @@ def plot_read_length_distribution(adaID, fragment, length):
         ax.scatter(np.arange(1, 251), length[irt], s=50, c=color, label=read_type)
     ax.set_xlabel('Read length [bases]')
     ax.set_ylabel('# reads')
-    ax.set_title('adaID '+'{:02d}'.format(adaID)+', '+fragment)
+    ax.set_title('adaID '+adaID+', '+fragment)
     ax.set_yscale('log')
     ax.legend(loc='lower right', fontsize=10)
     ax.set_ylim(ymin=1)
@@ -106,7 +106,7 @@ def plot_read_length_distribution_cumulative(adaID, fragment, length):
                 label=labss[read_type])
     ax.set_xlabel('Read length [bases]')
     ax.set_ylabel('fraction of reads longer than x')
-    #ax.set_title('adaID '+'{:02d}'.format(adaID)+', '+fragment)
+    #ax.set_title('adaID '+adaID+', '+fragment)
     ax.legend(loc='lower left', fontsize=18)
     ax.set_ylim(-0.05, 1.05)
     ax.set_xlim(-5, 255)
@@ -124,10 +124,10 @@ if __name__ == '__main__':
 
     # Input arguments
     parser = argparse.ArgumentParser(description='Study minor allele frequency')
-    parser.add_argument('--run', type=int, required=True,
-                        help='MiSeq run to analyze (e.g. 28, 37)')
-    parser.add_argument('--adaIDs', nargs='*', type=int,
-                        help='Adapter IDs to analyze (e.g. 2 16)')
+    parser.add_argument('--run', required=True,
+                        help='Seq run to analyze (e.g. Tue28)')
+    parser.add_argument('--adaIDs', nargs='*',
+                        help='Adapter IDs to analyze (e.g. TS2)')
     parser.add_argument('--fragments', nargs='*',
                         help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('-n', type=int, default=-1,
@@ -136,14 +136,14 @@ if __name__ == '__main__':
                         help='Verbosity level [0-3]')
 
     args = parser.parse_args()
-    miseq_run = args.run
+    seq_run = args.run
     adaIDs = args.adaIDs
     fragments = args.fragments
     n_reads = args.n
     VERBOSE = args.verbose
 
     # Specify the dataset
-    dataset = MiSeq_runs[miseq_run]
+    dataset = MiSeq_runs[seq_run]
     data_folder = dataset['folder']
 
     # If the script is called with no adaID, iterate over all

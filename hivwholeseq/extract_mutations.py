@@ -39,7 +39,7 @@ vmem = '8G'
 
 
 # Functions
-def fork_self(miseq_run, adaID):
+def fork_self(seq_run, adaID):
     '''Fork self for each adapter ID'''
     import subprocess as sp
 
@@ -48,11 +48,11 @@ def fork_self(miseq_run, adaID):
                  '-S', '/bin/bash',
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
-                 '-N', 'exm_'+'{:02d}'.format(adaID),
+                 '-N', 'exm_'+adaID,
                  '-l', 'h_rt='+cluster_time,
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
-                 '--run', miseq_run,
+                 '--run', seq_run,
                  '--adaID', adaID,
                 ]
     qsub_list = map(str, qsub_list)
@@ -67,9 +67,9 @@ if __name__ == '__main__':
 
     # Input arguments
     parser = argparse.ArgumentParser(description='Extract linkage information')
-    parser.add_argument('--run', type=int, required=True,
-                        help='MiSeq run to analyze (e.g. 28, 37)')
-    parser.add_argument('--adaID', metavar='00', type=int, required=True,
+    parser.add_argument('--run', required=True,
+                        help='Seq run to analyze (e.g. Tue28)')
+    parser.add_argument('--adaID', metavar='00', required=True,
                         help='Adapter ID sample to analyze')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
@@ -77,13 +77,13 @@ if __name__ == '__main__':
                         help='Submit the job to the cluster via qsub')
 
     args = parser.parse_args()
-    miseq_run = args.run
+    seq_run = args.run
     adaID = args.adaID
     VERBOSE = args.verbose
     submit = args.submit
 
     # Specify the dataset
-    dataset = MiSeq_runs[miseq_run]
+    dataset = MiSeq_runs[seq_run]
     data_folder = dataset['folder']
 
     # Branch to the cluster if required
@@ -94,7 +94,7 @@ if __name__ == '__main__':
         else:
             adaIDs = [adaID]
             for adaID in adaIDs:
-                fork_self(miseq_run, adaID) 
+                fork_self(seq_run, adaID) 
         sys.exit()
 
     ###########################################################################
