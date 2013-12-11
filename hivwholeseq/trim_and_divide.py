@@ -588,8 +588,9 @@ if __name__ == '__main__':
             with open(get_divide_summary_filename(data_folder, adaID), 'w') as f:
                 f.write('Call: python trim_and_divide.py --run '+seq_run+\
                         ' --adaIDs '+adaID+\
-                        ' --maxreads '+str(maxreads)+\
                         ' --verbose '+str(VERBOSE))
+                if maxreads != -1:
+                    f.write(' --maxreads '+str(maxreads))
                 if include_tests:
                     f.write(' --include_tests')
                 f.write('\n')

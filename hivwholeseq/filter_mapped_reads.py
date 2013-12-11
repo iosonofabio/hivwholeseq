@@ -190,76 +190,78 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0,
                 # Assign names
                 (read1, read2) = reads
 
-                # Flag to decide on the read
-                skip = False
-            
                 # Check a few things to make sure we are looking at paired reads
                 if read1.qname != read2.qname:
                     n_wrongname += 1
                     raise ValueError('Read pair '+str(irp)+': reads have different names!')
 
                 # Ignore unmapped reads
-                elif read1.is_unmapped or read2.is_unmapped:
+                if read1.is_unmapped or read2.is_unmapped:
                     if VERBOSE >= 2:
                         print 'Read pair '+read1.qname+': unmapped'
                     n_unmapped += 1
-                    skip = True
+                    map(trashfile.write, reads)
+                    continue
             
                 # Ignore not properly paired reads (this includes mates sitting on
                 # different fragments)
-                elif (not read1.is_proper_pair) or (not read2.is_proper_pair):
+                if (not read1.is_proper_pair) or (not read2.is_proper_pair):
                     if VERBOSE >= 2:
                         print 'Read pair '+read1.qname+': not properly paired'
                     n_unpaired += 1
-                    skip = True
+                    map(trashfile.write, reads)
+                    continue
+                    
+                # Mismappings are often characterized by many mutations:
+                # check the number of mismatches and skip reads with too many
+                dc = get_distance_from_consensus(ref, reads, VERBOSE=VERBOSE)
+                histogram_distance_from_consensus[dc.sum()] += 1
+                if (dc.sum() > max_mismatches):
+                    if VERBOSE >= 2:
+                        print 'Read pair '+read1.qname+': too many mismatches '+\
+                                '('+str(dc[0])+' + '+str(dc[1])+')'
+                    n_mutator += 1
+                    map(trashfile.write, reads)
+                    continue
 
-                else:
-
-                    # Mismappings are often characterized by many mutations:
-                    # check the number of mismatches and skip reads with too many
-                    dc = get_distance_from_consensus(ref, reads, VERBOSE=VERBOSE)
-                    histogram_distance_from_consensus[dc.sum()] += 1
-                    if (dc.sum() > max_mismatches):
-                        if VERBOSE >= 2:
-                            print 'Read pair '+read1.qname+': too many mismatches '+\
-                                    '('+str(dc[0])+' + '+str(dc[1])+')'
-                        n_mutator += 1
+                # Mismappings are sometimes at fragment edges:
+                # Check for overhangs beyond the edge
+                skip = False
+                for read in reads:
+                    # Check overhangs
+                    read_start = read.pos
+                    read_end = read.pos + sum(x[1] for x in read.cigar if x[0] != 1)
+                    if (((read_start == 0) and (read.cigar[0][0] == 1)) or
+                        ((read_end == len(ref)) and (read.cigar[-1][0] == 1))):
                         skip = True
+                        break
+                if skip:
+                    n_mismapped_edge += 1
+                    map(trashfile.write, reads)
+                    continue
 
-                    else:
-    
-                        # Mismappings are sometimes at fragment edges:
-                        # Check for overhangs beyond the edge
-                        for read in reads:
-                            # Check overhangs
-                            read_start = read.pos
-                            read_end = read.pos + sum(x[1] for x in read.cigar if x[0] != 1)
-                            if (((read_start == 0) and (read.cigar[0][0] == 1)) or
-                                ((read_end == len(ref)) and (read.cigar[-1][0] == 1))):
-                                n_mismapped_edge += 1
-                                skip = True
-                                break
+                # Trim the bad CIGARs from the sides, if there are any good ones
+                skip = trim_bad_cigar(reads, match_len_min=match_len_min,
+                                       trim_left=trim_bad_cigars,
+                                       trim_right=trim_bad_cigars)
+                if skip:
+                    n_badcigar += 1
+                    map(trashfile.write, reads)
+                    continue
 
-                # If the read pair survived, check and trim good cigars
-                if not skip:
-                    # Trim the bad CIGARs from the sides (in place)
-                    trash = trim_bad_cigar(reads, match_len_min=match_len_min,
-                                           trim_left=trim_bad_cigars,
-                                           trim_right=trim_bad_cigars)
+                # TODO: check for contamination from other PCR plates. Typically,
+                # contamination happens for only one fragment, whereas superinfection
+                # happens for all. At this stage, we can only give clues about
+                # cross-contamination, the rest will be done in a script downstream
+                # (here we could TAG suspicious reads for contamination)
 
-                    # TODO: we might want to incorporate some more stringent
-                    # criterion here, to avoid short reads, cross-overhang, etc.
-                    # If there are no good CIGARs, skip
-                    if trash:
-                        n_badcigar += 1
-                        skip = True
+
+                # TODO: we might want to incorporate some more stringent
+                # criterion here, to avoid short reads, cross-overhang, etc.
 
                 # Write the output
-                if skip:
-                    map(trashfile.write, reads)
-                else:
-                    n_good += 1
-                    map(outfile.write, reads)
+                n_good += 1
+                map(outfile.write, reads)
 
     if VERBOSE >= 1:
         print 'Read pairs: '

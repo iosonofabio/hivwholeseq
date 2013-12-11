@@ -250,7 +250,7 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
 
     if summary:
         with open(get_premap_summary_filename(data_folder, adaID), 'a') as f:
-            f.write('\nStampy premapped ('+str(threads)+' threads).\n')
+            f.write('Stampy premapped ('+str(threads)+' threads).\n')
 
     # Concatenate output files
     if VERBOSE >= 1:
@@ -261,7 +261,7 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
         print 'done.'
     if summary:
         with open(get_premap_summary_filename(data_folder, adaID), 'a') as f:
-            f.write('\nBAM files concatenated (unsorted).\n')
+            f.write('BAM files concatenated (unsorted).\n')
 
     # Sort the file by read names (to ensure the pair_generator)
     # NOTE: we exclude the extension and the option -f because of a bug in samtools
@@ -271,7 +271,7 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
     pysam.sort('-n', output_filename, output_filename_sorted[:-4])
     if summary:
         with open(get_premap_summary_filename(data_folder, adaID), 'a') as f:
-            f.write('\nJoint BAM file sorted.\n')
+            f.write('Joint BAM file sorted.\n')
 
     # Reheader the file without BAM -> SAM -> BAM
     if VERBOSE >= 1:
@@ -280,7 +280,7 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
     pysam.reheader(header_filename, output_filename_sorted)
     if summary:
         with open(get_premap_summary_filename(data_folder, adaID), 'a') as f:
-            f.write('\nJoint BAM file reheaded.\n')
+            f.write('Joint BAM file reheaded.\n')
 
 
 def report_insert_size(data_folder, adaID, seq_run, VERBOSE=0, summary=True):
@@ -335,12 +335,13 @@ def report_coverage(data_folder, adaID, VERBOSE=0, summary=True):
     # Save results
     from hivwholeseq.filenames import get_coverage_figure_filename
     import matplotlib.pyplot as plt
-    plt.plot(np.arange(len(refseq)), coverage + 1, lw=2, c='b')
-    plt.xlabel('Position')
-    plt.ylabel('Coverage')
-    plt.yscale('log')
-    plt.title('adaID '+adaID+', premapped',
-              fontsize=18)
+    fig, ax = plt.subplots(1, 1, figsize=(13, 6))
+    ax.plot(np.arange(len(refseq)), coverage + 1, lw=2, c='b')
+    ax.set_xlabel('Position')
+    ax.set_ylabel('Coverage')
+    ax.set_yscale('log')
+    ax.set_title('adaID '+adaID+', premapped', fontsize=18)
+    ax.set_xlim(-20, len(refseq) + 20)
     plt.tight_layout()
 
     from hivwholeseq.generic_utils import mkdirs

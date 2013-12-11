@@ -87,32 +87,37 @@ def make_output_folders(data_folder, adaID, VERBOSE=0, bwa=False):
             print 'Folder created:', dirname
 
 
-def make_index_and_hash(data_folder, adaID, fragment, VERBOSE=0):
+def make_index_and_hash(data_folder, adaID, fragment, VERBOSE=0, summary=True):
     '''Make index and hash files for consensus'''
     frag_gen = fragment[:2]
 
     # NOTE: we can use --overwrite here, because there is no concurrency (every
     # job has its own hash)
     # 1. Make genome index file
-    if not os.path.isfile(get_index_file(data_folder, adaID, frag_gen, ext=True)):
-        sp.call([stampy_bin,
-                 '--species="HIV fragment '+frag_gen+'"',
-                 '--overwrite',
-                 '-G', get_index_file(data_folder, adaID, frag_gen, ext=False),
-                 get_consensus_filename(data_folder, adaID, frag_gen, trim_primers=True),
-                 ])
-        if VERBOSE:
-            print 'Built index: '+adaID+' '+frag_gen
+    sp.call([stampy_bin,
+             '--species="HIV fragment '+frag_gen+'"',
+             '--overwrite',
+             '-G', get_index_file(data_folder, adaID, frag_gen, ext=False),
+             get_consensus_filename(data_folder, adaID, frag_gen, trim_primers=True),
+             ])
+    if VERBOSE:
+        print 'Built index: '+adaID+' '+frag_gen
     
     # 2. Build a hash file
-    if not os.path.isfile(get_hash_file(data_folder, adaID, frag_gen, ext=True)):
-        sp.call([stampy_bin,
-                 '--overwrite',
-                 '-g', get_index_file(data_folder, adaID, frag_gen, ext=False),
-                 '-H', get_hash_file(data_folder, adaID, frag_gen, ext=False),
-                 ])
-        if VERBOSE:
-            print 'Built hash: '+adaID+' '+frag_gen
+    sp.call([stampy_bin,
+             '--overwrite',
+             '-g', get_index_file(data_folder, adaID, frag_gen, ext=False),
+             '-H', get_hash_file(data_folder, adaID, frag_gen, ext=False),
+             ])
+    if VERBOSE:
+        print 'Built hash: '+adaID+' '+frag_gen
+
+    if summary:
+        with open(get_map_summary_filename(data_folder, adaID, fragment), 'a') as f:
+            f.write('\n')
+            f.write('Stampy index and hash written.')
+            f.write('\n')
+
 
 
 def make_bwa_hash(data_folder, adaID, fragment, VERBOSE=0):
@@ -163,7 +168,8 @@ def map_bwa(data_folder, adaID, fragment, VERBOSE=0):
         sp.call(call_list, stdout=f)
 
 
-def map_stampy(data_folder, adaID, fragment, VERBOSE=0, bwa=False, threads=1, n_pairs=-1):
+def map_stampy(data_folder, adaID, fragment, VERBOSE=0, bwa=False, threads=1,
+               n_pairs=-1, summary=True):
     '''Map using stampy, either directly or after BWA'''
     # Get input filenames
     frag_gen = fragment[:2]
@@ -195,6 +201,7 @@ def map_stampy(data_folder, adaID, fragment, VERBOSE=0, bwa=False, threads=1, n_
                      '-g', get_index_file(data_folder, adaID, frag_gen, ext=False),
                      '-h', get_hash_file(data_folder, adaID, frag_gen, ext=False), 
                      '-o', output_filename,
+                     '--overwrite',
                      '--substitutionrate='+subsrate,
                      '--gapopen', stampy_gapopen,
                      '--gapextend', stampy_gapextend]
@@ -217,103 +224,121 @@ def map_stampy(data_folder, adaID, fragment, VERBOSE=0, bwa=False, threads=1, n_
             print ' '.join(call_list)
         sp.call(call_list)
 
-    else:
+        if summary:
+            with open(get_map_summary_filename(data_folder, adaID, fragment), 'a') as f:
+                f.write('Stampy mapped (single thread).\n')
 
-        # Submit map script
-        jobs_done = np.zeros(threads, bool)
-        job_IDs = np.zeros(threads, 'S30')
-        for j in xrange(threads):
+        return
+
+    # Submit map script
+    jobs_done = np.zeros(threads, bool)
+    job_IDs = np.zeros(threads, 'S30')
+    for j in xrange(threads):
     
-            # Get output filename
-            output_filename =  get_mapped_filename(data_folder, adaID, frag_gen,
-                                               type='sam', part=(j+1))
-            # Map
-            call_list = ['qsub','-cwd',
-                         '-b', 'y',
-                         '-S', '/bin/bash',
-                         '-o', JOBLOGOUT,
-                         '-e', JOBLOGERR,
-                         '-N', 'm '+adaID+frag_gen+' p'+str(j+1),
-                         '-l', 'h_rt='+cluster_time[threads >= 10],
-                         '-l', 'h_vmem='+vmem,
-                         stampy_bin,
-                         '-g', get_index_file(data_folder, adaID, frag_gen, ext=False),
-                         '-h', get_hash_file(data_folder, adaID, frag_gen, ext=False), 
-                         '-o', output_filename,
-                         '--processpart='+str(j+1)+'/'+str(threads),
-                         '--substitutionrate='+subsrate,
-                         '--gapopen', stampy_gapopen,
-                         '--gapextend', stampy_gapextend]
-            if bwa:
-                call_list.append('--bamkeepgoodreads')
-            if stampy_sensitive:
-                call_list.append('--sensitive')
-            call_list = call_list + ['-M', input_filename]
-            call_list = map(str, call_list)
-            if VERBOSE >= 2:
-                print ' '.join(call_list)
-            job_ID = sp.check_output(call_list)
-            job_ID = job_ID.split()[2]
-            job_IDs[j] = job_ID
+        # Get output filename
+        output_filename =  get_mapped_filename(data_folder, adaID, frag_gen,
+                                           type='sam', part=(j+1))
+        # Map
+        call_list = ['qsub','-cwd',
+                     '-b', 'y',
+                     '-S', '/bin/bash',
+                     '-o', JOBLOGOUT,
+                     '-e', JOBLOGERR,
+                     '-N', 'm '+adaID+frag_gen+' p'+str(j+1),
+                     '-l', 'h_rt='+cluster_time[threads >= 10],
+                     '-l', 'h_vmem='+vmem,
+                     stampy_bin,
+                     '-g', get_index_file(data_folder, adaID, frag_gen, ext=False),
+                     '-h', get_hash_file(data_folder, adaID, frag_gen, ext=False), 
+                     '-o', output_filename,
+                     '--overwrite',
+                     '--processpart='+str(j+1)+'/'+str(threads),
+                     '--substitutionrate='+subsrate,
+                     '--gapopen', stampy_gapopen,
+                     '--gapextend', stampy_gapextend]
+        if bwa:
+            call_list.append('--bamkeepgoodreads')
+        if stampy_sensitive:
+            call_list.append('--sensitive')
+        call_list = call_list + ['-M', input_filename]
+        call_list = map(str, call_list)
+        if VERBOSE >= 2:
+            print ' '.join(call_list)
+        job_ID = sp.check_output(call_list)
+        job_ID = job_ID.split()[2]
+        job_IDs[j] = job_ID
 
-        # Monitor output
-        output_file_parts = [get_mapped_filename(data_folder, adaID, frag_gen,
-                                                 type='bam', part=(j+1))
-                              for j in xrange(threads)]
+    # Monitor output
+    output_file_parts = [get_mapped_filename(data_folder, adaID, frag_gen,
+                                             type='bam', part=(j+1))
+                          for j in xrange(threads)]
+    time_wait = 10 # secs
+    while not jobs_done.all():
+
+        # Sleep some time
+        time.sleep(time_wait)
+
+        # Get the output of qstat to check the status of jobs
+        qstat_output = sp.check_output(['qstat'])
+        qstat_output = qstat_output.split('\n')[:-1] # The last is an empty line
+        if len(qstat_output) < 3:
+            jobs_done[:] = True
+            break
+        else:
+            qstat_output = [line.split()[0] for line in qstat_output[2:]]
+
         time_wait = 10 # secs
-        while not jobs_done.all():
+        for j in xrange(threads):
+            if jobs_done[j]:
+                continue
 
-            # Sleep some time
-            time.sleep(time_wait)
+            if job_IDs[j] not in qstat_output:
+                # Convert to BAM for merging
+                if VERBOSE >= 1:
+                    print 'Convert mapped reads to BAM for merging: adaID '+\
+                           adaID+', part '+str(j+1)+ ' of '+ \
+                           str(threads)
+                convert_sam_to_bam(output_file_parts[j])
+                # We do not need to wait if we did the conversion (it takes
+                # longer than some secs)
+                time_wait = 0
+                jobs_done[j] = True
 
-            # Get the output of qstat to check the status of jobs
-            qstat_output = sp.check_output(['qstat'])
-            qstat_output = qstat_output.split('\n')[:-1] # The last is an empty line
-            if len(qstat_output) < 3:
-                jobs_done[:] = True
-                break
-            else:
-                qstat_output = [line.split()[0] for line in qstat_output[2:]]
+    if summary:
+        with open(get_map_summary_filename(data_folder, adaID, fragment), 'a') as f:
+            f.write('Stampy mapped ('+str(threads)+' threads).\n')
 
-            time_wait = 10 # secs
-            for j in xrange(threads):
-                if jobs_done[j]:
-                    continue
+    # Concatenate output files
+    output_filename = get_mapped_filename(data_folder, adaID, frag_gen, type='bam',
+                                          unsorted=True)
+    if VERBOSE >= 1:
+        print 'Concatenate mapped reads: adaID '+adaID
+    pysam.cat('-o', output_filename, *output_file_parts)
+    if summary:
+        with open(get_map_summary_filename(data_folder, adaID, fragment), 'a') as f:
+            f.write('BAM files concatenated (unsorted).\n')
 
-                if job_IDs[j] not in qstat_output:
-                    # Convert to BAM for merging
-                    if VERBOSE >= 1:
-                        print 'Convert mapped reads to BAM for merging: adaID '+\
-                               adaID+', part '+str(j+1)+ ' of '+ \
-                               str(threads)
-                    convert_sam_to_bam(output_file_parts[j])
-                    # We do not need to wait if we did the conversion (it takes
-                    # longer than some secs)
-                    time_wait = 0
-                    jobs_done[j] = True
+    # Sort the file by read names (to ensure the pair_generator)
+    output_filename_sorted = get_mapped_filename(data_folder, adaID, frag_gen,
+                                                 type='bam',
+                                                 unsorted=False)
+    # NOTE: we exclude the extension and the option -f because of a bug in samtools
+    if VERBOSE >= 1:
+        print 'Sort mapped reads: adaID '+adaID
+    pysam.sort('-n', output_filename, output_filename_sorted[:-4])
+    if summary:
+        with open(get_map_summary_filename(data_folder, adaID, fragment), 'a') as f:
+            f.write('Joint BAM file sorted.\n')
 
-        # Concatenate output files
-        output_filename = get_mapped_filename(data_folder, adaID, frag_gen, type='bam',
-                                              unsorted=True)
-        if VERBOSE >= 1:
-            print 'Concatenate premapped reads: adaID '+adaID
-        pysam.cat('-o', output_filename, *output_file_parts)
-
-        # Sort the file by read names (to ensure the pair_generator)
-        output_filename_sorted = get_mapped_filename(data_folder, adaID, frag_gen,
-                                                     type='bam',
-                                                     unsorted=False)
-        # NOTE: we exclude the extension and the option -f because of a bug in samtools
-        if VERBOSE >= 1:
-            print 'Sort mapped reads: adaID '+adaID
-        pysam.sort('-n', output_filename, output_filename_sorted[:-4])
-
-        # Reheader the file without BAM -> SAM -> BAM
-        if VERBOSE >= 1:
-            print 'Reheader mapped reads: adaID '+adaID
-        header_filename = get_mapped_filename(data_folder, adaID, frag_gen,
-                                              type='sam', part=1)
-        pysam.reheader(header_filename, output_filename_sorted)
+    # Reheader the file without BAM -> SAM -> BAM
+    if VERBOSE >= 1:
+        print 'Reheader mapped reads: adaID '+adaID
+    header_filename = get_mapped_filename(data_folder, adaID, frag_gen,
+                                          type='sam', part=1)
+    pysam.reheader(header_filename, output_filename_sorted)
+    if summary:
+        with open(get_map_summary_filename(data_folder, adaID, fragment), 'a') as f:
+            f.write('Joint BAM file reheaded.\n')
 
 
 
@@ -405,9 +430,10 @@ if __name__ == '__main__':
                             ' --run '+seq_run+\
                             ' --adaIDs '+adaID+\
                             ' --fragments '+fragment+\
-                            ' -n '+str(n_pairs)+\
                             ' --threads '+str(threads)+\
                             ' --verbose '+str(VERBOSE))
+                    if n_pairs != -1:
+                        f.write(' -n '+str(n_pairs))
                     if bwa:
                         f.write(' --bwa')
                     if filter_reads:
@@ -424,13 +450,16 @@ if __name__ == '__main__':
                         VERBOSE=VERBOSE)
     
             # Make stampy hashes
-            make_index_and_hash(data_folder, adaID, fragment, VERBOSE=VERBOSE)
+            make_index_and_hash(data_folder, adaID, fragment, VERBOSE=VERBOSE,
+                                summary=summary)
             
             # Map via stampy afterwards
             map_stampy(data_folder, adaID, fragment,
                        VERBOSE=VERBOSE, bwa=bwa,
-                       threads=threads, n_pairs=n_pairs)
+                       threads=threads, n_pairs=n_pairs,
+                       summary=summary)
 
             # Filter reads after mapping if requested
             if filter_reads:
-                filter_mapped_reads(data_folder, adaID, fragment, VERBOSE=VERBOSE)
+                filter_mapped_reads(data_folder, adaID, fragment, VERBOSE=VERBOSE,
+                                    summary=summary)
