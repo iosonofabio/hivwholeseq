@@ -321,6 +321,7 @@ def trim_primers(reads, frag_pos, include_tests=False):
 
 def trim_and_divide_reads(data_folder, adaID, n_cycles, fragments,
                           maxreads=-1, VERBOSE=0,
+                          minisize=100,
                           include_tests=False, summary=True):
     '''Trim reads and divide them into fragments'''
     if VERBOSE:
@@ -411,7 +412,7 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, fragments,
                 if reads[0].is_unmapped or (not reads[0].is_proper_pair) or \
                    reads[1].is_unmapped or (not reads[1].is_proper_pair) or \
                    (reads[0].rlen < 50) or (reads[1].rlen < 50) or \
-                   (np.abs(reads[0].isize) < 100):
+                   (np.abs(reads[0].isize) < minisize):
                     if VERBOSE >= 3:
                         print 'Read pair unmapped/unpaired/tiny:', reads[0].qname
                     n_unmapped += 1
@@ -544,6 +545,8 @@ if __name__ == '__main__':
                         help='Verbosity level [0-3]')
     parser.add_argument('--maxreads', type=int, default=-1,
                         help='Maximal number of reads to analyze')
+    parser.add_argument('--minisize', type=int, default=100,
+                        help='Minimal insert size to keep')
     parser.add_argument('--submit', action='store_true',
                         help='Execute the script in parallel on the cluster')
     parser.add_argument('--test', action='store_true',
@@ -556,6 +559,7 @@ if __name__ == '__main__':
     adaIDs = args.adaIDs
     VERBOSE = args.verbose
     maxreads = args.maxreads
+    minisize = args.minisize
     submit = args.submit
     include_tests = args.test
     summary = args.summary
@@ -579,7 +583,7 @@ if __name__ == '__main__':
             if include_tests:
                 raise ValueError('Tests require an interactive shell')
             fork_self(seq_run, adaID, VERBOSE=VERBOSE, maxreads=maxreads,
-                      summary=summary)
+                      minisize=minisize, summary=summary)
             continue
 
         make_output_folders(data_folder, adaID, VERBOSE=VERBOSE)
@@ -588,6 +592,7 @@ if __name__ == '__main__':
             with open(get_divide_summary_filename(data_folder, adaID), 'w') as f:
                 f.write('Call: python trim_and_divide.py --run '+seq_run+\
                         ' --adaIDs '+adaID+\
+                        ' --minisize '+str(minisize)+\
                         ' --verbose '+str(VERBOSE))
                 if maxreads != -1:
                     f.write(' --maxreads '+str(maxreads))
@@ -602,6 +607,7 @@ if __name__ == '__main__':
         # Note: we pass over the file only once
         trim_and_divide_reads(data_folder, adaID, n_cycles, fragments,
                               maxreads=maxreads, VERBOSE=VERBOSE,
+                              minisize=minisize,
                               include_tests=include_tests,
                               summary=summary)
         continue

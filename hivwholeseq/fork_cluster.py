@@ -89,7 +89,7 @@ def fork_premap(seq_run, adaID, VERBOSE=0, bwa=False, threads=1,
     return sp.check_output(call_list)
 
 
-def fork_trim_and_divide(seq_run, adaID, VERBOSE=0, maxreads=-1,
+def fork_trim_and_divide(seq_run, adaID, VERBOSE=0, maxreads=-1, minisize=100,
                          summary=True):
     '''Submit trim and divide script to the cluster for each adapter ID'''
     if VERBOSE:
@@ -111,6 +111,7 @@ def fork_trim_and_divide(seq_run, adaID, VERBOSE=0, maxreads=-1,
                  '--adaIDs', adaID,
                  '--verbose', VERBOSE,
                  '--maxreads', maxreads,
+                 '--minisize', minisize,
                 ]
     if not summary:
         call_list.append('--no-summary')

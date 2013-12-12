@@ -18,7 +18,7 @@ from Bio import SeqIO
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.adapter_info import load_adapter_table
 from hivwholeseq.filenames import get_consensus_filename, get_mapped_filename, \
-        get_filter_mapped_summary_filename
+        get_filter_mapped_summary_filename, get_mapped_suspicious_filename
 from hivwholeseq.mapping_utils import get_ind_good_cigars, convert_sam_to_bam,\
         pair_generator, get_range_good_cigars
 from hivwholeseq.fork_cluster import fork_filter_mapped as fork_self
@@ -36,19 +36,95 @@ trim_bad_cigars = 3
 # Functions
 def plot_distance_histogram(data_folder, adaID, fragment, counts, savefig=False):
     '''Plot the histogram of distance from consensus'''
+    from hivwholeseq.filenames import get_distance_from_consensus_figure_filename as gff
     import matplotlib.pyplot as plt
+
+    # Linear histogram
     fig, ax = plt.subplots(1, 1)
-    ax.plot(np.arange(len(counts)), counts, 'b', lw=2)
     ax.set_xlabel('Hamming distance')
     ax.set_ylabel('# read pairs')
     ax.set_title('adaID '+adaID+', '+fragment)
     ax.set_xlim(-0.5, 0.5 + counts.nonzero()[0][-1])
 
+    ax.plot(np.arange(len(counts)), counts, 'b', lw=2)
     if savefig:
-        from hivwholeseq.filenames import get_distance_from_consensus_figure_filename
-        outputfile = get_distance_from_consensus_figure_filename(data_folder, adaID,
-                                                                 fragment)
+        outputfile = gff(data_folder, adaID, fragment)
         fig.savefig(outputfile)
+        plt.close(fig)
+
+    # Log cumulative histogram
+    fig, ax = plt.subplots(1, 1)
+    ax.set_xlabel('Hamming distance')
+    ax.set_ylabel('# read pairs < x')
+    ax.set_title('adaID '+adaID+', '+fragment)
+    ax.set_xlim(-0.5, 0.5 + counts.nonzero()[0][-1])
+    ax.set_ylim(1.0 / counts.sum() * 0.9, 1.1)
+    ax.set_yscale('log')
+
+    y = 1.0 - 1.0 * np.cumsum(counts) / counts.sum()
+    ax.plot(np.arange(len(counts)), y, 'b', lw=2)
+    if savefig:
+        outputfile = gff(data_folder, adaID, fragment, cumulative=True, yscale='log')
+        fig.savefig(outputfile)
+        plt.close(fig)
+
+
+def plot_distance_histogram_sliding_window(data_folder, adaID, fragment,
+                                           lref,
+                                           counts, binsize=200,
+                                           savefig=False):
+    '''Plot the distance histogram along the genome'''
+    from hivwholeseq.filenames import get_distance_from_consensus_figure_filename as gff
+    import matplotlib.pyplot as plt
+    from matplotlib import cm
+
+    # Figure max x
+    xmax = counts.nonzero()[1].max()
+
+    # Linear histogram
+    fig, ax = plt.subplots(1, 1)
+    ax.set_xlabel('Hamming distance')
+    ax.set_ylabel('# read pairs')
+    ax.set_title('adaID '+adaID+', '+fragment)
+    ax.set_xlim(-0.5, 0.5 + xmax)
+
+    for i, count in enumerate(counts):
+        color = cm.jet(int(255.0 * i / counts.shape[0]))
+        start = binsize * i
+        end = min(binsize * (i+1), lref)
+        ax.plot(np.arange(counts.shape[1]), count, lw=2,
+                color=color, label=str(start)+' to '+str(end))
+    ax.legend(loc=1)
+
+    if savefig:
+        outputfile = gff(data_folder, adaID, fragment, sliding_window=True)
+        fig.savefig(outputfile)
+        plt.close(fig)
+
+
+    # Log cumulative histogram
+    fig, ax = plt.subplots(1, 1)
+    ax.set_xlabel('Hamming distance')
+    ax.set_ylabel('# read pairs')
+    ax.set_title('adaID '+adaID+', '+fragment)
+    ax.set_xlim(-0.5, 0.5 + xmax)
+    ax.set_ylim(1.0 / counts.sum(axis=1).max() * 0.9, 1.1)
+    ax.set_yscale('log')
+
+    for i, count in enumerate(counts):
+        color = cm.jet(int(255.0 * i / counts.shape[0]))
+        start = binsize * i
+        end = min(binsize * (i+1), lref)
+        y = 1.0 - 1.0 * np.cumsum(count) / count.sum()
+        ax.plot(np.arange(counts.shape[1]), y, lw=2,
+                color=color, label=str(start)+' to '+str(end))
+    ax.legend(loc=1)
+
+    if savefig:
+        outputfile = gff(data_folder, adaID, fragment, cumulative=True,
+                         sliding_window=True)
+        fig.savefig(outputfile)
+        plt.close(fig)
 
 
 def get_distance_from_consensus(ref, reads, VERBOSE=0):
@@ -72,6 +148,20 @@ def get_distance_from_consensus(ref, reads, VERBOSE=0):
                 pos_read += bl
         ds.append(d)
     return np.array(ds, int)
+
+
+def check_overhanging_reads(reads, refl):
+    '''Check for reads overhanging beyond the fragment edges'''
+    skip = False
+    for read in reads:
+        # Check overhangs
+        read_start = read.pos
+        read_end = read.pos + sum(x[1] for x in read.cigar if x[0] != 1)
+        if (((read_start == 0) and (read.cigar[0][0] == 1)) or
+            ((read_end == refl) and (read.cigar[-1][0] == 1))):
+            skip = True
+            break
+    return skip
 
 
 def trim_bad_cigar(reads, match_len_min=match_len_min,
@@ -151,12 +241,14 @@ def trim_bad_cigar(reads, match_len_min=match_len_min,
 
 
 def filter_reads(data_folder, adaID, fragment, VERBOSE=0,
-                 n_cycles=600, max_mismatches=30,
+                 n_cycles=600,
+                 max_mismatches=30,
+                 susp_mismatches=20,
                  summary=True):
     '''Filter the reads to good chunks'''
     frag_gen = fragment[:2]
 
-    reffilename = get_consensus_filename(data_folder, adaID, frag_gen, trim_primers=True)
+    reffilename = get_consensus_filename(data_folder, adaID, frag_gen)
     refseq = SeqIO.read(reffilename, 'fasta')
     ref = np.array(refseq)
 
@@ -167,10 +259,12 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0,
 
     outfilename = get_mapped_filename(data_folder, adaID, frag_gen, type='bam',
                                      filtered=True)
+    suspiciousfilename = get_mapped_suspicious_filename(data_folder, adaID, frag_gen)
     trashfilename = outfilename[:-4]+'_trashed.bam'
  
     with pysam.Samfile(bamfilename, 'rb') as bamfile:
         with pysam.Samfile(outfilename, 'wb', template=bamfile) as outfile,\
+             pysam.Samfile(suspiciousfilename, 'wb', template=bamfile) as suspfile,\
              pysam.Samfile(trashfilename, 'wb', template=bamfile) as trashfile:
  
             # Iterate over all pairs
@@ -179,9 +273,13 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0,
             n_unmapped = 0
             n_unpaired = 0
             n_mutator = 0
+            n_suspect = 0
             n_mismapped_edge = 0
             n_badcigar = 0
             histogram_distance_from_consensus = np.zeros(n_cycles + 1, int)
+            binsize = 200
+            histogram_dist_along = np.zeros((len(ref) // binsize + 1,
+                                             n_cycles + 1), int)
             for irp, reads in enumerate(pair_generator(bamfile)):
 
                 # Limit to the first reads
@@ -189,6 +287,7 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0,
             
                 # Assign names
                 (read1, read2) = reads
+                i_fwd = reads[0].is_reverse
 
                 # Check a few things to make sure we are looking at paired reads
                 if read1.qname != read2.qname:
@@ -211,11 +310,21 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0,
                     n_unpaired += 1
                     map(trashfile.write, reads)
                     continue
+
+                # Mismappings are sometimes at fragment edges:
+                # Check for overhangs beyond the edge
+                skip = check_overhanging_reads(reads, len(ref))
+                if skip:
+                    n_mismapped_edge += 1
+                    map(trashfile.write, reads)
+                    continue
                     
                 # Mismappings are often characterized by many mutations:
                 # check the number of mismatches and skip reads with too many
                 dc = get_distance_from_consensus(ref, reads, VERBOSE=VERBOSE)
                 histogram_distance_from_consensus[dc.sum()] += 1
+                hbin = (reads[i_fwd].pos + reads[i_fwd].isize / 2) // binsize
+                histogram_dist_along[hbin, dc.sum()] += 1
                 if (dc.sum() > max_mismatches):
                     if VERBOSE >= 2:
                         print 'Read pair '+read1.qname+': too many mismatches '+\
@@ -224,20 +333,14 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0,
                     map(trashfile.write, reads)
                     continue
 
-                # Mismappings are sometimes at fragment edges:
-                # Check for overhangs beyond the edge
-                skip = False
-                for read in reads:
-                    # Check overhangs
-                    read_start = read.pos
-                    read_end = read.pos + sum(x[1] for x in read.cigar if x[0] != 1)
-                    if (((read_start == 0) and (read.cigar[0][0] == 1)) or
-                        ((read_end == len(ref)) and (read.cigar[-1][0] == 1))):
-                        skip = True
-                        break
-                if skip:
-                    n_mismapped_edge += 1
-                    map(trashfile.write, reads)
+                # Check for contamination from other PCR plates. Typically,
+                # contamination happens for only one fragment, whereas superinfection
+                # happens for all. At this stage, we can only give clues about
+                # cross-contamination, the rest will be done in a script downstream
+                # (here we could TAG suspicious reads for contamination)
+                elif (dc.sum() > susp_mismatches):
+                    n_suspect += 1
+                    map(suspfile.write, reads)
                     continue
 
                 # Trim the bad CIGARs from the sides, if there are any good ones
@@ -248,13 +351,6 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0,
                     n_badcigar += 1
                     map(trashfile.write, reads)
                     continue
-
-                # TODO: check for contamination from other PCR plates. Typically,
-                # contamination happens for only one fragment, whereas superinfection
-                # happens for all. At this stage, we can only give clues about
-                # cross-contamination, the rest will be done in a script downstream
-                # (here we could TAG suspicious reads for contamination)
-
 
                 # TODO: we might want to incorporate some more stringent
                 # criterion here, to avoid short reads, cross-overhang, etc.
@@ -270,23 +366,31 @@ def filter_reads(data_folder, adaID, fragment, VERBOSE=0,
         print 'Unpaired:', n_unpaired
         print 'Mispapped at edge:', n_mismapped_edge
         print 'Many-mutations:', n_mutator
+        print 'Suspect contaminations:', n_suspect
         print 'Bad CIGARs:', n_badcigar
 
     if summary:
         summary_filename = get_filter_mapped_summary_filename(data_folder, adaID, fragment)
         with open(summary_filename, 'a') as f:
             f.write('Filter results: adaID '+adaID+fragment+'\n')
-            f.write('Total:\t\t'+str(irp)+'\n')
-            f.write('Good:\t\t'+str(n_good)+'\n')
-            f.write('Unmapped:\t'+str(n_unmapped)+'\n')
-            f.write('Unpaired:\t'+str(n_unpaired)+'\n')
+            f.write('Total:\t\t\t'+str(irp + 1)+'\n')
+            f.write('Good:\t\t\t'+str(n_good)+'\n')
+            f.write('Unmapped:\t\t'+str(n_unmapped)+'\n')
+            f.write('Unpaired:\t\t'+str(n_unpaired)+'\n')
             f.write('Mismapped at edge:\t'+str(n_mismapped_edge)+'\n')
-            f.write('Many-mutations:\t'+str(n_mutator)+'\n')
-            f.write('Bad CIGARs:\t'+str(n_badcigar)+'\n')
+            f.write('Many-mutations:\t\t'+str(n_mutator)+'\n')
+            f.write('Suspect contaminations:\t'+str(n_suspect)+'\n')
+            f.write('Bad CIGARs:\t\t'+str(n_badcigar)+'\n')
 
         plot_distance_histogram(data_folder, adaID, frag_gen,
                                 histogram_distance_from_consensus,
                                 savefig=True)
+
+        plot_distance_histogram_sliding_window(data_folder, adaID, frag_gen,
+                                               len(ref),
+                                               histogram_dist_along,
+                                               binsize=binsize,
+                                               savefig=True)
 
 
 
@@ -310,6 +414,10 @@ if __name__ == '__main__':
     parser.add_argument('--max-mismatches', type=int, default=30,
                         dest='max_mismatches',
                         help='Maximal number of mismatches from consensus')
+    parser.add_argument('--suspicious-mismatches', type=int, default=20,
+                        dest='susp_mismatches',
+                        help='Threshold number of mismatches from consensus \
+                              for suspicion of contamination')
 
     args = parser.parse_args()
     seq_run = args.run
@@ -319,6 +427,7 @@ if __name__ == '__main__':
     submit = args.submit
     summary=args.summary
     max_mismatches = args.max_mismatches
+    susp_mismatches = args.susp_mismatches
 
     # Specify the dataset
     dataset = MiSeq_runs[seq_run]
@@ -366,8 +475,13 @@ if __name__ == '__main__':
                             ' --verbose '+str(VERBOSE))
                     f.write('\n')
 
+            # Other adaIDs
+            adaIDs_other = list(adaIDs)
+            del adaIDs_other[adaIDs_other.index(adaID)]
+
             # Filter reads
             filter_reads(data_folder, adaID, fragment, VERBOSE=VERBOSE,
                          n_cycles=dataset['n_cycles'],
                          max_mismatches=max_mismatches,
+                         susp_mismatches=susp_mismatches,
                          summary=summary)

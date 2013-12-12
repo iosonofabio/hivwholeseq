@@ -100,8 +100,8 @@ if __name__ == '__main__':
         samplename = dataset['samples'][dataset['adapters'].index(adaID)]
         fragments = [fr[:2] for fr in samples[samplename]['fragments']]
 
+        # Write one or more meged consensi
         consensus = merge_consensi(data_folder, adaID, fragments, VERBOSE=VERBOSE)
-
         for (frags, cons) in consensus:
             output_filename = get_merged_consensus_filename(data_folder, adaID, frags)
             SeqIO.write(cons, output_filename, 'fasta')

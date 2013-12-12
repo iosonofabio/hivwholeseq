@@ -49,8 +49,8 @@ def get_reference_premap_hash_filename(data_folder, adaID, ext=True):
 def get_consensus_filename(data_folder, adaID, fragment, trim_primers=True):
     '''Find the filename of the final consensus'''
     filename = 'consensus_'+fragment
-    if trim_primers:
-        filename = filename+'_trim_primers'
+    if not trim_primers:
+        filename = filename+'_with_primers'
     filename = filename+'.fasta'
     filename = foldername_adapter(adaID)+filename
     return data_folder+filename
@@ -59,25 +59,11 @@ def get_consensus_filename(data_folder, adaID, fragment, trim_primers=True):
 def get_consensus_old_filename(data_folder, adaID, fragment, trim_primers=True):
     '''Find the filename of the final consensus'''
     filename = 'consensus_old_'+fragment
-    if trim_primers:
-        filename = filename+'_trim_primers'
+    if not trim_primers:
+        filename = filename+'_with_primers'
     filename = filename+'.fasta'
     filename = foldername_adapter(adaID)+filename
     return data_folder+filename
-
-
-def get_last_consensus_number(data_folder, adaID):
-    '''Find the number of the final consensus after iterative mapping'''
-    # Directory to read
-    dirname = foldername_adapter(adaID)
-
-    # Find the last (fragmented) consensus
-    g = os.walk(data_folder+dirname)
-    fns = g.next()[2]
-    fns = filter(lambda x: ('consensus' in x) and ('fragmented.fasta' in x), fns)
-    consensus_numbers = map(lambda x: int(x.split('_')[1]), fns)
-    cons_max = max(consensus_numbers)
-    return cons_max
 
 
 def get_mutations_file(data_folder, adaID, fragment):
@@ -300,6 +286,13 @@ def get_mapped_filename(data_folder, adaID, fragment, type='bam',
     return data_folder+filename
 
 
+def get_mapped_suspicious_filename(data_folder, adaID, fragment, type='bam'):
+    '''The the filename of the mapped reads with many mutations from consensus'''
+    filename = fragment+'_suspicious.'+type
+    filename = data_folder+foldername_adapter(adaID)+'mapped/'+filename
+    return filename
+
+
 def get_raw_read_files(dataset):
     '''Get the raw files which we obtain from Joerg/Xi'''
     data_folder = dataset['folder'].rstrip('/')+'/'
@@ -440,9 +433,19 @@ def get_overlap_nu_figure_filename(data_folder, adaID, fragments, ext='png'):
     return filename
 
 
-def get_distance_from_consensus_figure_filename(data_folder, adaID, fragment, ext='png'):
+def get_distance_from_consensus_figure_filename(data_folder, adaID, fragment,
+                                                yscale='linear',
+                                                sliding_window=False,
+                                                cumulative=False,
+                                                ext='png'):
     '''Get the filename of the figure of distance from fragment consensus'''
     filename = 'distance_from_consensus_histogram_'+fragment
+    if sliding_window:
+        filename = filename+'_sliding_window'
+    if cumulative:
+        filename = filename+'_cumulative'
+    if yscale != 'linear':
+        filename = filename+'_y'+yscale
     filename = filename+'.'+ext
     filename = get_figure_folder(data_folder, adaID)+filename
     return filename

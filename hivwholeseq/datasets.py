@@ -54,7 +54,8 @@ patients1 = {'description': 'Second library (first patient-only)',
              'raw_data': {'read1': 'read1.fastq',
                           'adapter': 'barcode.fastq',
                           'read2': 'read2.fastq'},
-             'adapters': (2, 4, 5, 6, 7, 12, 13, 14, 15),
+             'adapters': ('TS2', 'TS4', 'TS5', 'TS6', 'TS7',
+                          'TS12', 'TS13', 'TS14', 'TS15'),
              'samples': ('VK04-3106',
                          '08HR-0235',
                          'VK07-4778',
@@ -74,15 +75,15 @@ testnextera_Lina = {'description': 'Test run for the Nextera library (Sweden)',
                     'comments': 'Library prepared by Lina, sequencing by Pawel Zajac (illumina)',
                     'folder': '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/pawel_nextera/',
                     'raw_data': None, # ALREADY DEMULTIPLEXED!
-                    'adapters': (1, 2), # FAKE NUMBERS!
-                    'samples': ('HIV-8262-1: 0.2 ng/ul',
-                                'HIV-8262-2: 0.033 ng/ul'),
+                    'adapters': ('01', '02'), # FAKE NUMBERS!
+                    'samples': ('Nextera_HIV-8262-1',
+                                'Nextera_HIV-8262-2'),
                    }
 
 
 # MiSeq runs
 MiSeq_runs = {'Tue28': testmiseq,
               'Tue37': patients1,
-              'test_nextera_Lina': testnextera_Lina,
+              'Lina_nextera': testnextera_Lina,
               'test_tiny': test_tiny,
              }
