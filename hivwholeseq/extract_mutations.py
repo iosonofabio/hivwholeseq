@@ -19,6 +19,7 @@ from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.adapter_info import load_adapter_table
 from hivwholeseq.filenames import get_last_reference, get_last_mapped
 from hivwholeseq.mapping_utils import get_ind_good_cigars, pair_generator
+from hivwholeseq.fork_cluster import fork_extract_mutations as fork_self
 
 
 
@@ -26,39 +27,6 @@ from hivwholeseq.mapping_utils import get_ind_good_cigars, pair_generator
 maxreads = 50000
 match_len_min = 30
 trim_bad_cigars = 3
-
-# Cluster submit
-import hivwholeseq
-JOBDIR = hivwholeseq.__path__[0].rstrip('/')+'/'
-JOBLOGERR = JOBDIR+'logerr'
-JOBLOGOUT = JOBDIR+'logout'
-JOBSCRIPT = JOBDIR+'extract_mutations.py'
-cluster_time = '0:59:59'
-vmem = '8G'
-
-
-
-# Functions
-def fork_self(seq_run, adaID):
-    '''Fork self for each adapter ID'''
-    import subprocess as sp
-
-    qsub_list = ['qsub','-cwd',
-                 '-b', 'y',
-                 '-S', '/bin/bash',
-                 '-o', JOBLOGOUT,
-                 '-e', JOBLOGERR,
-                 '-N', 'exm_'+adaID,
-                 '-l', 'h_rt='+cluster_time,
-                 '-l', 'h_vmem='+vmem,
-                 JOBSCRIPT,
-                 '--run', seq_run,
-                 '--adaID', adaID,
-                ]
-    qsub_list = map(str, qsub_list)
-    if VERBOSE:
-        print ' '.join(qsub_list)
-    sp.call(qsub_list)
 
 
 
@@ -75,12 +43,15 @@ if __name__ == '__main__':
                         help='Verbosity level [0-3]')
     parser.add_argument('--submit', action='store_true', default=False,
                         help='Submit the job to the cluster via qsub')
+    parser.add_argument('--no-summary', action='store_false', dest='summary',
+                        help='Do not save results in a summary file')
 
     args = parser.parse_args()
     seq_run = args.run
     adaID = args.adaID
     VERBOSE = args.verbose
     submit = args.submit
+    summary = args.summary
 
     # Specify the dataset
     dataset = MiSeq_runs[seq_run]
@@ -94,7 +65,7 @@ if __name__ == '__main__':
         else:
             adaIDs = [adaID]
             for adaID in adaIDs:
-                fork_self(seq_run, adaID) 
+                fork_self(seq_run, adaID, VERBOSE=VERBOSE, summary=summary) 
         sys.exit()
 
     ###########################################################################

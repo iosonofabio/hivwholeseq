@@ -348,6 +348,7 @@ def report_coverage(data_folder, adaID, VERBOSE=0, summary=True):
     from hivwholeseq.filenames import get_figure_folder
     mkdirs(get_figure_folder(data_folder, adaID))
     plt.savefig(get_coverage_figure_filename(data_folder, adaID, 'premapped'))
+    plt.close(fig)
 
     if summary:
         with open(get_premap_summary_filename(data_folder, adaID), 'a') as f:

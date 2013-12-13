@@ -21,6 +21,7 @@ from hivwholeseq.filenames import get_mapped_filename, get_allele_counts_filenam
         get_coallele_counts_filename, get_consensus_filename
 from hivwholeseq.mapping_utils import pair_generator
 from hivwholeseq.get_allele_counts import get_allele_counts
+from hivwholeseq.fork_cluster import fork_get_coallele_counts as fork_self
 
 
 # Globals
@@ -32,39 +33,9 @@ match_len_min = 30
 trim_bad_cigars = 3
 maxreads = 1e2 #FIXME
 
-# Cluster submit
-import hivwholeseq
-JOBDIR = hivwholeseq.__path__[0].rstrip('/')+'/'
-JOBSCRIPT = JOBDIR+'get_coallele_counts.py'
-JOBLOGERR = JOBDIR+'logerr'
-JOBLOGOUT = JOBDIR+'logout'
-cluster_time = '0:59:59'
-vmem = '8G'
-
 
 
 # Functions
-def fork_self(data_folder, adaID, fragment, VERBOSE=3):
-    '''Fork self for each adapter ID and fragment'''
-    qsub_list = ['qsub','-cwd',
-                 '-b', 'y',
-                 '-S', '/bin/bash',
-                 '-o', JOBLOGOUT,
-                 '-e', JOBLOGERR,
-                 '-N', 'ca '+adaID+' '+fragment,
-                 '-l', 'h_rt='+cluster_time,
-                 '-l', 'h_vmem='+vmem,
-                 JOBSCRIPT,
-                 '--adaIDs', adaID,
-                 '--fragments', fragment,
-                 '--verbose', VERBOSE,
-                ]
-    qsub_list = map(str, qsub_list)
-    if VERBOSE:
-        print ' '.join(qsub_list)
-    sp.call(qsub_list)
-
-
 def get_coallele_counts(data_folder, adaID, fragment, VERBOSE=0):
     '''Extract allele and insert counts from a bamfile'''
 
@@ -204,12 +175,15 @@ if __name__ == '__main__':
                         help='Verbosity level [0-3]')
     parser.add_argument('--submit', action='store_true',
                         help='Execute the script in parallel on the cluster')
+    parser.add_argument('--no-summary', action='store_false', dest='summary',
+                        help='Do not save results in a summary file')
 
     args = parser.parse_args()
     adaIDs = args.adaIDs
     fragments = args.fragments
     VERBOSE = args.verbose
     submit = args.submit
+    summary = args.summary
 
     # If the script is called with no adaID, iterate over all
     if not adaIDs:
@@ -229,7 +203,8 @@ if __name__ == '__main__':
 
             # Submit to the cluster self if requested
             if submit:
-                fork_self(data_folder, adaID, fragment, VERBOSE=VERBOSE)
+                fork_self(data_folder, adaID, fragment, VERBOSE=VERBOSE,
+                          summary=summary)
                 continue
 
             # Get cocounts

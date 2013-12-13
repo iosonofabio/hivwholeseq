@@ -17,9 +17,11 @@ from hivwholeseq.adapter_info import load_adapter_table
 from hivwholeseq.filenames import get_mapped_filename, get_allele_counts_filename, \
         get_insert_counts_filename, get_coverage_filename, get_consensus_filename
 from hivwholeseq.mapping_utils import convert_sam_to_bam
-from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file
+from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file,\
+        filter_nus, plot_SFS_folded
 from hivwholeseq.fork_cluster import fork_get_allele_counts as fork_self
 from hivwholeseq.samples import samples
+from hivwholeseq.filter_allele_frequencies import write_frequency_files
 
 
 
@@ -54,11 +56,14 @@ def get_allele_counts(data_folder, adaID, fragment, VERBOSE=0,
                                                   maxreads=maxreads, VERBOSE=VERBOSE)
 
 
-def write_output_files(data_folder, adaID, fragment,
-                       counts, inserts, coverage, VERBOSE=0):
+def write_counts_files(data_folder, adaID, fragment,
+                       counts, inserts, coverage=None, VERBOSE=0):
     '''Write allele counts, inserts, and coverage to file'''
     if VERBOSE >= 1:
         print 'Write to file: '+adaID+' '+fragment
+
+    if coverage is None:
+        coverage = counts.sum(axis=1)
 
     # Save counts and coverage
     counts.dump(get_allele_counts_filename(data_folder, adaID, fragment))
@@ -68,8 +73,6 @@ def write_output_files(data_folder, adaID, fragment,
     inserts_dic = {k: dict(v) for (k, v) in inserts.iteritems()}
     with open(get_insert_counts_filename(data_folder, adaID, fragment), 'w') as f:
         pickle.dump(inserts_dic, f, protocol=-1)
-
-
 
 
 
@@ -88,6 +91,10 @@ if __name__ == '__main__':
                         help='Verbosity level [0-3]')
     parser.add_argument('--submit', action='store_true',
                         help='Execute the script in parallel on the cluster')
+    parser.add_argument('--no-frequencies', action='store_false', dest='write_freqs',
+                        help='Do not filter and write allele frequencies')
+    parser.add_argument('--no-summary', action='store_false', dest='summary',
+                        help='Do not save results in a summary file')
 
     args = parser.parse_args()
     seq_run = args.run
@@ -95,6 +102,8 @@ if __name__ == '__main__':
     fragments = args.fragments
     VERBOSE = args.verbose
     submit = args.submit
+    write_frequencies = args.write_freqs
+    summary = args.summary
 
     # Specify the dataset
     dataset = MiSeq_runs[seq_run]
@@ -105,12 +114,6 @@ if __name__ == '__main__':
         adaIDs = dataset['adapters']
     if VERBOSE >= 3:
         print 'adaIDs', adaIDs
-
-    # If the script is called with no fragment, iterate over all
-    if not fragments:
-        fragments = ['F'+str(i) for i in xrange(1, 7)]
-    if VERBOSE >= 3:
-        print 'fragments', fragments
 
     # Iterate over all requested samples
     for adaID in adaIDs:
@@ -127,6 +130,8 @@ if __name__ == '__main__':
                 frs = filter(lambda x: fragment in x, fragments_all)
                 if len(frs):
                     fragments_sample.append(frs[0][:2])
+            if VERBOSE >= 3:
+                print 'adaID', adaID, 'fragments', fragments_sample
 
         for fragment in fragments_sample:
 
@@ -135,14 +140,17 @@ if __name__ == '__main__':
                 fork_self(seq_run, adaID, fragment, VERBOSE=VERBOSE)
                 continue
 
-            # Get counts
             counts, inserts = get_allele_counts(data_folder, adaID, fragment,
                                                 VERBOSE=VERBOSE)
+            write_counts_files(data_folder, adaID, fragment,
+                               counts, inserts, VERBOSE=VERBOSE)
 
-            # Get coverage
-            coverage = counts.sum(axis=1)
+            if write_frequencies:
+                nu_filtered = filter_nus(counts)
+                write_frequency_files(data_folder, adaID, fragment, nu_filtered,
+                                      VERBOSE=VERBOSE)
 
-            # Save to file
-            write_output_files(data_folder, adaID, fragment,
-                               counts, inserts, coverage,
-                               VERBOSE=VERBOSE)
+                if summary:
+                    plot_SFS_folded(data_folder, adaID, fragment, nu_filtered,
+                                    VERBOSE=VERBOSE, savefig=True)
+

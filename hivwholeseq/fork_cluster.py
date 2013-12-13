@@ -40,7 +40,7 @@ def fork_demultiplex(seq_run, VERBOSE=0, summary=True):
                  '-S', '/bin/bash',
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
-                 '-N', 'demux HIV',
+                 '-N', 'demux',
                  '-l', 'h_rt='+cluster_time,
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
@@ -71,7 +71,7 @@ def fork_premap(seq_run, adaID, VERBOSE=0, bwa=False, threads=1,
                  '-S', '/bin/bash',
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
-                 '-N', 'prem '+adaID,
+                 '-N', 'pm '+adaID,
                  '-l', 'h_rt='+cluster_time[threads >= 30],
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
@@ -103,7 +103,7 @@ def fork_trim_and_divide(seq_run, adaID, VERBOSE=0, maxreads=-1, minisize=100,
                  '-S', '/bin/bash',
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
-                 '-N', 'tr+dv '+adaID,
+                 '-N', 'trdv '+adaID,
                  '-l', 'h_rt='+cluster_time,
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
@@ -202,7 +202,7 @@ def fork_filter_mapped(seq_run, adaID, fragment, VERBOSE=0, summary=True):
                  '-S', '/bin/bash',
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
-                 '-N', 'fmr '+adaID+' '+fragment,
+                 '-N', 'fm '+adaID+' '+fragment,
                  '-l', 'h_rt='+cluster_time,
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
@@ -247,4 +247,89 @@ def fork_get_allele_counts(seq_run, adaID, fragment, VERBOSE=3):
     return sp.check_output(call_list)
 
 
+def fork_filter_allele_frequencies(seq_run, adaID, fragment, VERBOSE=3, summary=True):
+    '''Submit filter allele frequencies to the cluster for each adapter ID and fragment'''
+    if VERBOSE:
+        print 'Forking to the cluster: adaID '+adaID+', fragment '+fragment
+
+    JOBSCRIPT = JOBDIR+'filter_allele_frequencies.py'
+    cluster_time = '0:59:59'
+    vmem = '2G'
+    call_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'faf '+adaID+' '+fragment,
+                 '-l', 'h_rt='+cluster_time,
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--run', seq_run,
+                 '--adaIDs', adaID,
+                 '--fragments', fragment,
+                 '--verbose', VERBOSE,
+                ]
+    if not summary:
+        call_list.append('--no-summary')
+    call_list = map(str, call_list)
+    if VERBOSE:
+        print ' '.join(call_list)
+    return sp.check_output(call_list)
+
+
+def fork_extract_mutations(seq_run, adaID, VERBOSE=0, summary=True):
+    '''Submit extract mutation to the cluster for each adapter ID'''
+    if VERBOSE:
+        print 'Forking to the cluster: adaID '+adaID
+
+    JOBSCRIPT = JOBDIR+'extract_mutations.py'
+    cluster_time = '0:59:59'
+    vmem = '8G'
+    call_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'exm_'+adaID,
+                 '-l', 'h_rt='+cluster_time,
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--run', seq_run,
+                 '--adaID', adaID,
+                ]
+    if not summary:
+        call_list.append('--no-summary')
+    call_list = map(str, call_list)
+    if VERBOSE:
+        print ' '.join(call_list)
+    return sp.check_output(call_list)
+
+
+def fork_get_coallele_counts(data_folder, adaID, fragment, VERBOSE=3, summary=True):
+    '''Fork self for each adapter ID and fragment'''
+    if VERBOSE:
+        print 'Forking to the cluster: adaID '+adaID+', fragment '+fragment
+
+    JOBSCRIPT = JOBDIR+'get_coallele_counts.py'
+    cluster_time = '0:59:59'
+    vmem = '8G'
+    call_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'ca '+adaID+' '+fragment,
+                 '-l', 'h_rt='+cluster_time,
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--adaIDs', adaID,
+                 '--fragments', fragment,
+                 '--verbose', VERBOSE,
+                ]
+    if not summary:
+        call_list.append('--no-summary')
+    call_list = map(str, call_list)
+    if VERBOSE:
+        print ' '.join(call_list)
+    return sp.check_output(call_list)
 

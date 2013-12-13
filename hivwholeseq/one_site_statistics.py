@@ -219,9 +219,12 @@ def get_allele_counts_insertions_from_file_unfiltered(bamfilename, length, qual_
     return (counts, inserts)
 
 
-def filter_nus(counts, coverage, VERBOSE=0):
+def filter_nus(counts, coverage=None, VERBOSE=0):
     '''Filter allele frequencies from the four read types'''
     from scipy.stats import chi2_contingency
+
+    if coverage is None:
+        coverage = counts.sum(axis=1)
 
     # Divide binarily
     nocounts = (coverage - counts.swapaxes(0, 1)).swapaxes(0, 1)
@@ -237,7 +240,6 @@ def filter_nus(counts, coverage, VERBOSE=0):
     ind_low_cov_b = cov_b < 10
     ind_high_cov_both = (-ind_low_cov_f) & (-ind_low_cov_b)
 
-    # Set filtered allele frequencies
     nu_filtered = np.ma.masked_all((len(alpha), counts.shape[-1]))
 
     # Iterate over positions
@@ -246,7 +248,7 @@ def filter_nus(counts, coverage, VERBOSE=0):
         # 1. if we cover neither fwd nor rev, keep masked
         if ind_low_cov_f[i] and ind_low_cov_b[i]:
             if VERBOSE >= 4:
-                print 'pos', i, 'base', alpha[j], 'not covered'
+                print 'pos', i, 'not covered'
             pass
 
         # 2. if we cover only one of them, well, just take the
@@ -254,7 +256,7 @@ def filter_nus(counts, coverage, VERBOSE=0):
         elif ind_low_cov_f[i] != ind_low_cov_b[i]:
             nu_filtered[:, i] = 1.0 * counts[:, :, i].sum(axis=0) / coverage[:, i].sum()
             if VERBOSE >= 4:
-                print 'pos', i, 'base', alpha[j], 'covered only once'
+                print 'pos', i, 'covered only once'
                 
         # 3. If we cover both, check whether the counts are significantly different
         else:
@@ -290,3 +292,68 @@ def filter_nus(counts, coverage, VERBOSE=0):
         nu_filtered = nu_filtered.data
 
     return nu_filtered
+
+
+# PLOT
+def plot_SFS_folded(data_folder, adaID, fragment, nu_filtered, VERBOSE=0, savefig=False):
+    '''Plot the site frequency spectrum (folded)'''
+    from hivwholeseq.filenames import get_SFS_figure_filename as gff
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    nu_maj = np.ma.masked_all(nu_filtered.shape[1])
+    nu_min = np.ma.masked_all(nu_filtered.shape[1])
+    for pos, nus in enumerate(nu_filtered.T):
+        if nus[0] == np.ma.masked:
+            continue
+        nus = np.sort(nus)
+        if (nus[-1] < 0.5):
+            if VERBOSE >= 3:
+                print pos, 'has 3+ alleles:', nus, 'skipping.'
+            continue
+
+        nu_maj[pos] = nus[-1]
+        nu_min[pos] = nus[-2]
+
+    nu_maj_fold = 1 - nu_maj
+
+    nu_mm = np.concatenate([nu_maj_fold, nu_min])
+    nu_mm = np.array(nu_mm[nu_mm > 1e-5])
+    nu_mm.sort()
+
+    # Cumulative histogram
+    fig, ax = plt.subplots(1, 1)
+    ax.set_xlabel(r'$\nu$', fontsize=20)
+    ax.set_ylabel('# alleles < x folded')
+    ax.set_title('adaID '+adaID+', '+fragment)
+    ax.set_xlim(10**(np.floor(np.log10(nu_mm[0] * 0.9))), 0.6)
+    ax.set_xscale('log')
+    ax.set_ylim(1.0 / len(nu_mm) * 0.9, 1.1)
+    ax.set_yscale('log')
+    ax.plot(nu_mm, 1.0 - np.linspace(0, 1 - 1.0 / len(nu_mm), len(nu_mm)), lw=2, c='b')
+
+    if savefig:
+        outputfile = gff(data_folder, adaID, fragment, cumulative=True, yscale='log')
+        fig.savefig(outputfile)
+        plt.close(fig)
+
+    # Histogram
+    fig, ax = plt.subplots(1, 1)
+    ax.set_xlabel(r'$\nu$', fontsize=20)
+    ax.set_ylabel('SFS folded (density)')
+    ax.set_title('adaID '+adaID+', '+fragment)
+    ax.set_xlim(10**(np.floor(np.log10(nu_mm[0] * 0.9))), 0.6)
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+
+    bins = np.logspace(-4, np.log10(0.5), 50)
+    h = np.histogram(nu_mm, bins=bins, density=True)
+    x = np.sqrt(h[1][1:] * h[1][:-1])
+    y = h[0]
+    ax.plot(x, y, lw=2, c='b')
+    ax.scatter(x, y, s=50, edgecolor='none', facecolor='b')
+
+    if savefig:
+        outputfile = gff(data_folder, adaID, fragment, cumulative=False, yscale='log')
+        fig.savefig(outputfile)
+        plt.close(fig)

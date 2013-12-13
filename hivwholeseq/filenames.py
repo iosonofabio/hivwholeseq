@@ -449,6 +449,21 @@ def get_distance_from_consensus_figure_filename(data_folder, adaID, fragment,
     filename = filename+'.'+ext
     filename = get_figure_folder(data_folder, adaID)+filename
     return filename
+
+
+def get_SFS_figure_filename(data_folder, adaID, fragment,
+                            yscale='linear',
+                            cumulative=False,
+                            ext='png'):
+    '''Get the filename of the SFS figure'''
+    filename = 'SFS_'+fragment
+    if cumulative:
+        filename = filename+'_cumulative'
+    if yscale != 'linear':
+        filename = filename+'_y'+yscale
+    filename = filename+'.'+ext
+    filename = get_figure_folder(data_folder, adaID)+filename
+    return filename
     
 
 # SUMMARY
