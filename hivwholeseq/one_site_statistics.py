@@ -357,3 +357,8 @@ def plot_SFS_folded(data_folder, adaID, fragment, nu_filtered, VERBOSE=0, savefi
         outputfile = gff(data_folder, adaID, fragment, cumulative=False, yscale='log')
         fig.savefig(outputfile)
         plt.close(fig)
+    else:
+        plt.ion()
+        plt.show()
+
+
