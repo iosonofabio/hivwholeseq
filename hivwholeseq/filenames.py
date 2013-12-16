@@ -467,9 +467,13 @@ def get_SFS_figure_filename(data_folder, adaID, fragment,
 
 
 def get_minor_allele_frequency_figure_filename(data_folder, adaID, fragments,
+                                               only_filtered=False,
                                                ext='png'):
     '''Get the filename of the figure of the minor allele frequency along the genome'''
-    filename = 'minor_nu_'+'_'.join(fragments)+'.'+ext
+    filename = 'minor_nu_'+'_'.join(fragments)
+    if only_filtered:
+        filename = filename+'_filtered'
+    filename = filename+'.'+ext
     filename = get_figure_folder(data_folder, adaID)+filename
     return filename
     

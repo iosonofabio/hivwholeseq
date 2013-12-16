@@ -11,7 +11,8 @@ import numpy as np
 
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.miseq import alpha, read_types
-from hivwholeseq.filenames import get_allele_counts_filename, get_coverage_filename
+from hivwholeseq.filenames import get_allele_counts_filename, get_coverage_filename, \
+        get_allele_frequencies_filename
 from hivwholeseq.adapter_info import load_adapter_table
 from hivwholeseq.one_site_statistics import filter_nus
 from hivwholeseq.samples import samples
@@ -68,12 +69,10 @@ def plot_minor_allele_frequency(data_folder, adaID, fragments, VERBOSE=0,
     nus_minor_filtered = {}
 
     for fragment in fragments:
-        counts = np.load(get_allele_counts_filename(data_folder, adaID, fragment))
         coverage = np.load(get_coverage_filename(data_folder, adaID, fragment))
-
-        # Store coverage
         covs[fragment] = coverage
     
+        counts = np.load(get_allele_counts_filename(data_folder, adaID, fragment))
         (counts_major,
          counts_minor,
          counts_minor2) = get_minor_allele_counts(counts, n_minor=2)
@@ -85,7 +84,10 @@ def plot_minor_allele_frequency(data_folder, adaID, fragments, VERBOSE=0,
         alls_minor[fragment] = all_minor
     
         # Filter the minor frequencies by comparing the read types
-        nu_filtered = filter_nus(counts, coverage)
+        try:
+            nu_filtered = np.load(get_allele_frequencies_filename(data_folder, adaID, fragment))
+        except IOError:
+            nu_filtered = filter_nus(counts, coverage)
         nut = np.zeros(nu_filtered.shape[-1])
         for pos, nupos in enumerate(nu_filtered.T):
             nut[pos] = np.sort(nupos)[-2]
@@ -112,6 +114,7 @@ def plot_minor_allele_frequency(data_folder, adaID, fragments, VERBOSE=0,
         if i > 2:
             ax.set_xlabel('Position')
     
+        # Plot divided by readtype
         for js, nu_minorjs in enumerate(nus_minor[fragment]):
             color = cm.jet(int(255.0 * js / len(read_types)))
             ax.plot(nu_minorjs, lw=1.5, c=color, label=labss[read_types[js]])
@@ -144,6 +147,87 @@ def plot_minor_allele_frequency(data_folder, adaID, fragments, VERBOSE=0,
         plt.show()
 
 
+def plot_minor_allele_frequency_filtered(data_folder, adaID, fragments, VERBOSE=0,
+                                savefig=False):
+    '''Plot minor allele frequency along the genome'''
+    from hivwholeseq.filenames import get_minor_allele_frequency_figure_filename as gff
+    import matplotlib
+    params = {'axes.labelsize': 20, 
+              'text.fontsize': 20,
+              'legend.fontsize': 8,
+              'xtick.labelsize': 16,
+              'ytick.labelsize': 16,
+              'text.usetex': False}
+    matplotlib.rcParams.update(params)
+    from matplotlib import cm
+    import matplotlib.pyplot as plt
+
+    plot_grid = [(1, 1), (1, 2), (1, 3), (2, 2), (1, 5), (2, 3)]
+
+    # Store in globals structures
+    covs = {}
+    nus_minor_filtered = {}
+
+    for fragment in fragments:
+        coverage = np.load(get_coverage_filename(data_folder, adaID, fragment))
+        covs[fragment] = coverage
+
+        try:
+            nu_filtered = np.load(get_allele_frequencies_filename(data_folder,
+                                                                  adaID, fragment))
+        except IOError:
+            counts = np.load(get_allele_counts_filename(data_folder, adaID, fragment))
+            nu_filtered = filter_nus(counts)
+
+        nut = np.zeros(nu_filtered.shape[-1])
+        for pos, nupos in enumerate(nu_filtered.T):
+            nut[pos] = np.sort(nupos)[-2]
+        
+        nus_minor_filtered[fragment] = nut
+ 
+    # Plot them
+    (n_plots_y, n_plots_x) = plot_grid[len(fragments) - 1]
+    fig, axs = plt.subplots(n_plots_y, n_plots_x, figsize=(13, 8))
+    if len(fragments) > 1:
+        axs = axs.ravel()
+    else:
+        axs = [axs]
+    fig.suptitle('adapterID '+adaID, fontsize=20)
+    labss = {'read1 f': 'read1 fwd', 'read1 r': 'read1 rev',
+             'read2 f': 'read2 fwd', 'read2 r': 'read2 rev'}
+    for i, fragment in enumerate(fragments):
+        ax = axs[i]
+        ax.set_yscale('log')
+        ax.set_title(fragment)
+        if i in [0, 3]:
+            ax.set_ylabel(r'$\nu$')
+        if i > 2:
+            ax.set_xlabel('Position')
+        
+        # Plot filtered
+        ax.plot(nus_minor_filtered[fragment], lw=1.5, c='k',
+                alpha=0.5, label='Filtered')
+        ax.scatter(np.arange(len(nus_minor_filtered[fragment])),
+                   nus_minor_filtered[fragment], lw=1.5, c='k',
+                   alpha=0.5)
+
+        ax.set_xlim(-100, len(nus_minor_filtered[fragment]) + 100)
+    
+    plt.legend(loc='upper right')
+    plt.tight_layout(rect=(0, 0, 1, 0.95))
+
+    if savefig:
+        outputfile = gff(data_folder, adaID, fragment, only_filtered=True)
+        fig.savefig(outputfile)
+        plt.close(fig)
+    else:
+        plt.ion()
+        plt.show()
+
+
+
+
+
 
 # Script
 if __name__ == '__main__':
@@ -160,6 +244,8 @@ if __name__ == '__main__':
                         help='Verbosity level [0-3]')
     parser.add_argument('--no-savefig', action='store_false', dest='savefig',
                         help='Show figure instead of saving it')
+    parser.add_argument('--only-filtered', action='store_true', dest='only_filt',
+                        help='Plot only filtered frequencies')
 
     args = parser.parse_args()
     seq_run = args.run
@@ -167,6 +253,7 @@ if __name__ == '__main__':
     fragments = args.fragments
     VERBOSE = args.verbose
     savefig = args.savefig
+    only_filt = args.only_filt
 
     # Specify the dataset
     dataset = MiSeq_runs[seq_run]
@@ -194,5 +281,9 @@ if __name__ == '__main__':
                 if len(frs):
                     fragments_sample.append(frs[0][:2])
 
-        plot_minor_allele_frequency(data_folder, adaID, fragments_sample,
-                                    VERBOSE=VERBOSE, savefig=savefig)
+        if not only_filt:
+            plot_minor_allele_frequency(data_folder, adaID, fragments_sample,
+                                        VERBOSE=VERBOSE, savefig=savefig)
+        else:
+            plot_minor_allele_frequency_filtered(data_folder, adaID, fragments_sample,
+                                                 VERBOSE=VERBOSE, savefig=savefig)

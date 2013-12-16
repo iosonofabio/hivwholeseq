@@ -17,7 +17,6 @@ import Bio.SeqIO as SeqIO
 import Bio.AlignIO as AlignIO
 
 from hivwholeseq.datasets import MiSeq_runs
-from hivwholeseq.mapping_utils import align_muscle
 from hivwholeseq.filenames import get_consensus_filename, \
         get_allele_counts_filename, get_coverage_filename, \
         get_overlap_nu_figure_filename
@@ -37,6 +36,8 @@ def get_overlapping_fragments(fragments):
 
 def get_overlap(data_folder, adaID, frag1, frag2, VERBOSE=0):
     '''Find the overlap coordinates for the two fragments'''
+    from hivwholeseq.mapping_utils import align_muscle
+
     seq1 = SeqIO.read(get_consensus_filename(data_folder, adaID, frag1,
                                              trim_primers=True), 'fasta')
     seq2 = SeqIO.read(get_consensus_filename(data_folder, adaID, frag2,
@@ -137,6 +138,10 @@ def check_overlap_allele_frequencies(data_folder, adaID, frag1, frag2, overlap,
     # because of the uneven coverage)
     nu1 = filter_nus(cou1, cov1)
     nu2 = filter_nus(cou2, cov2)
+
+    # FIXME
+    if nu1.shape != nu2.shape:
+        return
 
     # Print table of called polymorphisms
     print 'adaID', adaID, frag1, frag2, 'polymorphism matrix (NO | YES)'
