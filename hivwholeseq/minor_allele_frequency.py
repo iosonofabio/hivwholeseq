@@ -167,7 +167,6 @@ def plot_minor_allele_frequency_filtered(data_folder, adaID, fragments, VERBOSE=
     # Store in globals structures
     covs = {}
     nus_minor_filtered = {}
-
     for fragment in fragments:
         coverage = np.load(get_coverage_filename(data_folder, adaID, fragment))
         covs[fragment] = coverage
@@ -193,8 +192,6 @@ def plot_minor_allele_frequency_filtered(data_folder, adaID, fragments, VERBOSE=
     else:
         axs = [axs]
     fig.suptitle('adapterID '+adaID, fontsize=20)
-    labss = {'read1 f': 'read1 fwd', 'read1 r': 'read1 rev',
-             'read2 f': 'read2 fwd', 'read2 r': 'read2 rev'}
     for i, fragment in enumerate(fragments):
         ax = axs[i]
         ax.set_yscale('log')

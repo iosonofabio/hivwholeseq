@@ -295,6 +295,34 @@ def filter_nus(counts, coverage=None, VERBOSE=0):
 
 
 # PLOT
+def plot_coverage(data_folder, adaID, fragment, counts, VERBOSE=0, savefig=False):
+    '''Plot figure with the coverage'''
+    from hivwholeseq.filenames import get_coverage_figure_filename as gff
+
+    if VERBOSE >= 1:
+        print 'Plotting coverage: '+adaID+' '+fragment
+
+    coverage = counts.sum(axis=1).sum(axis=0)
+
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(1, 1, figsize=(15, 8))
+    ax.plot(coverage + 0.5)
+    ax.set_yscale('log')
+    ax.set_xlabel('Position')
+    ax.set_ylabel('Coverage')
+    ax.set_title('adaID '+adaID+', fragment '+fragment)
+
+    if savefig:
+        outputfile = gff(data_folder, adaID, fragment)
+        fig.savefig(outputfile)
+        plt.close(fig)
+
+    else:
+        plt.ion()
+        plt.show()
+
+
+
 def plot_SFS_folded(data_folder, adaID, fragment, nu_filtered, VERBOSE=0, savefig=False):
     '''Plot the site frequency spectrum (folded)'''
     from hivwholeseq.filenames import get_SFS_figure_filename as gff

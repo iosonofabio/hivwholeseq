@@ -224,7 +224,7 @@ def make_index_map(overlaps):
 if __name__ == '__main__':
 
     # FIXME: do for all
-    fragments = ['F'+str(i) for i in xrange(5, 7)]
+    fragments = ['F'+str(i) for i in xrange(1, 3)]
 
     frag1 = fragments[0] 
     frag2 = fragments[1] 

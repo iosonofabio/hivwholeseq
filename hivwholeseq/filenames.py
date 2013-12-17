@@ -349,9 +349,18 @@ def get_unclassified_reads_filenames(data_folder, filtered=False):
     return filenames
 
 
-def get_merged_consensus_filename(data_folder, adaID, fragments):
+def get_merged_consensus_filename(data_folder, adaID,
+                                  fragments=['F1', 'F2', 'F3', 'F4', 'F5', 'F6']):
     '''Get the merged consensus of several fragments'''
     filename = 'consensus_'+'-'.join(fragments)+'.fasta'
+    filename = data_folder+foldername_adapter(adaID)+filename
+    return filename
+
+
+def get_merged_allele_frequencies_filename(data_folder, adaID,
+                                    fragments=['F1', 'F2', 'F3', 'F4', 'F5', 'F6']):
+    '''Get the merged allele frequencies of several fragments'''
+    filename = 'allele_frequencies_'+'-'.join(fragments)+'.fasta'
     filename = data_folder+foldername_adapter(adaID)+filename
     return filename
 
@@ -473,6 +482,16 @@ def get_minor_allele_frequency_figure_filename(data_folder, adaID, fragments,
     filename = 'minor_nu_'+'_'.join(fragments)
     if only_filtered:
         filename = filename+'_filtered'
+    filename = filename+'.'+ext
+    filename = get_figure_folder(data_folder, adaID)+filename
+    return filename
+    
+
+def get_minor_allele_frequency_merged_figure_filename(data_folder, adaID, fragments,
+                                               ext='png'):
+    '''Get the filename of the figure of the minor allele frequency along the genome'''
+    filename = 'minor_nu_merged'+'_'.join(fragments)
+    filename = filename+'_filtered'
     filename = filename+'.'+ext
     filename = get_figure_folder(data_folder, adaID)+filename
     return filename

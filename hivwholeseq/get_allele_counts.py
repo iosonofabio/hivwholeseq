@@ -18,7 +18,7 @@ from hivwholeseq.filenames import get_mapped_filename, get_allele_counts_filenam
         get_insert_counts_filename, get_coverage_filename, get_consensus_filename
 from hivwholeseq.mapping_utils import convert_sam_to_bam
 from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file,\
-        filter_nus, plot_SFS_folded
+        filter_nus, plot_SFS_folded, plot_coverage
 from hivwholeseq.fork_cluster import fork_get_allele_counts as fork_self
 from hivwholeseq.samples import samples
 from hivwholeseq.filter_allele_frequencies import write_frequency_files
@@ -144,6 +144,10 @@ if __name__ == '__main__':
                                                 VERBOSE=VERBOSE)
             write_counts_files(data_folder, adaID, fragment,
                                counts, inserts, VERBOSE=VERBOSE)
+
+            if summary:
+                plot_coverage(data_folder, adaID, fragment, counts, VERBOSE=VERBOSE,
+                              savefig=True)
 
             if write_frequencies:
                 nu_filtered = filter_nus(counts)
