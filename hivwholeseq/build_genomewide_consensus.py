@@ -111,7 +111,6 @@ def merge_allele_frequencies(data_folder, adaID, fragments, VERBOSE=0):
 # Script
 if __name__ == '__main__':
 
-
     # Parse input args
     parser = argparse.ArgumentParser(description='Merge consensi and allele frequencies')
     parser.add_argument('--run', required=True,
