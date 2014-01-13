@@ -58,6 +58,7 @@ if __name__ == '__main__':
         with open(get_demultiplex_summary_filename(data_folder), 'w') as f:
             f.write('Call: python demultiplex.py --run '+seq_run+' --verbose '+str(VERBOSE)+'\n')
 
+    #TODO: adapt for dual index!
     # Get designed adapters
     adapters_designed = tuple((adaID, adapters_illumina[adaID]) for adaID in dataset['adapters'])
     output = [['Designed adapters:'],

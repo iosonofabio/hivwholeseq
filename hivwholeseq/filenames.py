@@ -396,10 +396,21 @@ def get_custom_hash_filename_fun(reference):
 
 
 # FIGURES
-def get_figure_folder(data_folder, adaID):
+def get_figure_folder(data_folder, adaID=None):
     '''Get the folder for figures for this sample'''
-    folder = data_folder+foldername_adapter(adaID)+'figures/'
+    folder = 'figures/'
+    if adaID is not None:
+        folder = foldername_adapter(adaID)+folder
+    folder = data_folder+folder
     return folder
+
+
+def get_quality_along_reads_filename(data_folder, ext='png'):
+    '''Get the filename of the quality along the reads'''
+    filename = 'quality_along_reads'
+    filename = filename+'.'+ext
+    filename = get_figure_folder(data_folder)+filename
+    return filename
 
 
 def get_insert_size_distribution_cumulative_filename(data_folder, adaID, fragment,
