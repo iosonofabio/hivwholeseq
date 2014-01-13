@@ -6,18 +6,22 @@ content:    After the preliminary mapping to reference, plot coverage and allele
             frequencies to spot major issues.
 '''
 # Modules
+import os
 import argparse
 import numpy as np
+from Bio import SeqIO
 
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.miseq import read_types
 from hivwholeseq.reference import load_HXB2, load_custom_reference
-from hivwholeseq.filenames import get_premapped_file
+from hivwholeseq.filenames import get_premapped_file, get_reference_premap_filename, \
+        get_fragment_positions_filename
 from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file_unfiltered
 from hivwholeseq.minor_allele_frequency import get_minor_allele_counts
 from hivwholeseq.primer_info import primers_coordinates_HXB2_inner as pcis_HXB2
 from hivwholeseq.primer_info import primers_coordinates_HXB2_outer as pcos_HXB2
 from hivwholeseq.mapping_utils import get_number_reads
+from hivwholeseq.samples import samples
 
 
 
@@ -75,33 +79,25 @@ def plot_coverage_minor_allele(counts, frags_pos=None, frags_pos_out=None,
 def check_premap(seq_run, adaID, qual_min=30, match_len_min=10,
                    reference='HXB2', maxreads=-1, VERBOSE=0):
     '''Check premap to reference: coverage, etc.'''
-    # Specify the dataset
+
     dataset = MiSeq_runs[seq_run]
     data_folder = dataset['folder']
-    F5_primer = dataset['primerF5'][dataset['adapters'].index(adaID)]
 
-    # Get fragments
-    fragments = ['F1', 'F2', 'F3', 'F4', F5_primer, 'F6']
+    samplename = dataset['samples'][dataset['adapters'].index(adaID)]
+    fragments = samples[samplename]['fragments']
 
-    if reference == 'HXB2':
-        refseq = load_HXB2(cropped=True)
-        # This structure contains the inner primers coordinates in cropped ref
-        frags_pos = np.zeros((2, len(fragments)), int)
-        frags_pos_out = np.zeros((2, len(fragments)), int)
-        for i, fragment in enumerate(fragments):
-            pci = pcis_HXB2[fragment]
-            frags_pos[:, i] = (pci[0][0], pci[1][1])
-            pco = pcos_HXB2[fragment]
-            frags_pos_out[:, i] = (pco[0][0], pco[1][1])
-        start = frags_pos.min()
-        frags_pos -= start
-        frags_pos_out -= start
-        print frags_pos, frags_pos_out
+    refseq = SeqIO.read(get_reference_premap_filename(data_folder, adaID), 'fasta')
+
+    fragpos_filename = get_fragment_positions_filename(data_folder, adaID)
+    if os.path.isfile(fragpos_filename):
+        fragtmp = list(np.loadtxt(fragpos_filename, usecols=[0], dtype='S10'))
+        postmp = np.loadtxt(fragpos_filename, usecols=[1, 4], dtype=int)
+        frags_pos = np.array([postmp[fragtmp.index(fr)] for fr in fragments], int).T
 
     else:
-        refseq = load_custom_reference(reference)
         frags_pos = None
-        frags_pos_out = None
+    
+    frags_pos_out = None
 
     # Open BAM and scan reads
     input_filename = get_premapped_file(data_folder, adaID, type='bam')

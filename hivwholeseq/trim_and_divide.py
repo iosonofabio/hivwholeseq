@@ -63,32 +63,49 @@ def store_reference_fragmented(data_folder, adaID, refseq, fragment_trim_poss_di
                     'fasta')
 
 
+def write_fragment_positions(data_folder, adaID, fragments, frags_pos):
+    '''Write the fragments position to file'''
+    from hivwholeseq.filenames import get_fragment_positions_filename as gfpf
+    with open(gfpf(data_folder, adaID), 'w') as f:
+        f.write('\t'.join(['# Fragment', 'fwd start', 'fwd end', 'rev start', 'rev end']))
+        f.write('\n')
+        for (fragment, poss_full, poss_trim) in izip(fragments,
+                                                     frags_pos['full'],
+                                                     frags_pos['trim']):
+            f.write('\t'.join(map(str, [fragment,
+                                        poss_full[0], poss_trim[0],
+                                        poss_trim[1], poss_full[1]]))+'\n')
+
+
 def get_primer_positions(smat, fragments, type='both'):
     '''Get the primer positions for fwd, rev, or both primers'''
     from hivwholeseq.primer_info import primers_PCR
     from hivwholeseq.sequence_utils import expand_ambiguous_seq as eas
 
     # j controls the direction: j = 0 --> FWD, j = 1 --> REV
-    js = {'fwd': [0], 'rev': [1], 'both': [0, 1]}[type]
+    types = {'fwd': [0], 'rev': [1], 'both': [0, 1]}
+    js = types[type]
     primer_poss = [[], []]
     for j in js:
         pr_old_pos = 0
         pr_old = ''
-        for fragment in fragments:
+        for ifr, fragment in enumerate(fragments):
             # Expand ambiguous primers in a list of all possible unambiguous ones,
             # and look for the best approximate match between all primers and a
             # sliding window in the HIV genome
             pr = primers_PCR[fragment][j]
             pr_mat = np.array(map(list, eas(pr)), 'S1')
             n_matches = [(smat[i: i + len(pr)] == pr_mat).sum(axis=1).max()
-                         for i in xrange(pr_old_pos + len(pr_old), len(smat) - len(pr))]
-            # NOTE: if F6 rev is the only primer, it lies in the LTR, so we risk
-            # reading the other LTR. Treat it as a special case
-            if j and (len(fragments) == 1) and ('F6' in fragments[0]):
-                pr_pos = len(smat) - len(pr) - 1 - np.argmax(n_matches[::-1])
+                         for i in xrange(pr_old_pos + len(pr_old),
+                                         len(smat) - len(pr) + 1)]
+
+            # NOTE: F6 rev lies in the LTR, so we risk reading the other LTR.
+            # Treat it as a special case: come from the right!
+            if j and ('F6' in fragment):
+                pr_pos = len(smat) - len(pr) - np.argmax(n_matches[::-1])
             else:
                 pr_pos = pr_old_pos + len(pr_old) + np.argmax(n_matches)
-            
+
             primer_poss[j].append([pr_pos, pr_pos + len(pr)])
             pr_old_pos = pr_pos
             pr_old = pr
@@ -341,6 +358,15 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, fragments,
     frags_pos = get_fragment_positions(smat, fragments)
     store_reference_fragmented(data_folder, adaID, refseq,
                                dict(zip(*[fragments, frags_pos['trim']])))
+    if summary:
+        with open(get_divide_summary_filename(data_folder, adaID), 'a') as f:
+            f.write('Primer positions (for fragments):\n')
+            for (fragment, poss_full, poss_trim) in izip(fragments,
+                                                         frags_pos['full'],
+                                                         frags_pos['trim']):
+                f.write(fragment+': fwd '+str(poss_full[0])+' '+str(poss_trim[0])+\
+                                 ', rev '+str(poss_trim[1])+' '+str(poss_full[1])+'\n')
+    write_fragment_positions(data_folder, adaID, fragments, frags_pos)
 
     # Get the positions of the unwanted outer primers (in case we DO nested PCR
     # for that fragment)

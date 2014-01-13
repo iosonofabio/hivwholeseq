@@ -2,8 +2,8 @@
 '''
 author:     Fabio Zanini
 date:       24/09/13
-content:    Check iterative consensus with reference (if appropriate) and between
-            fragments at overlaps.
+content:    Check whether the subsample consensus is also the real consensus of
+            the full mapped dataset.
 '''
 # Modules
 import argparse

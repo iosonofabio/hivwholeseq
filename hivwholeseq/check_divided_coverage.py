@@ -8,13 +8,15 @@ content:    After division into fragments, check quickly coverage and minor
 # Modules
 import argparse
 import numpy as np
+from Bio import SeqIO
 
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.miseq import read_types
 from hivwholeseq.reference import load_HXB2
-from hivwholeseq.filenames import get_divided_filenames
+from hivwholeseq.filenames import get_divided_filename, get_reference_premap_filename
 from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file
 from hivwholeseq.minor_allele_frequency import get_minor_allele_counts
+from hivwholeseq.samples import samples
 
 
 
@@ -59,16 +61,11 @@ def check_division(seq_run, adaID, fragment, qual_min=35,
     dataset = MiSeq_runs[seq_run]
     data_folder = dataset['folder']
 
-    if reference == 'HXB2':
-        refseq = load_HXB2(fragment=fragment, trim_primers=True)
-    else:
-        raise ValueError('Only HXB2 is implemented as a reference')
+    refseq = SeqIO.read(get_reference_premap_filename(data_folder, adaID, fragment),
+                        'fasta')
 
-    # Open BAM and scan reads
-    input_filename = get_divided_filenames(data_folder, adaID, [fragment],
-                                        type='bam')[0]
-
-    # Get counts
+    # Scan reads
+    input_filename = get_divided_filename(data_folder, adaID, fragment, type='bam')
     counts, inserts = get_allele_counts_insertions_from_file(input_filename,
                                                              len(refseq),
                                                              maxreads=maxreads,
@@ -122,14 +119,11 @@ if __name__ == '__main__':
     if VERBOSE >= 3:
         print 'adaIDs', adaIDs
 
-    # If the script is called with no fragment, iterate over all
-    if not fragments:
-        fragments = ['F'+str(i) for i in xrange(1, 7)]
-    if VERBOSE >= 3:
-        print 'fragments', fragments
-
     # Iterate over samples and fragments
     for adaID in adaIDs:
+        samplename = dataset['samples'][dataset['adapters'].index(adaID)]
+        fragments = samples[samplename]['fragments']
+
         for fragment in fragments:
 
             check_division(seq_run, adaID, fragment,

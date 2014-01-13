@@ -232,6 +232,13 @@ def get_premapped_file(data_folder, adaID, type='bam', bwa=False,
     return data_folder+filename
 
 
+def get_fragment_positions_filename(data_folder, adaID):
+    '''Get the filename of the positions of fragments in the reference for premap'''
+    filename = 'fragment_positions_premapped.dat'
+    filename = 'divided/'+filename
+    return data_folder+foldername_adapter(adaID)+filename
+
+
 def get_divided_filenames(data_folder, adaID, fragments, type='bam'):
     '''Get the filenames of the BAM files divided by fragment'''
     filename = 'divided_on_HXB2'

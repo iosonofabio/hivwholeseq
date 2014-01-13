@@ -90,9 +90,12 @@ def make_reference(data_folder, adaID, fragments, refname, VERBOSE=0, summary=Tr
             f.write(output)
             f.write('\n')
 
-    seq_trim = seq[pr_fwd_pos: pr_rev_pos]
-    seq_trim.id = '_'.join([seq_trim.id, str(pr_fwd_pos + 1), str(pr_rev_pos + len(pr_rev))])
-    seq_trim.name = '_'.join([seq_trim.name, str(pr_fwd_pos + 1), str(pr_rev_pos + len(pr_rev))])
+    # The reference includes both the first fwd primer and the last rev one
+    seq_trim = seq[pr_fwd_pos: pr_rev_pos + len(pr_rev)]
+    seq_trim.id = '_'.join([seq_trim.id, str(pr_fwd_pos + 1),
+                            str(pr_rev_pos + len(pr_rev))])
+    seq_trim.name = '_'.join([seq_trim.name, str(pr_fwd_pos + 1),
+                              str(pr_rev_pos + len(pr_rev))])
     seq_trim.description = ' '.join([seq_trim.description,
                                      'from', str(pr_fwd_pos + 1),
                                      'to', str(pr_rev_pos + len(pr_rev)),
