@@ -10,8 +10,8 @@ import subprocess as sp
 
 import hivwholeseq
 JOBDIR = hivwholeseq.__path__[0].rstrip('/')+'/'
-JOBLOGOUT = JOBDIR+'logout'
-JOBLOGERR = JOBDIR+'logerr'
+JOBLOGOUT = JOBDIR+'logout/'
+JOBLOGERR = JOBDIR+'logerr/'
 
 
 

@@ -105,6 +105,14 @@ sample_list = [\
   'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i'),
   'patient': '15313'},
 
+ # Test samples for PCR1, Nextera XT, and MiSeq v3 (600 bp)
+ {'name': 'MIX1_PCR1'},
+ {'name': 'MIX2_PCR1'},
+ {'name': 'NL4-3_PCR1'},
+ {'name': 'NL4-3_PCR1_Taq'},
+ {'name': 'NL4-3_PCR2'},
+ {'name': 'NL4-3_PCR2_Taq'},
+
  ]
 
 # Sample table using Pandas

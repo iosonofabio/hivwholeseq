@@ -3,6 +3,12 @@
 author:     Fabio Zanini
 date:       26/10/13
 content:    Study PCR-mediated recombination from the plasmid mixes.
+
+            This script is used both for:
+                - MIX1 PCR2 probes (Tue28, adaID TS18)
+                - MIX1 PCR1 probes (Tue42, adaID N1-S1)
+                - MIX2 PCR2 probes (Tue28, adaID TS19)
+                - MIX2 PCR1 probes (Tue42, adaID N2-S2)
 '''
 # Modules
 import argparse
@@ -16,18 +22,19 @@ import pysam
 from matplotlib import cm
 import matplotlib.pyplot as plt
 
-from mapping.miseq import alphal
-from mapping.datasets import MiSeq_runs
-from mapping.filenames import get_consensus_filename, get_mapped_filename, \
+from hivwholeseq.miseq import alphal
+from hivwholeseq.datasets import MiSeq_runs
+from hivwholeseq.filenames import get_consensus_filename, get_mapped_filename, \
         get_allele_counts_filename, get_coverage_filename
-from mapping.mapping_utils import align_muscle, pair_generator
-from mapping.minor_allele_frequency import filter_nus
-from mapping.coverage_tuples import get_coverage_tuples
+from hivwholeseq.mapping_utils import align_muscle, pair_generator
+from hivwholeseq.minor_allele_frequency import filter_nus
+from hivwholeseq.coverage_tuples import get_coverage_tuples
 
 
 # Globals
-mix1_references_adaIDs = [(0.5, 2), (0.5, 4)]
-mix2_references_adaIDs = [(0.045, 2), (0.95, 4), (0.005, 7)]
+#TODO: generalize for the Nextera XT samples
+mix1_references_adaIDs = [(0.5, 'TS2'), (0.5, 'TS4')]
+mix2_references_adaIDs = [(0.045, 'TS2'), (0.95, 'TS4'), (0.005, 'TS7')]
 
 
 
@@ -35,13 +42,13 @@ mix2_references_adaIDs = [(0.045, 2), (0.95, 4), (0.005, 7)]
 def align_consensi_mix1(fragment):
     '''Align consensi for mix1'''
     # Specify the dataset
-    miseq_run = 28
+    miseq_run = 'Tue28'
     dataset = MiSeq_runs[miseq_run]
     data_folder = dataset['folder']
 
     # Get the consensus of the mix1, and align it with the two consensi of
     # the pure strains
-    adaID_mix1 = 18
+    adaID_mix1 = 'TS18'
     adaIDs = [adaID_mix1] + map(itemgetter(1), mix1_references_adaIDs)
     consensi = []
     for adaID in adaIDs:
@@ -88,13 +95,13 @@ def check_consensus_mix1(fragment, alignment=None):
 def align_consensi_mix2(fragment):
     '''Align consensi for mix2'''
     # Specify the dataset
-    miseq_run = 28
+    miseq_run = 'Tue28'
     dataset = MiSeq_runs[miseq_run]
     data_folder = dataset['folder']
 
     # Get the consensus of the mix1, and align it with the two consensi of
     # the pure strains
-    adaID_mix2 = 19
+    adaID_mix2 = 'TS19'
     adaIDs = [adaID_mix2] + map(itemgetter(1), mix2_references_adaIDs)
     consensi = []
     for adaID in adaIDs:
@@ -184,7 +191,7 @@ def count_cross_reads_mix1(fragment, maxreads=100, markers_min=4, VERBOSE=0):
     cocoverage = Counter()
 
     # Open BAM file
-    adaID = 18
+    adaID = 'TS18'
     bamfilename = get_mapped_filename(data_folder, adaID, fragment, type='bam',
                                       filtered=True)
     with pysam.Samfile(bamfilename, 'rb') as bamfile:
@@ -347,7 +354,7 @@ if __name__ == '__main__':
     VERBOSE = args.verbose
 
     # Specify the dataset
-    miseq_run = 28
+    miseq_run = 'Tue28'
     dataset = MiSeq_runs[miseq_run]
     data_folder = dataset['folder']
 
