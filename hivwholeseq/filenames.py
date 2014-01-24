@@ -211,8 +211,8 @@ def get_read_filenames(data_folder, adaID, fragment=None,
 
 def get_premapped_file(data_folder, adaID, type='bam', bwa=False,
                        part=None, unsorted=False):
-    '''Get the filename of the readed mapped to HXB2 to split into fragments'''
-    filename = 'premapped_to_HXB2'
+    '''Get the filename of the readed mapped to reference to split into fragments'''
+    filename = 'premapped'
     filename = 'premapped/'+filename
     filename = foldername_adapter(adaID)+filename
     if part is not None:
@@ -321,9 +321,16 @@ def get_phix_filename():
     return filename
 
 
-def get_mapped_phix_filename(data_folder, type='bam', filtered=False, sort=False):
+def get_mapped_phix_filename(data_folder, type='bam', filtered=False, sort=False,
+                             part=None, unsorted=False):
     '''Get the filename of the mapped reads onto PhiX'''
     filename = 'mapped_to_phix'
+
+    if part is not None:
+        filename = filename+'_part'+str(part)
+    elif unsorted:
+        filename = filename+'_unsorted'
+
     if filtered:
         filename = filename + '_filtered'
     if sort:

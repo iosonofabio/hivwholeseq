@@ -146,13 +146,11 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
     if VERBOSE:
         print 'Mapping: adaID ', adaID
 
-    # Get input filenames (raw reads)
     input_filenames = get_read_filenames(data_folder, adaID, filtered=False)
 
     # parallelize if requested
     if threads == 1:
 
-        # Map
         call_list = [stampy_bin,
                      '--overwrite',
                      '-g', get_reference_premap_index_filename(data_folder, adaID, ext=False),

@@ -442,8 +442,11 @@ def main_block_read_pair_low_quality(read_pair, phred_min=20, read_len_min=50, i
     return False
 
 
-def trim_read_pair_low_quality(read_pair, phred_min=20, read_len_min=50, include_tests=False,
-                     VERBOSE=0):
+def trim_read_pair_low_quality(read_pair,
+                               phred_min=20,
+                               read_len_min=50,
+                               include_tests=False,
+                               VERBOSE=0):
     '''Strip loq-phred from left and right edges, but leave in the middle'''
     # The rationale of this approach is that we still have the Qs later for
     # more detailed exclusions (e.g. for minor allele frequencies)
@@ -496,7 +499,8 @@ def trim_read_pair_low_quality(read_pair, phred_min=20, read_len_min=50, include
 
         # If the trimmed read still has widespread low-q, it was not a trimming
         # problem: trash the pair (this happend almost never)
-        if phred[read_start: read_end].mean() < 0.9:
+        # NOTE: changed recently (20/01/14)
+        if (phred[read_start: read_end] >= phred_min).mean() < 0.9:
             return True
 
         # If we trim nothing, proceed: this happens if the only low-q bases are

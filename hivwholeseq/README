@@ -1,7 +1,7 @@
 -------------------------------------------------------------------------------
 PIPELINE FOR HIV MISEQ SEQUENCING DATA
 -------------------------------------------------------------------------------
-Note: this pipeline was updated in October 2013.
+LAST UPDATE: Jan 2014.
 
 0. We get three FASTQ files from Joerg/Xi (and the Miseq):
  - read1
@@ -74,3 +74,17 @@ DIAGRAM
     6
     |
     7
+
+-------------------------------------------------------------------------------
+PHIX ANALYSIS PIPELINE
+-------------------------------------------------------------------------------
+LAST UPDATE: Jan 2014.
+
+We often spike in some phiX to control for sequencing errors. The scripts for
+this pipeline are in the 'phix' folder.
+
+1. map unclassified reads against phiX genome (map_phix.py).
+
+2. filter mapped reads to get read of low-quality stuff (filter_mapped_reads_phix.py).
+
+3. TODO

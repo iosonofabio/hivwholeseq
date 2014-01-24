@@ -106,12 +106,20 @@ sample_list = [\
   'patient': '15313'},
 
  # Test samples for PCR1, Nextera XT, and MiSeq v3 (600 bp)
- {'name': 'MIX1_PCR1'},
- {'name': 'MIX2_PCR1'},
- {'name': 'NL4-3_PCR1'},
- {'name': 'NL4-3_PCR1_Taq'},
- {'name': 'NL4-3_PCR2'},
- {'name': 'NL4-3_PCR2_Taq'},
+ {'name': 'MIX1_PCR1', 'run': 'Tue42', 'adaID': 'N1-S1',
+  'fragments': ('F1o', 'F2o', 'F3o', 'F4o', 'F5bo', 'F6o'),
+  'description': 'MIX1 SF162 50% + NL4-3 50%'},
+ {'name': 'MIX2_PCR1', 'run': 'Tue42', 'adaID': 'N3-S3',
+  'fragments': ('F1o', 'F2o', 'F3o', 'F4o', 'F5bo', 'F6o'),
+  'description': 'MIX2 SF162 95% + NL4-3 4.5% + F10 0.5%'},
+ {'name': 'NL4-3_PCR1_TaqHiFi', 'run': 'Tue42', 'adaID': 'N4-S3',
+  'fragments': ('F1o', 'F2o', 'F3o', 'F4o', 'F5bo', 'F6o')},
+ {'name': 'NL4-3_PCR1_Taq', 'run': 'Tue42', 'adaID': 'N5-S4',
+  'fragments': ('F1o', 'F2o', 'F3o', 'F4o', 'F5bo', 'F6o')},
+ {'name': 'NL4-3_PCR2_TaqHiFi', 'run': 'Tue42', 'adaID': 'N2-S2',
+  'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5bi', 'F6i')},
+ {'name': 'NL4-3_PCR2_Taq', 'run': 'Tue42', 'adaID': 'N6-S4',
+  'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5bi', 'F6i')},
 
  ]
 

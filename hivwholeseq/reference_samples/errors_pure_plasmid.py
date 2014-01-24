@@ -14,19 +14,24 @@ import numpy as np
 from Bio import SeqIO
 import matplotlib.pyplot as plt
 
-from mapping.datasets import MiSeq_runs
-from mapping.miseq import alpha
-from mapping.filenames import get_NL43_entire, get_NL43_fragmented, \
+from hivwholeseq.datasets import MiSeq_runs
+from hivwholeseq.miseq import alpha
+from hivwholeseq.filenames import get_NL43_entire, get_NL43_fragmented, \
         get_F10_entire, get_F10_fragmented, \
         get_consensus_filename, get_allele_counts_filename, get_coverage_filename
-from mapping.mapping_utils import align_muscle
+from hivwholeseq.mapping_utils import align_muscle
 
 
 
 # Globals
 #             run adaID  sample  ref_function     fragmented_function
-references = {(28, 2): ('NL4-3', get_NL43_entire, get_NL43_fragmented),
-              (28, 7): ('F10', get_F10_entire, get_F10_fragmented)}
+references = {('Tue28', 'TS2'): ('NL4-3', get_NL43_entire, get_NL43_fragmented),
+              ('Tue28', 'TS7'): ('F10', get_F10_entire, get_F10_fragmented),
+              ('Tue42', 'N4-S3'): ('NL4-3', get_NL43_entire, get_NL43_fragmented),
+              ('Tue42', 'N5-S4'): ('NL4-3', get_NL43_entire, get_NL43_fragmented),
+              ('Tue42', 'N2-S2'): ('NL4-3', get_NL43_entire, get_NL43_fragmented),
+              ('Tue42', 'N6-S4'): ('NL4-3', get_NL43_entire, get_NL43_fragmented),
+             }
 colors = {'fwd': 'b', 'rev': 'g'}
 figures_folder = '/ebio/ag-neher/home/fzanini/phd/sequencing/figures/'
 
@@ -71,15 +76,15 @@ def get_coverage(count):
     return coverage
 
 
-def consensus_vs_reference(miseq_run, adaID, fragment, VERBOSE=0):
+def consensus_vs_reference(seq_run, adaID, fragment, VERBOSE=0):
     '''Check the consensus sequence VS the phiX reference'''
     # There are two seta of primer for F5
     if fragment == 'F5':
-        frag_ref = MiSeq_runs[miseq_run]['primerF5'][MiSeq_runs[miseq_run]['adapters'].index(adaID)]
+        frag_ref = MiSeq_runs[seq_run]['primerF5'][MiSeq_runs[seq_run]['adapters'].index(adaID)]
     else:
         frag_ref = fragment
 
-    data_folder = MiSeq_runs[miseq_run]['folder']
+    data_folder = MiSeq_runs[seq_run]['folder']
 
     # Calculate consensus
     consensus_filename = get_consensus_filename(data_folder, adaID, fragment,
@@ -87,7 +92,7 @@ def consensus_vs_reference(miseq_run, adaID, fragment, VERBOSE=0):
     consensus = SeqIO.read(consensus_filename, 'fasta')
 
     # Get reference
-    sample, _, get_fragmented = references[(miseq_run, adaID)]
+    sample, _, get_fragmented = references[(seq_run, adaID)]
     refseq = SeqIO.read(get_fragmented(frag_ref, trim_primers=True), 'fasta')
 
     # Align them
@@ -103,12 +108,12 @@ def consensus_vs_reference(miseq_run, adaID, fragment, VERBOSE=0):
             print pos, ali[0][pos], '->', ali[1][pos]
 
 
-def minor_alleles_along_genome(miseq_run, adaID, fragment, VERBOSE=0, plot=False,
+def minor_alleles_along_genome(seq_run, adaID, fragment, VERBOSE=0, plot=False,
                                savefig=False):
     '''Show the minor alleles along the phiX genome'''
     # Get the counts
-    sample = references[(miseq_run, adaID)][0]
-    data_folder = MiSeq_runs[miseq_run]['folder']
+    sample = references[(seq_run, adaID)][0]
+    data_folder = MiSeq_runs[seq_run]['folder']
     counts = np.load(get_allele_counts_filename(data_folder, adaID, fragment))
 
     # Study the minor alleles (sequencing errors)
@@ -165,13 +170,13 @@ def minor_alleles_along_genome(miseq_run, adaID, fragment, VERBOSE=0, plot=False
             fig.savefig(figures_folder+sample+'_minornu_'+fragment+'.png')
 
 
-def spikes_motifs(miseq_run, adaID, fragment, VERBOSE=0,
+def spikes_motifs(seq_run, adaID, fragment, VERBOSE=0,
                   binom_mean=2e-4,
                   plot=False, savefig=False):
     '''Find the motifs around the spikes in error rates'''
     # Get the counts
-    sample = references[(miseq_run, adaID)][0]
-    data_folder = MiSeq_runs[miseq_run]['folder']
+    sample = references[(seq_run, adaID)][0]
+    data_folder = MiSeq_runs[seq_run]['folder']
     counts = np.load(get_allele_counts_filename(data_folder, adaID, fragment))
 
     # Study the minor alleles (sequencing errors)
@@ -192,7 +197,7 @@ def spikes_motifs(miseq_run, adaID, fragment, VERBOSE=0,
         ind = (minor_counts[key] > k_crit).nonzero()[0]
         if len(ind):
             if VERBOSE:
-                print 'Spikes: run', miseq_run, 'adaID', adaID, 'fragment', fragment, '('+key+')'
+                print 'Spikes: run', seq_run, 'adaID', adaID, 'fragment', fragment, '('+key+')'
                 print ' Pos WT Motifs'
                 print '----------------------'
             for pos in ind:
@@ -248,6 +253,10 @@ def spikes_motifs(miseq_run, adaID, fragment, VERBOSE=0,
                               width=nu_spike / 100,
                               head_length=100,
                               overhang=0.4)
+
+                if not trans[0]:
+                    trans = (' ', trans[1])
+
                 txt = ax.text(nu_spike * 1.05, ym * 1.05 * 1.08**j,
                               str(pos)+': '+trans[0][-1]+' -> '+trans[1][-1],
                               fontsize=12)
@@ -269,28 +278,28 @@ if __name__ == '__main__':
 
     # Parse input args: this is used to call itself recursively
     parser = argparse.ArgumentParser(description='Errors in HIV pure strains')
-    parser.add_argument('--run', type=int, required=True,
-                        help='MiSeq run to analyze (e.g. 28, 37)')
-    parser.add_argument('--adaIDs', nargs='*', type=int,
-                        help='Adapter IDs to analyze (e.g. 2 16)')
+    parser.add_argument('--run', required=True,
+                        help='MiSeq run to analyze (e.g. Tue28, Tue42)')
+    parser.add_argument('--adaIDs', nargs='*',
+                        help='Adapter IDs to analyze (e.g. TS2 N4-S3)')
     parser.add_argument('--fragments', nargs='*',
                         help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
 
     args = parser.parse_args()
-    miseq_run = args.run
+    seq_run = args.run
     adaIDs = args.adaIDs
     fragments = args.fragments
     VERBOSE = args.verbose
 
     # Specify the dataset
-    dataset = MiSeq_runs[miseq_run]
+    dataset = MiSeq_runs[seq_run]
     data_folder = dataset['folder']
 
     # If the script is called with no adaID, iterate over all
     if not adaIDs:
-        adaIDs = load_adapter_table(data_folder)['ID']
+        adaIDs = MiSeq_runs[seq_run]['adapters']
     if VERBOSE >= 3:
         print 'adaIDs', adaIDs
 
@@ -302,8 +311,8 @@ if __name__ == '__main__':
 
     for adaID in adaIDs:
         for fragment in fragments:
-            consensus_vs_reference(miseq_run, adaID, fragment, VERBOSE=VERBOSE)
-            minor_alleles_along_genome(miseq_run, adaID, fragment,
+            consensus_vs_reference(seq_run, adaID, fragment, VERBOSE=VERBOSE)
+            minor_alleles_along_genome(seq_run, adaID, fragment,
                                        VERBOSE=VERBOSE, plot=True, savefig=False)
-            spikes_motifs(miseq_run, adaID, fragment,
+            spikes_motifs(seq_run, adaID, fragment,
                           VERBOSE=VERBOSE, plot=True, savefig=False)

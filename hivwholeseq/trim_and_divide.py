@@ -182,6 +182,7 @@ def test_outer_primer(reads, primers_out_pos, primers_out_seq, lref):
     if (read_fwd.pos + read_fwd.isize == lref) and (read_rev.cigar[-1][0] == 1):
         return True
 
+    # TODO: do you work in case there is only fwd OR rev?
     # The internal outer primer cannot be checked by positions only, because
     # there might be little indels in the reads and we want to be conservative;
     # however, the read start/end must be mapped somewhere close
@@ -391,13 +392,11 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, fragments,
                                for fr in primers_out['rev']],
                       }
 
-    primers_out_pos = {'fwd': get_primer_positions(smat,
-                                                   primers_out['fwd'],
-                                                   'fwd')[:, 0],
-                       'rev': get_primer_positions(smat,
-                                                   primers_out['rev'],
-                                                   'rev')[:, 1],
-                      }
+    primers_out_pos = {'fwd': [], 'rev': []}
+    if primers_out['fwd']:
+        primers_out_pos['fwd'] = get_primer_positions(smat, primers_out['fwd'], 'fwd')[:, 0]
+    if primers_out['rev']:
+        primers_out_pos['rev'] = get_primer_positions(smat, primers_out['rev'], 'rev')[:, 1]
 
     # Input and output files
     input_filename = get_premapped_file(data_folder, adaID, type='bam')
@@ -428,19 +427,25 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, fragments,
             n_lowq = 0
             for irp, reads in enumerate(pair_generator(bamfile)):
 
-                # Stop at the maximal number of reads (for testing)
                 if irp == maxreads:
                     if VERBOSE:
                         print 'Maximal number of read pairs reached:', maxreads
                     break
 
-                # If unmapped or unpaired, mini, or insert size mini, discard
+                if VERBOSE >= 2:
+                    if not ((irp+1) % 10000):
+                        print irp+1, maxreads
+
+                i_fwd = reads[0].is_reverse
+
+                # If unmapped or unpaired, mini, or insert size mini, or
+                # divergent read pair (fully cross-overlapping), discard
                 if reads[0].is_unmapped or (not reads[0].is_proper_pair) or \
                    reads[1].is_unmapped or (not reads[1].is_proper_pair) or \
                    (reads[0].rlen < 50) or (reads[1].rlen < 50) or \
-                   (np.abs(reads[0].isize) < minisize):
+                   (reads[i_fwd].isize < minisize):
                     if VERBOSE >= 3:
-                        print 'Read pair unmapped/unpaired/tiny:', reads[0].qname
+                        print 'Read pair unmapped/unpaired/tiny/divergent:', reads[0].qname
                     n_unmapped += 1
                     fo_um.write(reads[0])
                     fo_um.write(reads[1])
@@ -455,7 +460,8 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, fragments,
                 # etc.), ONE of the reads in the pair will start exactly with one
                 # outer primer: if the rev read with a rev primer, if the fwd
                 # with a fwd one. Test all six.
-                if test_outer_primer(reads,
+                if (len(primers_out_pos['fwd']) or len(primers_out_pos['rev'])) and \
+                   test_outer_primer(reads,
                                      primers_out_pos, primers_out_seq,
                                      len_reference):
                     if VERBOSE >= 3:
@@ -499,7 +505,6 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, fragments,
                 #                                         include_tests=include_tests)
                 trashed_quality = trim_low_quality(reads, phred_min=20,
                                                    include_tests=include_tests)
-                i_fwd = reads[0].is_reverse
                 if trashed_quality or (reads[i_fwd].isize < 100):
                     n_lowq += 1
                     if VERBOSE >= 3:

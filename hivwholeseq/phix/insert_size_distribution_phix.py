@@ -11,15 +11,13 @@ import pysam
 import numpy as np
 
 from hivwholeseq.datasets import MiSeq_runs
-from hivwholeseq.filenames import get_mapped_filename, get_premapped_file, \
-        get_insert_size_distribution_cumulative_filename, \
-        get_insert_size_distribution_filename
+from hivwholeseq.filenames import get_mapped_phix_filename
 from hivwholeseq.mapping_utils import pair_generator, convert_sam_to_bam
 
 
 
 # Functions
-def get_insert_size_distribution(data_folder, adaID, fragment, bins=None,
+def get_insert_size_distribution(data_folder, bins=None,
                                  maxreads=-1, VERBOSE=0):
     '''Get the distribution of insert sizes'''
 
@@ -28,18 +26,10 @@ def get_insert_size_distribution(data_folder, adaID, fragment, bins=None,
     else:
         insert_sizes = np.zeros(1e6, np.int16)
 
-    # Open BAM file
-    if fragment == 'premapped':
-        bamfilename = get_premapped_file(data_folder, adaID, type='bam')
-    else:
-        bamfilename = get_mapped_filename(data_folder, adaID, fragment, type='bam',
-                                          filtered=True)
-
-    # Convert from SAM if necessary
+    bamfilename = get_mapped_phix_filename(data_folder, type='bam')
     if not os.path.isfile(bamfilename):
         convert_sam_to_bam(bamfilename)
 
-    # Open file
     with pysam.Samfile(bamfilename, 'rb') as bamfile:
         # Iterate over single reads (no linkage info needed)
         n_written = 0
@@ -66,6 +56,7 @@ def get_insert_size_distribution(data_folder, adaID, fragment, bins=None,
 
     insert_sizes = insert_sizes[:n_written]
     insert_sizes.sort()
+    insert_sizes = insert_sizes[insert_sizes > 0]
 
     # Bin it
     if bins is None:
@@ -76,8 +67,8 @@ def get_insert_size_distribution(data_folder, adaID, fragment, bins=None,
     return insert_sizes, h
 
 
-def plot_cumulative_histogram(seq_run, adaID, fragment, insert_sizes,
-                              show=False, savefig=False,
+def plot_cumulative_histogram(seq_run, insert_sizes,
+                              show=False,
                               **kwargs):
     '''Plot cumulative histogram of insert sizes'''
     import matplotlib.pyplot as plt
@@ -85,7 +76,7 @@ def plot_cumulative_histogram(seq_run, adaID, fragment, insert_sizes,
     ax.plot(insert_sizes, np.linspace(0, 1, len(insert_sizes)), **kwargs)
     ax.set_xlabel('Insert size')
     ax.set_ylabel('Cumulative fraction')
-    ax.set_title('run '+str(seq_run)+', adaID '+str(adaID)+', '+fragment)
+    ax.set_title('run '+str(seq_run)+', phiX')
 
     plt.tight_layout()
 
@@ -93,29 +84,14 @@ def plot_cumulative_histogram(seq_run, adaID, fragment, insert_sizes,
         plt.ion()
         plt.show()
 
-    if savefig:
-        dataset = MiSeq_runs[seq_run]
-        data_folder = dataset['folder']
-        output_filename = get_insert_size_distribution_cumulative_filename(data_folder,
-                                                                           adaID,
-                                                                           fragment)
-        from hivwholeseq.generic_utils import mkdirs
-        from hivwholeseq.filenames import get_figure_folder
-        mkdirs(get_figure_folder(data_folder, adaID))
-        fig.savefig(output_filename)
 
-
-def plot_histogram(seq_run, adaID, fragment, h,
-                   ax=None,
+def plot_histogram(seq_run, h,
                    show=False, savefig=False,
                    **kwargs):
     '''Plot histogram of insert sizes'''
     import matplotlib.pyplot as plt
-    if ax is None:
-        fig, ax = plt.subplots(1, 1)
-        ax.set_title('run '+str(seq_run)+', adaID '+str(adaID)+', '+fragment)
-    else:
-        ax.set_title('run '+str(seq_run))
+    fig, ax = plt.subplots(1, 1)
+    ax.set_title('run '+str(seq_run)+', phiX')
     x = 0.5 * (h[1][1:] + h[1][:-1])
     y = h[0]
     ax.plot(x, y, **kwargs)
@@ -127,17 +103,6 @@ def plot_histogram(seq_run, adaID, fragment, h,
     if show:
         plt.ion()
         plt.show()
-
-    if savefig:
-        dataset = MiSeq_runs[seq_run]
-        data_folder = dataset['folder']
-        output_filename = get_insert_size_distribution_filename(data_folder, adaID,
-                                                                fragment)
-
-        from hivwholeseq.generic_utils import mkdirs
-        from hivwholeseq.filenames import get_figure_folder
-        mkdirs(get_figure_folder(data_folder, adaID))
-        plt.savefig(output_filename)
 
 
 
@@ -174,47 +139,23 @@ if __name__ == '__main__':
     dataset = MiSeq_runs[seq_run]
     data_folder = dataset['folder']
 
-    # If the script is called with no adaID, iterate over all
-    if not adaIDs:
-        adaIDs = MiSeq_runs[seq_run]['adapters']
-    if VERBOSE >= 3:
-        print 'adaIDs', adaIDs
-
-    # If the script is called with no fragment, iterate over all
-    if premapped:
-        fragments = ['premapped']
-    elif not fragments:
-        fragments = ['F'+str(i) for i in xrange(1, 7)]
-    if VERBOSE >= 3:
-        print 'fragments', fragments
-
     # Set the bins
     bins = np.linspace(0, 1000, 100)
 
     # Make a single figure for the histograms
     import matplotlib.pyplot as plt
     from matplotlib import cm
-    fig, ax = plt.subplots(1, 1)
 
-    # Iterate over all requested samples
-    for i, adaID in enumerate(adaIDs):
-        for j, fragment in enumerate(fragments):
 
-            isz, h = get_insert_size_distribution(data_folder, adaID, fragment,
-                                             bins=bins, maxreads=maxreads,
-                                             VERBOSE=VERBOSE)
-            plot_cumulative_histogram(seq_run, adaID, fragment, isz, lw=2, c='b',
-                                      savefig=savefig)
-            plot_histogram(seq_run, adaID, fragment, h, ax=ax,
-                           lw=2,
-                           color=cm.jet(int(255.0 * (i *len(fragments) + j) / \
-                                            (len(adaIDs) * len(fragments)))),
-                           label=adaID+', '+fragment,
-                           savefig=savefig)
+    isz, h = get_insert_size_distribution(data_folder,
+                                     bins=bins, maxreads=maxreads,
+                                     VERBOSE=VERBOSE)
+    plot_cumulative_histogram(seq_run, isz, lw=2, c='b')
+    plot_histogram(seq_run, h,
+                   lw=2,
+                   color='b')
 
-            if not savefig:
-                import matplotlib.pyplot as plt
-                plt.ion()
-                plt.show()
+    plt.ion()
+    plt.show()
 
 

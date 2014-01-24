@@ -144,8 +144,8 @@ def extract_reads_subsample(data_folder, adaID, fragment, n_reads, VERBOSE=0,
 
             n_written = 0
             for i, (read1, read2) in enumerate(pair_generator(bamfile_in)):
-                # Log activity
-                if VERBOSE >= 3:
+
+                if VERBOSE >= 2:
                     if not ((i+1) % 10000):
                         print i+1, n_written, ind_store[n_written]
     

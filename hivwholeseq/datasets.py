@@ -52,6 +52,18 @@ MiSeq_runs_list = [\
   'raw_data': None, # ALREADY DEMULTIPLEXED!
  },
 
+ {'name': 'Tue42',
+  'description': 'Test run for PCR1 + Nextera XT + 600 bp',
+  'date': '2014-01-10',
+  'n_cycles': 602,
+  'comments': 'Dual index Nextera adapters',
+  'folder': '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run42/',
+  'raw_data': {'read1': 'lane1_NoIndex_L001_R1_001.fastq',
+               'read2': 'lane1_NoIndex_L001_R4_001.fastq',
+               'adapter1': 'lane1_NoIndex_L001_R2_001.fastq',
+               'adapter2': 'lane1_NoIndex_L001_R3_001.fastq'},
+ },
+
 ]
 
 # Add samples to the runs

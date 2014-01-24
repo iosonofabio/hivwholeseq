@@ -27,6 +27,35 @@ def empty_log_folders():
     os.mkdir(JOBLOGERR)
 
 
+def fork_quality_along_read(seq_run, VERBOSE=0, maxreads=-1, savefig=True):
+    '''Submit quality check along read to the cluster'''
+    if VERBOSE:
+        print 'Forking to the cluster'
+
+    JOBSCRIPT = JOBDIR+'quality_along_read.py'
+    cluster_time = '00:59:59'
+    vmem = '1G'
+    call_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'demux',
+                 '-l', 'h_rt='+cluster_time,
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--run', seq_run,
+                 '--verbose', VERBOSE,
+                 '--maxreads', maxreads,
+                ]
+    if not savefig:
+        call_list.append('--no-savefig')
+    call_list = map(str, call_list)
+    if VERBOSE:
+        print ' '.join(call_list)
+    return sp.check_output(call_list)
+
+
 def fork_demultiplex(seq_run, VERBOSE=0, summary=True):
     '''Submit demultiplex script to the cluster'''
     if VERBOSE:

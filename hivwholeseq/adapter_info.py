@@ -34,7 +34,24 @@ TrueSeq_LT = {1: 'ATCACG',
 adapter_universal = 'AATGATACGGCGACCACCGAGATCTACACTCTTTCCCTACACGACGCTCTTCCGATCT'
 adapter_prefix = 'GATCGGAAGAGCACACGTCTGAACTCCAGTCAC'
 
+Nextera_XT_i7 = {1: 'TAAGGCGA',
+                 2: 'CGTACTAG',
+                 3: 'AGGCAGAA',
+                 4: 'TCCTGAGC',
+                 5: 'GGACTCCT',
+                 6: 'TAGGCATG'}
+
+Nextera_XT_i5 = {1: 'TAGATCGC',
+                 2: 'CTCTCTAT',
+                 3: 'TATCCTCT',
+                 4: 'AGAGTAGA'}
+
+
 adapters_illumina = dict([('TS'+str(adaID), s) for (adaID, s) in TrueSeq_LT.iteritems()])
+adapters_illumina.update({'N'+str(i7k)+'-'+'S'+str(i5k): i7v+'-'+i5v
+                          for (i7k, i7v) in Nextera_XT_i7.iteritems()
+                          for (i5k, i5v) in Nextera_XT_i5.iteritems()})
+
 
 
 

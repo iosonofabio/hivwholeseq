@@ -18,20 +18,24 @@ import pysam
 from matplotlib import cm
 import matplotlib.pyplot as plt
 
-from mapping.miseq import alphal
-from mapping.datasets import MiSeq_runs
-from mapping.filenames import get_consensus_filename, get_mapped_filename, \
+from hivwholeseq.miseq import alphal
+from hivwholeseq.datasets import MiSeq_runs
+from hivwholeseq.filenames import get_consensus_filename, get_mapped_filename, \
         get_allele_counts_filename, get_coverage_filename
-from mapping.mapping_utils import align_muscle, pair_generator
-from mapping.one_site_statistics import filter_nus
-from mapping.coverage_tuples import get_coverage_tuples
-from mapping.reference_samples.mix_recombination import align_consensi_mix1, \
+from hivwholeseq.mapping_utils import align_muscle, pair_generator
+from hivwholeseq.one_site_statistics import filter_nus
+from hivwholeseq.coverage_tuples import get_coverage_tuples
+from hivwholeseq.reference_samples.mix_recombination_PCR import align_consensi_mix1, \
         check_consensus_mix1, align_consensi_mix2, check_consensus_mix2
 
 
 # Globals
-mix1_references_adaIDs = [(0.5, 2), (0.5, 4)]
-mix2_references_adaIDs = [(0.045, 2), (0.95, 4), (0.005, 7)]
+mix_adaIDs = {'Tue28': {'mix1': 'TS18', 'mix2': 'TS19'},
+              'Tue42': {'mix1': 'N1-S1', 'mix2': 'N3-S3'}}
+
+mix1_references_adaIDs = [(0.5, 'TS2'), (0.5, 'TS4')]
+mix2_references_adaIDs = [(0.045, 'TS2'), (0.95, 'TS4'), (0.005, 'TS7')]
+
 colors = {'NL4-3': cm.jet(int(255.0 * 0 / 3)),
           'SF162': cm.jet(int(255.0 * 1 / 3)),
           'F10': cm.jet(int(255.0 * 2 / 3))}
@@ -81,18 +85,20 @@ if __name__ == '__main__':
 
     # Parse input args: this is used to call itself recursively
     parser = argparse.ArgumentParser(description='Errors in HIV pure strains')
+    parser.add_argument('--run', required=True,
+                        help='MiSeq run to analyze (e.g. Tue28)')
     parser.add_argument('--fragments', nargs='*',
                         help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
 
     args = parser.parse_args()
+    seq_run = args.run
     fragments = args.fragments
     VERBOSE = args.verbose
 
     # Specify the dataset
-    miseq_run = 28
-    dataset = MiSeq_runs[miseq_run]
+    dataset = MiSeq_runs[seq_run]
     data_folder = dataset['folder']
 
     # If the script is called with no fragment, iterate over all
@@ -108,16 +114,17 @@ if __name__ == '__main__':
 
         # MIX1
         ax = axs[0]
+        adaID = mix_adaIDs[seq_run]['mix1']
 
         # Check consensus
-        alignment = align_consensi_mix1(fragment)
+        alignment = align_consensi_mix1(seq_run, fragment)
         ali = np.array(alignment)
-        check_consensus_mix1(fragment, alignment=alignment)
+        check_consensus_mix1(seq_run, fragment, alignment=alignment)
 
         # Check allele frequencies of the two strains (there is PCR-mediated
         # recombination - watch out!)
-        counts = np.load(get_allele_counts_filename(data_folder, 18, fragment))
-        coverage = np.load(get_coverage_filename(data_folder, 18, fragment))
+        counts = np.load(get_allele_counts_filename(data_folder, adaID, fragment))
+        coverage = np.load(get_coverage_filename(data_folder, adaID, fragment))
         nus = filter_nus(counts, coverage)
         pos_poly = get_ind_private_alleles_nogaps_mix1(ali)
         nus_ali = np.zeros((2, len(pos_poly)))
@@ -142,16 +149,17 @@ if __name__ == '__main__':
 
         # MIX2
         ax = axs[1]
+        adaID = mix_adaIDs[seq_run]['mix2']
 
         # Check consensus
-        alignment = align_consensi_mix2(fragment)
+        alignment = align_consensi_mix2(seq_run, fragment)
         ali = np.array(alignment)
-        check_consensus_mix2(fragment, alignment=alignment)
+        check_consensus_mix2(seq_run, fragment, alignment=alignment)
 
         # Check allele frequencies of the three strains (there is PCR-mediated
         # recombination - watch out!)
-        counts = np.load(get_allele_counts_filename(data_folder, 19, fragment))
-        coverage = np.load(get_coverage_filename(data_folder, 19, fragment))
+        counts = np.load(get_allele_counts_filename(data_folder, adaID, fragment))
+        coverage = np.load(get_coverage_filename(data_folder, adaID, fragment))
         nus = filter_nus(counts, coverage)
         pos_poly = get_ind_private_alleles_nogaps_mix2(ali)
         nus_ali = np.zeros((3, len(pos_poly)))
@@ -168,7 +176,7 @@ if __name__ == '__main__':
             y = logit(y)
             c = colors[alignment[j+1].name]
             # Labels stuff
-            adaID = int(alignment[j+1].id.split('_')[1])
+            adaID = alignment[j+1].id.split('_')[1]
             a = zip(*mix2_references_adaIDs)
             label = alignment[j+1].name+', '+str(100 * a[0][a[1].index(adaID)])+'%'
             ax.plot(pos_poly, y, color=c,
@@ -190,7 +198,7 @@ if __name__ == '__main__':
         plt.show()
 
         # NOTE
-        savefig = True
+        savefig = False
         if savefig:
             fig.savefig('/ebio/ag-neher/home/fzanini/phd/sequencing/figures/'+\
                         'PCR_amplification_bias_'+str(fragment)+'.png')

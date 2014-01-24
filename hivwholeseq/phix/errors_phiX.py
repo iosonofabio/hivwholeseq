@@ -17,11 +17,11 @@ import numpy as np
 from Bio import SeqIO
 from Bio.Seq import reverse_complement as rc
 
-from mapping.datasets import MiSeq_runs
-from mapping.miseq import alpha, read_types, alphal
-from mapping.filenames import get_phix_filename, get_allele_counts_phix_filename, \
+from hivwholeseq.datasets import MiSeq_runs
+from hivwholeseq.miseq import alpha, read_types, alphal
+from hivwholeseq.filenames import get_phix_filename, get_allele_counts_phix_filename, \
         get_mapped_phix_filename
-from mapping.mapping_utils import get_ind_good_cigars
+from hivwholeseq.mapping_utils import get_ind_good_cigars
 
 
 
@@ -74,10 +74,10 @@ def load_allele_counts(data_folder, VERBOSE=0):
     return counts
 
 
-def consensus_vs_reference(miseq_run, counts=None, VERBOSE=0):
+def consensus_vs_reference(seq_run, counts=None, VERBOSE=0):
     '''Check the consensus sequence VS the phiX reference'''
     if counts is None:
-        counts = load_allele_counts(MiSeq_runs[miseq_run]['folder'], VERBOSE=VERBOSE)
+        counts = load_allele_counts(MiSeq_runs[seq_run]['folder'], VERBOSE=VERBOSE)
 
     # Calculate consensus
     count = get_count(counts)
@@ -92,7 +92,7 @@ def consensus_vs_reference(miseq_run, counts=None, VERBOSE=0):
         ind = {key: (con != ref).nonzero()[0] for key, con in consensus.iteritems()}
         for key, indo in ind.iteritems():
             if len(indo):
-                print 'PhiX run', miseq_run, 'differences from reference ('+key+'):'
+                print 'PhiX run', seq_run, 'differences from reference ('+key+'):'
                 print 'Pos  Ref   Cons  Mutation'
                 print '-------------------------'
                 for i in indo:
@@ -107,10 +107,13 @@ def consensus_vs_reference(miseq_run, counts=None, VERBOSE=0):
     return {key: ''.join(value) for key, value in consensus.iteritems()}
 
 
-def minor_alleles_along_genome(miseq_run, counts=None, VERBOSE=0, plot=False):
+def minor_alleles_along_genome(seq_run, qual_min=0, maxreads=-1, VERBOSE=0, plot=False):
     '''Show the minor alleles along the phiX genome'''
-    if counts is None:
-        counts = load_allele_counts(MiSeq_runs[miseq_run]['folder'], VERBOSE=VERBOSE)
+
+    # Reload counts at different quality filter level
+    from hivwholeseq.phix.get_allele_counts_phiX import get_allele_counts as gac
+    (counts, _) = gac(MiSeq_runs[seq_run]['folder'], qual_min=qual_min,
+                      VERBOSE=VERBOSE, maxreads=maxreads)
 
     # Study the minor alleles (sequencing errors)
     count = get_count(counts)
@@ -120,8 +123,10 @@ def minor_alleles_along_genome(miseq_run, counts=None, VERBOSE=0, plot=False):
     # Mean error frequency
     cov = get_coverage(count)
     print 'Average error frequency:',
+    err_rate_avg = {}
     for key in count:
-        print key, '{:1.1e}'.format(minor_counts[key][300:].mean() / cov[key][300:].mean()),
+        err_rate_avg[key] = minor_counts[key][300:].mean() / cov[key][300:].mean()
+        print key, '{:1.1e}'.format(err_rate_avg[key]),
     print ''
 
     # Plot
@@ -151,20 +156,20 @@ def minor_alleles_along_genome(miseq_run, counts=None, VERBOSE=0, plot=False):
         axs[1].set_yscale('log')
     
     
-        plt.suptitle('PhiX analysis: run '+str(miseq_run), fontsize=20)
+        plt.suptitle('PhiX analysis: run '+str(seq_run), fontsize=20)
         plt.tight_layout(rect=(0, 0, 1, 0.95))
     
         plt.ion()
         plt.show()
 
-    return minor_counts, minor_nus
+    return minor_counts, minor_nus, err_rate_avg
 
 
-def spikes_motifs(miseq_run, counts=None, consensus=None, minor_counts=None,
+def spikes_motifs(seq_run, counts=None, consensus=None, minor_counts=None,
                   VERBOSE=0, plot=False):
     '''Find the motifs around the spikes in error rates'''
     if counts is None:
-        counts = load_allele_counts(MiSeq_runs[miseq_run]['folder'], VERBOSE=VERBOSE)
+        counts = load_allele_counts(MiSeq_runs[seq_run]['folder'], VERBOSE=VERBOSE)
     count = get_count(counts)
 
     if minor_counts is None: 
@@ -185,7 +190,7 @@ def spikes_motifs(miseq_run, counts=None, consensus=None, minor_counts=None,
         k_crit = binom.ppf(0.999, n, p)
         ind = (minor_counts[key][300:] > k_crit).nonzero()[0] + 300
         if len(ind):
-            print 'Spikes: run', miseq_run, '('+key+')'
+            print 'Spikes: run', seq_run, '('+key+')'
             print ' Pos WT Motifs'
             print '----------------------'
             for pos in ind:
@@ -237,21 +242,21 @@ def spikes_motifs(miseq_run, counts=None, consensus=None, minor_counts=None,
                               overhang=0.4)
                 txt = ax.text(nu_spike * 1.05, ym * 1.05 * 1.08**j, str(pos), fontsize=12)
 
-        fig.suptitle('run '+str(miseq_run), fontsize=18)
+        fig.suptitle('run '+str(seq_run), fontsize=18)
         plt.tight_layout()
         plt.ion()
         plt.show()
 
-        #fig.savefig('/ebio/ag-neher/home/fzanini/phd/sequencing/figures/phix_run'+str(miseq_run)+'_spikes.png')
+        #fig.savefig('/ebio/ag-neher/home/fzanini/phd/sequencing/figures/phix_run'+str(seq_run)+'_spikes.png')
 
     return spikes
 
 
-def characterize_motifs(miseq_run, spikes=None, counts=None, consensus=None, minor_counts=None,
+def characterize_motifs(seq_run, spikes=None, counts=None, consensus=None, minor_counts=None,
                         VERBOSE=0, plot=False):
     '''Find the DNA motifs of the errors'''
     if counts is None:
-        counts = load_allele_counts(MiSeq_runs[miseq_run]['folder'], VERBOSE=VERBOSE)
+        counts = load_allele_counts(MiSeq_runs[seq_run]['folder'], VERBOSE=VERBOSE)
     count = get_count(counts)
     cov = get_coverage(count)
 
@@ -309,7 +314,7 @@ def characterize_motifs(miseq_run, spikes=None, counts=None, consensus=None, min
         fig.subplots_adjust(right=0.8)
         cbar_ax = fig.add_axes([0.85, 0.2, 0.05, 0.6])
         fig.colorbar(im, cax=cbar_ax)
-        fig.suptitle('Mutation matrix for MiSeq (phiX, run'+str(miseq_run)+')',
+        fig.suptitle('Mutation matrix for MiSeq (phiX, run'+str(seq_run)+')',
                      fontsize=18)
         plt.figtext(0.05, 0.5, 'from', rotation=90, fontsize=18)
         plt.figtext(0.45, 0.04, 'to', fontsize=18)
@@ -386,7 +391,7 @@ def characterize_motifs(miseq_run, spikes=None, counts=None, consensus=None, min
         fig2.subplots_adjust(right=0.8)
         cbar_ax = fig2.add_axes([0.85, 0.1, 0.05, 0.8])
         fig2.colorbar(im, cax=cbar_ax)
-        fig2.suptitle('Double mutation matrix for MiSeq (phiX, run'+str(miseq_run)+')',
+        fig2.suptitle('Double mutation matrix for MiSeq (phiX, run'+str(seq_run)+')',
                      fontsize=18)
         plt.figtext(0.05, 0.5, 'from', rotation=90, fontsize=18)
         plt.figtext(0.45, 0.04, 'to', fontsize=18)
@@ -395,200 +400,11 @@ def characterize_motifs(miseq_run, spikes=None, counts=None, consensus=None, min
         plt.ion()
         plt.show()
 
-        fig.savefig('/ebio/ag-neher/home/fzanini/phd/sequencing/figures/phix_run'+str(miseq_run)+'_mutmatrix.png')
-        fig2.savefig('/ebio/ag-neher/home/fzanini/phd/sequencing/figures/phix_run'+str(miseq_run)+'_mutmatrix2.png')
+        fig.savefig('/ebio/ag-neher/home/fzanini/phd/sequencing/figures/phix_run'+str(seq_run)+'_mutmatrix.png')
+        fig2.savefig('/ebio/ag-neher/home/fzanini/phd/sequencing/figures/phix_run'+str(seq_run)+'_mutmatrix2.png')
 
 
     return M1, M2
-
-
-def errors_vs_quality(miseq_run, maxreads=1e3, VERBOSE=0, plot=False):
-    '''Count the errors VS the phred score'''
-    # In principle, the phred is q = 10 * log10(p) where p is the error rate,
-    # so 30 -> 1e-3, 40 -> 1e-4 and so on.
-
-    # Prepare output structure
-    qual_errs = np.zeros(min(1e6, maxreads * 250), 'S1')
-    qual_base = np.zeros(1e6, 'S1')
-    
-    # Calculate consensus
-    counts = load_allele_counts(MiSeq_runs[miseq_run]['folder'], VERBOSE=VERBOSE)
-    count = get_count(counts)
-    consensus = get_consensus(count)
-
-    # Open BAM file
-    # Note: the reads should already be filtered of unmapped stuff at this point
-    bamfilename = get_mapped_phix_filename(data_folder, filtered=False)
-    if not os.path.isfile(bamfilename):
-        convert_sam_to_bam(bamfilename)
-    with pysam.Samfile(bamfilename, 'rb') as bamfile:
-
-        # Iterate over single reads (no linkage info needed)
-        ierr = 0
-        ibase = 0
-        for i, read in enumerate(bamfile):
-
-            if ierr >= len(qual_errs) - 1:
-                break
-
-            if i == maxreads:
-                if VERBOSE >= 2:
-                    print 'Max reads reached:', maxreads
-                break
-        
-            # Print output
-            if (VERBOSE >= 3) and (not ((i +1) % 10000)):
-                print (i+1)
-        
-            # Exclude unmapped and unpaired
-            if read.is_unmapped or (not read.is_proper_pair):
-                continue
-
-            # Divide by forward/reverse
-            if read.is_reverse:
-                key = 'rev'
-            else:
-                key = 'fwd'
-
-            # Get appropriate consensus (they differ by a few bases)
-            cons = consensus[key]
-    
-            # Read good CIGARs (to avoid mapping quirks)
-            cigar = read.cigar
-            len_cig = len(cigar)
-            (good_cigars, first_good_cigar, last_good_cigar) = \
-                    get_ind_good_cigars(cigar, match_len_min=match_len_min,
-                                        full_output=True)
-            
-            # Sequence and position
-            # Note: stampy takes the reverse complement already
-            pos = read.pos
-            seq = read.seq
-            qual = read.qual
-
-            # Iterate over CIGARs
-            for ic, (block_type, block_len) in enumerate(cigar):
-
-                # Inline block
-                if block_type == 0:
-                    # Exclude bad CIGARs
-                    if good_cigars[ic]: 
-            
-                        # The first and last good CIGARs are matches:
-                        # trim them (unless they end the read)
-                        if (ic == first_good_cigar) and (ic != 0):
-                            trim_left = trim_bad_cigars
-                        else:
-                            trim_left = 0
-                        if (ic == last_good_cigar) and (ic != len_cig - 1):
-                            trim_right = trim_bad_cigars
-                        else:
-                            trim_right = 0
-            
-                        seqb = np.array(list(seq[trim_left:block_len - trim_right]), 'S1')
-                        qualb = np.array(list(qual[trim_left:block_len - trim_right]), 'S1')
-                        # Check for errors
-                        cloc = cons[pos + trim_left: pos + trim_left + len(seqb)]
-                        errs = (cloc != seqb)
-                        
-                        # Reads with lots of mutations are mismapped
-                        if errs.sum() > 20:
-                            break
-                        
-                        elif errs.any():
-                            qerrs = qualb[errs]
-                            if len(qual_errs) - (ierr + len(qerrs)) <= 1:
-                                qerrs = qerrs[:len(qual_errs) - ierr - 1]
-                            
-                            qual_errs[ierr: ierr + len(qerrs)] = qerrs
-                            ierr += len(qerrs)
-
-                            if VERBOSE >= 3:
-                                print len(qerrs), qerrs, ierr
-
-                        # Collect background
-                        if len(qual_base) - ibase > len(qualb):
-                            qual_base[ibase: ibase + len(qualb)] = qualb
-                            ibase += len(qualb)
-
-            
-                    # Chop off this block
-                    if ic != len_cig - 1:
-                        seq = seq[block_len:]
-                        qual = qual[block_len:]
-                        pos += block_len
-            
-                # Deletion: the whole block is wrong, but has no quality!
-                elif block_type == 2:
-                    # Chop off pos, but not sequence
-                    pos += block_len
-            
-                # Insertion
-                # an insert @ pos 391 means that seq[:391] is BEFORE the insert,
-                # THEN the insert, FINALLY comes seq[391:]
-                # The whole block is wrong, no matter what, but that might come
-                # from mapping
-                elif block_type == 1:
-                    # Chop off seq, but not pos
-                    if ic != len_cig - 1:
-                        seq = seq[block_len:]
-                        qual = qual[block_len:]
-            
-                # Other types of cigar?
-                else:
-                    raise ValueError('CIGAR type '+str(block_type)+' not recognized')
-
-    # Convert and trim
-    qual_errs = qual_errs[:ierr]
-    qual_errs.sort()
-    qual_errs = np.array(map(ord, qual_errs), int) - ord('!')
-    qual_base = qual_base[:ibase]
-    qual_base.sort()
-    qual_base = np.array(map(ord, qual_base), int) - ord('!')
-
-    if plot:
-        import matplotlib.pyplot as plt
-        fig, axs = plt.subplots(1, 2, figsize=(12, 6))
-
-        # Cumulative
-        ax = axs[0]
-        x = qual_errs
-        y = np.linspace(0, 1, len(qual_errs))
-        ax.plot(x, y, lw=2, c='b', label='errs')
-    
-        xb = qual_base
-        yb = np.linspace(0, 1, len(qual_base))
-        ax.plot(xb, yb, lw=2, c='grey', label='baseline')
-
-        ax.set_xlabel('Phred quality')
-        ax.set_ylabel('Cumulative fraction of errors')
-        ax.legend(loc=2)
-
-        # Error probability
-        # This goes via Bayes' theorem: P(e|q) = P(q|e) * P(e) / P(q)
-        ax = axs[1]
-        Pq = 1.0 * np.bincount(qual_base - 20) / len(qual_base)
-        Pqe = 1.0 * np.bincount(qual_errs - 20) / len(qual_errs)
-        Pe = 1.1e-4
-        y = Pqe * Pe / (Pq + 1e-6)
-        x = np.arange(20, 20 + len(y))
-        ax.scatter(x[y > 0], y[y > 0], lw=2, c='k', label='Data')
-
-        # Plot theoretical Phred curve
-        ax.plot(x, 10**(-1.0 * x / 10), lw=2, c='grey', label='Theory')
-
-        ax.set_xlabel('Phred quality')
-        ax.set_ylabel('P(e | q)')
-        ax.set_yscale('log')
-        ax.set_ylim(1e-5, 1e-1)
-        ax.legend(loc=1)
-
-        fig.suptitle('run '+str(miseq_run), fontsize=18)
-        plt.tight_layout(rect=(0, 0, 1, 0.96))
-        plt.ion()
-        plt.show()
-
-    return (qual_errs, qual_base)
 
 
 def minor_nus_crossrun(data_runs, VERBOSE=0):
@@ -647,59 +463,63 @@ if __name__ == '__main__':
 
     # Parse input args
     parser = argparse.ArgumentParser(description='Divide HIV reads into fragments')
-    parser.add_argument('--runs', type=int, nargs='+', required=True,
-                        help='MiSeq run to analyze (e.g. 28, 37)')
+    parser.add_argument('--runs', nargs='+', required=True,
+                        help='Seq run to analyze (e.g. Tue28)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
+    parser.add_argument('--maxreads', type=int, default=-1,
+                        help='Maximal number of reads to analyze')
+    parser.add_argument('--qual_min', type=int, default=0,
+                        help='Maximal number of reads to analyze')
     parser.add_argument('--plot', action='store_true',
                         help='Plot results')
 
     args = parser.parse_args()
-    miseq_runs = args.runs
+    seq_runs = args.runs
     VERBOSE = args.verbose
+    maxreads = args.maxreads
+    qual_min = args.qual_min
     plot = args.plot
 
     # Crossrun data structures
     data_runs = defaultdict(dict)
 
     # Iterate over requested runs
-    for miseq_run in miseq_runs:
+    for seq_run in seq_runs:
     
         # Specify the dataset
-        dataset = MiSeq_runs[miseq_run]
+        dataset = MiSeq_runs[seq_run]
         data_folder = dataset['folder']
     
         # Get allele counts
         counts = load_allele_counts(data_folder, VERBOSE=VERBOSE)
-        data_runs[miseq_run]['counts'] = counts
+        data_runs[seq_run]['counts'] = counts
     
         # Check consensus
-        consensus = consensus_vs_reference(miseq_run, counts, VERBOSE=VERBOSE)
-        data_runs[miseq_run]['consensus'] = consensus
+        consensus = consensus_vs_reference(seq_run, counts, VERBOSE=VERBOSE)
+        data_runs[seq_run]['consensus'] = consensus
 
         # Along genome
         minor_counts, \
-        minor_nus = minor_alleles_along_genome(miseq_run, counts,
-                                               VERBOSE=VERBOSE,
-                                               plot=plot)
-        data_runs[miseq_run]['minor_counts'] = minor_counts
-        data_runs[miseq_run]['minor_nus'] = minor_nus
+        minor_nus, \
+        error_rate_avg = minor_alleles_along_genome(seq_run,
+                                                    qual_min=qual_min,
+                                                    maxreads=maxreads,
+                                                    VERBOSE=VERBOSE,
+                                                    plot=plot)
+        data_runs[seq_run]['minor_counts'] = minor_counts
+        data_runs[seq_run]['minor_nus'] = minor_nus
 
-        # Spikes
-        spikes = spikes_motifs(miseq_run, VERBOSE=VERBOSE, plot=False)
-        data_runs[miseq_run]['spikes'] = spikes
+        ## Spikes
+        #spikes = spikes_motifs(seq_run, VERBOSE=VERBOSE, plot=False)
+        #data_runs[seq_run]['spikes'] = spikes
 
-        # Motifs
-        motifs = characterize_motifs(miseq_run,
-                                     spikes=spikes,
-                                     VERBOSE=VERBOSE,
-                                     plot=plot)
-        data_runs[miseq_run]['motifs'] = motifs
-
-        # Phred quality VS errors
-        (qual_errs, qual_base) = errors_vs_quality(miseq_run, maxreads=1e6, VERBOSE=VERBOSE,
-                                      plot=plot)
-        data_runs[miseq_run]['qual_errs'] = (qual_errs, qual_base)
+        ## Motifs
+        #motifs = characterize_motifs(seq_run,
+        #                             spikes=spikes,
+        #                             VERBOSE=VERBOSE,
+        #                             plot=plot)
+        #data_runs[seq_run]['motifs'] = motifs
 
 #    # Check consistency across runs
 #    if len(data_runs) > 1:

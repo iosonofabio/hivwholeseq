@@ -119,10 +119,13 @@ if __name__ == '__main__':
                         help='Adapter IDs to analyze (e.g. TS2)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
+    parser.add_argument('--nus', action='store_true',
+                        help='Also create genome-wide allele frequencies')
     
     args = parser.parse_args()
     seq_run = args.run
     adaIDs = args.adaIDs
+    do_nus = args.nus
     VERBOSE = args.verbose
 
     # Specify the dataset
@@ -147,8 +150,9 @@ if __name__ == '__main__':
             SeqIO.write(cons, output_filename, 'fasta')
 
         # Write allele frequencies
-        nu = merge_allele_frequencies(data_folder, adaID, fragments, VERBOSE=VERBOSE)
-        for (frags, nuf) in nu:
-            output_filename = get_merged_allele_frequencies_filename(data_folder,
-                                                                     adaID, frags)
-            nuf.dump(output_filename)
+        if do_nus:
+            nu = merge_allele_frequencies(data_folder, adaID, fragments, VERBOSE=VERBOSE)
+            for (frags, nuf) in nu:
+                output_filename = get_merged_allele_frequencies_filename(data_folder,
+                                                                         adaID, frags)
+                nuf.dump(output_filename)

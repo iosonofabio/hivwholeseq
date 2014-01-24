@@ -8,7 +8,7 @@ content:    Study PCR-mediated recombination from the plasmid mixes.
                 - MIX1 PCR2 probes (Tue28, adaID TS18)
                 - MIX1 PCR1 probes (Tue42, adaID N1-S1)
                 - MIX2 PCR2 probes (Tue28, adaID TS19)
-                - MIX2 PCR1 probes (Tue42, adaID N2-S2)
+                - MIX2 PCR1 probes (Tue42, adaID N3-S3)
 '''
 # Modules
 import argparse
@@ -32,26 +32,29 @@ from hivwholeseq.coverage_tuples import get_coverage_tuples
 
 
 # Globals
-#TODO: generalize for the Nextera XT samples
+mix_adaIDs = {'Tue28': {'mix1': 'TS18', 'mix2': 'TS19'},
+              'Tue42': {'mix1': 'N1-S1', 'mix2': 'N3-S3'}}
+
 mix1_references_adaIDs = [(0.5, 'TS2'), (0.5, 'TS4')]
 mix2_references_adaIDs = [(0.045, 'TS2'), (0.95, 'TS4'), (0.005, 'TS7')]
 
 
 
 # Functions
-def align_consensi_mix1(fragment):
+def align_consensi_mix1(seq_run, fragment):
     '''Align consensi for mix1'''
-    # Specify the dataset
-    miseq_run = 'Tue28'
-    dataset = MiSeq_runs[miseq_run]
-    data_folder = dataset['folder']
+
+    dataset_mix = MiSeq_runs[seq_run]
+    dataset_pure = MiSeq_runs['Tue28']
 
     # Get the consensus of the mix1, and align it with the two consensi of
     # the pure strains
-    adaID_mix1 = 'TS18'
+    adaID_mix1 = mix_adaIDs[seq_run]['mix1']
     adaIDs = [adaID_mix1] + map(itemgetter(1), mix1_references_adaIDs)
+    datasets = [dataset_mix] + ([dataset_pure] * len(mix1_references_adaIDs))
     consensi = []
-    for adaID in adaIDs:
+    for (adaID, dataset) in izip(adaIDs, datasets):
+        data_folder = dataset['folder']
         i = dataset['adapters'].index(adaID)
         sample = dataset['samples'][i]
         seq = SeqIO.read(get_consensus_filename(data_folder, adaID, fragment),
@@ -70,10 +73,10 @@ def align_consensi_mix1(fragment):
     return alignment
 
 
-def check_consensus_mix1(fragment, alignment=None):
+def check_consensus_mix1(seq_run, fragment, alignment=None):
     '''Check the consensus switch for mix1'''
     if alignment is None:
-        alignment = align_consensi_mix1(fragment)
+        alignment = align_consensi_mix1(seq_run, fragment)
     ali = np.array(alignment)
 
     # Look for polymorphisms
@@ -92,19 +95,21 @@ def check_consensus_mix1(fragment, alignment=None):
     # fragment (i.e. there is amplification bias, but no strong recombination)
 
 
-def align_consensi_mix2(fragment):
+def align_consensi_mix2(seq_run, fragment):
     '''Align consensi for mix2'''
-    # Specify the dataset
-    miseq_run = 'Tue28'
-    dataset = MiSeq_runs[miseq_run]
-    data_folder = dataset['folder']
+
+    dataset_mix = MiSeq_runs[seq_run]
+    dataset_pure = MiSeq_runs['Tue28']
 
     # Get the consensus of the mix1, and align it with the two consensi of
     # the pure strains
-    adaID_mix2 = 'TS19'
+    adaID_mix2 = mix_adaIDs[seq_run]['mix2']
     adaIDs = [adaID_mix2] + map(itemgetter(1), mix2_references_adaIDs)
+    datasets = [dataset_mix] + ([dataset_pure] * len(mix2_references_adaIDs))
+
     consensi = []
-    for adaID in adaIDs:
+    for (adaID, dataset) in izip(adaIDs, datasets):
+        data_folder = dataset['folder']
         i = dataset['adapters'].index(adaID)
         sample = dataset['samples'][i]
         seq = SeqIO.read(get_consensus_filename(data_folder, adaID, fragment),
@@ -123,10 +128,10 @@ def align_consensi_mix2(fragment):
     return alignment
 
 
-def check_consensus_mix2(fragment, alignment=None):
+def check_consensus_mix2(seq_run, fragment, alignment=None):
     '''Check the consensus switch for mix1'''
     if alignment is None:
-        alignment = align_consensi_mix2(fragment)
+        alignment = align_consensi_mix2(seq_run, fragment)
     ali = np.array(alignment)
 
     # Look for polymorphisms
@@ -148,11 +153,11 @@ def check_consensus_mix2(fragment, alignment=None):
     # EXCEPTION: F6 (but there's something wrong in that consensus!)
 
 
-def get_SNPs_mix1(fragment):
+def get_SNPs_mix1(seq_run, fragment):
     '''Get the SNPs of mix1'''
 
     # Get the positions of private alleles for each of the two references
-    alignment = align_consensi_mix1(fragment)
+    alignment = align_consensi_mix1(seq_run, fragment)
     ali = np.array(alignment)
     poss = (ali[1] != ali[2]).nonzero()[0]
     alls = ali[1:, poss]
@@ -171,7 +176,7 @@ def get_SNPs_mix1(fragment):
     return poss, poss_ref, alls
 
 
-def count_cross_reads_mix1(fragment, maxreads=100, markers_min=4, VERBOSE=0):
+def count_cross_reads_mix1(seq_run, fragment, maxreads=100, markers_min=4, VERBOSE=0):
     '''Count the number of reads jmping from one haplotype to the other
     
     This function calculates also the coverage normalization, and the switches
@@ -183,7 +188,7 @@ def count_cross_reads_mix1(fragment, maxreads=100, markers_min=4, VERBOSE=0):
         raise ValueError('To spot recombnation you need at least 2 markers!')
 
     # Get SNP positions and alleles
-    poss, poss_ref, alls = get_SNPs_mix1(fragment)
+    poss, poss_ref, alls = get_SNPs_mix1(seq_run, fragment)
 
     # Go to the reads and ask how often you switch and where
     reads_identity = {'faithful': 0, 'cross': 0, 'borderline': 0}
@@ -191,8 +196,8 @@ def count_cross_reads_mix1(fragment, maxreads=100, markers_min=4, VERBOSE=0):
     cocoverage = Counter()
 
     # Open BAM file
-    adaID = 'TS18'
-    bamfilename = get_mapped_filename(data_folder, adaID, fragment, type='bam',
+    adaID_mix1 = mix_adaIDs[seq_run]['mix1']
+    bamfilename = get_mapped_filename(data_folder, adaID_mix1, fragment, type='bam',
                                       filtered=True)
     with pysam.Samfile(bamfilename, 'rb') as bamfile:
 
@@ -341,6 +346,8 @@ if __name__ == '__main__':
 
     # Parse input args: this is used to call itself recursively
     parser = argparse.ArgumentParser(description='Errors in HIV pure strains')
+    parser.add_argument('--run', required=True,
+                        help='MiSeq run to analyze (e.g. Tue28)')
     parser.add_argument('--fragments', nargs='*',
                         help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('-n', type=int, default=100,
@@ -349,13 +356,13 @@ if __name__ == '__main__':
                         help='Verbosity level [0-3]')
 
     args = parser.parse_args()
+    seq_run = args.run
     fragments = args.fragments
     n_reads = args.n
     VERBOSE = args.verbose
 
     # Specify the dataset
-    miseq_run = 'Tue28'
-    dataset = MiSeq_runs[miseq_run]
+    dataset = MiSeq_runs[seq_run]
     data_folder = dataset['folder']
 
     # If the script is called with no fragment, iterate over all
@@ -367,9 +374,11 @@ if __name__ == '__main__':
     # MIX1
     fig, axs = plt.subplots(2, 3, figsize=(19, 12))
     for ax, fragment in izip(axs.ravel(), fragments):
-        check_consensus_mix1(fragment)
-        (reads_identity, switch_counts,
-         cocoverage) = count_cross_reads_mix1(fragment, maxreads=n_reads, VERBOSE=VERBOSE)
+        check_consensus_mix1(seq_run, fragment)
+        (reads_identity,
+         switch_counts,
+         cocoverage) = count_cross_reads_mix1(seq_run, fragment,
+                                              maxreads=n_reads, VERBOSE=VERBOSE)
 
         print reads_identity
 
@@ -394,7 +403,7 @@ if __name__ == '__main__':
         ax.set_xlabel('dist [bases]')
         ax.set_ylabel('N of crossover')
         #ax.legend(loc=2, fontsize=18)
-        ax.set_title('Mix1, '+fragment, fontsize=20)
+        ax.set_title('Mix1, '+seq_run+', '+fragment, fontsize=20)
         ax.set_ylim(-0.1, 0.5)
 
         # Follow along the fragment
