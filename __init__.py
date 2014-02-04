@@ -1,1 +1,1 @@
-__all__ = ['hivwholeseq']
+__all__ = ['hivwholeseq', 'hivwholeseq_pacbio']

@@ -11,4 +11,4 @@
 
 // Functions
 int nothing();
-int align_overlap(std::string seq1, std::string seq2, std::string* ali1, std::string* ali2, int band=100);
+int find_seed(std::string refseq, std::string seed, int *scoreout);

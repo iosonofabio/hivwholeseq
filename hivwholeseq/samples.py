@@ -121,6 +121,24 @@ sample_list = [\
  {'name': 'NL4-3_PCR2_Taq', 'run': 'Tue42', 'adaID': 'N6-S4',
   'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5bi', 'F6i')},
 
+ # TrueSeq Nano patient samples #2
+ {'name': 'F10_PCR2_TaqHiFi', 'run': 'Tue44', 'adaID': 'TS2',
+  'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i')},
+ {'name': 'F10_PCR2_Taq', 'run': 'Tue44', 'adaID': 'TS4',
+  'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i')},
+ {'name': '34493', 'run': 'Tue44', 'adaID': 'TS5',
+  'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i')},
+ {'name': '29184', 'run': 'Tue44', 'adaID': 'TS6',
+  'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i')},
+ {'name': '30847', 'run': 'Tue44', 'adaID': 'TS7',
+  'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i')},
+ {'name': 'VK02-4452', 'run': 'Tue44', 'adaID': 'TS12',
+  'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i')},
+ {'name': '06HR-0145', 'run': 'Tue44', 'adaID': 'TS13',
+  'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i')},
+ {'name': '28929', 'run': 'Tue44', 'adaID': 'TS14',
+  'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i')},
+
  ]
 
 # Sample table using Pandas

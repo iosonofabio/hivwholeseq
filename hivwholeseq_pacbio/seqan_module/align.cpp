@@ -3,7 +3,8 @@
 
 using namespace seqan;
 
-int align_overlap(std::string seq1, std::string seq2, std::string* ali1, std::string* ali2, int band) {
+int align_overlap(std::string seq1, std::string seq2, std::string* ali1, std::string* ali2, int band, int trim,
+		  int score_match, int score_mismatch, int score_gap, int score_gapopen) {
 
 	typedef String<char> TSequence;                 // sequence type
 	typedef Align<TSequence,ArrayGaps> TAlign;      // align type
@@ -20,12 +21,18 @@ int align_overlap(std::string seq1, std::string seq2, std::string* ali1, std::st
 	// Align
 	if(band >= 0)
 		score = globalAlignment(ali,
-					Score<int,Simple>(1,-1,-1),
+					Score<int,Simple>(score_match,
+						score_mismatch,
+						score_gap,
+						score_gapopen),
 					AlignConfig<true, false, false, true>(),
 					-band, band);
 	else
 		score = globalAlignment(ali,
-					Score<int,Simple>(1,-1,-1),
+					Score<int,Simple>(score_match,
+						score_mismatch,
+						score_gap,
+						score_gapopen),
 					AlignConfig<true, true, true, true>());
 
 	// Set the output
@@ -39,5 +46,14 @@ int align_overlap(std::string seq1, std::string seq2, std::string* ali1, std::st
 	rowstream << row2;
 	(*ali2) = rowstream.str();
 
-	return score;
+	// Trim the alignment and return the offset
+	if(trim) {
+		// Test also ali1 (DAMN)
+		size_t start = (*ali2).find_first_not_of('-');
+		size_t end = (*ali2).find_last_not_of('-') + 1;
+		(*ali1) = (*ali1).substr(start, end - start);
+		(*ali2) = (*ali2).substr(start, end - start);
+		return start;
+	} else
+		return score;
 }

@@ -24,48 +24,58 @@ samples = pd.DataFrame(samples)
 
 
 # Functions
-def trim_reference(refm, readm, band=100, VERBOSE=0, try_reverse_complement=True):
+def trim_reference(refm, readm, band=100, VERBOSE=0):
     '''Trim the reference around a seed of the read'''
 
-    seed_len = 15
-    matches_min = 12
-
-    # Get seed from the middle of the read
+    seed_len = 30
+    matches_min = 25
     rl = len(readm)
-    seed_start = max(0, rl / 2 - seed_len / 2)
-    seed = readm[seed_start: seed_start + seed_len]
-    mismatches = 0
 
-    # Get scores for the seed
-    scores = [(seed == refm[i: i + seed_len]).sum()
-              for i in xrange(len(refm) - (rl - seed_start) + band / 2)]
-    pos_seed = np.argmax(scores)
+    # Try out a few seeds: middle of the read, a bit earlier, a bit later
+    seed_starts = [max(0, rl / 2 - seed_len / 2),
+                   max(0, rl / 2 - 5 * seed_len),
+                   min(rl - seed_len, rl / 2 + 5 * seed_len)]
 
-    if scores[pos_seed] >= matches_min:
-        if VERBOSE >= 1:
-            print 'Position:', pos_seed, 'score:', scores[pos_seed]
+    for seed_start in seed_starts:
+        seed = readm[seed_start: seed_start + seed_len]
+        mismatches = 0
+
+        # Get scores for the seed
+        scores = [(seed == refm[i: i + seed_len]).sum()
+                  for i in xrange(len(refm) - (rl - seed_start) + band / 2)]
+        pos_seed = np.argmax(scores)
+
+        if scores[pos_seed] >= matches_min:
+            if VERBOSE >= 1:
+                print 'Position:', pos_seed, 'score:', scores[pos_seed]
+        
+            pos_trim_start = pos_seed - seed_start - band / 2
+            pos_trim_end = pos_seed + (rl - seed_start) + band / 2
+            ref_trim = refm[max(0, pos_trim_start): min(len(refm), pos_trim_end)]
+
+            if pos_trim_end > len(ref_trim):
+                ref_trim = np.concatenate([ref_trim, np.repeat('-', pos_trim_end - len(ref_trim))])
+            if pos_trim_start < 0:
+                ref_trim = np.concatenate([np.repeat('-', -pos_trim_start), ref_trim])
+
+            return (pos_trim_start, ref_trim)
     
-        ref_trim = refm[pos_seed - seed_start - band / 2: \
-                        pos_seed + (rl - seed_start) + band / 2]
-        return ref_trim
-
-    elif try_reverse_complement:
-        if VERBOSE >= 1:
-            print 'Trying reverse complement',
-        ref_trim = trim_reference(refm, readm[::-1], band=band, VERBOSE=VERBOSE,
-                                  try_reverse_complement=False)
-        if ref_trim:
-            return tref_trim
-    
-    if VERBOSE:
-        print
-    raise ValueError('Seed not found in reference on any strand')
+    raise ValueError('Seed not found in reference')
 
 
-def align_overlap_seqan(refm, readm, band=100, VERBOSE=0):
+def align_overlap_seqan(refm, readm, band=100, VERBOSE=0, raw_output=False):
     '''Global alignment via SeqAn'''
+    from Bio.Seq import reverse_complement as revcom
+
     if len(refm) > len(readm) + 2 * band:
-        refm = trim_reference(refm, readm, band=band, VERBOSE=VERBOSE)
+        try:
+            (pos, refm) = trim_reference(refm, readm, band=band, VERBOSE=VERBOSE)
+        except ValueError:
+            try:
+                readm = np.fromstring(revcom(readm.tostring()), 'S1')
+                (pos, refm) = trim_reference(refm, readm, band=band, VERBOSE=VERBOSE)
+            except ValueError:
+                raise ValueError('Seed not found in reference on any strand')
 
     # Call SeqAn
     # OLD WAY: pipes
@@ -87,7 +97,13 @@ def align_overlap_seqan(refm, readm, band=100, VERBOSE=0):
     else:
         import seqan_module.seqanpy as sap
         (score, ali1, ali2) = sap.align_overlap(refm.tostring(),
-                                                readm.tostring())
+                                                readm.tostring(),
+                                                band=band,
+                                                trim=True)
+        pos += score
+
+    if raw_output:
+        return (pos, ali1, ali2)
 
     # Make a Biopython MSA
     from Bio.Align import MultipleSeqAlignment as MSA
@@ -97,7 +113,7 @@ def align_overlap_seqan(refm, readm, band=100, VERBOSE=0):
     ali = MSA([SeqRecord(Seq(ali1, alphabet=ambiguous_dna), id='ref'),
                SeqRecord(Seq(ali2, alphabet=ambiguous_dna), id='read')])
 
-    return ali
+    return (pos, ali)
 
 
 
@@ -113,7 +129,8 @@ if __name__ == '__main__':
     reads_iter = SeqIO.parse(data_folder+'ccs_reads/'+sample['filename']+\
                              '_ccs_reads.fastq.txt', 'fastq')
     
-    reads = [reads_iter.next() for i in xrange(100)]
+    reads_all = [reads_iter.next() for i in xrange(2100)]
+    reads = reads_all[2000:2100]
     
 
     # Get NL4-3 reference
@@ -123,16 +140,20 @@ if __name__ == '__main__':
 
     # Align a few reads
     from hivwholeseq.mapping_utils import align_muscle
+    poss = []
     alis = []
-    for i, read in enumerate(reads[:10]):
+    for i, read in enumerate(reads_iter):
+
+        print i,
 
         readm = np.array(read)
         try:
-            ali = align_overlap_seqan(refm, readm)
+            (pos, ali) = align_overlap_seqan(refm, readm)
         except ValueError:
-            ali = None
+            pos = ali = None
 
-        print i, ali
+        print ali
 
+        poss.append(pos)
         alis.append(ali)
 

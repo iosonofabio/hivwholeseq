@@ -207,6 +207,12 @@ if __name__ == '__main__':
         reads_filenames = [data_filenames['read1'], data_filenames['read2']]
         quality = quality_score_along_reads(read_len, reads_filenames,
                                             maxreads=maxreads, VERBOSE=VERBOSE)
+
+        # Plot it
+        plot_quality_along_reads(data_folder, seq_run,
+                                 quality, VERBOSE=VERBOSE,
+                                 savefig=savefig)
+
     else:
         bamfilename = get_premapped_file(data_folder, adaID, type='bam')
         quality = quality_score_along_reads_mapped(read_len, bamfilename,
@@ -214,7 +220,8 @@ if __name__ == '__main__':
                                                    maxreads=maxreads,
                                                    VERBOSE=VERBOSE)
 
-    # Plot it
-    plot_quality_along_reads(data_folder, seq_run+', isizes '+str(insertsize_range),
-                             quality, VERBOSE=VERBOSE,
-                             savefig=savefig)
+        # Plot it
+        plot_quality_along_reads(data_folder, seq_run+', isizes '+str(insertsize_range),
+                                 quality, VERBOSE=VERBOSE,
+                                 savefig=savefig)
+

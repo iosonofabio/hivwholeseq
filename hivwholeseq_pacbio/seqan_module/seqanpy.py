@@ -82,8 +82,8 @@ def nothing():
   return _seqanpy.nothing()
 nothing = _seqanpy.nothing
 
-def align_overlap(*args, **kwargs):
-  return _seqanpy.align_overlap(*args, **kwargs)
-align_overlap = _seqanpy.align_overlap
+def find_seed(*args, **kwargs):
+  return _seqanpy.find_seed(*args, **kwargs)
+find_seed = _seqanpy.find_seed
 
 

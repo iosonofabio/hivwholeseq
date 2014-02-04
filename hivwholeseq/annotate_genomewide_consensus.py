@@ -8,8 +8,6 @@ content:    Add gene and region annotations to the genome wide consensus.
 import argparse
 import numpy as np
 from Bio import SeqIO
-from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
-from matplotlib import cm
 import matplotlib.pyplot as plt
 
 from hivwholeseq.datasets import MiSeq_runs
@@ -19,11 +17,14 @@ from hivwholeseq.filenames import get_merged_consensus_filename as gmcf
 
 def annotate_sequence(seqrecord, features=['gene', 'RNA structure', 'other']):
     '''Annotate a consensus with the genes and stuff (in place)'''
+    from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
     from hivwholeseq.genome_info import gene_edges, RNA_structure_edges, \
             other_edges, find_region_edges, find_region_edges_multiple
+    from hivwholeseq.primer_info import primers_PCR as primers_PCR_edges
     edge_dict = {'gene': gene_edges,
-                'RNA structure': RNA_structure_edges,
-                'other': other_edges}
+                 'RNA structure': RNA_structure_edges,
+                 'PCR primers': primers_PCR_edges,
+                 'other': other_edges}
 
     smat = np.array(seqrecord)
 
@@ -32,7 +33,12 @@ def annotate_sequence(seqrecord, features=['gene', 'RNA structure', 'other']):
         for name, edges in edges_all.iteritems():
             # Behave differently for unsplit regions and split ones
             if len(edges) == 2:
-                pos_edge = find_region_edges(smat, edges)
+                # LTR problems with F6
+                if 'F6' in name:
+                    pos_edge = find_region_edges(smat[::-1], [edges[1][::-1], edges[0][::-1]])
+                    pos_edge = [len(smat) - 1 - pos_edge[1], len(smat) - 1 - pos_edge[0]]
+                else:
+                    pos_edge = find_region_edges(smat, edges)
                 location = FeatureLocation(*pos_edge)
             else:
                 pos_edges = find_region_edges_multiple(smat, edges)
@@ -44,7 +50,9 @@ def annotate_sequence(seqrecord, features=['gene', 'RNA structure', 'other']):
 
 def annotate_plot(ax, consensus, features=['gene', 'RNA structure', 'other']):
     '''Annotate a plot with genome features'''
+    from Bio.SeqFeature import CompoundLocation
     from matplotlib.patches import Rectangle
+    from matplotlib import cm
 
     annotate_sequence(consensus)
     feats = filter(lambda x: x.type in features, consensus.features)

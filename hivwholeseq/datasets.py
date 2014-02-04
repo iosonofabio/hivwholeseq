@@ -64,6 +64,17 @@ MiSeq_runs_list = [\
                'adapter2': 'lane1_NoIndex_L001_R3_001.fastq'},
  },
 
+ {'name': 'Tue44',
+  'description': 'Second patient-only library with TrueSeq Nano',
+  'date': '2014-01-24',
+  'n_cycles': 602,
+  'folder': '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run44/',
+  'raw_data': {'read1': 'lane1_NoIndex_L001_R1_001.fastq',
+               'read2': 'lane1_NoIndex_L001_R3_001.fastq',
+               'adapter': 'lane1_NoIndex_L001_R2_001.fastq'},
+ },
+
+
 ]
 
 # Add samples to the runs
