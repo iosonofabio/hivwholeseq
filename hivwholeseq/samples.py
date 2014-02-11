@@ -132,19 +132,43 @@ sample_list = [\
   'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i')},
  {'name': '30847', 'run': 'Tue44', 'adaID': 'TS7',
   'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i')},
- {'name': 'VK02-4452', 'run': 'Tue44', 'adaID': 'TS12',
-  'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i')},
+ {'name': 'VK02-4452_PCR2', 'run': 'Tue44', 'adaID': 'TS12',
+  'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i'),
+  'patient': '20097', 'date': '2002-10-29'},
  {'name': '06HR-0145', 'run': 'Tue44', 'adaID': 'TS13',
-  'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i')},
+  'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i'),
+  'patient': '15823', 'date': '2006-02-02'},
  {'name': '28929', 'run': 'Tue44', 'adaID': 'TS14',
   'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i')},
+
+ # Nextera XT #2 + BluePippin test + 3 pat PCR1 samples
+ {'name': 'F10_PCR1_TaqHiFi', 'run': 'Tue48', 'adaID': 'N2-S2',
+  'fragments': ('F1o', 'F2o', 'F3o', 'F4o', 'F5ao', 'F6o')},
+ {'name': 'F10_PCR1_Taq', 'run': 'Tue48', 'adaID': 'N3-S2',
+  'fragments': ('F1o', 'F2o', 'F3o', 'F4o', 'F5ao', 'F6o')},
+ {'name': 'RNA_mix_PCR1_TaqHiFi', 'run': 'Tue48', 'adaID': 'N4-S1',
+  'fragments': ('F2o', 'F3o', 'F4o', 'F6o')},
+ {'name': 'RNA_mix_PCR1_Taq', 'run': 'Tue48', 'adaID': 'N5-S1',
+  'fragments': ('F2o', 'F3o', 'F4o', 'F6o')},
+ {'name': 'RNA_mix_PCR2_TaqHiFi', 'run': 'Tue48', 'adaID': 'N6-S1',
+  'fragments': ('F2i', 'F3i', 'F4i', 'F6i')},
+ {'name': 'RNA_mix_PCR2_Taq', 'run': 'Tue48', 'adaID': 'N1-S3',
+  'fragments': ('F2i', 'F3i', 'F4i', 'F6i')},
+ {'name': 'VK02-4452_PCR1', 'run': 'Tue48', 'adaID': 'N2-S3',
+  'fragments': ('F1o', 'F2o', 'F3o', 'F4o', 'F5ao', 'F6o'),
+  'patient': '20097', 'date': '2002-10-29'},
+ {'name': '06HR-0145_PCR1', 'run': 'Tue48', 'adaID': 'N1-S4',
+  'fragments': ('F1o', 'F2o', 'F3o', 'F4o', 'F5ao', 'F6o'),
+  'patient': '15823', 'date': '2006-02-02'},
+ {'name': '28929_PCR1', 'run': 'Tue48', 'adaID': 'N2-S4',
+  'fragments': ('F1o', 'F2o', 'F3o', 'F4o', 'F5ao', 'F6o')},
 
  ]
 
 # Sample table using Pandas
 sample_table = SampleTable(sample_list)
 
-# Make a dictionary (deprecated)
+# Make a dictionary
 samples = {}
 for line in sample_list:
     dic = dict(line)

@@ -16,16 +16,15 @@ from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
-from mapping.datasets import MiSeq_runs
-from mapping.miseq import alpha
-from mapping.filenames import get_consensus_filename
-from mapping.patients.filenames import get_initial_consensus_filename, \
+from hivwholeseq.datasets import MiSeq_runs
+from hivwholeseq.miseq import alpha
+from hivwholeseq.filenames import get_consensus_filename
+from hivwholeseq.patients.filenames import get_initial_consensus_filename, \
         get_foldername
-from mapping.patients.patients import get_patient, get_initial_sequenced_sample, \
-        get_sequenced_samples
-from mapping.samples import samples, date_to_integer
-from mapping.primer_info import primers_inner
-from mapping.primer_info import primers_coordinates_HXB2_inner as pci
+from hivwholeseq.patients.patients import get_patient
+from hivwholeseq.samples import samples, date_to_integer
+from hivwholeseq.primer_info import primers_inner
+from hivwholeseq.primer_info import primers_coordinates_HXB2_inner as pci
 
 
 
@@ -160,11 +159,11 @@ if __name__ == '__main__':
             print pname+': folder created.'
     
     # Get the first sequenced sample
-    sample_init = get_initial_sequenced_sample(patient)
-    miseq_run = samples[sample_init]['run']
-    dataset = MiSeq_runs[miseq_run]
+    sample_init = patient.initial_sample
+    seq_run = sample_init['run']
+    adaID = sample_init['adaID']
+    dataset = MiSeq_runs[seq_run]
     data_folder = dataset['folder']
-    adaID = dataset['adapters'][dataset['samples'].index(sample_init)]
 
     # Check for the existence of an initial consensus already
     for fragment in fragments:
@@ -173,11 +172,12 @@ if __name__ == '__main__':
         input_filename = get_consensus_filename(data_folder, adaID, fragment)
         seq_in = SeqIO.read(input_filename, 'fasta')
 
-        # Fragment F5 needs a special treatment, because of the double primers
-        if fragment == 'F5':
-            seq_in = expand_consensus_F5(patient, seq_in, sample_init,
-                                         data_folder, adaID,
-                                         VERBOSE=VERBOSE)
+        # FIXME: IGNORE F5 PECULIARITY FOR THE TIME BEING
+        ## Fragment F5 needs a special treatment, because of the double primers
+        #if fragment == 'F5':
+        #    seq_in = expand_consensus_F5(patient, seq_in, sample_init,
+        #                                 data_folder, adaID,
+        #                                 VERBOSE=VERBOSE)
 
         # Write output
         output_filename = get_initial_consensus_filename(pname, fragment)

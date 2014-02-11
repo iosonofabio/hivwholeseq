@@ -10,13 +10,13 @@ import argparse
 from Bio import SeqIO
 from Bio import AlignIO
 
-from mapping.samples import samples as samples_seq
-from mapping.datasets import MiSeq_runs
-from mapping.filenames import get_merged_consensus_filename, get_consensus_filename
-from mapping.patients.filenames import get_consensi_alignment_genomewide_filename, \
+from hivwholeseq.samples import samples as samples_seq
+from hivwholeseq.datasets import MiSeq_runs
+from hivwholeseq.filenames import get_merged_consensus_filename, get_consensus_filename
+from hivwholeseq.patients.filenames import get_consensi_alignment_genomewide_filename, \
         get_consensi_alignment_filename
-from mapping.patients.patients import get_patient, get_sequenced_samples
-from mapping.mapping_utils import align_muscle
+from hivwholeseq.patients.patients import get_patient, get_sequenced_samples
+from hivwholeseq.mapping_utils import align_muscle
 
 
 
@@ -24,22 +24,19 @@ from mapping.mapping_utils import align_muscle
 def get_consensi_frag(patient, fragment, VERBOSE=0):
     '''Collect all consensi for a single fragment'''
     consensi = []
-    for sample in patient['samples']:
-        # Find run and adaID of the sample
-        miseq_run = samples_seq[sample]['run']
-        dataset = MiSeq_runs[miseq_run]
-        data_folder = dataset['folder']
-        adaID = dataset['adapters'][dataset['samples'].index(sample)]
+    for (index, sample) in patient.sample_table.iterrows():
+        seq_run = sample['run']
+        adaID = sample['adaID']
+        date = sample['date']
 
-        # Get input filename
+        dataset = MiSeq_runs[seq_run]
+        data_folder = dataset['folder']
+
         input_filename = get_consensus_filename(data_folder, adaID, fragment)
-        # If present, add it
         if os.path.isfile(input_filename):
             seq = SeqIO.read(input_filename, 'fasta')
-
-            # Change name
             seq.description = ', '.join([seq.id, seq.description])
-            seq.id = seq.name = sample
+            seq.id = seq.name = sample['name']+'_'+date
 
             consensi.append(seq)
 
@@ -51,24 +48,41 @@ def get_consensi_genomewide(patient, VERBOSE=0):
     # FIXME: assume all fragments are there for now (no patchy stuff yet)
     fragments = ['F'+str(i) for i in xrange(1, 7)]
     consensi = []
-    for sample in patient['samples']:
-        # Find run and adaID of the sample
-        miseq_run = samples_seq[sample]['run']
-        dataset = MiSeq_runs[miseq_run]
+
+    for (index, sample) in patient.sample_table.iterrows():
+        seq_run = sample['run']
+        adaID = sample['adaID']
+        date = sample['date']
+
+        dataset = MiSeq_runs[seq_run]
         data_folder = dataset['folder']
-        adaID = dataset['adapters'][dataset['samples'].index(sample)]
 
-        # Get input filename
         input_filename = get_merged_consensus_filename(data_folder, adaID, fragments)
-        seq = SeqIO.read(input_filename, 'fasta')
+        if os.path.isfile(input_filename):
+            seq = SeqIO.read(input_filename, 'fasta')
+            seq.description = ', '.join([seq.id, seq.description])
+            seq.id = seq.name = sample['name']+'_'+date
 
-        # Change name
-        seq.description = ', '.join([seq.id, seq.description])
-        seq.id = seq.name = sample
-
-        consensi.append(seq)
+            consensi.append(seq)
 
     return consensi
+
+
+def align_consensi(consensi, VERBOSE=0):
+    '''Align with muscle and sort'''
+    from Bio.Align import MultipleSeqAlignment as MSA
+
+    ali = align_muscle(*consensi)
+
+    ali_sorted = []
+    for cons in consensi:
+        for row in ali:
+            if row.id == cons.id:
+                ali_sorted.append(row)
+                break
+
+    ali_sorted = MSA(ali_sorted)
+    return ali_sorted
 
 
 
@@ -92,27 +106,33 @@ if __name__ == '__main__':
 
     # Get patient and the sequenced samples
     patient = get_patient(pname)
-    patient['samples'] = get_sequenced_samples(patient)
 
     # If the script is called with no fragment, iterate over all
     if not fragments:
-        fragments = ['F'+str(i) for i in xrange(1, 7)]
+        fragments = ['F'+str(i) for i in xrange(1, 7)] + ['genomewide']
     if VERBOSE >= 3:
         print 'fragments', fragments
 
     # Collect and align fragment by fragment
     for fragment in fragments:
+        if fragment == 'genomewide':
+            continue
+        if VERBOSE >= 2:
+            print fragment,
         consensi = get_consensi_frag(patient, fragment, VERBOSE=VERBOSE)
-        ali = align_muscle(*consensi)
+        ali = align_consensi(consensi)
         output_filename = get_consensi_alignment_filename(pname, fragment)
         AlignIO.write(ali, output_filename, 'fasta')
+    if VERBOSE >= 2:
+        print
 
     # Collect and align genome wide consensi
-    consensi = get_consensi_genomewide(patient, VERBOSE=VERBOSE)
-
-    # Align them
-    ali = align_muscle(*consensi)
-
-    # Write alignment
-    output_filename = get_consensi_alignment_genomewide_filename(pname)
-    AlignIO.write(ali, output_filename, 'fasta')
+    if 'genomewide' in fragments:
+        consensi = get_consensi_genomewide(patient, VERBOSE=VERBOSE)
+    
+        # Align them
+        ali = align_consensi(consensi)
+    
+        # Write alignment
+        output_filename = get_consensi_alignment_genomewide_filename(pname)
+        AlignIO.write(ali, output_filename, 'fasta')

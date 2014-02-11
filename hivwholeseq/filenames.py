@@ -183,28 +183,15 @@ def get_HXB2_hash_file(fragment='F0', ext=True):
     return filename
 
 
-def get_read_filenames(data_folder, adaID, fragment=None,
-                       filtered=True, premapped=False, suffix=''):
+def get_read_filenames(data_folder, adaID, fragment=None, suffix='',
+                       gzip=False):
     '''Get the filenames of the demultiplexed reads'''
     filenames = ['read1', 'read2']
     for i,fn in enumerate(filenames):
-        if premapped:
-            fn = 'premapped/'+fn
-        elif filtered:
-            fn = fn+'_filtered_trimmed'
         fn = foldername_adapter(adaID)+fn
-        fn = data_folder+fn
-        
-        # If there was a premap, 6 files have to be made for each orientation
-        if premapped:
-            if fragment is None:
-                fn = [fn+'_F'+str(j)+suffix+'.fastq' for j in xrange(1, 7)] +\
-                     [fn+'_ambiguous.fastq'] +\
-                     [fn+'_unmapped.fastq']
-            else:
-                fn = fn+'_'+fragment+suffix+'.fastq'
-        else:
-            fn = fn+suffix+'.fastq'
+        fn = data_folder+fn+suffix+'.fastq'
+        if gzip:
+            fn = fn+'.gz' 
         filenames[i] = fn
     return filenames
 
@@ -241,26 +228,20 @@ def get_fragment_positions_filename(data_folder, adaID):
 
 def get_divided_filenames(data_folder, adaID, fragments, type='bam'):
     '''Get the filenames of the BAM files divided by fragment'''
-    filename = 'divided_on_HXB2'
+    filename = 'divided'
     filename = 'divided/'+filename
     filename = data_folder+foldername_adapter(adaID)+filename
     filenames = []
     for fragment in (list(fragments) + ['ambiguous', 'crossmapped',
                                         'unmapped', 'low_quality']):
-        fnf = filename+'_'+fragment
-        if type == 'sam':
-            fnf = fnf + '.sam'
-        elif type == 'bam':
-            fnf = fnf + '.bam'
-        else:
-            raise ValueError('Type of mapped reads file not recognized')
+        fnf = filename+'_'+fragment+'.'+type
         filenames.append(fnf)
     return filenames
 
 
 def get_divided_filename(data_folder, adaID, fragment, type='bam'):
     '''Get the filename of the BAM files divided for a single fragment'''
-    filename = 'divided_on_HXB2'
+    filename = 'divided'
     filename = 'divided/'+filename
     filename = data_folder+foldername_adapter(adaID)+filename
     filename = filename+'_'+fragment+'.'+type
@@ -520,6 +501,14 @@ def get_minor_allele_frequency_merged_figure_filename(data_folder, adaID, fragme
     filename = filename+'.'+ext
     filename = get_figure_folder(data_folder, adaID)+filename
     return filename
+
+
+def get_consensi_alignment_dataset_filename(data_folder, fragment):
+    '''Get the filename of the alignment of consensi from a dataset'''
+    fn = 'ali_consensi_'+fragment+'.fasta'
+    fn = data_folder+fn
+    return fn
+
     
 
 # SUMMARY

@@ -19,8 +19,8 @@ import matplotlib.pyplot as plt
 #from hivwholeseq_pacbio.test_align import trim_reference, align_overlap_seqan
 import seqanpy as sap
 import hivwholeseq_pacbio.seqan_module.seqanpy as sap2
-from hivwholeseq_pacbio.samples import samples
-from hivwholeseq_pacbio.datasets import data_folder_dict
+from hivwholeseq_pacbio.samples import sample_table
+from hivwholeseq_pacbio.datasets import PacBio_runs
 from hivwholeseq_pacbio.filenames import get_premapped_file, \
         get_reference_premap_filename
 
@@ -110,16 +110,14 @@ def trim_reference(refm, readm, band=100, VERBOSE=0):
 
         if score >= matches_min:
             if VERBOSE >= 3:
-                print 'Position:', pos_seed, 'score:', score
+                print 'Position:', pos_seed, 'seed start:', seed_start, 'score:', score
         
-            pos_trim_start = pos_seed - seed_start - band / 2
-            pos_trim_end = pos_seed + (rl - seed_start) + band / 2
+            pos_trim_start = pos_seed - seed_start - band
+            pos_trim_end = pos_seed + (rl - seed_start) + band
             ref_trim = refm[max(0, pos_trim_start): min(len(refm), pos_trim_end)]
 
-            if pos_trim_end > len(ref_trim):
-                ref_trim = np.concatenate([ref_trim, np.repeat('-', pos_trim_end - len(ref_trim))])
-            if pos_trim_start < 0:
-                ref_trim = np.concatenate([np.repeat('-', -pos_trim_start), ref_trim])
+            if (pos_trim_end > len(ref_trim)) or (pos_trim_start < 0):
+                raise ValueError('Seed overhangs from reference')
 
             return (pos_trim_start, ref_trim)
     
@@ -228,9 +226,6 @@ def map_read(refm, readm, qual, qname, band=100, VERBOSE=0):
     if len(cigar) and (cigar[0][0] == 1):
         pos_ref += cigar[0][1]
 
-    if pos_ref < 0:
-        import ipdb; ipdb.set_trace()
-
     readout = pysam.AlignedRead()
     readout.qname = qname
     readout.seq = readm.tostring()
@@ -245,8 +240,12 @@ def map_read(refm, readm, qual, qname, band=100, VERBOSE=0):
     readout.cigar = cigar
     readout.mrnm = 0
     readout.mpos = 0
-    readout.isize = sum(bl for (bt, bl) in cigar if bt in (0, 2))
     readout.tags = ()
+    isize = sum(bl for (bt, bl) in cigar if bt in (0, 2))
+    if is_reverse:
+        readout.isize = -isize
+    else:
+        readout.isize = isize
 
     return readout
 
@@ -287,8 +286,9 @@ if __name__ == '__main__':
 
 
     # Specify the dataset
-    data_folder = data_folder_dict[seq_run]
-    sample = samples.set_index('name').loc[samplename]
+    dataset = PacBio_runs[seq_run]
+    data_folder = dataset['folder']
+    sample = sample_table.set_index('name').loc[samplename]
 
     # Parse raw circular consensus reads
     reads_iter = SeqIO.parse(data_folder+'ccs_reads/'+sample['filename']+\

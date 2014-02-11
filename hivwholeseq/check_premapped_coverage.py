@@ -13,7 +13,6 @@ from Bio import SeqIO
 
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.miseq import read_types
-from hivwholeseq.reference import load_HXB2, load_custom_reference
 from hivwholeseq.filenames import get_premapped_file, get_reference_premap_filename, \
         get_fragment_positions_filename
 from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file_unfiltered
@@ -77,7 +76,7 @@ def plot_coverage_minor_allele(counts, frags_pos=None, frags_pos_out=None,
 
 
 def check_premap(seq_run, adaID, qual_min=30, match_len_min=10,
-                   reference='HXB2', maxreads=-1, VERBOSE=0):
+                 maxreads=-1, VERBOSE=0):
     '''Check premap to reference: coverage, etc.'''
 
     dataset = MiSeq_runs[seq_run]
@@ -139,19 +138,16 @@ if __name__ == '__main__':
                         help='Seq run to analyze (e.g. Tue28)')
     parser.add_argument('--adaIDs', nargs='*',
                         help='Adapter IDs to analyze (e.g. TS2)')
-    parser.add_argument('-n', type=int, default=1000,
+    parser.add_argument('--maxreads', type=int, default=1000,
                         help='Number of reads analyzed')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
-    parser.add_argument('--reference', default='HXB2',
-                        help='Use alternative reference, e.g. chimeras (the file must exist)')
 
     args = parser.parse_args()
     seq_run = args.run
     adaIDs = args.adaIDs
-    n_reads = args.n
+    n_reads = args.maxreads
     VERBOSE = args.verbose
-    refname = args.reference
 
     # Specify the dataset
     dataset = MiSeq_runs[seq_run]
@@ -168,7 +164,6 @@ if __name__ == '__main__':
 
             check_premap(seq_run, adaID,
                          maxreads=n_reads,
-                         reference=refname,
                          VERBOSE=VERBOSE)
 
 

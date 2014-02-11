@@ -93,7 +93,7 @@ def fork_premap(seq_run, adaID, VERBOSE=0, bwa=False, threads=1,
     JOBSCRIPT = JOBDIR+'premap_to_reference.py'
     # It is hard to tell whether 1h is sufficient, because the final sorting takes
     # quite some time. So for now give up and require 2h.
-    cluster_time = ['23:59:59', '1:59:59']
+    cluster_time = ['23:59:59', '3:59:59']
     vmem = '8G'
     call_list = ['qsub','-cwd',
                  '-b', 'y',
@@ -184,7 +184,8 @@ def fork_build_consensus(seq_run, adaID, fragment, n_reads=1000,
 
 
 def fork_map_to_consensus(seq_run, adaID, fragment, VERBOSE=3, bwa=False,
-                          threads=1, n_pairs=-1, filter_reads=False):
+                          threads=1, n_pairs=-1, filter_reads=False,
+                          summary=True):
     '''Submit map script for each adapter ID and fragment'''
     if VERBOSE:
         print 'Forking to the cluster: adaID '+adaID+', fragment '+fragment
@@ -198,7 +199,7 @@ def fork_map_to_consensus(seq_run, adaID, fragment, VERBOSE=3, bwa=False,
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
                  '-N', 'm '+adaID+' '+fragment,
-                 '-l', 'h_rt='+cluster_time[threads >= 10],
+                 '-l', 'h_rt='+cluster_time[(threads >= 15) and (not filter_reads)],
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
                  '--run', seq_run,
@@ -212,6 +213,8 @@ def fork_map_to_consensus(seq_run, adaID, fragment, VERBOSE=3, bwa=False,
         call_list.append('--bwa')
     if filter_reads:
         call_list.append('--filter')
+    if not summary:
+        call_list.append('--no-summary')
     call_list = map(str, call_list)
     if VERBOSE:
         print ' '.join(call_list)
@@ -361,4 +364,45 @@ def fork_get_coallele_counts(data_folder, adaID, fragment, VERBOSE=3, summary=Tr
     if VERBOSE:
         print ' '.join(call_list)
     return sp.check_output(call_list)
+
+
+# PATIENTS
+def fork_map_to_initial_consensus(pname, sample, fragment, VERBOSE=0, threads=1,
+                                  n_pairs=-1, filter_reads=False,
+                                  summary=True):
+    '''Fork to the cluster for each sample and fragment'''
+    if VERBOSE:
+        print 'Forking to the cluster: patient '+pname+', sample '+\
+                sample+', fragment '+fragment
+
+    JOBSCRIPT = JOBDIR+'patients/map_to_initial_consensus.py'
+    cluster_time = ['23:59:59', '0:59:59']
+    vmem = '8G'
+
+    qsub_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'm '+sample+' '+fragment,
+                 '-l', 'h_rt='+cluster_time[threads >= 10],
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--patient', pname,
+                 '--samples', sample,
+                 '--fragments', fragment,
+                 '--verbose', VERBOSE,
+                 '--threads', threads,
+                 '--maxreads', n_pairs,
+                 '--skiphash',
+                ]
+    if filter_reads:
+        qsub.append('--filter')
+    if not summary:
+        call_list.append('--no-summary')
+    qsub_list = map(str, qsub_list)
+    if VERBOSE:
+        print ' '.join(qsub_list)
+    return sp.check_output(qsub_list)
+
 

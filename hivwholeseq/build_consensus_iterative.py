@@ -121,43 +121,14 @@ def get_mapped_filename(data_folder, adaID, fragment, n_iter, type='bam'):
 
 def extract_reads_subsample(data_folder, adaID, fragment, n_reads, VERBOSE=0,
                             summary=True):
-    '''Extract a subsample of reads from the initial sample mapped to HXB2'''
-    # Count the number of reads first
+    '''Extract a subsample of reads from the initial sample premapped'''
+    from hivwholeseq.mapping_utils import extract_mapped_reads_subsample
+
     input_filename = get_divided_filenames(data_folder, adaID, [fragment], type='bam')[0]
-    with pysam.Samfile(input_filename, 'rb') as bamfile_in:
-        n_reads_tot = sum(1 for read in bamfile_in) / 2
-
-    # Pick random numbers among those
-    # Get the random indices of the reads to store
-    ind_store = np.arange(int(0.00 * n_reads_tot), int(1 * n_reads_tot))
-    np.random.shuffle(ind_store)
-    ind_store = ind_store[:n_reads]
-    ind_store.sort()
-
-    if VERBOSE >= 2:
-        print 'Random indices between '+str(ind_store[0])+' and '+str(ind_store[-1])
-
-    # Copy reads
     output_filename = get_mapped_filename(data_folder, adaID, fragment, 1, type='bam')
-    with pysam.Samfile(input_filename, 'rb') as bamfile_in:
-        with pysam.Samfile(output_filename, 'wb', template=bamfile_in) as bamfile_out:
 
-            n_written = 0
-            for i, (read1, read2) in enumerate(pair_generator(bamfile_in)):
-
-                if VERBOSE >= 2:
-                    if not ((i+1) % 10000):
-                        print i+1, n_written, ind_store[n_written]
-    
-                # If you hit a read pair, write it
-                if i == ind_store[n_written]:
-                    bamfile_out.write(read1)
-                    bamfile_out.write(read2)
-                    n_written += 1
-    
-                # Break after the last one
-                if n_written >= n_reads:
-                    break
+    n_written = extract_mapped_reads_subsample(input_filename, output_filename,
+                                               n_reads, VERBOSE=VERBOSE)
 
     if summary:
         with open(get_summary_fn(data_folder, adaID, fragment), 'a') as f:
@@ -423,10 +394,14 @@ def write_consensus_intermediate(data_folder, adaID, fragment, n_iter, consensus
         SeqIO.write(consensusseq, f, 'fasta')
 
 
-def write_consensus_final(data_folder, adaID, fragment, consensus):
+def write_consensus_final(seq_run, adaID, fragment, consensus):
     '''Write the final consensus (fragments are now called F5 instead of F5ai)'''
+    dataset = MiSeq_runs[seq_run]
+    data_folder = dataset['folder']
+    samplename = dataset['samples'][dataset['adapters'].index(adaID)]
+
     frag_out = fragment[:2]
-    name = 'adaID_'+adaID+'_'+frag_out+'_consensus'
+    name = samplename+'_seqrun_'+seq_run+'_adaID_'+adaID+'_'+frag_out+'_consensus'
     consensusseq = SeqRecord(Seq(consensus), id=name, name=name)
 
     outfile = get_consensus_filename(data_folder, adaID, frag_out, trim_primers=True)
@@ -560,7 +535,7 @@ if __name__ == '__main__':
 
                 # or terminate
                 else:
-                    write_consensus_final(data_folder, adaID, fragment, consensus)
+                    write_consensus_final(seq_run, adaID, fragment, consensus)
                     if VERBOSE:
                         if match:
                             print 'Consensus converged at iteration '+str(n_iter)+\

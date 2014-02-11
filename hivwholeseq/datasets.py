@@ -74,6 +74,13 @@ MiSeq_runs_list = [\
                'adapter': 'lane1_NoIndex_L001_R2_001.fastq'},
  },
 
+ {'name': 'Tue48',
+  'description': 'Second Nextera XT + test for BluePippin',
+  'date': '2014-01-31',
+  'n_cycles': 600,
+  'folder': '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run48/',
+  'raw_data': None, # ALREADY DEMULTIPLEXED!
+ },
 
 ]
 
@@ -84,5 +91,5 @@ for run in MiSeq_runs_list:
     run['samples'] = tuple(tmp['name'])
     run['sample_table'] = tmp.copy()
 
-# MiSeq runs dictionary
+# runs dictionary
 MiSeq_runs = {run['name']: run for run in MiSeq_runs_list}

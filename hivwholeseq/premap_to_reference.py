@@ -35,6 +35,7 @@ from hivwholeseq.mapping_utils import stampy_bin, subsrate, \
         convert_sam_to_bam, convert_bam_to_sam
 from hivwholeseq.fork_cluster import fork_premap as fork_self
 from hivwholeseq.samples import samples
+from hivwholeseq.clean_temp_files import remove_premapped_tempfiles
 
 
 
@@ -58,7 +59,7 @@ def make_reference(data_folder, adaID, fragments, refname, VERBOSE=0, summary=Tr
     seq = load_custom_reference(refname)
     smat = np.array(seq)
 
-    # Look for the F1_fwd and the F6_rev primers to trim the reference
+    # Look for the first fwd and the last rev primers to trim the reference
     # NOTE: this works even if F1 or F6 are missing (e.g. only F2-5 are seq-ed)!
     from hivwholeseq.primer_info import primers_PCR
     pr_fwd = primers_PCR[fragments[0]][0]
@@ -86,7 +87,6 @@ def make_reference(data_folder, adaID, fragments, refname, VERBOSE=0, summary=Tr
 
     if summary:
         with open(get_premap_summary_filename(data_folder, adaID), 'a') as f:
-            f.write('\n')
             f.write(output)
             f.write('\n')
 
@@ -106,7 +106,6 @@ def make_reference(data_folder, adaID, fragments, refname, VERBOSE=0, summary=Tr
 
     if summary:
         with open(get_premap_summary_filename(data_folder, adaID), 'a') as f:
-            f.write('\n')
             f.write('Reference sequence written to: '+output_filename)
             f.write('\n')
 
@@ -144,9 +143,17 @@ def make_index_and_hash(data_folder, adaID, VERBOSE=0, summary=True):
 def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
     '''Call stampy for actual mapping'''
     if VERBOSE:
-        print 'Mapping: adaID ', adaID
+        print 'Premapping: adaID ', adaID
 
-    input_filenames = get_read_filenames(data_folder, adaID, filtered=False)
+    if summary:
+        summary_filename = get_premap_summary_filename(data_folder, adaID)
+
+
+
+    # Stampy can handle both gzipped and uncompressed fastq inputs
+    input_filenames = get_read_filenames(data_folder, adaID, gzip=True)
+    if not os.path.isfile(input_filenames[0]):
+        input_filenames = get_read_filenames(data_folder, adaID, gzip=False)
 
     # parallelize if requested
     if threads == 1:
@@ -171,7 +178,7 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
         convert_sam_to_bam(get_premapped_file(data_folder, adaID, type='bam'))
 
         if summary:
-            with open(get_premap_summary_filename(data_folder, adaID), 'a') as f:
+            with open(summary_filename, 'a') as f:
                 f.write('\nSAM file converted to compressed BAM: '+\
                         get_premapped_file(data_folder, adaID, type='bam')+'\n')
 
@@ -196,7 +203,7 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
                      '-S', '/bin/bash',
                      '-o', JOBLOGOUT,
                      '-e', JOBLOGERR,
-                     '-N', 'pre '+adaID+' p'+str(j+1),
+                     '-N', 'pm '+adaID+' p'+str(j+1),
                      '-l', 'h_rt='+cluster_time[threads >= 30],
                      '-l', 'h_vmem='+vmem,
                      stampy_bin,
@@ -252,7 +259,7 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
                 jobs_done[j] = True
 
     if summary:
-        with open(get_premap_summary_filename(data_folder, adaID), 'a') as f:
+        with open(summary_filename, 'a') as f:
             f.write('Stampy premapped ('+str(threads)+' threads).\n')
 
     # Concatenate output files
@@ -263,7 +270,7 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
     if VERBOSE >= 1:
         print 'done.'
     if summary:
-        with open(get_premap_summary_filename(data_folder, adaID), 'a') as f:
+        with open(summary_filename, 'a') as f:
             f.write('BAM files concatenated (unsorted).\n')
 
     # Sort the file by read names (to ensure the pair_generator)
@@ -273,7 +280,7 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
     output_filename_sorted = get_premapped_file(data_folder, adaID, type='bam', unsorted=False)
     pysam.sort('-n', output_filename, output_filename_sorted[:-4])
     if summary:
-        with open(get_premap_summary_filename(data_folder, adaID), 'a') as f:
+        with open(summary_filename, 'a') as f:
             f.write('Joint BAM file sorted.\n')
 
     # Reheader the file without BAM -> SAM -> BAM
@@ -282,8 +289,16 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
     header_filename = get_premapped_file(data_folder, adaID, type='sam', part=1)
     pysam.reheader(header_filename, output_filename_sorted)
     if summary:
-        with open(get_premap_summary_filename(data_folder, adaID), 'a') as f:
+        with open(summary_filename, 'a') as f:
             f.write('Joint BAM file reheaded.\n')
+
+    if VERBOSE >= 1:
+        print 'Remove temporary files: adaID '+adaID
+    remove_premapped_tempfiles(data_folder, adaID, VERBOSE=VERBOSE)
+    if summary:
+        with open(summary_filename, 'a') as f:
+            f.write('Temp premapping files removed.\n')
+            f.write('\n')
 
 
 def report_insert_size(data_folder, adaID, seq_run, VERBOSE=0, summary=True):

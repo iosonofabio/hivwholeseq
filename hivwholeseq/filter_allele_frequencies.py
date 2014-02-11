@@ -18,6 +18,7 @@ from hivwholeseq.filenames import get_allele_counts_filename, get_coverage_filen
 from hivwholeseq.adapter_info import load_adapter_table
 from hivwholeseq.one_site_statistics import filter_nus, plot_SFS_folded
 from hivwholeseq.fork_cluster import fork_filter_allele_frequencies as fork_self
+from hivwholeseq.samples import samples
 
 
 
@@ -67,15 +68,20 @@ if __name__ == '__main__':
     if VERBOSE >= 3:
         print 'adaIDs', adaIDs
 
-    # If the script is called with no fragment, iterate over all
-    if not fragments:
-        fragments = ['F'+str(i) for i in xrange(1, 7)]
-    if VERBOSE >= 3:
-        print 'fragments', fragments
-
     # Iterate over all requested samples
     for adaID in adaIDs:
-        for fragment in fragments:
+
+        # If the script is called with no fragment, iterate over all
+        samplename = dataset['samples'][dataset['adapters'].index(adaID)]
+        if fragments is None:
+            fragments_sample = [fr[:2] for fr in samples[samplename]['fragments']]
+        else:
+            fragments_sample = fragments
+
+        if VERBOSE >= 3:
+            print 'adaID:', adaID+', fragments:', fragments_sample
+
+        for fragment in fragments_sample:
 
             # Submit to the cluster self if requested
             if submit:

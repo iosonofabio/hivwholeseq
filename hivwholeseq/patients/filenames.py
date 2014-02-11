@@ -30,7 +30,7 @@ def get_initial_consensus_filename(pname, fragment,
     return filename
 
 
-def get_mapped_to_initial_filename(pname, sample, fragment, type='bam',
+def get_mapped_to_initial_filename(pname, samplename, fragment, type='bam',
                                    part=None, unsorted=False,
                                    root_data_folder=root_data_folder):
     '''Get the filename of the mapped reads to initial consensus'''
@@ -40,7 +40,7 @@ def get_mapped_to_initial_filename(pname, sample, fragment, type='bam',
     elif unsorted:
         filename = filename+'_unsorted'
     filename = filename+'.'+type
-    filename = sample+'/mapped_to_initial/'+filename
+    filename = samplename+'/mapped_to_initial/'+filename
     filename = get_foldername(pname, root_data_folder=root_data_folder)+filename
     return filename
 
@@ -90,3 +90,17 @@ def get_allele_frequency_trajectories_filename(pname,
     filename = 'allele_frequency_trajectories.npy'
     filename = get_foldername(pname, root_data_folder=root_data_folder)+filename
     return filename
+
+
+# SUMMARY
+def get_map_initial_summary_filename(pname, samplename, fragment,
+                                     root_data_folder=root_data_folder):
+    '''Get the filename of the summary of the division into fragments'''
+    filename = 'summary_map_initial_'+fragment+'.txt'
+    filename = samplename+'/mapped_to_initial/'+filename
+    filename = get_foldername(pname, root_data_folder=root_data_folder)+filename
+    return filename
+
+
+
+

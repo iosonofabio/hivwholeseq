@@ -5,9 +5,12 @@ date:       30/01/14
 content:    Functions for getting standard filenames.
 '''
 # Functions
-def get_reference_premap_filename(data_folder, samplename):
+def get_reference_premap_filename(data_folder, samplename, fragment=None):
     '''Get the filename of the reference used from premapping'''
-    fn = 'reference.fasta'
+    fn = 'reference'
+    if fragment is not None:
+        fn = fn+'_'+fragment
+    fn = fn+'.fasta'
     fn = data_folder+samplename+'/premapped/'+fn
     return fn
 
@@ -17,4 +20,36 @@ def get_premapped_file(data_folder, samplename, type='bam'):
     filename = 'premapped'
     filename = data_folder+samplename+'/premapped/'+filename+'.'+type
     return filename
+
+
+def get_divided_filenames(data_folder, samplename, fragments, type='bam'):
+    '''Get the filenames of the BAM files divided by fragment'''
+    filename = 'divided'
+    filename = 'divided/'+filename
+    filename = data_folder+samplename+'/'+filename
+    filenames = []
+    for fragment in (list(fragments) + ['ambiguous', 'crossmapped',
+                                        'unmapped', 'low_quality']):
+        fnf = filename+'_'+fragment+'.'+type
+        filenames.append(fnf)
+    return filenames
+
+
+def get_fragment_positions_filename(data_folder, samplename):
+    '''Get the filename of the positions of fragments in the reference for premap'''
+    filename = 'fragment_positions_premapped.dat'
+    filename = 'divided/'+filename
+    return data_folder+samplename+'/'+filename
+
+
+
+
+# SUMMARY
+def get_divide_summary_filename(data_folder, samplename):
+    '''Get the filename of the summary of the division into fragments'''
+    filename = 'summary_divide.txt'
+    filename = 'divided/'+filename
+    filename = data_folder+samplename+'/'+filename
+    return filename
+
 

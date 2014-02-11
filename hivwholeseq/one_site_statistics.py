@@ -380,6 +380,7 @@ def plot_SFS_folded(data_folder, adaID, fragment, nu_filtered, VERBOSE=0, savefi
     y = h[0]
     ax.plot(x, y, lw=2, c='b')
     ax.scatter(x, y, s=50, edgecolor='none', facecolor='b')
+    ax.grid()
 
     if savefig:
         outputfile = gff(data_folder, adaID, fragment, cumulative=False, yscale='log')

@@ -122,12 +122,13 @@ if __name__ == '__main__':
     # Iterate over samples and fragments
     for adaID in adaIDs:
         samplename = dataset['samples'][dataset['adapters'].index(adaID)]
-        fragments = samples[samplename]['fragments']
+        fragments_sample = samples[samplename]['fragments']
 
-        for fragment in fragments:
-
-            check_division(seq_run, adaID, fragment,
-                           maxreads=n_reads,
-                           VERBOSE=VERBOSE)
+        for fragment in fragments_sample:
+            frag_gen = fragment[:2]
+            if (fragments is None) or (frag_gen in fragments):
+                check_division(seq_run, adaID, fragment,
+                               maxreads=n_reads,
+                               VERBOSE=VERBOSE)
 
 

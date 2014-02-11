@@ -235,7 +235,7 @@ def index_bam(bamfilename_sorted):
     pysam.index(bamfilename_sorted)
 
 
-def align_muscle(*seqs):
+def align_muscle(*seqs, **kwargs):
     '''Global alignment of sequences via MUSCLE'''
     import subprocess as sp
     from Bio import AlignIO, SeqIO
@@ -251,6 +251,17 @@ def align_muscle(*seqs):
     align = AlignIO.read(child.stdout, "fasta")
     child.stderr.close()
     child.stdout.close()
+
+    if ('sort' in kwargs) and kwargs['sort']:
+        from Bio.Align import MultipleSeqAlignment as MSA
+        alisort = []
+        for seq in seqs:
+            for row in align:
+                if row.id == seq.id:
+                    alisort.append(row)
+                    break
+        align = MSA(alisort)
+
     return align
 
 
@@ -261,6 +272,53 @@ def get_number_reads(bamfilename, format='bam'):
     with pysam.Samfile(bamfilename, file_modes[format]) as bamfile:
         n_reads = sum(1 for read in bamfile)
     return n_reads
+
+
+def extract_mapped_reads_subsample(input_filename, output_filename, n_reads,
+                                   VERBOSE=0):
+    '''Extract a subset of reads into a new file'''
+    import numpy as np
+    import pysam
+    file_modes = {'read': {'bam': 'rb', 'sam': 'r'},
+                  'write': {'bam': 'wb', 'sam': 'w'}}
+    input_format = input_filename[-3:]
+    output_format = output_filename[-3:]
+
+    n_reads_tot = get_number_reads(input_filename, input_format) / 2
+
+    # Pick random numbers among those
+    # Get the random indices of the reads to store
+    ind_store = np.arange(int(0.00 * n_reads_tot), int(1 * n_reads_tot))
+    np.random.shuffle(ind_store)
+    ind_store = ind_store[:n_reads]
+    ind_store.sort()
+
+    if VERBOSE >= 2:
+        print 'Random indices between '+str(ind_store[0])+' and '+str(ind_store[-1])
+
+    # Copy reads
+    with pysam.Samfile(input_filename, file_modes['read'][input_format]) as bamfile_in:
+        with pysam.Samfile(output_filename, file_modes['write'][output_format],
+                           template=bamfile_in) as bamfile_out:
+
+            n_written = 0
+            for i, (read1, read2) in enumerate(pair_generator(bamfile_in)):
+
+                if VERBOSE >= 2:
+                    if not ((i+1) % 10000):
+                        print i+1, n_written, ind_store[n_written]
+    
+                # If you hit a read pair, write it
+                if i == ind_store[n_written]:
+                    bamfile_out.write(read1)
+                    bamfile_out.write(read2)
+                    n_written += 1
+    
+                # Break after the last one
+                if n_written >= n_reads:
+                    break
+
+    return n_written
 
 
 def test_read_pair_integrity(read_pair, VERBOSE=True):
@@ -447,7 +505,7 @@ def trim_read_pair_low_quality(read_pair,
                                read_len_min=50,
                                include_tests=False,
                                VERBOSE=0):
-    '''Strip loq-phred from left and right edges, but leave in the middle'''
+    '''Strip low-phred from left and right edges, but leave in the middle'''
     # The rationale of this approach is that we still have the Qs later for
     # more detailed exclusions (e.g. for minor allele frequencies)
     import numpy as np
