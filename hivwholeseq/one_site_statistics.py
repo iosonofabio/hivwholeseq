@@ -294,6 +294,21 @@ def filter_nus(counts, coverage=None, VERBOSE=0):
     return nu_filtered
 
 
+def get_minor_allele_frequencies(afs, alpha=None):
+    '''Get the identity and frequency of the top minor allele at every site'''
+    if alpha is None:
+        from hivwholeseq.miseq import alpha
+
+    allm = np.zeros(afs.shape[1], 'S1')
+    num = np.zeros(afs.shape[1])
+
+    for i, af in enumerate(afs.T):
+        ind = np.argsort(af)[-2]
+        allm = alpha[ind]
+        num[i] = af[ind]
+    return allm, num
+
+
 # PLOT
 def plot_coverage(data_folder, adaID, fragment, counts, VERBOSE=0, savefig=False):
     '''Plot figure with the coverage'''

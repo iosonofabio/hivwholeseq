@@ -135,6 +135,7 @@ def plot_minor_allele_frequency(data_folder, adaID, fragments, VERBOSE=0,
 
         ax.set_xlim(-100, len(nu_minorjs) + 100)
     
+    plt.grid()
     plt.legend(loc='upper right')
     plt.tight_layout(rect=(0, 0, 1, 0.95))
 

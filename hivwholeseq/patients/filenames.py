@@ -87,7 +87,7 @@ def get_allele_frequency_trajectories_filename(pname,
                                                fragment,
                                                root_data_folder=root_data_folder):
     '''Get the matrix with allele frequencies on the initial consensus'''
-    filename = 'allele_frequency_trajectories.npy'
+    filename = 'allele_frequency_trajectories_'+fragment+'.npy'
     filename = get_foldername(pname, root_data_folder=root_data_folder)+filename
     return filename
 

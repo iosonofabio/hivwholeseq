@@ -32,6 +32,8 @@ def plot_allele_frequency_trajectories_3d(times, nus, title='', VERBOSE=0,
     '''Plot the allele freq traj in 3D'''
     from mpl_toolkits.mplot3d import Axes3D
     from matplotlib import cm
+    import matplotlib.pyplot as plt
+    import numpy as np
 
     fig = plt.figure(figsize=(12, 12))
     ax = fig.gca(projection='3d')

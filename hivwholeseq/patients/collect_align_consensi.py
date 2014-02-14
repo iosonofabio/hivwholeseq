@@ -15,12 +15,21 @@ from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.filenames import get_merged_consensus_filename, get_consensus_filename
 from hivwholeseq.patients.filenames import get_consensi_alignment_genomewide_filename, \
         get_consensi_alignment_filename
-from hivwholeseq.patients.patients import get_patient, get_sequenced_samples
+from hivwholeseq.patients.patients import get_patient
 from hivwholeseq.mapping_utils import align_muscle
 
 
 
 # Functions
+def make_output_folders(pname, VERBOSE=0):
+    '''Make the patient folder and similia'''
+    from hivwholeseq.generic_utils import mkdirs
+    from hivwholeseq.patients.filenames import get_foldername
+    mkdirs(get_foldername(pname))
+    if VERBOSE >= 1:
+        print 'Folder created:', get_foldername(pname)
+
+
 def get_consensi_frag(patient, fragment, VERBOSE=0):
     '''Collect all consensi for a single fragment'''
     consensi = []
@@ -106,6 +115,8 @@ if __name__ == '__main__':
 
     # Get patient and the sequenced samples
     patient = get_patient(pname)
+
+    make_output_folders(pname)
 
     # If the script is called with no fragment, iterate over all
     if not fragments:

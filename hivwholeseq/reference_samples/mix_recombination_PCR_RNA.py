@@ -13,7 +13,7 @@ content:    Study PCR-mediated recombination from the plasmid mixes.
 # Modules
 import argparse
 import numpy as np
-from collections import Counter
+from collections import Counter, defaultdict
 from itertools import izip
 from operator import itemgetter, attrgetter
 from Bio import SeqIO, AlignIO
@@ -42,11 +42,16 @@ mix_RNA_strains = ['HXB2'] # The other one we have to build ourselves... see bel
 ref2_pol = load_custom_reference('38540_pol')
 
 # Some markers are bad!
-bad_markers = {'N4-S1 F2': [947, 653, 668, 1208],
-               'N5-S1 F2': [947, 653, 668, 1208],
+bad_markers = defaultdict(list)
+bad_markers.update({'N4-S1 F2': [947, 653, 668, 1208, 1802],
+               'N5-S1 F2': [947, 653, 668, 1208, 1802],
                'N6-S1 F2': [923, 629, 644, 1184],
                'N1-S3 F2': [923, 629, 644, 1184],
-              }
+               'N4-S1 F4': [768, 392],
+               'N5-S1 F4': [768, 392],
+               'N4-S1 F4': [716, 340],
+               'N1-S3 F4': [716, 340],
+              })
 
 
 
@@ -124,7 +129,7 @@ def guess_second_reference(seq_run, adaID, fragment, ref1,
     return ref2_rec
 
 
-def get_annotated_references():
+def get_annotated_references(mix_RNA_strains):
     '''Annotate the references with fragments'''
     from hivwholeseq.annotate_genomewide_consensus import annotate_sequence
     refs = []
@@ -485,56 +490,62 @@ if __name__ == '__main__':
         print 'fragments', fragments
 
     # Annotate refs
-    refs = get_annotated_references()
+    # Try other refs for ref2
+    #mix_RNA_strains.append('AY901967')
+    mix_RNA_strains.append('HIV1_CON_2002_subtype_C')
+    refs = get_annotated_references(mix_RNA_strains)
 
     for fragment in fragments:
         ref2 = guess_second_reference(seq_run, adaID, fragment, refs[0])
 
         # FIXME: Use the actual sequenced pol for the time being (1000 bp)
-        if fragment != 'F2':
-            raise ValueError('Guessing reference does not work yet')
+        use_pol = False
+        if use_pol:
+            if fragment != 'F2':
+                raise ValueError('Pol only in F2')
 
-        ali_pol = align_muscle(ref2, ref2_pol, sort=True)
-        ali_pol = ali_pol[:, len(ali_pol[0]) - len(str(ali_pol[1].seq).lstrip('-')):\
-                             len(str(ali_pol[1].seq).rstrip('-'))]
+            ali_pol = align_muscle(ref2, ref2_pol, sort=True)
+            ali_pol = ali_pol[:, len(ali_pol[0]) - len(str(ali_pol[1].seq).lstrip('-')):\
+                                 len(str(ali_pol[1].seq).rstrip('-'))]
 
-        if VERBOSE >= 3:
-            for i in xrange(len(ali_pol[0]) / 50):
-                alit1 = str(ali_pol[0, i * 50: (i+1) * 50].seq)
-                alit2 = str(ali_pol[1, i * 50: (i+1) * 50].seq)
-                alit12 = []
-                for (a1, a2) in izip(alit1, alit2):
-                    if a1 == a2:
-                        alit12.append(' ')
-                    else:
-                        alit12.append('x')
-                alit12 = ''.join(alit12)
-                print 'GUESS', alit1
-                print '     ', alit12
-                print 'POL  ', alit2
-                print
+            if VERBOSE >= 3:
+                for i in xrange(len(ali_pol[0]) / 50):
+                    alit1 = str(ali_pol[0, i * 50: (i+1) * 50].seq)
+                    alit2 = str(ali_pol[1, i * 50: (i+1) * 50].seq)
+                    alit12 = []
+                    for (a1, a2) in izip(alit1, alit2):
+                        if a1 == a2:
+                            alit12.append(' ')
+                        else:
+                            alit12.append('x')
+                    alit12 = ''.join(alit12)
+                    print 'GUESS', alit1
+                    print '     ', alit12
+                    print 'POL  ', alit2
+                    print
 
-        # The sequenced pol contains 28 ambiguous sites, too many to check all
-        # seqs out. If the guessed seq contains a nucleotide that is in the seq
-        # of possible ones, set it
-        ref2_pol_correct = []
-        for i in xrange(len(ali_pol[0])):
-            a1 = ali_pol[0, i]
-            a2 = ali_pol[1, i]
-            if (a2 not in ['A', 'C', 'G', 'T']) and (a1 in expand_ambiguous_seq([a2])):
-                ref2_pol_correct.append(a1)
-            else:
-                ref2_pol_correct.append(a2)
-        ref2_pol_correct = ''.join(ref2_pol_correct)
+            # The sequenced pol contains 28 ambiguous sites, too many to check all
+            # seqs out. If the guessed seq contains a nucleotide that is in the seq
+            # of possible ones, set it
+            ref2_pol_correct = []
+            for i in xrange(len(ali_pol[0])):
+                a1 = ali_pol[0, i]
+                a2 = ali_pol[1, i]
+                if (a2 not in ['A', 'C', 'G', 'T']) and (a1 in expand_ambiguous_seq([a2])):
+                    ref2_pol_correct.append(a1)
+                else:
+                    ref2_pol_correct.append(a2)
+            ref2_pol_correct = ''.join(ref2_pol_correct)
 
-        from Bio.Seq import Seq
-        from Bio.SeqRecord import SeqRecord
-        from Bio.Alphabet.IUPAC import ambiguous_dna
-        refs.append(SeqRecord(Seq(ref2_pol_correct, ambiguous_dna), id='38540_pol',
-                              name='38540_pol', description=''))
-
+            from Bio.Seq import Seq
+            from Bio.SeqRecord import SeqRecord
+            from Bio.Alphabet.IUPAC import ambiguous_dna
+            refs = [refs[0],
+                    SeqRecord(Seq(ref2_pol_correct, ambiguous_dna),
+                              id='38540_pol', name='38540_pol', description='')]
 
         ali = align_mix_references(seq_run, adaID, fragment, refs)
+        alim = np.array(ali)
 
         AlignIO.write(ali, data_folder+'ali_mix_'+adaID+'_'+fragment+'.fasta', 'fasta')
 
@@ -542,18 +553,44 @@ if __name__ == '__main__':
 
         poss, poss_ref, alls = get_SNPs_mix(ali)
 
-        afs = np.load(get_allele_frequencies_filename(data_folder, adaID, fragment))
-
         proportions = get_proportions_reference_alleles(seq_run, adaID, fragment, ali)
 
+        if use_pol:
+            # Check the alleles at 10%, what are the proportions there?
+            afs = np.load(get_allele_frequencies_filename(data_folder, adaID, fragment))
+            from hivwholeseq.one_site_statistics import get_minor_allele_frequencies
+            allm, num = get_minor_allele_frequencies(afs, alpha=alpha)
+            poss_ref_8percent = (num > 0.08).nonzero()[0]
+            if VERBOSE >= 2:
+                print 'Positions of minor allele > 8%:', poss_ref_8percent
+            # Alignment with ambiguous nucleotides in the Sangered pol
+            ali_nc = align_mix_references(seq_run, adaID, fragment, [refs[0], ref2_pol])
+            ali_ncm = np.array(ali_nc)
+            poss_ref_ambi = ((ali_ncm[2] != 'A') & (ali_ncm[2] != 'C') & (ali_ncm[2] != 'G') & \
+                             (ali_ncm[2] != 'T') & (ali_ncm[2] != '-')).nonzero()[0]
 
-        # FIXME: use a random subset of markers to see whether we get rid of strange
-        # high-recomb points
-        ind = np.arange(len(poss_ref)); np.random.shuffle(ind); ind = np.sort(ind[:])
-        for pos_bad in bad_markers[adaID+' '+fragment]:
-            ind = ind[poss_ref[ind] != pos_bad]
-        poss_ref = poss_ref[ind]
-        alls = alls[:, ind]
+        # Get rid of strange high-recomb points by excluding a few "bad" markers
+        # NOTE: these coordinates seems to wotk not only for the pol seq, but also
+        # for the subtype C consensus
+        if use_pol or ('subtype_C' in mix_RNA_strains[1]):
+            ind = np.arange(len(poss_ref))
+            for pos_bad in bad_markers[adaID+' '+fragment]:
+                ind = ind[poss_ref[ind] != pos_bad]
+            poss_ref = poss_ref[ind]
+            alls = alls[:, ind]
+            proportions = proportions[:, ind]
+
+
+
+        # Plot proportions
+        fig, ax = plt.subplots(1, 1)
+        ax.plot(poss_ref, proportions[0] + 1e-5, lw=2, c='b', label='LAI III')
+        ax.plot(poss_ref, proportions[1] + 1e-5, lw=2, c='g', label='38540')
+        ax.set_xlabel('Position [bp]')
+        ax.set_ylabel('Allele frequency')
+        ax.set_yscale('log')
+        ax.set_ylim(1e-5, 1.5)
+        ax.set_title(samplename+', '+fragment, fontsize=20)
 
         print '\n'.join(map(''.join, np.array(ali)[:, poss_ref]))
 
@@ -578,6 +615,12 @@ if __name__ == '__main__':
         pos_frag = np.array(pos_frag)
         n_switch = np.array(n_switch)
         cocoverage_list = np.array([cocoverage[tuple(pair)] for pair in pairs])
+        # Proportions of ref1/ref2 at the markers, to normalize by the number of visible chances
+        props = []
+        for pair in pairs:
+            prop = proportions[:, (poss_ref >= pair[0]) & (poss_ref <= pair[1])].mean(axis=1)
+            props.append(prop)
+        props = np.array(props).T
 
         # Find out about outliers at high switch numbers and short distances
         outlier_ind = ((lengths < 400) & (n_switch > lengths * 0.001))
@@ -599,6 +642,22 @@ if __name__ == '__main__':
         ax.set_title(samplename+', '+fragment, fontsize=20)
         ax.set_ylim(-0.1, 0.5)
         ax.text(10, 0.3, 'r = '+'{:1.1e}'.format(m)+' per base')
+
+        # Plot normalized
+        mn = np.dot(lengths, n_switch / 2.0 / props.prod(axis=0)) / np.dot(lengths, lengths)
+        fig, ax = plt.subplots(1, 1)
+        lenmax = np.array([pos_frag, lengths]).sum(axis=0).max()
+        colors = [cm.jet(int(255.0 * (p + l /2) / lenmax)) for (p, l) in izip(pos_frag, lengths)]
+        ax.scatter(lengths, n_switch / 2.0 / props.prod(axis=0), s=50, c=colors, label='data (color like starting\npos in fragment)')
+        ax.plot([0, np.max(lengths)], [q, q + mn * np.max(lengths)], lw=2,
+                 ls='--', c='k', label='Fit: r = '+'{:1.0e}'.format(mn)+' / base')
+        ax.set_xlabel('dist [bases]')
+        ax.set_ylabel('N of crossover / chance')
+        ax.set_title(samplename+', '+fragment, fontsize=20)
+        ax.set_ylim(-0.1, 10)
+        ax.text(400, 4, 'r = '+'{:1.1e}'.format(mn)+' per base')
+
+
 
     plt.tight_layout()
     plt.ion()

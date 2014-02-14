@@ -406,3 +406,32 @@ def fork_map_to_initial_consensus(pname, sample, fragment, VERBOSE=0, threads=1,
     return sp.check_output(qsub_list)
 
 
+def fork_get_allele_frequency_trajectory(pname, fragment, VERBOSE=0):
+    '''Fork to the cluster for each sample and fragment'''
+    if VERBOSE:
+        print 'Forking to the cluster: patient '+pname+', fragment '+fragment
+
+    JOBSCRIPT = JOBDIR+'patients/get_allele_frequency_trajectories.py'
+    cluster_time = '0:59:59'
+    vmem = '2G'
+
+    qsub_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'aft '+fragment,
+                 '-l', 'h_rt='+cluster_time,
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--patient', pname,
+                 '--fragments', fragment,
+                 '--verbose', VERBOSE,
+                 '--save',
+                ]
+    qsub_list = map(str, qsub_list)
+    if VERBOSE:
+        print ' '.join(qsub_list)
+    return sp.check_output(qsub_list)
+
+

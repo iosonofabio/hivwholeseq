@@ -34,5 +34,5 @@ if __name__ == '__main__':
 
     # Get patient and the sequenced samples
     for p in patients:
-        print p
+        print p, tuple(p.dates(unique=True))
 

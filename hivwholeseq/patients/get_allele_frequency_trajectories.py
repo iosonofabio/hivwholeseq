@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # vim: fdm=indent
 '''
 author:     Fabio Zanini
@@ -6,6 +7,7 @@ content:    Collect the allele frequencies of all samples to the initial
             consensus and save them as a matrix into a single trajectory file.
 '''
 # Modules
+import os
 import argparse
 import numpy as np
 from Bio import SeqIO
@@ -19,6 +21,7 @@ from hivwholeseq.patients.filenames import get_initial_consensus_filename, \
         get_mapped_to_initial_filename, get_allele_frequency_trajectories_filename
 from hivwholeseq.patients.one_site_statistics import plot_allele_frequency_trajectories as plot_nus
 from hivwholeseq.patients.one_site_statistics import plot_allele_frequency_trajectories_3d as plot_nus_3d
+from hivwholeseq.fork_cluster import fork_get_allele_frequency_trajectory as fork_self
 
 
 
@@ -68,6 +71,8 @@ if __name__ == '__main__':
                         help='Save the allele frequency trajectories to file')
     parser.add_argument('--plot', action='store_true',
                         help='Plot the allele frequency trajectories')
+    parser.add_argument('--submit', action='store_true',
+                        help='Execute the script in parallel on the cluster')
 
     args = parser.parse_args()
     pname = args.patient
@@ -75,6 +80,7 @@ if __name__ == '__main__':
     VERBOSE = args.verbose
     save_to_file = args.save
     plot = args.plot
+    submit = args.submit
 
     # Get patient and the sequenced samples (and sort them by date)
     patient = get_patient(pname)
@@ -88,11 +94,21 @@ if __name__ == '__main__':
     # Iterate over samples and fragments
     for fragment in fragments:
 
-        # TODO: decide whether or not to move the single allele counts to a
-        # separate script, to parallelize (speed up)
-            
-        nus = np.load(get_allele_frequency_trajectories_filename(pname, fragment))
-        #nus = get_allele_frequency_trajectories(patient, fragment, VERBOSE=VERBOSE)
+        # Submit to the cluster self if requested (--save is assumed)
+        if submit:
+            fork_self(pname, fragment,
+                      VERBOSE=VERBOSE)
+            continue
+
+        if VERBOSE >= 1:
+            print fragment
+
+        # Save new computation?
+        aft_filename = get_allele_frequency_trajectories_filename(pname, fragment)
+        if save_to_file or (not os.path.isfile(aft_filename)):
+            nus = get_allele_frequency_trajectories(patient, fragment, VERBOSE=VERBOSE)
+        else:
+            nus = np.load(aft_filename)
 
         if save_to_file:
             nus.dump(get_allele_frequency_trajectories_filename(pname, fragment))
@@ -105,6 +121,7 @@ if __name__ == '__main__':
 
             plot_nus_3d(times, nus, title='Patient '+pname+', '+fragment, VERBOSE=VERBOSE)
 
-            plt.tight_layout()
-            plt.ion()
-            plt.show()
+    if plot:
+        plt.tight_layout()
+        plt.ion()
+        plt.show()
