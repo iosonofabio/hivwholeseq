@@ -5,11 +5,12 @@ LAST UPDATE: Feb 2014.
 
 0. We have all samples with consensus for all fragments and, if possible, genomewide.
 
-1. We collect and align all consensi to get a rough idea. (collect_align_consensi.py)
+1. Collect and align all consensi to get a rough idea. (collect_align_consensi.py)
 
-2. We pick or update the initial consensus. (update_initial_consensus.py)
+2. Build the consensus at the initial time point, against which everything will
+   be mapped. Perform check on frameshifts in genes and similia. (build_initial_reference.py)
 
-3. We map everything to the initial consensus. (map_to_initial_consensus.py)
+3. Map everything to the initial consensus. (map_to_initial_consensus.py)
 
 4. We build allele frequency trajectories (get_allele_frequency_trajectories.py)
 -------------------------------------------------------------------------------

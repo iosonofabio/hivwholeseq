@@ -44,6 +44,50 @@ def load_F10(fragment=None):
                           'fasta')
 
 
-def load_custom_reference(reference):
+def load_custom_reference(reference, format='fasta'):
     '''Load a custom reference'''
-    return SeqIO.read(get_custom_reference_filename(reference), 'fasta')
+    record = SeqIO.read(get_custom_reference_filename(reference, format=format), format)
+
+    # BUG: feature id is lost during write, fake it with the 'note' qualifier
+    if format in ['gb' , 'genbank']:
+        for feat in record.features:
+            try:
+                feat.id = feat.qualifiers['note'][-1]
+            except KeyError, IndexError:
+                pass
+
+    return record
+
+
+def save_custom_reference(record, reference, format='fasta', molecule='DNA'):
+    '''Save a custom reference'''
+    if format in ['gb' , 'genbank']:
+        # BUG: feature id is lost during write, fake it with the 'note' qualifier
+        for feat in record.features:
+            if feat.id != '<unknown id>':
+                if 'note' not in feat.qualifiers:
+                    feat.qualifiers['note'] = []
+                # If already there, ignore (this is acting IN PLACE!)
+                elif feat.id == feat.qualifiers['note'][-1]:
+                    continue
+                feat.qualifiers['note'].append(feat.id)
+
+        # BUG: gb allows only names up to 16 chars
+        if len(record.name) > 16:
+            if '|' in record.name:
+                record.name = record.name.split('|')[-1]
+            record.name = record.name[:16]
+
+        # Specify an alphabet explicitely
+        from Bio.Alphabet.IUPAC import ambiguous_dna, ambiguous_rna, extended_protein
+        if molecule == 'DNA':
+            record.seq.alphabet = ambiguous_dna
+        elif molecule == 'RNA':
+            record.seq.alphabet = ambiguous_rna
+        else:
+            record.seq.alphabet = extended_protein
+
+    return SeqIO.write(record,
+                       get_custom_reference_filename(reference, format=format),
+                       format)
+

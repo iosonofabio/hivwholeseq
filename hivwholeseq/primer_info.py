@@ -11,6 +11,16 @@ from Bio.Seq import reverse_complement as rc
 
 
 # Globals
+fragments_genes = {'gag': ['F1', 'F2'],
+                   'pol': ['F2'],
+                   'env': ['F4', 'F5', 'F6'],
+                   'vif': ['F4'],
+                   'vpr': ['F4'],
+                   'vpu': ['F4'],
+                   'tat': [['F4'], ['F5', 'F6']],
+                   'rev': [['F4'], ['F5', 'F6']],
+                   }
+
 # Note: the reverse primers get reverse complemented
 primers_inner = {'F1': ['AAGTAGTGTGTGCCCGTCTGT', rc('TGCCAAAGAGTGATYTGAGGG')],
                  'F2': ['GGGCTGTTGGARATGTGG', rc('ACAAACTCCCAYTCAGGAATCCA')],

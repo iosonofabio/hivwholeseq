@@ -18,6 +18,8 @@ from hivwholeseq.patients.patients import get_patient
 from hivwholeseq.patients.filenames import get_initial_consensus_filename, \
         get_allele_frequency_trajectories_filename, \
         get_consensi_alignment_filename
+from hivwholeseq.genome_info import locate_gene
+from hivwholeseq.sequence_utils import pretty_print_pairwise_ali as pretty_print_ali
 
 
 # Globals
@@ -27,77 +29,6 @@ gene_fragments = {'pol': 'F2',
 
 
 # Functions
-def locate_gene(consensus, gene, VERBOSE=0):
-    '''Locate a gene in a single fragment consensus'''
-    from hivwholeseq.genome_info import gene_edges
-    gene_edge = gene_edges[gene]
-    
-    cons = np.array(consensus, 'S1')
-
-    # Find start
-    start_found = True
-    start = consensus.seq.find(gene_edge[0])
-    # If perfect match does not work, try imperfect
-    if start == -1:
-        seed = np.fromstring(gene_edge[0], 'S1')
-        sl = len(seed)
-        n_match = np.array([(cons[i: i + sl] == seed).sum()
-                            for i in xrange(len(cons) - sl)], int)
-        pos_seed = np.argmax(n_match)
-        if n_match[pos_seed] > 2 * sl / 3:
-            start = pos_seed
-        else:
-            start = 0
-            start_found = False
-    if VERBOSE:
-        if start_found:
-            print 'Gene start:', start
-        else:
-            print 'Gene start not found'
-
-    # Find end
-    end_found = True
-    end = consensus.seq[start + 100:].find(gene_edge[1])
-    if end == -1:
-        seed = np.fromstring(gene_edge[1], 'S1')
-        sl = len(seed)
-        n_match = np.array([(cons[i: i + sl] == seed).sum()
-                            for i in xrange(start + 100, len(cons) - sl)], int)
-        pos_seed = np.argmax(n_match)
-        if n_match[pos_seed] > 2 * sl / 3:
-            end = pos_seed + sl
-        else:
-            end = len(consensus) - start - 100
-            end_found = False
-    end += start + 100
-    if VERBOSE:
-        if end_found:
-            print 'Gene end:', end
-        else:
-            print 'Gene end not found'
-
-    return (start, end, start_found, end_found)
-
-
-def pretty_print_ali(ali, name1='', name2=''):
-    '''Pretty print function for pairwise alignments'''
-    for i in xrange(len(ali_prot[0]) / 50):
-        ali1_t = str(ali[0, i * 50: (i+1) * 50].seq)
-        ali2_t = str(ali[1, i * 50: (i+1) * 50].seq)
-        match_t = []
-        for (a1, a2) in izip(ali1_t, ali2_t):
-            if a1 == a2:
-                match_t.append(' ')
-            else:
-                match_t.append('x')
-        match_t = ''.join(match_t)
-
-        lh = min(max(map(len, [name1, name2])), 6)
-        print name1[:lh]+(' ' * max(0, lh - len(name1)))+':', ali1_t
-        print (' ' * (lh + 1)), match_t
-        print name2[:lh]+(' ' * max(0, lh - len(name2)))+':', ali2_t
-        print
-
 
 
 

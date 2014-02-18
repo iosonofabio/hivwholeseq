@@ -37,6 +37,7 @@ from hivwholeseq.filenames import get_HXB2_fragmented, \
         get_divided_filenames, get_reference_premap_filename, \
         get_build_consensus_summary_filename
 from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file_unfiltered
+from hivwholeseq.one_site_statistics import build_consensus_from_allele_counts_insertions as build_consensus
 from hivwholeseq.fork_cluster import fork_build_consensus as fork_self
 from hivwholeseq.filenames import get_build_consensus_summary_filename as get_summary_fn
 from hivwholeseq.samples import samples
@@ -51,7 +52,6 @@ stampy_sensitive = True     # Default: False
 maxreads = 1e5
 match_len_min = 10
 trim_bad_cigars = 3
-coverage_min = 10
 # Minimal quality required for a base to be considered trustful (i.e. added to 
 # the allele counts), in phred score. Too high: lose coverage, too low: seq errors.
 # Reasonable numbers are between 30 and 36.
@@ -207,7 +207,7 @@ def map_stampy(data_folder, adaID, fragment, n_iter, VERBOSE=0, summary=True):
 
 
 def make_consensus(data_folder, adaID, fragment, n_iter, qual_min=20, VERBOSE=0,
-                   summary=True):
+                   coverage_min=10, summary=True):
     '''Make consensus sequence from the mapped reads'''
     if VERBOSE:
         print 'Build consensus: '+adaID+' '+fragment+' iteration '+str(n_iter)
@@ -222,144 +222,13 @@ def make_consensus(data_folder, adaID, fragment, n_iter, qual_min=20, VERBOSE=0,
     if not os.path.isfile(bamfilename):
         convert_sam_to_bam(bamfilename)
 
-    # Call lower-level function for allele counts and inserts
     (counts, inserts) = get_allele_counts_insertions_from_file_unfiltered(bamfilename,\
                                 len(refseq), qual_min=qual_min,
                                 match_len_min=match_len_min)
 
-    # Build consensus
-    # Make allele count consensi for each of the four categories
-    consensi = np.zeros((len(read_types), len(refseq)), 'S1')
-    for js, count in enumerate(counts):
-        # Positions without reads are considered N
-        # (this should happen only at the ends)
-        count.T[(count).sum(axis=0) == 0] = np.array([0, 0, 0, 0, 0, 1])
-        consensi[js] = alpha[count.argmax(axis=0)]
-
-    # Make final consensus
-    # This has two steps: 1. counts; 2. inserts
-    # We should check that different read types agree (e.g. forward/reverse) on
-    # both counts and inserts if they are covered
-    # 1.0: Prepare everything as 'N': ambiguous
-    consensus = np.repeat('N', len(refseq))
-    # 1.1: Put safe stuff
-    ind_agree = (consensi == consensi[0]).all(axis=0)
-    consensus[ind_agree] = consensi[0, ind_agree]
-    # 1.2: Ambiguous stuff requires more care
-    polymorphic = []
-    # 1.2.1: If is covered by some read types only, look among those
-    amb_pos = (-ind_agree).nonzero()[0]
-    for pos in amb_pos:
-        cons_pos = consensi[:, pos]
-        cons_pos = cons_pos[cons_pos != 'N']
-        # If there is unanimity, ok
-        if (cons_pos == cons_pos[0]).all():
-            consensus[pos] = cons_pos[0]
-        # else, assign only likely mismapped deletions
-        else:
-            # Restrict to nongapped things (caused by bad mapping)
-            cons_pos = cons_pos[cons_pos != '-']
-            if (cons_pos == cons_pos[0]).all():
-                consensus[pos] = cons_pos[0]
-            # In case of polymorphisms, take any most abundant nucleotide
-            else:
-                polymorphic.append(pos)
-                tmp = zip(*Counter(cons_pos).items())
-                consensus[pos] = tmp[0][np.argmax(tmp[1])]
-    
-    # 2. Inserts
-    # This is a bit tricky, because we could have a variety of inserts at the
-    # same position because of PCR or sequencing errors (what we do with that
-    # stuff, is another question). So, assuming the mapping program maps
-    # everything decently at the same starting position, we have to look for
-    # prefix families
-    insert_consensus = []
-
-    # Iterate over all insert positions
-    for pos, insert in inserts.iteritems():
-
-        # Get the coverage around the insert in all four read types
-        # Note: the sum is over the four nucleotides, the mean over the two positions
-        cov = counts[:, :, pos: min(len(refseq), pos + 2)].sum(axis=1).mean(axis=1)
-
-        # Determine what read types have coverage
-        is_cov = cov > coverage_min
-        covcs = cov[is_cov]
-
-        # A single covered read type is sufficient: we are going to do little
-        # with that, but as a consensus it's fine
-        if not is_cov.any():
-            continue
-
-        # Use prefixes/suffixes, and come down from highest frequencies
-        # (averaging fractions is not a great idea, but -- oh, well).
-        # Implement it as a count table: this is not very efficient a priori,
-        # but Python is lame anyway if we start making nested loops
-        len_max = max(map(len, insert.keys()))
-        align_pre = np.tile('-', (len(insert), len_max))
-        align_suf = np.tile('-', (len(insert), len_max))
-        counts_loc = np.zeros((len(insert), len(read_types)), int)
-        for i, (s, cs) in enumerate(insert.iteritems()):
-            align_pre[i, :len(s)] = list(s)
-            align_suf[i, -len(s):] = list(s)
-            counts_loc[i] = cs
-
-        # Make the allele count tables
-        counts_pre_table = np.zeros((len(read_types), len(alpha), len_max), int)
-        counts_suf_table = np.zeros((len(read_types), len(alpha), len_max), int)
-        for j, a in enumerate(alpha):
-            counts_pre_table[:, j] = np.dot(counts_loc.T, (align_pre == a))
-            counts_suf_table[:, j] = np.dot(counts_loc.T, (align_suf == a))
-
-        # Look whether any position of the insertion has more than 50% freq
-        # The prefix goes: ----> x
-        ins_pre = []
-        for cs in counts_pre_table.swapaxes(0, 2):
-            freq = 1.0 * (cs[:, is_cov] / covcs).mean(axis=1)
-            iaM = freq.argmax()
-            if (alpha[iaM] != '-') and (freq[iaM] > 0.5):
-                ins_pre.append(alpha[iaM])
-            else:
-                break
-        # The suffix goes: x <----
-        ins_suf = []
-        for cs in counts_suf_table.swapaxes(0, 2)[::-1]:
-            freq = 1.0 * (cs[:, is_cov] / covcs).mean(axis=1)
-            iaM = freq.argmax()
-            if (alpha[iaM] != '-') and (freq[iaM] > 0.5):
-                ins_suf.append(alpha[iaM])
-            else:
-                break
-        ins_suf.reverse()
-
-        if VERBOSE >= 4:
-            if ins_pre or ins_suf:
-                print ''.join(ins_pre)
-                print ''.join(ins_suf)
-
-        # Add the insertion to the list (they should agree in most cases)
-        if ins_pre:
-            insert_consensus.append((pos, ''.join(ins_pre)))
-        elif ins_suf:
-            insert_consensus.append((pos, ''.join(ins_suf)))
-
-    # 3. put inserts in
-    insert_consensus.sort(key=itemgetter(0))
-    consensus_final = []
-    pos = 0
-    for insert_name in insert_consensus:
-        # Indices should be fine...
-        # an insert @ pos 391 means that seq[:391] is BEFORE the insert,
-        # THEN the insert, FINALLY comes seq[391:]
-        consensus_final.append(''.join(consensus[pos:insert_name[0]]))
-        consensus_final.append(insert_name[1])
-        pos = insert_name[0]
-    consensus_final.append(''.join(consensus[pos:]))
-    # Strip initial and final Ns and gaps
-    consensus_final = ''.join(consensus_final).strip('N')
-    consensus_final = re.sub('-', '', consensus_final)
-
-    #import ipdb; ipdb.set_trace()
+    consensus_final = build_consensus(counts, inserts,
+                                      coverage_min=coverage_min,
+                                      VERBOSE=VERBOSE)
 
     if summary:
         with open(get_summary_fn(data_folder, adaID, fragment), 'a') as f:

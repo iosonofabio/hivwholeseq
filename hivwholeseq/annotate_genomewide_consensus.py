@@ -15,6 +15,24 @@ from hivwholeseq.samples import samples
 from hivwholeseq.filenames import get_merged_consensus_filename as gmcf
 
 
+# Functions
+def extract_feature(refseq, featurename):
+    '''Extract a feature from a SeqRecord'''
+    if not len(refseq.features):
+        raise ValueError('The sequence has no features')
+
+    from operator import attrgetter
+    featurenames = map(attrgetter('id'), refseq.features)
+    try:
+        record = refseq.features[featurenames.index(featurename)].extract(refseq)
+        record.id = record.id+'|'+featurename
+        record.name = record.name+'|'+featurename
+    except ValueError:
+        raise ValueError('Feature not in the list of features of the sequence')
+
+    return record
+
+
 def annotate_sequence(seqrecord, features=['gene', 'RNA structure', 'other']):
     '''Annotate a consensus with the genes and stuff (in place)'''
     from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
@@ -31,6 +49,10 @@ def annotate_sequence(seqrecord, features=['gene', 'RNA structure', 'other']):
     for feature_type in features:
         edges_all = edge_dict[feature_type]
         for name, edges in edges_all.iteritems():
+            # Skip a feature if it's present already
+            if name in map(lambda x: x.id, seqrecord.features):
+                continue
+
             # Behave differently for unsplit regions and split ones
             if len(edges) == 2:
                 # LTR problems with F6

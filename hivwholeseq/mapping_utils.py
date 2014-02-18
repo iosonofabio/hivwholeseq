@@ -274,6 +274,74 @@ def get_number_reads(bamfilename, format='bam'):
     return n_reads
 
 
+def extract_mapped_reads_subsample_object(input_filename, n_reads,
+                                          maxreads=-1,
+                                          VERBOSE=0):
+    '''Extract a subset of read pairs into new objects'''
+    import numpy as np
+    import pysam
+    file_modes = {'read': {'bam': 'rb', 'sam': 'r'},
+                  'write': {'bam': 'wb', 'sam': 'w'}}
+    input_format = input_filename[-3:]
+
+    n_reads_tot = get_number_reads(input_filename, input_format) / 2
+
+    # Limit to the first part of the file
+    if maxreads == -1:
+        maxreads = n_reads_tot
+    else:
+        maxreads = min(n_reads_tot, maxreads)
+
+    # Pick random numbers among those
+    # Get the random indices of the reads to store
+    ind_store = np.arange(maxreads)
+    np.random.shuffle(ind_store)
+    ind_store = ind_store[:n_reads]
+    ind_store.sort()
+
+    if VERBOSE >= 2:
+        print 'Random indices between '+str(ind_store[0])+' and '+str(ind_store[-1])
+
+    # Copy reads
+    output_reads = []
+    with pysam.Samfile(input_filename, file_modes['read'][input_format]) as bamfile_in:
+
+            n_written = 0
+            for i, (read1, read2) in enumerate(pair_generator(bamfile_in)):
+
+                if VERBOSE >= 2:
+                    if not ((i+1) % 10000):
+                        print i+1, n_written, ind_store[n_written]
+    
+                # If you hit a read pair, add it
+                if i == ind_store[n_written]:
+
+                    read_pair = []
+                    for read in (read1, read2):
+                        read_new = pysam.AlignedRead()
+                        read_new.qname = read.qname
+                        read_new.seq = read.seq
+                        read_new.qual = read.qual
+                        read_new.flag = read.flag
+                        read_new.pos = read.pos
+                        read_new.mapq = read.mapq
+                        read_new.cigar = read.cigar
+                        read_new.mrnm = read.mrnm
+                        read_new.mpos = read.mpos
+                        read_new.isize = read.isize
+                        read_new.tags = read.tags
+                        read_pair.append(read_new)
+
+                    output_reads.append(read_pair)
+                    n_written += 1
+    
+                # Break after the last one
+                if n_written >= n_reads:
+                    break
+
+    return output_reads
+
+
 def extract_mapped_reads_subsample(input_filename, output_filename, n_reads,
                                    VERBOSE=0):
     '''Extract a subset of reads into a new file'''

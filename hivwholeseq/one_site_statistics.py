@@ -6,12 +6,16 @@ content:    Collection of functions to do single site statistics (allele counts,
             coverage, allele frequencies).
 '''
 # Modules
-from collections import defaultdict
+from collections import defaultdict, Counter
 import numpy as np
 import pysam
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
+from Bio.Alphabet.IUPAC import ambiguous_dna
 
 from hivwholeseq.miseq import alpha, read_types
 from hivwholeseq.mapping_utils import get_ind_good_cigars
+from hivwholeseq.mapping_utils import align_muscle
 
 
 # Functions
@@ -307,6 +311,309 @@ def get_minor_allele_frequencies(afs, alpha=None):
         allm = alpha[ind]
         num[i] = af[ind]
     return allm, num
+
+
+def build_consensus_from_allele_counts_insertions(counts, inserts, 
+                                                  coverage_min=10,
+                                                  align_inserts=False,
+                                                  VERBOSE=0):
+    '''Build consensus sequence (including insertions)
+    
+    Parameters:
+        - coverage_min: minimal coverage required to not be considered N
+        - align_inserts: make a MSA of insers at each position intead of using prefix/suffix trees
+    '''
+    import re
+    from collections import Counter
+    from operator import itemgetter
+
+    # Make allele count consensi for each of the four categories (fwd/rev, r1/r2)
+    consensi = np.zeros((counts.shape[0], counts.shape[-1]), 'S1')
+    for js, count in enumerate(counts):
+        # Positions without reads are considered N
+        # (this should happen only at the ends)
+        count.T[(count).sum(axis=0) == 0] = np.array([0, 0, 0, 0, 0, 1])
+        consensi[js] = alpha[count.argmax(axis=0)]
+
+    # Make final consensus
+    # This has two steps: 1. counts; 2. inserts
+    # We should check that different read types agree (e.g. forward/reverse) on
+    # both counts and inserts if they are covered
+    # 1.0: Prepare everything as 'N': ambiguous
+    consensus = np.repeat('N', counts.shape[-1])
+    # 1.1: Put safe stuff
+    ind_agree = (consensi == consensi[0]).all(axis=0)
+    consensus[ind_agree] = consensi[0, ind_agree]
+    # 1.2: Ambiguous stuff requires more care
+    polymorphic = []
+    amb_pos = (-ind_agree).nonzero()[0]
+    for pos in amb_pos:
+        cons_pos = consensi[:, pos]
+        # Limit to read types that have information: if none have info, we
+        # have done this already (read types agree, albeit on no info)
+        cons_pos = cons_pos[cons_pos != 'N']
+
+        # If there is unanimity, ok
+        if (cons_pos == cons_pos[0]).all():
+            consensus[pos] = cons_pos[0]
+        # else, assign only likely mismapped deletions
+        else:
+            # Restrict to nongapped things (caused by bad mapping)
+            cons_pos = cons_pos[cons_pos != '-']
+            if (cons_pos == cons_pos[0]).all():
+                consensus[pos] = cons_pos[0]
+            # In case of polymorphisms, take any most abundant nucleotide
+            else:
+                polymorphic.append(pos)
+                tmp = zip(*Counter(cons_pos).items())
+                consensus[pos] = tmp[0][np.argmax(tmp[1])]
+    
+    # 2. Inserts
+    # This is a bit tricky, because we could have a variety of inserts at the
+    # same position because of PCR or sequencing errors (what we do with that
+    # stuff, is another question). So, assuming the mapping program maps
+    # everything decently at the same starting position, we have to look for
+    # prefix families
+    insert_consensus = []
+
+    # Iterate over all insert positions
+    for pos, insert in inserts.iteritems():
+
+        # Get the coverage around the insert in all four read types
+        # Note: the sum is over the four nucleotides, the mean over the two positions
+        cov = counts[:, :, pos: min(counts.shape[-1], pos + 2)].sum(axis=1).mean(axis=1)
+
+        # Determine what read types have coverage
+        is_cov = cov > coverage_min
+        covcs = cov[is_cov]
+
+        # A single covered read type is sufficient: we are going to do little
+        # with that, but as a consensus it's fine
+        if not is_cov.any():
+            continue
+
+        if align_inserts:
+            # Take the ABUNDANT insertions at this positions
+            insert_big = [key for (key, val) in insert.iteritems() \
+                          if (val[is_cov] > 0.1 * covcs).any()]
+            if not insert_big:
+                continue
+
+            # Get abundances
+            val_big = np.array([insert[key] for key in insert_big], int)
+
+            # Make MSA
+            ali = align_muscle(*[SeqRecord(Seq(key, ambiguous_dna), id=str(i)) \
+                                 for (i, key) in enumerate(insert_big)], sort=True)
+            ali = np.array(ali, 'S1')
+
+            # Get allele counts
+            cts_ins = np.zeros((len(read_types), len(alpha), ali.shape[-1]), int)
+            for pos_ali in xrange(ali.shape[-1]):
+                for j, a in enumerate(alpha):
+                    ind_ins = (ali[:, pos_ali] == a).nonzero()[0]
+                    if len(ind_ins):
+                        cts_ins[:, j, pos_ali] = val_big[ind_ins].sum(axis=0)
+
+            # Sum read types
+            cts_ins = cts_ins.sum(axis=0)
+
+            # Get major allele counts
+            cts_ins_maj = np.max(cts_ins, axis=0)
+            all_ins_maj = np.argmax(cts_ins, axis=0)
+
+            # Get only the ones above 50%
+            ins = ''.join(alpha[all_ins_maj[cts_ins_maj > 0.5 * cov.sum()]])
+
+            if ins:
+                insert_consensus.append((pos, ins))
+
+        else:
+
+            # Use prefixes/suffixes, and come down from highest frequencies
+            # (averaging fractions is not a great idea, but -- oh, well).
+            # Implement it as a count table: this is not very efficient a priori,
+            # but Python is lame anyway if we start making nested loops
+            len_max = max(map(len, insert.keys()))
+            align_pre = np.tile('-', (len(insert), len_max))
+            align_suf = np.tile('-', (len(insert), len_max))
+            counts_loc = np.zeros((len(insert), len(read_types)), int)
+            for i, (s, cs) in enumerate(insert.iteritems()):
+                align_pre[i, :len(s)] = list(s)
+                align_suf[i, -len(s):] = list(s)
+                counts_loc[i] = cs
+    
+            # Make the allele count tables
+            counts_pre_table = np.zeros((len(read_types), len(alpha), len_max), int)
+            counts_suf_table = np.zeros((len(read_types), len(alpha), len_max), int)
+            for j, a in enumerate(alpha):
+                counts_pre_table[:, j] = np.dot(counts_loc.T, (align_pre == a))
+                counts_suf_table[:, j] = np.dot(counts_loc.T, (align_suf == a))
+    
+            # Look whether any position of the insertion has more than 50% freq
+            # The prefix goes: ----> x
+            ins_pre = []
+            for cs in counts_pre_table.swapaxes(0, 2):
+                freq = 1.0 * (cs[:, is_cov] / covcs).mean(axis=1)
+                iaM = freq.argmax()
+                if (alpha[iaM] != '-') and (freq[iaM] > 0.5):
+                    ins_pre.append(alpha[iaM])
+                else:
+                    break
+            # The suffix goes: x <----
+            ins_suf = []
+            for cs in counts_suf_table.swapaxes(0, 2)[::-1]:
+                freq = 1.0 * (cs[:, is_cov] / covcs).mean(axis=1)
+                iaM = freq.argmax()
+                if (alpha[iaM] != '-') and (freq[iaM] > 0.5):
+                    ins_suf.append(alpha[iaM])
+                else:
+                    break
+            ins_suf.reverse()
+    
+            if VERBOSE >= 4:
+                if ins_pre or ins_suf:
+                    print ''.join(ins_pre)
+                    print ''.join(ins_suf)
+    
+            # Add the insertion to the list (they should agree in most cases)
+            if ins_pre:
+                insert_consensus.append((pos, ''.join(ins_pre)))
+            elif ins_suf:
+                insert_consensus.append((pos, ''.join(ins_suf)))
+
+    # 3. put inserts in
+    insert_consensus.sort(key=itemgetter(0))
+    consensus_final = []
+    pos = 0
+    for insert_name in insert_consensus:
+        # Indices should be fine...
+        # an insert @ pos 391 means that seq[:391] is BEFORE the insert,
+        # THEN the insert, FINALLY comes seq[391:]
+        consensus_final.append(''.join(consensus[pos:insert_name[0]]))
+        consensus_final.append(insert_name[1])
+        pos = insert_name[0]
+    consensus_final.append(''.join(consensus[pos:]))
+    # Strip initial and final Ns and gaps
+    consensus_final = ''.join(consensus_final).strip('N')
+    consensus_final = re.sub('-', '', consensus_final)
+
+    return consensus_final
+
+
+def build_consensus_from_mapped_reads(bamfilename, maxreads=2000, block_len=100,
+                                      min_reads_per_group=30,
+                                      len_fragment=2000, VERBOSE=0):
+    '''Build a better consensus from an assembly of a few mapped reads
+    
+    This method exploits local linkage information to get frameshifts right.
+    '''
+    from hivwholeseq.mapping_utils import extract_mapped_reads_subsample_object
+
+    if VERBOSE >= 1:
+        print 'Building consensus from mapped reads:', bamfilename
+
+    # Collect a few reads from every block_len nucleotides
+    reads_grouped = [[] for i in xrange(len_fragment / block_len)]
+    poss = np.array([i * block_len for i in xrange(len_fragment / block_len)], int)
+
+    read_pairs = extract_mapped_reads_subsample_object(bamfilename,
+                                                       n_reads=maxreads,
+                                                       maxreads=max(maxreads, 100000),
+                                                       VERBOSE=VERBOSE)
+
+    if VERBOSE >= 2:
+        print 'Grouping subsample of read pairs'
+
+    # Classify according to START position
+    for read_pair in read_pairs:
+        for read in read_pair:
+            ind = (read.pos <= poss).nonzero()[0]
+            if len(ind) and (np.abs(read.isize) > \
+                             poss[ind[0]] - read.pos + block_len + 20):
+
+                # Forget about exact mapping position, CIGAR, etc. We redo this
+                # via MSA. It is only required that the start position is covered
+                reads_grouped[ind[0]].append(read.seq)
+    
+    if VERBOSE >= 4:
+        print 'Reads per group:', map(len, reads_grouped)
+
+
+    # Trim the last groups which have no reads
+    # NOTE: even tiny groups are useful: of course, more errors there
+    for i in xrange(len(reads_grouped) - 1, -1, -1):
+        if len(reads_grouped[i]) < 2:
+            del reads_grouped[i]
+    poss = poss[:len(reads_grouped)]
+
+    if VERBOSE >= 2:
+        print 'Aligning groups and picking consensus blocks'
+
+    # MSA within each group
+    conss = []
+    for irg, read_grouped in enumerate(reads_grouped):
+
+        # Pick a few random ones out (or all if there are less than that)
+        ind = np.arange(len(read_grouped))
+        np.random.shuffle(ind)
+        ind = ind[:min_reads_per_group]
+        read_grouped_rnd = [read_grouped[i] for i in ind]
+        ali = align_muscle(*[SeqRecord(Seq(s, ambiguous_dna), id=str(i))
+                             for (i, s) in enumerate(read_grouped_rnd)])
+
+        # Trim alignment to start from the first common position (this exists
+        # because we binned reads according to their start!). In addition, every
+        # alignment must cover at least a block length plus some overlap
+        alim = np.array(ali)
+        pos_start = ((alim != '-').mean(axis=0) > 0.9).nonzero()[0][0]
+        # The end of the fragment should be a hard limit for all reads, because
+        # of the primer trimming
+        if irg == len(reads_grouped) - 1:
+            pos_end = alim.shape[1]
+        else:
+            pos_end = pos_start + block_len + 20
+        ali_trim = ali[:, pos_start: pos_end]
+
+        if VERBOSE >= 4:
+            print ali_trim
+        
+        # Get the most common string in this block (HERE WE USE LINKAGE INFO!)
+        # NOTE: we could be more sophisticated here (cluster the reads, like in
+        # a real-world assembly) but we should be needing this
+        cou = Counter([str(s.seq) for s in ali])
+        conss.append(str(Seq(cou.most_common(1)[0][0], ambiguous_dna).ungap('-')))    
+
+    if VERBOSE >= 2:
+        print 'Joining consensus blocks'
+        
+    # Join blocks (from the left)
+    consensus = [conss[0]]
+    for j, cons in enumerate(conss[1:], 1):
+        seed = consensus[-1][-20:]
+        sl = len(seed)
+        pos_start = cons.find(seed)
+        # Allow imperfect matches
+        if pos_start == -1:
+            consm = np.fromstring(cons, 'S1')
+            seedm = np.fromstring(seed, 'S1')
+            n_matches = [(consm[i: i + sl] == seedm).sum()
+                         for i in xrange(len(cons) - len(seed))]
+            pos_start = np.argmax(n_matches)
+
+            # Try to only add non-bogus stuff
+            if n_matches[pos_start] < 0.66 * sl:
+                pos_start = -1
+                if VERBOSE >= 4:
+                    print 'block n.', j, 'not joint!'
+
+        if pos_start != -1:
+            consensus.append(cons[pos_start + sl:])
+        
+    consensus = ''.join(consensus)
+
+    return consensus
+
 
 
 # PLOT
