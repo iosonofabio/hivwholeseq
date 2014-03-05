@@ -56,13 +56,13 @@ def fork_quality_along_read(seq_run, VERBOSE=0, maxreads=-1, savefig=True):
     return sp.check_output(call_list)
 
 
-def fork_demultiplex(seq_run, VERBOSE=0, summary=True):
+def fork_demultiplex(seq_run, VERBOSE=0, maxreads=-1, summary=True):
     '''Submit demultiplex script to the cluster'''
     if VERBOSE:
         print 'Forking to the cluster'
 
     JOBSCRIPT = JOBDIR+'demultiplex.py'
-    cluster_time = '23:59:59'
+    cluster_times = ['0:59:59', '23:59:59']
     vmem = '8G'
     call_list = ['qsub','-cwd',
                  '-b', 'y',
@@ -70,11 +70,12 @@ def fork_demultiplex(seq_run, VERBOSE=0, summary=True):
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
                  '-N', 'demux',
-                 '-l', 'h_rt='+cluster_time,
+                 '-l', 'h_rt='+cluster_times[not (0 < maxreads < 1e6)],
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
                  '--run', seq_run,
                  '--verbose', VERBOSE,
+                 '--maxreads', maxreads,
                 ]
     if not summary:
         call_list.append('--no-summary')

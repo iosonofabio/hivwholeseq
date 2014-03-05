@@ -335,12 +335,14 @@ def get_insert_counts_phix_filename(data_folder):
     return data_folder+'phix/'+'insert_counts.pickle'
 
 
-def get_unclassified_reads_filenames(data_folder, filtered=False):
+def get_unclassified_reads_filenames(data_folder, filtered=False, gzip=False):
     '''Get the filenames of the unclassified reads'''
     filenames = ['read1', 'read2', 'adapter']
     if filtered:
         filenames = [f+'_filtered_trimmed' if 'read' in f else f for f in filenames]
     filenames = [data_folder+'unclassified_reads/'+f+'.fastq' for f in filenames]
+    if gzip:
+        filenames = [f+'.gz' for f in filenames]
     return filenames
 
 

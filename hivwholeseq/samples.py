@@ -163,6 +163,19 @@ sample_list = [\
  {'name': '28929_PCR1', 'run': 'Tue48', 'adaID': 'N2-S4',
   'fragments': ('F1o', 'F2o', 'F3o', 'F4o', 'F5ao', 'F6o')},
 
+  # TruSeq #3 + South Africa #2 (mixed library)
+  {'name': 'POL_SA_2', 'run': 'Tue52', 'adaID': 'TS1',
+   'description': 'South Africa mutation rate #2'}, #SOUTH AFRICAN SAMPLE
+  {'name': 'VK01-2965_PCR2', 'run': 'Tue52', 'adaID': 'TS5',
+   'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i'), #IS THIS TRUE?
+   'patient': '20097', 'date': '2001-08-13'},
+  {'name': '05HR-0269_PCR2', 'run': 'Tue52', 'adaID': 'TS6',
+   'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i'), #IS THIS TRUE?
+   'patient': '15823', 'date': '2005-03-01'},
+  {'name': 'VK09-1685_PCR2', 'run': 'Tue52', 'adaID': 'TS15',
+   'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i'), #IS THIS TRUE?
+   'patient': '15313', 'date': '2009-02-26'},
+
  ]
 
 # Sample table using Pandas

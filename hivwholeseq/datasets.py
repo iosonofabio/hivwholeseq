@@ -82,6 +82,17 @@ MiSeq_runs_list = [\
   'raw_data': None, # ALREADY DEMULTIPLEXED!
  },
 
+ {'name': 'Tue52',
+  'description': 'Third library with TrueSeq Nano',
+  'date': '2014-02-18',
+  'n_cycles': 600,
+  'folder': '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run52/',
+  'raw_data': {'read1': 'lane1_NoIndex_L001_R1_001.fastq.gz',
+               'read2': 'lane1_NoIndex_L001_R3_001.fastq.gz',
+               'adapter': 'lane1_NoIndex_L001_R2_001.fastq.gz'},
+ },
+
+
 ]
 
 # Add samples to the runs

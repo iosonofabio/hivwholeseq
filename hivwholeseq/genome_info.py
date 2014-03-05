@@ -17,9 +17,10 @@ vpr_edges = ['ATGGAACAAGCCCCAGAAGACCAG', 'AGATCCTAA']
 vpu_edges = ['ATGCAACCTATACCAATAGTAGCAATAGTAGCATTAGTAGTAGCAATAATAATAGCAATAGTTGTGTGGTCC',             
              'GGGATGTTGATGATCTGTAG']
 tat_edges = ['ATGGAGCCAGTAGATCCTAACC', 'ATCAAAGCA',
-             'ACCCAC', 'TTCGATTAG']
+             'ACCCNNNNCCCA', 'CAGAGACAGATCCATTCGATTAG']
+
 rev_edges = ['ATGGCAGGAAGAAGC', 'ATCAAAGCA',
-             'ACCCAC', 'GGAACTAAAGAATAG']
+             'ACCCNNNNCCCA', 'GGAACTAAAGAATAG']
 
 gene_edges = {'gag': gag_edges,
               'pol': pol_edges,
@@ -99,7 +100,14 @@ def locate_gene(refseq, gene, minimal_fraction_match='auto', VERBOSE=0,
     '''
     import numpy as np
 
-    gene_edge = gene_edges[gene]
+    gene_edge = gene_edges[gene[:3]]
+    # Deal with spliced genes: e.g. tat1 takes only the first exon, tat takes all
+    if len(gene_edge) > 2:
+        if len(gene) == 3:
+            gene_edge = [gene_edge[0], gene_edge[-1]]
+        else:
+            i = 2 * (int(gene[3:]) - 1)
+            gene_edge = gene_edge[i: i+2]
 
     # Automatic precision detection
     if minimal_fraction_match == 'auto':
@@ -162,7 +170,7 @@ def locate_gene(refseq, gene, minimal_fraction_match='auto', VERBOSE=0,
         
         # Find end
         end_found = True
-        end = refseq[start + 100:].find(gene_edge[1])
+        end = refseq[start + 50:].find(gene_edge[1])
         if end != -1:
             end += len(gene_edge[1])
         else:
@@ -170,14 +178,14 @@ def locate_gene(refseq, gene, minimal_fraction_match='auto', VERBOSE=0,
             seed[seed == 'N'] = np.ma.masked
             sl = len(seed)
             n_match = np.array([(refm[i: i + sl] == seed).sum()
-                                for i in xrange(start + 100, len(refm) - sl)], int)
+                                for i in xrange(start + 50, len(refm) - sl)], int)
             pos_seed = np.argmax(n_match)
             if n_match[pos_seed] > minimal_fraction_match * (-seed.mask).sum():
                 end = pos_seed + sl
             else:
-                end = len(refseq) - start - 100
+                end = len(refseq) - start - 50
                 end_found = False
-        end += start + 100
+        end += start + 50
 
 
     if VERBOSE:

@@ -10,6 +10,7 @@ content:    Demultiplex the FASTQ files we get into single adapter IDs (samples)
 # Modules
 import os
 import sys
+import gzip
 import argparse
 from collections import Counter
 from operator import itemgetter
@@ -18,7 +19,8 @@ from itertools import izip
 from Bio.SeqIO.QualityIO import FastqGeneralIterator as FGI
 
 from hivwholeseq.datasets import MiSeq_runs
-from hivwholeseq.filenames import get_demultiplex_summary_filename, get_raw_read_files
+from hivwholeseq.filenames import get_demultiplex_summary_filename, get_raw_read_files, \
+        get_read_filenames, get_unclassified_reads_filenames
 from hivwholeseq.adapter_info import adapters_illumina, foldername_adapter
 from hivwholeseq.fork_cluster import fork_demultiplex as fork_self
 
@@ -79,22 +81,22 @@ def demultiplex_reads_single_index(data_folder, data_filenames, adapters_designe
     datafile_read2 = data_filenames['read2']
     datafile_adapter = data_filenames['adapter']
 
-    # Open output files
-    fouts = {adaID: (open(data_folder+foldername_adapter(adaID)+'read1.fastq', 'w'),
-                     open(data_folder+foldername_adapter(adaID)+'read2.fastq', 'w'))
+    # Open output files (compressed)
+    fouts = {adaID: [gzip.open(fn, 'wb', compresslevel=9)
+             for fn in get_read_filenames(data_folder, adaID, gzip=True)]
              for adaID, _ in adapters_designed}
-    fouts['unclassified'] = (open(data_folder+'unclassified_reads/read1.fastq', 'w'),
-                             open(data_folder+'unclassified_reads/read2.fastq', 'w'),
-                             open(data_folder+'unclassified_reads/adapter.fastq', 'w'))
+
+    fouts['unclassified'] = [gzip.open(fn, 'wb', compresslevel=9)
+                             for fn in get_unclassified_reads_filenames(data_folder, gzip=True)]
 
 
     # Make sure you close the files
     try:
 
         # Iterate over all reads (using fast iterators)
-        with open(datafile_read1, 'r') as fh1,\
-             open(datafile_read2, 'r') as fh2,\
-             open(datafile_adapter, 'r') as fha:
+        with gzip.open(datafile_read1, 'rb') as fh1,\
+             gzip.open(datafile_read2, 'rb') as fh2,\
+             gzip.open(datafile_adapter, 'rb') as fha:
 
             if VERBOSE >= 3:
                 print 'adaID'
@@ -103,6 +105,11 @@ def demultiplex_reads_single_index(data_folder, data_filenames, adapters_designe
             adapters_found = Counter()
             for i, (read1, read2, adapter) in enumerate(izip(FGI(fh1), FGI(fh2),
                                                              SeqIO.parse(fha, 'fastq'))):
+
+                if i == maxreads:
+                    if VERBOSE:
+                        print 'Maxreads reached.'
+                    break
 
                 # Print some output
                 if VERBOSE and (not ((i + 1) % 10000)):
@@ -135,17 +142,19 @@ def demultiplex_reads_single_index(data_folder, data_filenames, adapters_designe
             for fou in fout:
                 fou.close()
 
-    if summary:
-        with open(get_demultiplex_summary_filename(data_folder), 'a') as f:
-            f.write('\n')
-            f.write('Adapters found across all reads:\n')
-            for e in adapters_found.most_common():
-                f.write('\t'.join(map(str, e))+'\n')
+        if summary:
+            with open(get_demultiplex_summary_filename(data_folder), 'a') as f:
+                f.write('\n')
+                f.write('Total number of reads demultiplexed: '+str(i+1)+'\n')
+                f.write('Adapters found across all reads:\n')
+                for e in adapters_found.most_common():
+                    f.write('\t'.join(map(str, e))+'\n')
 
 
 def demultiplex_reads_dual_index(data_folder, data_filenames, adapters_designed,
                                    maxreads=-1, VERBOSE=0, summary=True):
-    '''Demultiplex reads with single index adapters'''
+    '''Demultiplex reads with dual index adapters'''
+    #FIXME: use gzipped files
 
     # Get the read filenames
     datafile_read1 = data_filenames['read1']
@@ -183,6 +192,7 @@ def demultiplex_reads_dual_index(data_folder, data_filenames, adapters_designed,
                     adapter2) in enumerate(izip(FGI(fh1), FGI(fh2),
                                                 SeqIO.parse(fha1, 'fastq'),
                                                 SeqIO.parse(fha2, 'fastq'))):
+
                 # Stop at the maximal number of reads (for testing)
                 if i == maxreads:
                     if VERBOSE:
@@ -255,7 +265,7 @@ if __name__ == '__main__':
 
     # If submit, outsource to the cluster
     if submit:
-        fork_self(seq_run, VERBOSE=VERBOSE, summary=summary)
+        fork_self(seq_run, VERBOSE=VERBOSE, maxreads=maxreads, summary=summary)
         sys.exit()
 
     # Specify the dataset

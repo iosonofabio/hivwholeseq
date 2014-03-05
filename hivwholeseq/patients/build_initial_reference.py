@@ -47,6 +47,32 @@ from hivwholeseq.primer_info import fragments_genes
 
 
 # Functions
+def merge_initial_consensi(conss_frags, minimal_fraction_match=0.75, VERBOSE=0):
+    '''Merge fragment consensi into a genome-wide one'''
+    # Find overlaps
+    conss_all = [conss_frags[0]]
+    for conss in conss_frags[1:]:
+        # Avoid the first few bases because of low coverage
+        pos_seed_new = 30
+        seed = conss[pos_seed_new: pos_seed_new + 30]
+        pos_seed = conss_all[-1].find(seed)
+        # Allow imperfect matches
+        if pos_seed == -1:
+            refm = np.fromstring(conss, 'S1')
+            seed = np.fromstring(seed, 'S1')
+            sl = len(seed)
+            n_match = np.array([(refm[i: i + sl] == seed).sum()
+                                for i in xrange(len(refm) - sl)], int)
+            pos_seed = len(refm) - 1 - np.argmax(n_match[::-1])
+            if n_match[pos_seed] < minimal_fraction_match * sl:
+                raise ValueError('Cannot merge consensi!')
+
+        conss_all[-1] = conss_all[-1][:pos_seed]
+        conss_all.append(conss[pos_seed_new:])
+
+    return ''.join(conss_all)
+
+
 def check_seq_gene_consistency(gene_seq, gene,
                                check_start_M=True,
                                check_absence_stop=True,
@@ -82,7 +108,295 @@ def check_seq_gene_consistency(gene_seq, gene,
             print 'WARNING: gene', gene, 'has floating stop codons.'
         return (False, 'has floating stop codons')
 
-    return (True, '')
+    return (True, 'in frame (OK)')
+
+
+def check_gene_consensus(conss, fragment, gene, max_end_slippage=10,
+                         start_search=0, VERBOSE=0):
+    '''Check a single exon for consensus'''
+    if VERBOSE:
+        print gene,
+
+    if (not start_found) and (not end_found):
+        if VERBOSE:
+            print 'not found!'
+            genes_good[gene] = False
+        return None
+
+    elif start_found and end_found:
+        if VERBOSE:
+            print gene_start, gene_end,
+
+        gene_seq = Seq(conss[gene_start: gene_end], unambiguous_dna)
+        (is_good, msg) = check_seq_gene_consistency(gene_seq, gene,
+                                                    VERBOSE=0)
+
+    # If the gene end is not present, trim to codon and ignore absence
+    # of stop
+    elif start_found and (not end_found):
+        if VERBOSE:
+            print gene_start, 'no end',
+
+        gene_end = gene_end - (gene_end - gene_start) % 3
+        gene_seq = Seq(conss[gene_start: gene_end], unambiguous_dna)
+        (is_good, msg) = check_seq_gene_consistency(gene_seq, gene,
+                                                    check_absence_stop=False,
+                                                    VERBOSE=0)
+
+
+    # If the gene start is upstream, we might be out of frame
+    elif (not start_found) and (end_found):
+        if VERBOSE:
+            print 'no start', gene_end,
+        for gene_start in [0, 1, 2]:
+            #gene_end = gene_end - (gene_end - gene_start) % 3
+            gene_seq = Seq(conss[gene_start: gene_end], unambiguous_dna)
+            (is_good, msg) = check_seq_gene_consistency(gene_seq, gene,
+                                                 check_start_M=False,
+                                                 VERBOSE=0)
+            if is_good or ('no stop codon' in msg):
+                break
+        if not (is_good or ('no stop codon' in msg)):
+            msg = 'had some problems.'
+
+    # Check for a stop codon a little bit downstream
+    if 'no stop codon' in msg:
+        gene_end_old = gene_end
+        gene_end = len(conss) - (len(conss) - gene_start) % 3
+        gene_seq = Seq(conss[gene_start: gene_end], unambiguous_dna)
+        prot_seq = gene_seq.translate()
+        pos_first_stop = prot_seq.find('*')
+        if pos_first_stop != -1:
+            gene_seq = gene_seq[:(pos_first_stop + 1) * 3]
+            msg = msg+', first stop codon found '+\
+                    str(1 + pos_first_stop - (gene_end_old - gene_start) / 3)+\
+                    ' codons downstream'
+            gene_end = gene_start + len(gene_seq)
+            if (gene_end - gene_end_old) < max_end_slippage:
+                is_good = True
+                msg = msg + ' (OK)'
+            else:
+                msg = msg + ', this looks suspicious'
+        else:
+            msg = msg+' no stop codon found downstream at all.'
+
+    if is_good:
+        print msg
+    else:
+        print 'WARNING: gene', gene, msg
+
+        # No reference alignment and crap for exons
+        if len(gene) == 3:
+
+            ref = load_custom_reference('HXB2', 'gb')
+            gene_ref = extract_feature(ref, gene)
+            prot_seq = gene_seq.translate()
+            prot_ref = gene_ref.seq.translate()
+
+            ali = align_muscle(SeqRecord(prot_seq, id='cons'),
+                               SeqRecord(prot_ref, id='ref'), sort=True)
+            pretty_print_pairwise_ali(ali, 'cons', 'HXB2')
+
+    return (is_good, gene_seq, gene_start, gene_end)
+
+
+def check_genes_consensus(conss, fragment, max_end_slippage=10, VERBOSE=0):
+    '''Check gene consistency in a consensus'''
+    # Locate genes in the consensus and check they are in frame
+    genes_good = {}
+    gene_seqs = {}
+    for gene in genes:
+        fragments_gene = fragments_genes[gene]
+
+        # Single-exon genes
+        if len(gene_edges[gene]) == 2:
+            if (fragment != 'genomewide') and (fragment not in fragments_gene):
+                continue
+
+            if VERBOSE:
+                print gene,
+
+            # Locate gene
+            (gene_start, gene_end,
+             start_found, end_found) = locate_gene(conss, gene, VERBOSE=0)
+
+            # If neither start nor end are found, skip
+            if (not start_found) and (not end_found):
+                if VERBOSE:
+                    print 'not found!'
+                    genes_good[gene] = False
+                continue
+        
+            # If both start and end are found, ok
+            elif start_found and end_found:
+                if VERBOSE:
+                    print gene_start, gene_end,
+        
+                gene_seq = Seq(conss[gene_start: gene_end], unambiguous_dna)
+                (is_good, msg) = check_seq_gene_consistency(gene_seq, gene,
+                                                            VERBOSE=0)
+        
+            # If the gene end is not present, trim to codon and ignore if no stop
+            elif start_found and (not end_found):
+                if VERBOSE:
+                    print gene_start, 'no end',
+        
+                gene_end = gene_end - (gene_end - gene_start) % 3
+                gene_seq = Seq(conss[gene_start: gene_end], unambiguous_dna)
+                (is_good, msg) = check_seq_gene_consistency(gene_seq, gene,
+                                                            check_absence_stop=False,
+                                                            VERBOSE=0)
+        
+        
+            # If the gene start is upstream, we might be out of frame
+            elif (not start_found) and (end_found):
+                if VERBOSE:
+                    print 'no start', gene_end,
+                for gene_start in [0, 1, 2]:
+                    #gene_end = gene_end - (gene_end - gene_start) % 3
+                    gene_seq = Seq(conss[gene_start: gene_end], unambiguous_dna)
+                    (is_good, msg) = check_seq_gene_consistency(gene_seq, gene,
+                                                         check_start_M=False,
+                                                         VERBOSE=0)
+                    if is_good or ('no stop codon' in msg):
+                        break
+                if not (is_good or ('no stop codon' in msg)):
+                    msg = 'had some problems.'
+        
+            # Check for a stop codon a little bit downstream
+            if 'no stop codon' in msg:
+                gene_end_old = gene_end
+                gene_end = len(conss) - (len(conss) - gene_start) % 3
+                gene_seq = Seq(conss[gene_start: gene_end], unambiguous_dna)
+                prot_seq = gene_seq.translate()
+                pos_first_stop = prot_seq.find('*')
+                if pos_first_stop != -1:
+                    gene_seq = gene_seq[:(pos_first_stop + 1) * 3]
+                    msg = msg+', first stop codon found '+\
+                            str(1 + pos_first_stop - (gene_end_old - gene_start) / 3)+\
+                            ' codons downstream'
+                    gene_end = gene_start + len(gene_seq)
+                    if (gene_end - gene_end_old) < max_end_slippage:
+                        is_good = True
+                        msg = msg + ' (OK)'
+                    else:
+                        msg = msg + ', this looks suspicious'
+                else:
+                    msg = msg+' no stop codon found downstream at all.'
+        
+            if is_good:
+                print msg
+            else:
+                print 'WARNING: gene', gene, msg
+        
+                # No reference alignment and crap for exons
+                if len(gene) == 3:
+        
+                    ref = load_custom_reference('HXB2', 'gb')
+                    gene_ref = extract_feature(ref, gene)
+                    prot_seq = gene_seq.translate()
+                    prot_ref = gene_ref.seq.translate()
+        
+                    ali = align_muscle(SeqRecord(prot_seq, id='cons'),
+                                       SeqRecord(prot_ref, id='ref'), sort=True)
+                    pretty_print_pairwise_ali(ali, 'cons', 'HXB2')
+    
+            genes_good[gene] = is_good
+            gene_seqs[gene] = gene_seq
+
+        # Multi-exon genes
+        else:
+            if VERBOSE:
+                print gene,
+            gene_seq = Seq('', ambiguous_dna)
+            start_search = 0
+            for exon_num in xrange(len(gene_edges[gene]) // 2):
+                exon = gene+str(exon_num + 1)
+                fragments_exon = fragments_gene[exon_num]
+
+                if (fragment != 'genomewide') and (fragment not in fragments_exon):
+                    continue
+
+                # Locate exon
+                (exon_start, exon_end,
+                 start_found, end_found) = locate_gene(conss[start_search:], exon,
+                                                       VERBOSE=0)
+                if start_found:
+                    exon_start += start_search
+                exon_end += start_search
+
+                # Check exon
+                if (not start_found) and (not end_found):
+                    if VERBOSE >= 2:
+                        print 'not found!'
+                        is_good = False
+                        break
+
+                elif start_found and end_found:
+                    if VERBOSE:
+                        print exon_start, exon_end,
+            
+                    exon_seq = Seq(conss[exon_start: exon_end], unambiguous_dna)
+                    (is_good, msg) = check_seq_gene_consistency(exon_seq, exon,
+                                                                check_absence_stop=False,
+                                                                check_start_M=False,
+                                                                VERBOSE=0)
+
+                elif start_found and (not end_found):
+                    if VERBOSE >= 2:
+                        print exon_start, 'no end',
+        
+                    exon_seq = Seq(conss[exon_start: exon_end], unambiguous_dna)
+                    (is_good, msg) = check_seq_gene_consistency(exon_seq, exon,
+                                                                check_absence_stop=False,
+                                                                check_start_M=False,
+                                                                VERBOSE=0)
+        
+                # If the gene start is upstream, we might be out of frame
+                elif (not start_found) and (end_found):
+                    if VERBOSE >= 2:
+                        print 'no start', exon_end,
+                    for exon_start in [0, 1, 2]:
+                        exon_seq = Seq(conss[exon_start: exon_end], unambiguous_dna)
+                        (is_good, msg) = check_seq_gene_consistency(gene_seq, exon,
+                                                                    check_absence_stop=False,
+                                                                    check_start_M=False,
+                                                                    VERBOSE=0)
+                        if is_good:
+                            break
+                    if not is_good:
+                        msg = 'had some problems.'
+
+
+                if VERBOSE >= 2:
+                    if is_good:
+                        print msg
+                    else:
+                        print 'WARNING: exon', exon, msg
+
+                # Add up exons for the gene
+                gene_seq = gene_seq + exon_seq
+                gene_seqs[exon] = exon_seq
+
+                if start_found:
+                    start_search = exon_end + 1000
+
+            # Check whole gene
+            if fragment == 'genomewide':
+                (is_good, msg) = check_seq_gene_consistency(gene_seq, gene,
+                                                            VERBOSE=0)
+
+                if VERBOSE:
+                    if is_good:
+                        print msg
+                    else:
+                        print 'WARNING: gene', gene, msg
+
+                gene_seqs[gene] = gene_seq
+                genes_good[gene] = is_good
+
+
+    return gene_seqs, genes_good
 
 
 
@@ -107,6 +421,8 @@ if __name__ == '__main__':
     patient = get_patient(pname)
 
     # If the script is called with no fragment, iterate over all
+    # NOTE: This assumes that the fragment has been sequenced. If not, we should
+    # take a later time point or similia, but let's not worry about it yet.
     if not fragments:
         fragments = ['F'+str(i) for i in xrange(1, 7)]
     if VERBOSE >= 3:
@@ -127,6 +443,8 @@ if __name__ == '__main__':
     data_folder = dataset['folder']
 
     for fragment in fragments:
+        if fragment == 'genomewide':
+            continue
 
         # Write output
         output_filename = get_initial_consensus_filename(pname, fragment)
@@ -135,113 +453,17 @@ if __name__ == '__main__':
         # Build consensus by assembly
         bamfilename = get_mapped_filename(data_folder, adaID, fragment,
                                           filtered=True)
-        conss_ass = build_consensus_from_mapped_reads(bamfilename,
-                                                      block_len=100,
-                                                      VERBOSE=VERBOSE - 1)
+        conss = build_consensus_from_mapped_reads(bamfilename,
+                                                  maxreads=3000,
+                                                  block_len=100,
+                                                  VERBOSE=VERBOSE - 1)
 
-        #consensi_built = {'counts+inserts': conss_ci,
-        #                  'assembly': conss_ass}
-
-        conss = conss_ass
-                       
-        # Locate genes in the consensus and check they are in frame
-        gene_seqs = {}
-        for gene in genes:
-
-            # FIXME: only single-exon genes for now
-            if len(gene_edges[gene]) > 2:
-                continue
-
-            if fragment not in fragments_genes[gene]:
-                continue
-
-            if VERBOSE:
-                print gene,
-
-            (gene_start, gene_end,
-             start_found, end_found) = locate_gene(conss, gene, VERBOSE=0)
-
-            if (not start_found) and (not end_found):
-                if VERBOSE:
-                    print 'not found!'
-                continue
-
-            elif start_found and end_found:
-                if VERBOSE:
-                    print gene_start, gene_end,
-
-                gene_seq = Seq(conss[gene_start: gene_end], unambiguous_dna)
-                (is_good, msg) = check_seq_gene_consistency(gene_seq, gene,
-                                                            VERBOSE=0)
-
-            # If the gene end is not present, trim to codon and ignore absence
-            # of stop
-            elif start_found and (not end_found):
-                if VERBOSE:
-                    print gene_start, 'no end',
-
-                gene_end = gene_end - (gene_end - gene_start) % 3
-                gene_seq = Seq(conss[gene_start: gene_end], unambiguous_dna)
-                (is_good, msg) = check_seq_gene_consistency(gene_seq, gene,
-                                                            check_absence_stop=False,
-                                                            VERBOSE=0)
-
-
-            # If the gene start is upstream, we might be out of frame
-            elif (not start_found) and (end_found):
-                if VERBOSE:
-                    print 'no start', gene_end,
-                for gene_start in [0, 1, 2]:
-                    #gene_end = gene_end - (gene_end - gene_start) % 3
-                    gene_seq = Seq(conss[gene_start: gene_end], unambiguous_dna)
-                    (is_good, msg) = check_seq_gene_consistency(gene_seq, gene,
-                                                         check_start_M=False,
-                                                         VERBOSE=0)
-                    if is_good or ('no stop codon' in msg):
-                        break
-                if not (is_good or ('no stop codon' in msg)):
-                    msg = 'had some problems.'
-
-            # Check for a stop codon a little bit downstream
-            if 'no stop codon' in msg:
-                gene_end_new = len(conss) - (len(conss) - gene_start) % 3
-                gene_seq = Seq(conss[gene_start: gene_end_new], unambiguous_dna)
-                prot_seq = gene_seq.translate()
-                pos_first_stop = prot_seq.find('*')
-                if pos_first_stop != -1:
-                    gene_seq = gene_seq[:(pos_first_stop + 1) * 3]
-                    msg = msg+', first stop codon found '+\
-                            str(1 + pos_first_stop - (gene_end - gene_start) / 3)+\
-                            ' codons downstream.'
-                    gene_end = gene_end_new
-                else:
-                    msg = msg+' no stop codon found downstream at all.'
-
-            if is_good:
-                print '... in frame (OK)'
-            else:
-                print 'WARNING: gene', gene, msg
-
-                ref = load_custom_reference('HXB2', 'gb')
-                gene_ref = extract_feature(ref, gene)
-
-                prot_seq = gene_seq.translate()
-                prot_ref = gene_ref.seq.translate()
-
-                ali = align_muscle(SeqRecord(prot_seq, id='cons'),
-                                   SeqRecord(prot_ref, id='ref'), sort=True)
-                pretty_print_pairwise_ali(ali, 'cons', 'HXB2')
-                
-            gene_seqs[gene] = gene_seq
+        check_genes_consensus(conss, fragment, VERBOSE=VERBOSE)
 
         seq_in = SeqRecord(Seq(conss, unambiguous_dna),
                            id='cons_init_p'+pname,
                            name='cons_init_p'+pname,
                            description='Initial consensus of patient '+pname)
-
-        ## Read the new consensus
-        #input_filename = get_consensus_filename(data_folder, adaID, fragment)
-        #seq_in = SeqIO.read(input_filename, 'fasta')
 
         # If absent, just copy the thing over
         if not os.path.isfile(output_filename):
@@ -259,3 +481,26 @@ if __name__ == '__main__':
             if str(seq_in.seq) != str(seq_out.seq):
                 print 'NOTE: initial consensus updated to '+sample_init['name']+', remap!'
             
+    # Merge all fragments if requested
+    if 'genomewide' in fragments:
+        conss_frags = []
+        for fragment in ['F'+str(i) for i in xrange(1, 7)]:
+            output_filename = get_initial_consensus_filename(pname, fragment)
+            conss = str(SeqIO.read(output_filename, 'fasta').seq)
+            conss_frags.append(conss)
+
+        conss_genomewide = merge_initial_consensi(conss_frags, VERBOSE=VERBOSE)
+        
+        gene_seqs, genes_good = check_genes_consensus(conss_genomewide, 'genomewide', VERBOSE=VERBOSE)
+
+        output_filename = get_initial_consensus_filename(pname, 'genomewide')
+        seq_in = SeqRecord(Seq(conss, unambiguous_dna),
+                           id='cons_gw_init_p'+pname,
+                           name='cons_gw_init_p'+pname,
+                           description='Initial genomewide consensus of patient '+pname)
+        SeqIO.write(seq_in, output_filename, 'fasta')
+
+        
+
+
+
