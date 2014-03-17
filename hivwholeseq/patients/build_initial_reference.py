@@ -318,6 +318,7 @@ def check_genes_consensus(conss, fragment, genes=genes_all, max_end_slippage=10,
         else:
             if VERBOSE:
                 print gene,
+
             gene_seq = Seq('', ambiguous_dna)
             gene_pos = []
             start_search = 0
@@ -392,7 +393,7 @@ def check_genes_consensus(conss, fragment, genes=genes_all, max_end_slippage=10,
                 gene_seq = gene_seq + exon_seq
                 gene_pos.append(exon_pos)
                 gene_seqs[exon] = exon_seq
-                gene_poss[exon] = exon_pos
+                gene_poss[exon] = [exon_pos]
 
                 if start_found:
                     start_search = exon_end + 1000
@@ -434,7 +435,6 @@ if __name__ == '__main__':
     fragments = args.fragments
     VERBOSE = args.verbose
 
-    # Get the patient
     patient = get_patient(pname)
 
     # If the script is called with no fragment, iterate over all

@@ -5,8 +5,17 @@ date:       11/02/14
 content:    Collection of functions to do single site statistics (allele counts,
             coverage, allele frequencies) on patients.
 '''
+# Modules
+from Bio.Seq import Seq
+from Bio.Alphabet.IUPAC import ambiguous_dna
+
+from hivwholeseq.miseq import alpha
+
+
+
 # Functions
-def plot_allele_frequency_trajectories(times, nus, title='', VERBOSE=0):
+def plot_allele_frequency_trajectories(times, nus, title='', VERBOSE=0,
+                                       threshold=0.1, options=[]):
     '''Plot the allele frequency trajectories from a patient'''
     import matplotlib.pyplot as plt
     from matplotlib import cm
@@ -15,8 +24,23 @@ def plot_allele_frequency_trajectories(times, nus, title='', VERBOSE=0):
     for i in xrange(nus.shape[2]):
         for j in xrange(nus.shape[1]):
             nu = nus[:, j, i]
-            if (nu[0] < 0.5) and (nu > 0.01).any():
-                ax.plot(times, nu + 1e-4, lw=1.5,
+            if (nu[0] < 0.5) and (nu > threshold).any():
+
+                # Use dashed lines for synonymous if requested
+                if 'syn-nonsyn' in options:
+                    cod_initial = alpha[nus[0, :, i - i%3: i - i%3 + 3].argmax(axis=0)]
+                    cod_mut = cod_initial.copy()
+                    cod_mut[i%3] = alpha[j]
+                    if ('-' in cod_mut) or \
+                       (str(Seq(''.join(cod_initial), ambiguous_dna).translate()) != \
+                        str(Seq(''.join(cod_mut), ambiguous_dna).translate())):
+                        ls = '-'
+                    else:
+                        ls= '--'
+                else:
+                    ls = '-'
+
+                ax.plot(times, nu + 1e-4, lw=1.5, ls=ls,
                         color=cm.jet(int(255.0 * i / nus.shape[2])))
 
     ax.set_xlim(times[0] -10, times[-1] + 10)

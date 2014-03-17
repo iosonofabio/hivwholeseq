@@ -23,9 +23,10 @@ def get_foldername(pname, root_data_folder=root_data_folder):
 
 
 def get_initial_consensus_filename(pname, fragment,
-                                   root_data_folder=root_data_folder):
+                                   root_data_folder=root_data_folder,
+                                   format='fasta'):
     '''Get the filename of the initial consensus for a patient'''
-    filename = 'consensus_initial_'+fragment+'.fasta'
+    filename = 'consensus_initial_'+fragment+'.'+format
     filename = get_foldername(pname, root_data_folder=root_data_folder)+filename
     return filename
 
@@ -100,6 +101,19 @@ def get_allele_frequency_trajectories_filename(pname,
     filename = get_foldername(pname, root_data_folder=root_data_folder)+filename
     return filename
 
+
+# FIGURES
+def get_figure_folder(pname):
+    '''Get the folder for figures for this sample'''
+    folder = get_foldername(pname, root_data_folder=root_data_folder)+'figures/'
+    return folder
+
+
+def get_allele_frequency_trajectory_filename(pname, fragment_or_gene, format='png'):
+    '''Get the filename of the plot of allele frequency trajectories'''
+    folder = get_figure_folder(pname)
+    fn = folder+'allele_freq_traj_'+fragment_or_gene+'.'+format
+    return fn
 
 
 # SUMMARY

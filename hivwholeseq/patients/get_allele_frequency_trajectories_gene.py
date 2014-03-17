@@ -25,7 +25,8 @@ from hivwholeseq.patients.filenames import get_initial_consensus_filename, \
 from hivwholeseq.patients.one_site_statistics import plot_allele_frequency_trajectories as plot_nus
 from hivwholeseq.patients.one_site_statistics import plot_allele_frequency_trajectories_3d as plot_nus_3d
 from hivwholeseq.genome_info import genes, locate_gene, gene_edges
-
+from hivwholeseq.patients.filenames import get_allele_frequency_trajectory_filename
+from hivwholeseq.generic_utils import mkdirs
 
 
 # Globals
@@ -50,6 +51,9 @@ if __name__ == '__main__':
                         help='Save the allele frequency trajectories to file')
     parser.add_argument('--plot', action='store_true',
                         help='Plot the allele frequency trajectories')
+    parser.add_argument('--saveplot', action='store_true',
+                        help='Save the plot to file')
+    
 
     args = parser.parse_args()
     pname = args.patient
@@ -57,6 +61,7 @@ if __name__ == '__main__':
     VERBOSE = args.verbose
     save_to_file = args.save
     plot = args.plot
+    saveplot = args.saveplot
 
     # Get patient and the sequenced samples (and sort them by date)
     patient = get_patient(pname)
@@ -78,17 +83,25 @@ if __name__ == '__main__':
     gene_pos = gene_poss[gene]
     nus_gene = np.concatenate([nus[:, :, exon_pos[0]: exon_pos[1]]
                                for exon_pos in gene_pos], axis=2)
+    if save_to_file:
+        nus_gene.dump(get_allele_frequency_trajectories_filename(pname, gene))
 
     # Plot
     if plot:
         import matplotlib.pyplot as plt
 
         times = patient.times()
-        plot_nus(times, nus_gene, title='Patient '+pname+', '+gene, VERBOSE=VERBOSE)
-
-        plot_nus_3d(times, nus_gene, title='Patient '+pname+', '+gene, VERBOSE=VERBOSE)
-
-    if plot:
+        plot_nus(times, nus_gene, title='Patient '+pname+', '+gene, VERBOSE=VERBOSE,
+                 options=['syn-nonsyn'])
         plt.tight_layout()
+
+        #plot_nus_3d(times, nus_gene, title='Patient '+pname+', '+gene, VERBOSE=VERBOSE)
+
+    if plot and (not saveplot):
         plt.ion()
         plt.show()
+
+    if saveplot:
+        fn = get_allele_frequency_trajectory_filename(pname, gene)
+        mkdirs(os.path.dirname(fn))
+        plt.savefig(fn)
