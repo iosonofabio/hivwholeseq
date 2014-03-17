@@ -41,7 +41,8 @@ from hivwholeseq.mapping_utils import align_muscle
 from hivwholeseq.sequence_utils import pretty_print_pairwise_ali
 from hivwholeseq.filenames import get_mapped_filename
 from hivwholeseq.one_site_statistics import build_consensus_from_mapped_reads
-from hivwholeseq.genome_info import genes, locate_gene, gene_edges
+from hivwholeseq.genome_info import locate_gene, gene_edges
+from hivwholeseq.genome_info import genes as genes_all
 from hivwholeseq.primer_info import fragments_genes
 
 
@@ -200,11 +201,12 @@ def check_gene_consensus(conss, fragment, gene, max_end_slippage=10,
     return (is_good, gene_seq, gene_start, gene_end)
 
 
-def check_genes_consensus(conss, fragment, max_end_slippage=10, VERBOSE=0):
+def check_genes_consensus(conss, fragment, genes=genes_all, max_end_slippage=10, VERBOSE=0):
     '''Check gene consistency in a consensus'''
     # Locate genes in the consensus and check they are in frame
     genes_good = {}
     gene_seqs = {}
+    gene_poss = {}
     for gene in genes:
         fragments_gene = fragments_genes[gene]
 
@@ -233,6 +235,7 @@ def check_genes_consensus(conss, fragment, max_end_slippage=10, VERBOSE=0):
                     print gene_start, gene_end,
         
                 gene_seq = Seq(conss[gene_start: gene_end], unambiguous_dna)
+                gene_pos = (gene_start, gene_end)
                 (is_good, msg) = check_seq_gene_consistency(gene_seq, gene,
                                                             VERBOSE=0)
         
@@ -243,6 +246,7 @@ def check_genes_consensus(conss, fragment, max_end_slippage=10, VERBOSE=0):
         
                 gene_end = gene_end - (gene_end - gene_start) % 3
                 gene_seq = Seq(conss[gene_start: gene_end], unambiguous_dna)
+                gene_pos = (gene_start, gene_end)
                 (is_good, msg) = check_seq_gene_consistency(gene_seq, gene,
                                                             check_absence_stop=False,
                                                             VERBOSE=0)
@@ -255,6 +259,7 @@ def check_genes_consensus(conss, fragment, max_end_slippage=10, VERBOSE=0):
                 for gene_start in [0, 1, 2]:
                     #gene_end = gene_end - (gene_end - gene_start) % 3
                     gene_seq = Seq(conss[gene_start: gene_end], unambiguous_dna)
+                    gene_pos = (gene_start, gene_end)
                     (is_good, msg) = check_seq_gene_consistency(gene_seq, gene,
                                                          check_start_M=False,
                                                          VERBOSE=0)
@@ -268,6 +273,7 @@ def check_genes_consensus(conss, fragment, max_end_slippage=10, VERBOSE=0):
                 gene_end_old = gene_end
                 gene_end = len(conss) - (len(conss) - gene_start) % 3
                 gene_seq = Seq(conss[gene_start: gene_end], unambiguous_dna)
+                gene_pos = (gene_start, gene_end)
                 prot_seq = gene_seq.translate()
                 pos_first_stop = prot_seq.find('*')
                 if pos_first_stop != -1:
@@ -276,6 +282,7 @@ def check_genes_consensus(conss, fragment, max_end_slippage=10, VERBOSE=0):
                             str(1 + pos_first_stop - (gene_end_old - gene_start) / 3)+\
                             ' codons downstream'
                     gene_end = gene_start + len(gene_seq)
+                    gene_pos = (gene_start, gene_end)
                     if (gene_end - gene_end_old) < max_end_slippage:
                         is_good = True
                         msg = msg + ' (OK)'
@@ -285,9 +292,11 @@ def check_genes_consensus(conss, fragment, max_end_slippage=10, VERBOSE=0):
                     msg = msg+' no stop codon found downstream at all.'
         
             if is_good:
-                print msg
+                if VERBOSE:
+                    print msg
             else:
-                print 'WARNING: gene', gene, msg
+                if VERBOSE:
+                    print 'WARNING: gene', gene, msg
         
                 # No reference alignment and crap for exons
                 if len(gene) == 3:
@@ -303,12 +312,14 @@ def check_genes_consensus(conss, fragment, max_end_slippage=10, VERBOSE=0):
     
             genes_good[gene] = is_good
             gene_seqs[gene] = gene_seq
+            gene_poss[gene] = [gene_pos]
 
         # Multi-exon genes
         else:
             if VERBOSE:
                 print gene,
             gene_seq = Seq('', ambiguous_dna)
+            gene_pos = []
             start_search = 0
             for exon_num in xrange(len(gene_edges[gene]) // 2):
                 exon = gene+str(exon_num + 1)
@@ -337,6 +348,7 @@ def check_genes_consensus(conss, fragment, max_end_slippage=10, VERBOSE=0):
                         print exon_start, exon_end,
             
                     exon_seq = Seq(conss[exon_start: exon_end], unambiguous_dna)
+                    exon_pos = (exon_start, exon_end)
                     (is_good, msg) = check_seq_gene_consistency(exon_seq, exon,
                                                                 check_absence_stop=False,
                                                                 check_start_M=False,
@@ -347,6 +359,7 @@ def check_genes_consensus(conss, fragment, max_end_slippage=10, VERBOSE=0):
                         print exon_start, 'no end',
         
                     exon_seq = Seq(conss[exon_start: exon_end], unambiguous_dna)
+                    exon_pos = (exon_start, exon_end)
                     (is_good, msg) = check_seq_gene_consistency(exon_seq, exon,
                                                                 check_absence_stop=False,
                                                                 check_start_M=False,
@@ -358,6 +371,7 @@ def check_genes_consensus(conss, fragment, max_end_slippage=10, VERBOSE=0):
                         print 'no start', exon_end,
                     for exon_start in [0, 1, 2]:
                         exon_seq = Seq(conss[exon_start: exon_end], unambiguous_dna)
+                        exon_pos = (exon_start, exon_end)
                         (is_good, msg) = check_seq_gene_consistency(gene_seq, exon,
                                                                     check_absence_stop=False,
                                                                     check_start_M=False,
@@ -376,7 +390,9 @@ def check_genes_consensus(conss, fragment, max_end_slippage=10, VERBOSE=0):
 
                 # Add up exons for the gene
                 gene_seq = gene_seq + exon_seq
+                gene_pos.append(exon_pos)
                 gene_seqs[exon] = exon_seq
+                gene_poss[exon] = exon_pos
 
                 if start_found:
                     start_search = exon_end + 1000
@@ -394,9 +410,10 @@ def check_genes_consensus(conss, fragment, max_end_slippage=10, VERBOSE=0):
 
                 gene_seqs[gene] = gene_seq
                 genes_good[gene] = is_good
+                gene_poss[gene] = gene_pos
 
 
-    return gene_seqs, genes_good
+    return (gene_seqs, genes_good, gene_poss)
 
 
 
@@ -450,7 +467,7 @@ if __name__ == '__main__':
         output_filename = get_initial_consensus_filename(pname, fragment)
         #conss = str(SeqIO.read(output_filename, 'fasta').seq)
 
-        # Build consensus by assembly
+        # Build consensus by assisted assembly
         bamfilename = get_mapped_filename(data_folder, adaID, fragment,
                                           filtered=True)
         conss = build_consensus_from_mapped_reads(bamfilename,
@@ -491,10 +508,12 @@ if __name__ == '__main__':
 
         conss_genomewide = merge_initial_consensi(conss_frags, VERBOSE=VERBOSE)
         
-        gene_seqs, genes_good = check_genes_consensus(conss_genomewide, 'genomewide', VERBOSE=VERBOSE)
+        gene_seqs, genes_good, gene_poss = check_genes_consensus(conss_genomewide, 'genomewide', VERBOSE=VERBOSE)
+        if all(genes_good.values()):
+            print 'Genomewide consensus approved: you can map the single fragments!'
 
         output_filename = get_initial_consensus_filename(pname, 'genomewide')
-        seq_in = SeqRecord(Seq(conss, unambiguous_dna),
+        seq_in = SeqRecord(Seq(conss_genomewide, unambiguous_dna),
                            id='cons_gw_init_p'+pname,
                            name='cons_gw_init_p'+pname,
                            description='Initial genomewide consensus of patient '+pname)

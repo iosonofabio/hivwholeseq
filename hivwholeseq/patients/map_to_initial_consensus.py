@@ -35,7 +35,6 @@ stampy_gapextend = 5 	    # Default: 3
 stampy_sensitive = True     # Default: False
 
 
-
 # Functions
 def make_output_folders(pname, sample, VERBOSE=0):
     '''Make the output folders if necessary for hash and map'''
@@ -74,6 +73,13 @@ def make_index_and_hash(pname, fragment, VERBOSE=0):
 def map_stampy(patient, samplename, fragment, VERBOSE=0, threads=1, n_pairs=-1,
                summary=True):
     '''Map using stampy'''
+    import hivwholeseq
+    JOBDIR = hivwholeseq.__path__[0].rstrip('/')+'/'
+    JOBLOGOUT = JOBDIR+'logout/'
+    JOBLOGERR = JOBDIR+'logerr/'
+    cluster_time = ['23:59:59', '0:59:59']
+    vmem = '8G'
+
     # Get input filenames
     pname = patient.id
     sample = patient.sample_table.loc[samplename]

@@ -18,14 +18,11 @@ from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_fi
         filter_nus
 from hivwholeseq.patients.patients import get_patient
 from hivwholeseq.patients.filenames import get_initial_consensus_filename, \
-        get_mapped_to_initial_filename, get_allele_frequency_trajectories_filename
+        get_mapped_to_initial_filename, get_allele_frequency_trajectories_filename, \
+        get_allele_count_trajectories_filename
 from hivwholeseq.patients.one_site_statistics import plot_allele_frequency_trajectories as plot_nus
 from hivwholeseq.patients.one_site_statistics import plot_allele_frequency_trajectories_3d as plot_nus_3d
 from hivwholeseq.fork_cluster import fork_get_allele_frequency_trajectory as fork_self
-
-
-
-# Globals
 
 
 
@@ -36,6 +33,7 @@ def get_allele_frequency_trajectories(patient, fragment, qual_min=35, VERBOSE=0)
     refseq = SeqIO.read(get_initial_consensus_filename(pname, fragment), 'fasta')
 
     # Prepare output data structures
+    cos_traj = np.zeros((len(patient.samples), len(alpha), len(refseq)), int)
     nus_traj = np.zeros((len(patient.samples), len(alpha), len(refseq)))
     
     
@@ -46,6 +44,9 @@ def get_allele_frequency_trajectories(patient, fragment, qual_min=35, VERBOSE=0)
                                                                    len(refseq),
                                                                    qual_min=qual_min,
                                                                    VERBOSE=VERBOSE)
+        # Take the total counts, blending in the read types
+        cou = counts.sum(axis=0)
+        cos_traj[it] = cou
 
         # Take the filtered frequencies, blending in the read types
         nu = filter_nus(counts)
@@ -53,7 +54,7 @@ def get_allele_frequency_trajectories(patient, fragment, qual_min=35, VERBOSE=0)
 
     #FIXME: test, etc.
 
-    return nus_traj    
+    return (cos_traj, nus_traj)
 
 
 # Script
@@ -106,11 +107,12 @@ if __name__ == '__main__':
         # Save new computation?
         aft_filename = get_allele_frequency_trajectories_filename(pname, fragment)
         if save_to_file or (not os.path.isfile(aft_filename)):
-            nus = get_allele_frequency_trajectories(patient, fragment, VERBOSE=VERBOSE)
+            (cos, nus) = get_allele_frequency_trajectories(patient, fragment, VERBOSE=VERBOSE)
         else:
             nus = np.load(aft_filename)
 
         if save_to_file:
+            cos.dump(get_allele_count_trajectories_filename(pname, fragment))
             nus.dump(get_allele_frequency_trajectories_filename(pname, fragment))
 
         if plot:

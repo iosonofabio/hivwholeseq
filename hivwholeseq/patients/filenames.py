@@ -83,6 +83,15 @@ def get_consensi_alignment_genomewide_filename(pname,
     return filename
 
 
+def get_allele_count_trajectories_filename(pname,
+                                           fragment,
+                                           root_data_folder=root_data_folder):
+    '''Get the matrix with allele counts on the initial consensus'''
+    filename = 'allele_frequency_counts'+fragment+'.npy'
+    filename = get_foldername(pname, root_data_folder=root_data_folder)+filename
+    return filename
+
+
 def get_allele_frequency_trajectories_filename(pname,
                                                fragment,
                                                root_data_folder=root_data_folder):
@@ -90,6 +99,7 @@ def get_allele_frequency_trajectories_filename(pname,
     filename = 'allele_frequency_trajectories_'+fragment+'.npy'
     filename = get_foldername(pname, root_data_folder=root_data_folder)+filename
     return filename
+
 
 
 # SUMMARY

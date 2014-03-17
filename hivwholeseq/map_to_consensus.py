@@ -39,9 +39,8 @@ stampy_sensitive = True     # Default: False
 # Cluster submit
 import hivwholeseq
 JOBDIR = hivwholeseq.__path__[0].rstrip('/')+'/'
-JOBSCRIPT = JOBDIR+'map_to_consensus.py'
-JOBLOGERR = JOBDIR+'logerr'
-JOBLOGOUT = JOBDIR+'logout'
+JOBLOGERR = JOBDIR+'logerr/'
+JOBLOGOUT = JOBDIR+'logout/'
 vmem = '8G'
 
 

@@ -263,13 +263,7 @@ def get_mapped_filename(data_folder, adaID, fragment, type='bam',
     elif unsorted:
         filename = filename+'_unsorted'
 
-    if type == 'sam':
-        filename = filename + '.sam'
-    elif type == 'bam':
-        filename = filename + '.bam'
-    else:
-        raise ValueError('Type of mapped reads file not recognized')
-    filename = 'mapped/'+filename
+    filename = 'mapped/'+filename+'.'+type
     filename = foldername_adapter(adaID)+filename
     return data_folder+filename
 
@@ -395,11 +389,13 @@ def get_figure_folder(data_folder, adaID=None):
     return folder
 
 
-def get_quality_along_reads_filename(data_folder, ext='png'):
+def get_quality_along_reads_filename(data_folder, adaID=None, ext='png', simple=False):
     '''Get the filename of the quality along the reads'''
     filename = 'quality_along_reads'
+    if simple:
+        filename = filename+'_simple'
     filename = filename+'.'+ext
-    filename = get_figure_folder(data_folder)+filename
+    filename = get_figure_folder(data_folder, adaID)+filename
     return filename
 
 
