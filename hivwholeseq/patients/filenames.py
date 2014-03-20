@@ -33,6 +33,7 @@ def get_initial_consensus_filename(pname, fragment,
 
 def get_mapped_to_initial_filename(pname, samplename, fragment, type='bam',
                                    part=None, unsorted=False,
+                                   filtered=False,
                                    root_data_folder=root_data_folder):
     '''Get the filename of the mapped reads to initial consensus'''
     filename = fragment
@@ -40,6 +41,8 @@ def get_mapped_to_initial_filename(pname, samplename, fragment, type='bam',
         filename = filename+'_part'+str(part)
     elif unsorted:
         filename = filename+'_unsorted'
+    if filtered:
+        filename = filename+'_filtered'
     filename = filename+'.'+type
     filename = samplename+'/mapped_to_initial/'+filename
     filename = get_foldername(pname, root_data_folder=root_data_folder)+filename
@@ -126,5 +129,10 @@ def get_map_initial_summary_filename(pname, samplename, fragment,
     return filename
 
 
-
-
+def get_filter_mapped_init_summary_filename(pname, samplename, fragment,
+                                     root_data_folder=root_data_folder):
+    '''Get the filename of the summary of the post-map filtering'''
+    filename= 'summary_filter_mapped_init_'+fragment+'.txt'
+    filename = samplename+'/mapped_to_initial/'+filename
+    filename = get_foldername(pname, root_data_folder=root_data_folder)+filename
+    return filename

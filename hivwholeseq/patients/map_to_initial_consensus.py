@@ -26,6 +26,7 @@ from hivwholeseq.patients.filenames import get_initial_index_filename, \
         get_initial_hash_filename, get_initial_consensus_filename, \
         get_mapped_to_initial_filename, get_map_initial_summary_filename
 from hivwholeseq.fork_cluster import fork_map_to_initial_consensus as fork_self
+from hivwholeseq.clean_temp_files import remove_mapped_init_tempfiles
 
 
 
@@ -228,7 +229,7 @@ def map_stampy(patient, samplename, fragment, VERBOSE=0, threads=1, n_pairs=-1,
                     # Convert to BAM for merging
                     if VERBOSE >= 1:
                         print 'Convert mapped reads to BAM for merging: sample '+\
-                               sample+', part '+str(j+1)+ ' of '+ \
+                               samplename+', part '+str(j+1)+ ' of '+ \
                                str(threads)
                     convert_sam_to_bam(output_file_parts[j])
                     # We do not need to wait if we did the conversion (it takes
@@ -245,7 +246,7 @@ def map_stampy(patient, samplename, fragment, VERBOSE=0, threads=1, n_pairs=-1,
                                                          fragment,
                                                          type='bam', unsorted=True)
         if VERBOSE >= 1:
-            print 'Concatenate premapped reads: sample '+sample
+            print 'Concatenate premapped reads: sample '+samplename
         pysam.cat('-o', output_filename, *output_file_parts)
         if summary:
             with open(summary_filename, 'a') as f:
@@ -257,7 +258,7 @@ def map_stampy(patient, samplename, fragment, VERBOSE=0, threads=1, n_pairs=-1,
                                                                 type='bam')
         # NOTE: we exclude the extension and the option -f because of a bug in samtools
         if VERBOSE >= 1:
-            print 'Sort mapped reads: sample '+sample
+            print 'Sort mapped reads: sample '+samplename
         pysam.sort('-n', output_filename, output_filename_sorted[:-4])
         if summary:
             with open(summary_filename, 'a') as f:
@@ -265,7 +266,7 @@ def map_stampy(patient, samplename, fragment, VERBOSE=0, threads=1, n_pairs=-1,
 
         # Reheader the file without BAM -> SAM -> BAM
         if VERBOSE >= 1:
-            print 'Reheader mapped reads: sample '+sample
+            print 'Reheader mapped reads: sample '+samplename
         header_filename = get_mapped_to_initial_filename(pname, samplename,
                                                          fragment,
                                                          type='sam', part=1)
@@ -273,6 +274,16 @@ def map_stampy(patient, samplename, fragment, VERBOSE=0, threads=1, n_pairs=-1,
         if summary:
             with open(summary_filename, 'a') as f:
                 f.write('Joint BAM file reheaded.\n')
+
+        if VERBOSE >= 1:
+            print 'Remove temporary files: sample '+samplename
+        remove_mapped_init_tempfiles(data_folder, samplename, fragment, VERBOSE=VERBOSE)
+        if summary:
+            with open(summary_filename, 'a') as f:
+                f.write('Temp mapping files removed.\n')
+                f.write('\n')
+
+
 
     if n_pairs > 0:
         os.remove(input_filename_sub)
@@ -317,7 +328,6 @@ if __name__ == '__main__':
     skip_hash = args.skiphash
     summary = args.summary
 
-    # Get the patient
     patient = get_patient(pname)
 
     # If no samples are mentioned, use all sequenced ones
@@ -361,7 +371,7 @@ if __name__ == '__main__':
                             ' --threads '+str(threads)+\
                             ' --verbose '+str(VERBOSE))
                     if n_pairs != -1:
-                        f.write(' -n '+str(n_pairs))
+                        f.write(' --maxreads '+str(n_pairs))
                     if filter_reads:
                         f.write(' --filter')
                     f.write('\n')

@@ -42,6 +42,22 @@ def remove_mapped_tempfiles(data_folder, adaID, fragment='F', VERBOSE=0):
             print 'File removed:', fn
 
 
+def remove_mapped_init_tempfiles(pname, samplename, fragment='F', VERBOSE=0):
+    '''Remove the part files of multi-threaded mapping to initial patient consensus'''
+    from hivwholeseq.patients.filenames import get_mapped_to_initial_filename
+
+    dirname = os.path.dirname(get_mapped_to_initial_filename(pname,
+                                                             samplename,
+                                                             'F1'))+'/'
+    fns = glob.glob(dirname+fragment+'*_part*') + \
+          glob.glob(dirname+fragment+'*_unsorted*') + \
+          glob.glob(dirname+fragment+'*.00*.bam')
+    for fn in fns:
+        os.remove(fn)
+        if VERBOSE >= 3:
+            print 'File removed:', fn
+
+
 def gzip_demultiplexed_reads(data_folder, adaID, VERBOSE=0):
     '''Gzip FastQ demultiplexed files'''
     from hivwholeseq.filenames import get_read_filenames

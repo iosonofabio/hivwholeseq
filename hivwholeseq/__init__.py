@@ -22,4 +22,5 @@ __all__ = ['generic_utils',
            'reference_samples',
            'samples',
            'sequence_utils',
+           'two_site_statistics',
           ]

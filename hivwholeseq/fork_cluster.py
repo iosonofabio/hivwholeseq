@@ -368,13 +368,14 @@ def fork_get_coallele_counts(data_folder, adaID, fragment, VERBOSE=3, summary=Tr
 
 
 # PATIENTS
-def fork_map_to_initial_consensus(pname, sample, fragment, VERBOSE=0, threads=1,
+def fork_map_to_initial_consensus(pname, samplename, fragment,
+                                  VERBOSE=0, threads=1,
                                   n_pairs=-1, filter_reads=False,
                                   summary=True):
     '''Fork to the cluster for each sample and fragment'''
     if VERBOSE:
         print 'Forking to the cluster: patient '+pname+', sample '+\
-                sample+', fragment '+fragment
+                samplename+', fragment '+fragment
 
     JOBSCRIPT = JOBDIR+'patients/map_to_initial_consensus.py'
     cluster_time = ['23:59:59', '0:59:59']
@@ -385,12 +386,12 @@ def fork_map_to_initial_consensus(pname, sample, fragment, VERBOSE=0, threads=1,
                  '-S', '/bin/bash',
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
-                 '-N', 'm '+sample+' '+fragment,
+                 '-N', 'm '+samplename+' '+fragment,
                  '-l', 'h_rt='+cluster_time[threads >= 10],
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
                  '--patient', pname,
-                 '--samples', sample,
+                 '--samples', samplename,
                  '--fragments', fragment,
                  '--verbose', VERBOSE,
                  '--threads', threads,
@@ -399,6 +400,41 @@ def fork_map_to_initial_consensus(pname, sample, fragment, VERBOSE=0, threads=1,
                 ]
     if filter_reads:
         qsub.append('--filter')
+    if not summary:
+        call_list.append('--no-summary')
+    qsub_list = map(str, qsub_list)
+    if VERBOSE:
+        print ' '.join(qsub_list)
+    return sp.check_output(qsub_list)
+
+
+def fork_filter_mapped_init(pname, samplename, fragment,
+                            VERBOSE=0, n_pairs=-1,
+                            summary=True):
+    '''Fork to the cluster for each sample and fragment'''
+    if VERBOSE:
+        print 'Forking to the cluster: patient '+pname+', sample '+\
+                samplename+', fragment '+fragment
+
+    JOBSCRIPT = JOBDIR+'patients/filter_mapped_reads.py'
+    cluster_time = '3:59:59'
+    vmem = '8G'
+
+    qsub_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'fmi '+samplename+' '+fragment,
+                 '-l', 'h_rt='+cluster_time,
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--patient', pname,
+                 '--samples', samplename,
+                 '--fragments', fragment,
+                 '--verbose', VERBOSE,
+                 '--maxreads', n_pairs,
+                ]
     if not summary:
         call_list.append('--no-summary')
     qsub_list = map(str, qsub_list)
