@@ -472,3 +472,35 @@ def fork_get_allele_frequency_trajectory(pname, fragment, VERBOSE=0):
     return sp.check_output(qsub_list)
 
 
+def fork_get_cocounts_patient(pname, samplename, fragment, VERBOSE=0,
+                              maxreads=-1, use_tests=False):
+    '''Fork to the cluster for each patient, sample, and fragment'''
+    if VERBOSE:
+        print 'Forking to the cluster: patient '+pname+', sample'+samplename+', fragment '+fragment
+
+    JOBSCRIPT = JOBDIR+'patients/get_allele_cocounts.py'
+    cluster_time = '23:59:59'
+    vmem = '8G'
+
+    qsub_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'coco '+fragment,
+                 '-l', 'h_rt='+cluster_time,
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--patient', pname,
+                 '--fragments', fragment,
+                 '--samples', samplename,
+                 '--verbose', VERBOSE,
+                 '--maxreads', maxreads,
+                ]
+    if use_tests:
+        qsub_list.append('--tests')
+    qsub_list = map(str, qsub_list)
+    if VERBOSE:
+        print ' '.join(qsub_list)
+    return sp.check_output(qsub_list)
+

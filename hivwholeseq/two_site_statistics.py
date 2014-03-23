@@ -61,7 +61,7 @@ def get_coallele_counts_from_file(bamfilename, length, qual_min=35,
                             raise ValueError('Pos exceeded the length of the fragment')
                     # Insertions
                     if bt == 1:
-                        pos_read += bl!
+                        pos_read += bl
                     # Deletions
                     elif bt == 2:
                         pos_ref += bl
@@ -105,7 +105,7 @@ def get_coallele_counts_from_file(bamfilename, length, qual_min=35,
             # Avoid doubles (paired reads are twice the same biological molecule)
             posall.sort(order=('pos', 'aind'))
             iall = (posall['pos'] != -1).nonzero()[0][0]
-            while iall != len(posall) - 1:
+            while iall < len(posall) - 1:
                 if posall['pos'][iall + 1] == posall['pos'][iall]:
                     # If the dups agree, skip one
                     if posall['aind'][iall + 1] == posall['aind'][iall]:

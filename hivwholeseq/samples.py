@@ -163,7 +163,7 @@ sample_list = [\
  {'name': '28929_PCR1', 'run': 'Tue48', 'adaID': 'N2-S4',
   'fragments': ('F1o', 'F2o', 'F3o', 'F4o', 'F5ao', 'F6o')},
 
-  ## TruSeq #3 + South Africa #2 (mixed library)
+  ## TruSeq #3 + South Africa #2 (mixed library, only read1 worked)
   #{'name': 'POL_SA_2', 'run': 'Tue52', 'adaID': 'TS1',
   # 'description': 'South Africa mutation rate #2'}, #SOUTH AFRICAN SAMPLE
   #{'name': 'VK01-2965_PCR2', 'run': 'Tue52', 'adaID': 'TS5',
@@ -175,6 +175,28 @@ sample_list = [\
   #{'name': 'VK09-1685_PCR2', 'run': 'Tue52', 'adaID': 'TS15',
   # 'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i'), #IS THIS TRUE?
   # 'patient': '15313', 'date': '2009-02-26'},
+
+  {'name': 'LAI-III', 'run': 'Tue59', 'adaID': 'N3-S3',
+   'description': 'Reference sequence for subtype B',
+   'fragments': ('')},
+  {'name': '38540', 'run': 'Tue59', 'adaID': 'N5-S4',
+   'description': 'Reference sequence for subtype C',
+   'fragments': ('')},
+  {'name': '38304', 'run': 'Tue59', 'adaID': 'N6-S3',
+   'description': 'Reference sequence for subtype B',
+   'fragments': ('')},
+  {'name': 'VK03-4298_PCR1', 'run': 'Tue59', 'adaID': 'N5-S2',
+   'fragments': ('F1o', 'F2o', 'F3o', 'F4o', 'F5bo', 'F6o'),
+   'patient': '20097', 'date': ''},
+  {'name': 'VK04-3106_PCR1', 'run': 'Tue59', 'adaID': 'N3-S4',
+   'fragments': ('F1o', 'F2o', 'F3o', 'F4o', 'F5bo', 'F6o'),
+   'patient': '20097', 'date': ''},
+  {'name': 'VK09-1685_PCR1', 'run': 'Tue59', 'adaID': 'N4-S2',
+   'fragments': (''),
+   'patient': '15313', 'date': '2009-02-26'},
+  {'name': 'VK09-7738_PCR1', 'run': 'Tue59', 'adaID': 'N6-S4',
+   'fragments': ('F1o', 'F2o', 'F3o', 'F4o', 'F5ao', 'F6o'),
+   'patient': '20529', 'date': '2009-09-24'},
 
  ]
 

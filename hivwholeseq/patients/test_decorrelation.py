@@ -14,12 +14,14 @@ import numpy as np
 import pysam
 from Bio import SeqIO
 
+from hivwholeseq.miseq import alpha
 from hivwholeseq.patients.patients import get_patient
 from hivwholeseq.filter_mapped_reads import plot_distance_histogram, \
         plot_distance_histogram_sliding_window, get_distance_from_consensus, \
         check_overhanging_reads, trim_bad_cigar
 from hivwholeseq.patients.filenames import get_initial_consensus_filename, \
-        get_mapped_to_initial_filename, get_filter_mapped_init_summary_filename
+        get_mapped_to_initial_filename, get_filter_mapped_init_summary_filename, \
+        get_allele_cocounts_filename, get_allele_frequency_trajectories_filename
 from hivwholeseq.mapping_utils import convert_sam_to_bam, pair_generator
 from hivwholeseq.two_site_statistics import get_coallele_counts_from_file
 
@@ -35,21 +37,17 @@ if __name__ == '__main__':
                         help='Patient to analyze')
     parser.add_argument('--fragments', nargs='*',
                         help='Fragment to map (e.g. F1 F6)')
-    parser.add_argument('--maxreads', type=int, default=-1,
-                        help='Number of read pairs to map (for testing)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
-    parser.add_argument('--tests', action='store_true',
-                        help='Include consistency tests')
 
     args = parser.parse_args()
     pname = args.patient
     fragments = args.fragments
     VERBOSE = args.verbose
-    maxreads = args.maxreads
-    use_tests = args.tests
 
     patient = get_patient(pname)
+    samplenames = patient.samples # They are time sorted already
+    times = patient.times()
 
     # If the script is called with no fragment, iterate over all
     # NOTE: This assumes that the fragment has been sequenced. If not, we should
@@ -59,23 +57,45 @@ if __name__ == '__main__':
     if VERBOSE >= 3:
         print 'fragments', fragments
 
-    # Get the first sequenced sample
-    sample_init = patient.initial_sample
-
     for fragment in fragments:
+        refseq = SeqIO.read(get_initial_consensus_filename(pname, fragment), 'fasta')
 
-        reffilename = get_initial_consensus_filename(pname, fragment)
-        refseq = SeqIO.read(reffilename, 'fasta')
-        length = len(refseq)
+        if VERBOSE >= 1:
+            print 'Initializing matrix of coallele frequencies'
+        coaft = np.empty((len(samplenames), len(alpha), len(alpha), len(refseq), len(refseq)), float)
+        if VERBOSE >= 1:
+            print 'Collecting cocounts and normalizing'
+        for i, samplename in enumerate(samplenames):
+            if VERBOSE >= 2:
+                print pname, fragment, samplename
+            cocounts = np.load(get_allele_cocounts_filename(pname, samplename, fragment))
+            # NOTE: uncovered will get 0 correlation
+            coaft[i] = 1.0 * cocounts / (cocounts.sum(axis=0).sum(axis=0) + 0.1)
+            del cocounts
 
-        # FIXME: repeat for later time points
-        sample = sample_init
-        samplename = sample.name
+        if VERBOSE >= 1:
+            print 'Getting allele frequencies'
+        aft = np.load(get_allele_frequency_trajectories_filename(pname, fragment))
+        if VERBOSE >= 1:
+            print 'Broadcasting allele frequency product (outer tensor product)'
+        aftbroad = np.einsum('mij...,m...kl->mikjl', aft, aft)
+        if VERBOSE >= 1:
+            print 'Subtract product of allele frequencies'
+        LD = coaft - aftbroad 
 
-        bamfilename = get_mapped_to_initial_filename(pname, samplename, fragment,
-                                                     type='bam', filtered=True)
+        # Mask LD when allele freqs are too close to 0 or 1
+        LD = np.ma.array(LD)
+        LD[(aftbroad < 1e-4) | (aftbroad > 1 - 1e-4)] = np.ma.masked
 
-        cocounts = get_coallele_counts_from_file(bamfilename, length, 
-                                                 maxreads=maxreads,
-                                                 VERBOSE=VERBOSE,
-                                                 use_tests=use_tests)
+        # Take the correlation coefficient, i.e. divide by sqrt(pi pj qi qj)
+        aftbroadq = np.einsum('mij...,m...kl->mikjl', 1 - aft, 1 - aft)
+        corr = LD / np.sqrt(aftbroad * aftbroadq)
+
+        #if VERBOSE >= 1:
+        #    print 'Finding initial highly correlated pairs'
+        #    # FIXME: only use this criterion because we have t0 twice
+        #    #ind_highLD0 = ((LD[0] > 0.1) & (LD[1] > 0.1) & (aftbroad[0] > 1e-3) & (aftbroad[0] < 0.5)).nonzero()
+        #    pairs_high_LD0 = zip(*ind_highLD0)
+        #    LD_pairs = np.array([LD[:, pair[0], pair[1], pair[2], pair[3]] for pair in pairs_high_LD0]).T
+        #    corr_pairs = np.array([corr[:, pair[0], pair[1], pair[2], pair[3]] for pair in pairs_high_LD0]).T
+        #    print corr_pairs.T

@@ -105,6 +105,14 @@ def get_allele_frequency_trajectories_filename(pname,
     return filename
 
 
+def get_allele_cocounts_filename(pname, samplename, fragment,
+                                 root_data_folder=root_data_folder):
+    '''Get the matrix of allele cocounts on the initial consensus'''
+    filename = 'allele_cocounts_'+fragment+'.npy'
+    filename = get_foldername(pname, root_data_folder=root_data_folder)+samplename+'/'+filename
+    return filename
+
+
 # FIGURES
 def get_figure_folder(pname):
     '''Get the folder for figures for this sample'''
@@ -112,7 +120,7 @@ def get_figure_folder(pname):
     return folder
 
 
-def get_allele_frequency_trajectory_filename(pname, fragment_or_gene, format='png'):
+def get_allele_frequency_trajectory_figure_filename(pname, fragment_or_gene, format='png'):
     '''Get the filename of the plot of allele frequency trajectories'''
     folder = get_figure_folder(pname)
     fn = folder+'allele_freq_traj_'+fragment_or_gene+'.'+format
