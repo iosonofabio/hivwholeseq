@@ -533,10 +533,12 @@ def get_divide_summary_filename(data_folder, adaID):
     return filename
 
 
-def get_build_consensus_summary_filename(data_folder, adaID, fragment='general'):
+def get_build_consensus_summary_filename(data_folder, adaID, fragment='general',
+                                         iterative=True):
     '''Get the filename of the summary of the iterative consensus'''
     filename = 'summary_build_consensus_'+fragment+'.txt'
-    filename = 'map_iter/'+filename
+    if iterative:
+        filename = 'map_iter/'+filename
     filename = data_folder+foldername_adapter(adaID)+filename
     return filename
 

@@ -151,8 +151,8 @@ def fork_trim_and_divide(seq_run, adaID, VERBOSE=0, maxreads=-1, minisize=100,
     return sp.check_output(call_list)
 
 
-def fork_build_consensus(seq_run, adaID, fragment, n_reads=1000,
-                         iterations_max=0, VERBOSE=0, summary=True):
+def fork_build_consensus_iterative(seq_run, adaID, fragment, n_reads=1000,
+                                   iterations_max=0, VERBOSE=0, summary=True):
     '''Submit build consensus script to the cluster for each adapter ID and fragment'''
     if VERBOSE:
         print 'Forking to the cluster: adaID '+adaID+', fragment '+fragment
@@ -178,6 +178,43 @@ def fork_build_consensus(seq_run, adaID, fragment, n_reads=1000,
                 ]
     if not summary:
         call_list.append('--no-summary')
+    call_list = map(str, call_list)
+    if VERBOSE:
+        print ' '.join(call_list)
+    return sp.check_output(call_list)
+
+
+def fork_build_consensus(seq_run, adaID, fragment,
+                         block_len_initial=100, n_reads_per_ali=31,
+                         store_allele_counts=False, VERBOSE=0,
+                         summary=True):
+    '''Submit build consensus script to the cluster for each adapter ID and fragment'''
+    if VERBOSE:
+        print 'Forking to the cluster: adaID '+adaID+', fragment '+fragment
+
+    JOBSCRIPT = JOBDIR+'build_consensus.py'
+    cluster_time = '0:59:59'
+    vmem = '2G'
+    call_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'c '+adaID+' '+fragment,
+                 '-l', 'h_rt='+cluster_time,
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--run', seq_run,
+                 '--adaIDs', adaID,
+                 '--fragments', fragment,
+                 '--block-length', block_len_initial,
+                 '--reads-per-alignment', n_reads_per_ali,
+                 '--verbose', VERBOSE,
+                ]
+    if not summary:
+        call_list.append('--no-summary')
+    if store_allele_counts:
+        call_list.append('--allele-counts')
     call_list = map(str, call_list)
     if VERBOSE:
         print ' '.join(call_list)
