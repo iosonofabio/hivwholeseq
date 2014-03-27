@@ -61,7 +61,7 @@ def get_allele_frequency_trajectories(patient, fragment, qual_min=35, VERBOSE=0)
 if __name__ == '__main__':
 
     # Parse input args
-    parser = argparse.ArgumentParser(description='Update initial consensus')
+    parser = argparse.ArgumentParser(description='Get allele frequency trajectories')
     parser.add_argument('--patient', required=True,
                         help='Patient to analyze')
     parser.add_argument('--fragments', nargs='*',
@@ -83,7 +83,6 @@ if __name__ == '__main__':
     plot = args.plot
     submit = args.submit
 
-    # Get patient and the sequenced samples (and sort them by date)
     patient = get_patient(pname)
 
     # If the script is called with no fragment, iterate over all

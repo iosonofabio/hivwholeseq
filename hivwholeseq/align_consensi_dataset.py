@@ -37,9 +37,10 @@ def align_consensi_dataset(dataset, adaIDs, fragments, VERBOSE=0):
             frag_gen = frag[:2]
             if frag_gen not in fragments:
                 continue
-            con = SeqIO.read(get_consensus_filename(data_folder, adaID, frag_gen),
-                             'fasta')
-            consensi[frag_gen][adaID] = con
+            con_fn = get_consensus_filename(data_folder, adaID, frag_gen)
+            if os.path.isfile(con_fn):
+                con = SeqIO.read(con_fn, 'fasta')
+                consensi[frag_gen][adaID] = con
 
         if 'genomewide' in fragments:
             frag_gens = [frag[:2] for frag in fragments_sample]

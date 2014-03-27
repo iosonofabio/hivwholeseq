@@ -154,6 +154,8 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
     input_filenames = get_read_filenames(data_folder, adaID, gzip=True)
     if not os.path.isfile(input_filenames[0]):
         input_filenames = get_read_filenames(data_folder, adaID, gzip=False)
+    if not all(map(os.path.isfile, input_filenames)):
+        raise OSError('Input files for mapping not found: '+input_filenames[0])
 
     # parallelize if requested
     if threads == 1:

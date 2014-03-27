@@ -76,7 +76,7 @@ def check_division(seq_run, adaID, fragment, qual_min=35,
                         [['run', seq_run],
                          ['adaID', adaID],
                          ['fragment', fragment],
-                         ['n_reads', maxreads],
+                         ['maxreads', maxreads],
                         ]))
     plot_coverage_minor_allele(counts,
                                suptitle=title)
@@ -97,7 +97,7 @@ if __name__ == '__main__':
                         help='Adapter IDs to analyze (e.g. TS2)')
     parser.add_argument('--fragments', nargs='*',
                         help='Fragment to map (e.g. F1 F6)')
-    parser.add_argument('-n', type=int, default=1000,
+    parser.add_argument('--maxreads', type=int, default=1000,
                         help='Number of reads analyzed')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
@@ -106,7 +106,7 @@ if __name__ == '__main__':
     seq_run = args.run
     adaIDs = args.adaIDs
     fragments = args.fragments
-    n_reads = args.n
+    maxreads = args.maxreads
     VERBOSE = args.verbose
 
     # Specify the dataset
@@ -123,12 +123,14 @@ if __name__ == '__main__':
     for adaID in adaIDs:
         samplename = dataset['samples'][dataset['adapters'].index(adaID)]
         fragments_sample = samples[samplename]['fragments']
+        if VERBOSE:
+            print adaID, samplename
 
         for fragment in fragments_sample:
             frag_gen = fragment[:2]
             if (fragments is None) or (frag_gen in fragments):
                 check_division(seq_run, adaID, fragment,
-                               maxreads=n_reads,
+                               maxreads=maxreads,
                                VERBOSE=VERBOSE)
 
 

@@ -124,8 +124,8 @@ def extract_reads_subsample(data_folder, adaID, fragment, n_reads, VERBOSE=0,
     '''Extract a subsample of reads from the initial sample premapped'''
     from hivwholeseq.mapping_utils import extract_mapped_reads_subsample
 
-    input_filename = get_divided_filenames(data_folder, adaID, [fragment], type='bam')[0]
-    output_filename = get_mapped_filename(data_folder, adaID, fragment, 1, type='bam')
+    input_filename = get_divided_filename(data_folder, adaID, fragment, type='bam')
+    output_filename = get_mapped_filename(data_folder, adaID, fragment, n_iter=1, type='bam')
 
     n_written = extract_mapped_reads_subsample(input_filename, output_filename,
                                                n_reads, VERBOSE=VERBOSE)

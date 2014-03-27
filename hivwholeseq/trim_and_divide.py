@@ -561,7 +561,7 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, fragments,
         print 'Trim and divide results: adaID '+adaID
         print 'Total:\t\t', irp
         print 'Mapped:\t\t', sum(n_mapped), n_mapped
-        print 'Unmapped:\t', n_unmapped
+        print 'Unmapped/unpaired/tiny:\t', n_unmapped
         print 'Outer primer\t', n_outer
         print 'Crossfrag:\t', n_crossfrag
         print 'Ambiguous:\t', n_ambiguous
@@ -574,7 +574,7 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, fragments,
             f.write('Trim and divide results: adaID '+adaID+'\n')
             f.write('Total:\t\t'+str(irp)+'\n')
             f.write('Mapped:\t\t'+str(sum(n_mapped))+' '+str(n_mapped)+'\n')
-            f.write('Unmapped:\t'+str(n_unmapped)+'\n')
+            f.write('Unmapped/unpaired/tiny insert:\t'+str(n_unmapped)+'\n')
             f.write('Outer primer\t'+str(n_outer)+'\n')
             f.write('Crossfrag:\t'+str(n_crossfrag)+'\n')
             f.write('Ambiguous:\t'+str(n_ambiguous)+'\n')

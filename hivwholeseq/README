@@ -13,7 +13,7 @@ CHECKPOINT: quality score along reads. (quality_along_read.py)
 1. Demultiplex by adapter and put into separate folders with the adapter IDs and
    sample names. (demultiplex.py)
 
-CHECKPOINT: errors in adapter IDs.
+CHECKPOINT: errors in adapter IDs, quality along read by sample.
 
 2. Preliminary mapping to HXB2, to allow for better filtering immediately afterwards.
    (premap_to_reference.py)

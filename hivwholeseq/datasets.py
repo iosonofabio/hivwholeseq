@@ -96,7 +96,7 @@ MiSeq_runs_list = [\
   'description': 'Nextera XT + BluePippin from little DNA',
   'date': '2014-03-18',
   'n_cycles': 600,
-  'folder': '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run52/',
+  'folder': '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run59/',
   'raw_data': None, # ALREADY DEMULTIPLEXED!
  },
 
