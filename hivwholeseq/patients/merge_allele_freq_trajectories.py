@@ -131,20 +131,22 @@ if __name__ == '__main__':
     if save_to_file:
         afs.dump(get_allele_frequency_trajectories_filename(pname, 'genomewide'))
 
-    #if plot:
-    #    import matplotlib.pyplot as plt
-    #    times = patient.times()
-    #    plot_nus(times, afs, title='Patient '+pname, VERBOSE=VERBOSE)
-    #    plot_nus_3d(times, afs, title='Patient '+pname, VERBOSE=VERBOSE)
- 
-    
-    # Average in windows of 50 bp
-    window_size = 50
-    afs_win = np.zeros((afs.shape[0], afs.shape[1], afs.shape[2] // window_size))
-    for i in xrange(afs_win.shape[2]):
-        afs_win[:, :, i] = afs[:, :, i * window_size: (i+1) * window_size].mean(axis=2)
-
     if plot:
+        import matplotlib.pyplot as plt
         times = patient.times()
-        plot_nus_3d(times, afs_win, title='Patient '+pname, VERBOSE=VERBOSE)
+        plot_nus(times, afs, title='Patient '+pname, VERBOSE=VERBOSE)
+        plot_nus_3d(times, afs, title='Patient '+pname, VERBOSE=VERBOSE)
+
+        plt.ion()
+        plt.show()
+    
+    ## Average in windows of 50 bp
+    #window_size = 50
+    #afs_win = np.zeros((afs.shape[0], afs.shape[1], afs.shape[2] // window_size))
+    #for i in xrange(afs_win.shape[2]):
+    #    afs_win[:, :, i] = afs[:, :, i * window_size: (i+1) * window_size].mean(axis=2)
+
+    #if plot:
+    #    times = patient.times()
+    #    plot_nus_3d(times, afs_win, title='Patient '+pname, VERBOSE=VERBOSE)
 

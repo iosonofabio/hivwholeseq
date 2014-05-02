@@ -52,9 +52,13 @@ def merge_consensi(data_folder, adaID, fragments, VERBOSE=0):
         # copy from the end of the overlap on
         else:
             cons = consensus[-1]
-            (_, start, _) = overlaps[(fragments[i-1], frag)]
             cons[0].append(frag)
-            cons[1] = cons[1]+str(consensi[frag][start:].seq)
+            tmp = overlaps[(fragments[i-1], frag)]
+            if tmp is not None:
+                (_, start, _) = tmp
+                cons[1] = cons[1]+str(consensi[frag][start:].seq)
+            else:
+                cons[1] = cons[1]+('N' * 10)+str(consensi[frag].seq)
 
     # Make SeqRecords out of consensi
     for i, (frags, cons) in enumerate(consensus):
@@ -99,10 +103,16 @@ def merge_allele_frequencies(data_folder, adaID, fragments, VERBOSE=0):
         # FIXME: we could average the consensus zone out of indels...
         else:
             nuf = nu[-1]
-            (_, start, _) = overlaps[(fragments[i-1], frag)]
             nuf[0].append(frag)
-            #(recursion is not the most efficient but -- oh, well)
-            nuf[1] = np.concatenate([nuf[1], nus[frag][:, start:]], axis=1)
+            tmp = overlaps[(fragments[i-1], frag)]
+            if tmp is not None:
+                (_, start, _) = tmp
+                #(recursion is not the most efficient but -- oh, well)
+                nuf[1] = np.concatenate([nuf[1], nus[frag][:, start:]], axis=1)
+            else:
+                tmp = np.zeros((nuf[1].shape[0], 10), 'S1')
+                tmp[-1] = 1
+                nuf[1] = np.concatenate([nuf[1], tmp, nus[frag][:, start:]], axis=1)
 
     return nu
 

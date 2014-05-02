@@ -44,6 +44,14 @@ if __name__ == '__main__':
                         help='Samples to map (e.g. VL98-1253 VK03-4298)')
     parser.add_argument('--threshold', type=float, default=-3,
                         help='Log10 of the minimal allele frequency to trust')
+    parser.add_argument('--allele-frequencies', action='store_true',
+                        dest='allele_frequencies',
+                        help='Look at allele frequencies')
+    parser.add_argument('--allele-cofrequencies', action='store_true',
+                        dest='allele_cofrequencies',
+                        help='Look at allele cofrequencies')
+    parser.add_argument('--saveplot', action='store_true',
+                        help='Save the plot to file')
 
     args = parser.parse_args()
     pname = args.patient
@@ -51,6 +59,9 @@ if __name__ == '__main__':
     VERBOSE = args.verbose
     samplenames = args.samples
     threshold = args.threshold
+    use_allele_frequencies = args.allele_frequencies
+    use_allele_cofrequencies = args.allele_cofrequencies
+    saveplot = args.saveplot
 
     patient = get_patient(pname)
 
@@ -64,19 +75,7 @@ if __name__ == '__main__':
 
     for fragment in fragments:
         for samplename in samplenames:
-            if samplename in patient.samples:
-                samplename_PCR2 = samplename
-            elif samplename+'_PCR2' in patient.samples:
-                samplename_PCR2 = samplename+'_PCR2'
-            else:
-                raise ValueError('PCR2 sample not found!')
-
-            if samplename+'_PCR1' in patient.samples:
-                samplename_PCR1 = samplename+'_PCR1'
-            else:
-                raise ValueError('PCR1 sample not found!')
-
-            samplenames_both = [samplename_PCR1, samplename_PCR2]
+            samplenames_both = [samplename+'_PCR1', samplename+'_PCR2']
             index_both = map(patient.samples.index, samplenames_both)
 
             # Check allele frequencies
@@ -85,22 +84,39 @@ if __name__ == '__main__':
             aft[:, (aft < 10**threshold).any(axis=0)] = np.ma.masked
             aftlog = np.log10(aft)
 
-            print 'Allele frequencies'
-            print 'Difference, mean:', np.diff(aftlog[:, (aftlog > threshold).all(axis=0)]).mean()
-            print 'Difference, std :', np.diff(aftlog[:, (aftlog > threshold).all(axis=0)]).std()
-            #import matplotlib.pyplot as plt
-            #plt.figure()
-            #plt.scatter(aftlog[:, (aftlog > threshold).all(axis=0)][0],
-            #            aftlog[:, (aftlog > threshold).all(axis=0)][1],
-            #            s=40, facecolor='b', edgecolor='none', alpha=0.5)
-            #x = np.linspace(threshold, 0)
-            #plt.plot(x, x + 0.5, lw=2, c='r')
-            #plt.plot(x, x - 0.5, lw=2, c='r')
-            #plt.xlabel('log10 allele freq, PCR1')
-            #plt.ylabel('log10 allele freq, PCR2')
-            #plt.xlim(threshold - 0.1, 0)
-            #plt.ylim(threshold - 0.1, 0)
-            #plt.title(', '.join([pname, fragment, samplename]))
+            if use_allele_frequencies:
+                print 'Allele frequencies'
+                print 'Difference, mean:', np.diff(aftlog[:, (aftlog > threshold).all(axis=0)]).mean()
+                print 'Difference, std :', np.diff(aftlog[:, (aftlog > threshold).all(axis=0)]).std()
+                import matplotlib.pyplot as plt
+                colors = cm.jet(1.0 * np.arange(aft.shape[-1]) / aft.shape[-1])
+                shapes = ('o', 'v', 's', '*', '^', 'p')
+                plt.figure()
+                for ai in xrange(aftlog.shape[1]):
+                    plt.scatter(aftlog[0, ai].data,
+                                aftlog[1, ai].data,
+                                facecolor=colors[aftlog[0, ai].mask],
+                                marker=shapes[ai],
+                                s=40,
+                                edgecolor='none', alpha=0.5,
+                                label=alpha[ai])
+                x = np.linspace(threshold, 0)
+                plt.plot(x, x + 0.5, lw=2, c='r')
+                plt.plot(x, x - 0.5, lw=2, c='r')
+                plt.xlabel('log10 allele freq, PCR1')
+                plt.ylabel('log10 allele freq, PCR2')
+                plt.xlim(threshold - 0.1, 0)
+                plt.ylim(threshold - 0.1, 0)
+                plt.title(', '.join([pname, fragment, samplename]))
+                plt.legend(loc=4, fontsize=10)
+
+                if saveplot:
+                    from hivwholeseq.patients.filenames import get_correlation_PCR1_PCR2_aft_figure_filename
+                    fn = get_correlation_PCR1_PCR2_aft_figure_filename(pname, fragment, samplename)
+                    plt.savefig(fn)
+
+            if not use_allele_cofrequencies:
+                continue
 
             # Check coallele frequencies
             coaft = np.ma.empty((2, len(alpha), len(alpha), aft.shape[-1], aft.shape[-1]), float)

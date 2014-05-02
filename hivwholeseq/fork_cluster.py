@@ -222,9 +222,14 @@ def fork_build_consensus(seq_run, adaID, fragment,
 
 
 def fork_map_to_consensus(seq_run, adaID, fragment, VERBOSE=3, bwa=False,
-                          threads=1, n_pairs=-1, filter_reads=False,
+                          threads=1, maxreads=-1, filter_reads=False,
                           summary=True):
-    '''Submit map script for each adapter ID and fragment'''
+    '''Submit map script for each adapter ID and fragment
+    
+    Note on cluster runtime: we require less than 1 hr ONLY for tests, i.e. if
+    maxreads is less or equal 10k. There is too much stochasticity in the cluster
+    occupancy for anything else: the master thread is going to be cut down prematurely.
+    '''
     if VERBOSE:
         print 'Forking to the cluster: adaID '+adaID+', fragment '+fragment
 
@@ -237,7 +242,7 @@ def fork_map_to_consensus(seq_run, adaID, fragment, VERBOSE=3, bwa=False,
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
                  '-N', 'm '+adaID+' '+fragment,
-                 '-l', 'h_rt='+cluster_time[(threads >= 15) and (not filter_reads)],
+                 '-l', 'h_rt='+cluster_time[maxreads <= 10000],
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
                  '--run', seq_run,
@@ -245,7 +250,7 @@ def fork_map_to_consensus(seq_run, adaID, fragment, VERBOSE=3, bwa=False,
                  '--fragments', fragment,
                  '--verbose', VERBOSE,
                  '--threads', threads,
-                 '-n', n_pairs
+                 '--maxreads', maxreads
                 ]
     if bwa:
         call_list.append('--bwa')
@@ -272,7 +277,7 @@ def fork_filter_mapped(seq_run, adaID, fragment, VERBOSE=0, summary=True):
                  '-S', '/bin/bash',
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
-                 '-N', 'fm '+adaID+' '+fragment,
+                 '-N', 'f '+adaID+' '+fragment,
                  '-l', 'h_rt='+cluster_time,
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,

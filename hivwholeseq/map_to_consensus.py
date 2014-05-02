@@ -177,7 +177,7 @@ def map_bwa(data_folder, adaID, fragment, VERBOSE=0):
 
 
 def map_stampy(data_folder, adaID, fragment, VERBOSE=0, bwa=False, threads=1,
-               cluster_time='23:59:59', n_pairs=-1, summary=True):
+               cluster_time='23:59:59', maxreads=-1, summary=True):
     '''Map using stampy, either directly or after BWA'''
     if summary:
         summary_filename = get_map_summary_filename(data_folder, adaID, fragment)
@@ -223,9 +223,9 @@ def map_stampy(data_folder, adaID, fragment, VERBOSE=0, bwa=False, threads=1,
 
         # Take only a (random) subsample: stampy uses the fraction of reads
         # intead of the number
-        if n_pairs > 0:
+        if maxreads > 0:
             n_pairs_tot = get_number_reads(input_filename, 'bam') / 2
-            frac_pairs = 1.0 * n_pairs / n_pairs_tot
+            frac_pairs = 1.0 * maxreads / n_pairs_tot
             random_seed = np.random.randint(1e5)
             call_list.append('-s', frac_pairs + random_seed)
 
@@ -374,7 +374,7 @@ if __name__ == '__main__':
                         help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
-    parser.add_argument('-n', type=int, default=-1,
+    parser.add_argument('--maxreads', type=int, default=-1,
                         help='Number of read pairs to map (for testing)')
     parser.add_argument('--submit', action='store_true',
                         help='Execute the script in parallel on the cluster')
@@ -395,7 +395,7 @@ if __name__ == '__main__':
     submit = args.submit
     bwa = args.bwa
     threads = args.threads
-    n_pairs = args.n
+    maxreads = args.maxreads
     filter_reads = args.filter
     summary = args.summary
 
@@ -438,7 +438,7 @@ if __name__ == '__main__':
             if submit:
                 fork_self(seq_run, adaID, fragment,
                           VERBOSE=VERBOSE, bwa=bwa,
-                          threads=threads, n_pairs=n_pairs,
+                          threads=threads, maxreads=maxreads,
                           filter_reads=filter_reads,
                           summary=summary)
                 continue
@@ -452,8 +452,8 @@ if __name__ == '__main__':
                             ' --fragments '+fragment+\
                             ' --threads '+str(threads)+\
                             ' --verbose '+str(VERBOSE))
-                    if n_pairs != -1:
-                        f.write(' -n '+str(n_pairs))
+                    if maxreads != -1:
+                        f.write(' --maxreads '+str(maxreads))
                     if bwa:
                         f.write(' --bwa')
                     if filter_reads:
@@ -477,7 +477,7 @@ if __name__ == '__main__':
                        VERBOSE=VERBOSE, bwa=bwa,
                        threads=threads,
                        cluster_time=cluster_time,
-                       n_pairs=n_pairs,
+                       maxreads=maxreads,
                        summary=summary)
 
             if filter_reads:

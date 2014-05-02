@@ -149,7 +149,7 @@ def plot_minor_allele_frequency(data_folder, adaID, fragments, VERBOSE=0,
 
 
 def plot_minor_allele_frequency_filtered(data_folder, adaID, fragments, VERBOSE=0,
-                                savefig=False):
+                                         savefig=False):
     '''Plot minor allele frequency along the genome'''
     from hivwholeseq.filenames import get_minor_allele_frequency_figure_filename as gff
     import matplotlib
@@ -162,8 +162,6 @@ def plot_minor_allele_frequency_filtered(data_folder, adaID, fragments, VERBOSE=
     matplotlib.rcParams.update(params)
     from matplotlib import cm
     import matplotlib.pyplot as plt
-
-    plot_grid = [(1, 1), (1, 2), (1, 3), (2, 2), (1, 5), (2, 3)]
 
     # Store in globals structures
     covs = {}
@@ -186,6 +184,7 @@ def plot_minor_allele_frequency_filtered(data_folder, adaID, fragments, VERBOSE=
         nus_minor_filtered[fragment] = nut
  
     # Plot them
+    plot_grid = [(1, 1), (1, 2), (1, 3), (2, 2), (1, 5), (2, 3)]
     (n_plots_y, n_plots_x) = plot_grid[len(fragments) - 1]
     fig, axs = plt.subplots(n_plots_y, n_plots_x, figsize=(13, 8))
     if len(fragments) > 1:
@@ -211,7 +210,7 @@ def plot_minor_allele_frequency_filtered(data_folder, adaID, fragments, VERBOSE=
 
         ax.set_xlim(-100, len(nus_minor_filtered[fragment]) + 100)
     
-    plt.legend(loc='upper right')
+    #plt.legend(loc='upper right')
     plt.tight_layout(rect=(0, 0, 1, 0.95))
 
     if savefig:

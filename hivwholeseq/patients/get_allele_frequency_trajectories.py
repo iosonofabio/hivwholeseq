@@ -70,10 +70,12 @@ if __name__ == '__main__':
                         help='Verbosity level [0-3]')
     parser.add_argument('--save', action='store_true',
                         help='Save the allele frequency trajectories to file')
-    parser.add_argument('--plot', action='store_true',
-                        help='Plot the allele frequency trajectories')
     parser.add_argument('--submit', action='store_true',
                         help='Execute the script in parallel on the cluster')
+    parser.add_argument('--plot', nargs='?', default=None, const='2D',
+                        help='Plot the allele frequency trajectories')
+    parser.add_argument('--PCR1', action='store_true',
+                        help='Show only PCR1 samples where possible (still computes all)')
 
     args = parser.parse_args()
     pname = args.patient
@@ -82,8 +84,15 @@ if __name__ == '__main__':
     save_to_file = args.save
     plot = args.plot
     submit = args.submit
+    use_PCR1 = args.PCR1
 
     patient = get_patient(pname)
+    times = patient.times()
+    samplenames = patient.samples
+    if use_PCR1:
+        # Keep PCR2 only if PCR1 is absent
+        ind = np.nonzero(map(lambda x: ('PCR1' in x[1]) or ((times == times[x[0]]).sum() == 1), enumerate(samplenames)))[0]
+        times = times[ind]
 
     # If the script is called with no fragment, iterate over all
     if not fragments:
@@ -104,25 +113,34 @@ if __name__ == '__main__':
             print fragment
 
         # Save new computation?
+        act_filename = get_allele_count_trajectories_filename(pname, fragment)
         aft_filename = get_allele_frequency_trajectories_filename(pname, fragment)
         if save_to_file or (not os.path.isfile(aft_filename)):
-            (cos, nus) = get_allele_frequency_trajectories(patient, fragment, VERBOSE=VERBOSE)
+            (act, aft) = get_allele_frequency_trajectories(patient, fragment, VERBOSE=VERBOSE)
         else:
-            nus = np.load(aft_filename)
+            aft = np.load(aft_filename)
+            act = np.load(act_filename)
+
+        aft[np.isnan(aft)] = 0
+        aft[(aft < 1e-5) | (aft > 1)] = 0
 
         if save_to_file:
-            cos.dump(get_allele_count_trajectories_filename(pname, fragment))
-            nus.dump(get_allele_frequency_trajectories_filename(pname, fragment))
+            act.dump(get_allele_count_trajectories_filename(pname, fragment))
+            aft.dump(get_allele_frequency_trajectories_filename(pname, fragment))
 
-        if plot:
+        if use_PCR1:
+            aft = aft[ind]
+            act = act[ind]
+
+        if plot is not None:
             import matplotlib.pyplot as plt
 
-            times = patient.times()
-            plot_nus(times, nus, title='Patient '+pname+', '+fragment, VERBOSE=VERBOSE)
+            if plot in ('2D', '2d', ''):
+                plot_nus(times, aft, title='Patient '+pname+', '+fragment, VERBOSE=VERBOSE)
+            elif plot in ('3D', '3d'):
+                plot_nus_3d(times, aft, title='Patient '+pname+', '+fragment, VERBOSE=VERBOSE)
 
-            plot_nus_3d(times, nus, title='Patient '+pname+', '+fragment, VERBOSE=VERBOSE)
-
-    if plot:
+    if plot is not None:
         plt.tight_layout()
         plt.ion()
         plt.show()

@@ -91,7 +91,7 @@ def get_allele_count_trajectories_filename(pname,
                                            fragment,
                                            root_data_folder=root_data_folder):
     '''Get the matrix with allele counts on the initial consensus'''
-    filename = 'allele_frequency_counts'+fragment+'.npy'
+    filename = 'allele_counts_trajectories_'+fragment+'.npy'
     filename = get_foldername(pname, root_data_folder=root_data_folder)+filename
     return filename
 
@@ -125,6 +125,14 @@ def get_allele_frequency_trajectory_figure_filename(pname, fragment_or_gene, for
     folder = get_figure_folder(pname)
     fn = folder+'allele_freq_traj_'+fragment_or_gene+'.'+format
     return fn
+
+
+def get_correlation_PCR1_PCR2_aft_figure_filename(pname, fragment, samplename, format='png'):
+    '''Get the filename of the figure of allele freq correlation between PCR1 and PCR2'''
+    folder = get_figure_folder(pname)
+    fn = folder+'correlation_PCR1_PCR2_allele_frequencies_'+fragment+'_'+samplename+'.'+format
+    return fn
+
 
 
 # SUMMARY

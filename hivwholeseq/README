@@ -32,8 +32,7 @@ CHECKPOINT: insert size distribution (insert_size_distribution.py --premapped),
 
 CHECKPOINT: check coverage (check_divided_coverage.py)
 
-4. Extract subsample of mapped reads and build consensus iteratively.
-   (build_consensus_iterative.py)
+4. Build consensus using local assembly (build_consensus.py)
 
 CHECKPOINT: build a genome-wide consensus and check the consensus in overlapping
             regions. (build_genomewide_consensus.py)

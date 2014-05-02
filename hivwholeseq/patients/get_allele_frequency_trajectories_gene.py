@@ -25,7 +25,6 @@ from hivwholeseq.patients.filenames import get_initial_consensus_filename, \
 from hivwholeseq.patients.one_site_statistics import plot_allele_frequency_trajectories as plot_nus
 from hivwholeseq.patients.one_site_statistics import plot_allele_frequency_trajectories_3d as plot_nus_3d
 from hivwholeseq.genome_info import genes, locate_gene, gene_edges
-from hivwholeseq.patients.filenames import get_allele_frequency_trajectory_filename
 from hivwholeseq.generic_utils import mkdirs
 
 
@@ -49,12 +48,13 @@ if __name__ == '__main__':
                         help='Verbosity level [0-3]')
     parser.add_argument('--save', action='store_true',
                         help='Save the allele frequency trajectories to file')
-    parser.add_argument('--plot', action='store_true',
-                        help='Plot the allele frequency trajectories')
     parser.add_argument('--saveplot', action='store_true',
                         help='Save the plot to file')
+    parser.add_argument('--plot', nargs='?', default=None, const='2D',
+                        help='Plot the allele frequency trajectories')
+    parser.add_argument('--PCR1', action='store_true',
+                        help='Show only PCR1 samples where possible (still computes all)')
     
-
     args = parser.parse_args()
     pname = args.patient
     gene = args.gene
@@ -62,18 +62,22 @@ if __name__ == '__main__':
     save_to_file = args.save
     plot = args.plot
     saveplot = args.saveplot
+    use_PCR1 = args.PCR1
 
-    # Get patient and the sequenced samples (and sort them by date)
     patient = get_patient(pname)
+    times = patient.times()
+    samplenames = patient.samples
+    if use_PCR1:
+        # Keep PCR2 only if PCR1 is absent
+        ind = np.nonzero(map(lambda x: ('PCR1' in x[1]) or ((times == times[x[0]]).sum() == 1), enumerate(samplenames)))[0]
+        times = times[ind]
 
-    # Get reference
     from hivwholeseq.annotate_genomewide_consensus import annotate_sequence
     cons_rec = SeqIO.read(get_initial_consensus_filename('20097', 'genomewide'), 'fasta')
     conss = str(cons_rec.seq)
         
-    # Get allele freq trajectories
     aft_filename = get_allele_frequency_trajectories_filename(pname, 'genomewide')
-    nus = np.load(aft_filename)
+    aft = np.load(aft_filename)
 
     # Extract gene from reference and allele freq trajectories
     from hivwholeseq.patients.build_initial_reference import check_genes_consensus
@@ -81,27 +85,31 @@ if __name__ == '__main__':
                                                     VERBOSE=VERBOSE)
     conss_gene = gene_seqs[gene]
     gene_pos = gene_poss[gene]
-    nus_gene = np.concatenate([nus[:, :, exon_pos[0]: exon_pos[1]]
+    aft_gene = np.concatenate([aft[:, :, exon_pos[0]: exon_pos[1]]
                                for exon_pos in gene_pos], axis=2)
     if save_to_file:
-        nus_gene.dump(get_allele_frequency_trajectories_filename(pname, gene))
+        aft_gene.dump(get_allele_frequency_trajectories_filename(pname, gene))
+
+    if use_PCR1:
+        aft = aft[ind]
+        aft_gene = aft_gene[ind]
 
     # Plot
-    if plot:
+    if (plot is not None):
         import matplotlib.pyplot as plt
+        if plot in ('2D', '2d', ''):
+            plot_nus(times, aft_gene, title='Patient '+pname+', '+gene, VERBOSE=VERBOSE,
+                     options=['syn-nonsyn'])
+        elif plot in ('3D', '3d'):
+            plot_nus_3d(times, aft_gene, title='Patient '+pname+', '+gene, VERBOSE=VERBOSE)
 
-        times = patient.times()
-        plot_nus(times, nus_gene, title='Patient '+pname+', '+gene, VERBOSE=VERBOSE,
-                 options=['syn-nonsyn'])
         plt.tight_layout()
 
-        #plot_nus_3d(times, nus_gene, title='Patient '+pname+', '+gene, VERBOSE=VERBOSE)
-
-    if plot and (not saveplot):
+    if (plot is not None) and (not saveplot):
         plt.ion()
         plt.show()
 
     if saveplot:
-        fn = get_allele_frequency_trajectory_filename(pname, gene)
+        fn = get_allele_frequency_trajectories_filename(pname, gene)
         mkdirs(os.path.dirname(fn))
         plt.savefig(fn)

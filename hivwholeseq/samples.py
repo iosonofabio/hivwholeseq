@@ -77,7 +77,7 @@ sample_list = [\
   'description': 'HIV-8262-2: 0.033 ng/ul'},
 
  # First patient samples (nested PCR)
- {'name': 'VK04-3106', 'run': 'Tue37', 'adaID': 'TS2', 'date': '2004-07-09',
+ {'name': 'VK04-3106_PCR2', 'run': 'Tue37', 'adaID': 'TS2', 'date': '2004-07-09',
   'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5bi', 'F6i'),
   'patient': '20097'},
  {'name': '08HR-0235', 'run': 'Tue37', 'adaID': 'TS4', 'date': '2008-02-07',
@@ -86,7 +86,7 @@ sample_list = [\
  {'name': 'VK07-4778', 'run': 'Tue37', 'adaID': 'TS5', 'date': '2007-07-12',
   'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5bi', 'F6i'),
   'patient': '15313'},
- {'name': 'VK03-4298', 'run': 'Tue37', 'adaID': 'TS6', 'date': '2003-09-30',
+ {'name': 'VK03-4298_PCR2', 'run': 'Tue37', 'adaID': 'TS6', 'date': '2003-09-30',
   'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5bi', 'F6i'),
   'patient': '20097'},
  {'name': 'VK09-7738', 'run': 'Tue37', 'adaID': 'TS7', 'date': '2009-09-24',
@@ -176,6 +176,7 @@ sample_list = [\
   # 'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i'), #IS THIS TRUE?
   # 'patient': '15313', 'date': '2009-02-26'},
 
+  # reference RNA and patients PCR1 reruns
   {'name': 'LAI-III', 'run': 'Tue59', 'adaID': 'N3-S3',
    'description': 'Reference sequence for subtype B',
    'fragments': ('F1o', 'F2o', 'F3o', 'F4o', 'F5ao', 'F6o')},

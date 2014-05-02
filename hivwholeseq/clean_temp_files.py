@@ -51,7 +51,11 @@ def remove_mapped_init_tempfiles(pname, samplename, fragment='F', VERBOSE=0):
                                                              'F1'))+'/'
     fns = glob.glob(dirname+fragment+'*_part*') + \
           glob.glob(dirname+fragment+'*_unsorted*') + \
+          glob.glob(dirname+fragment+'_part*') + \
+          glob.glob(dirname+fragment+'_unsorted*') + \
+          glob.glob(dirname+fragment+'*.sam') + \
           glob.glob(dirname+fragment+'*.00*.bam')
+    fns = frozenset(fns)
     for fn in fns:
         os.remove(fn)
         if VERBOSE >= 3:
