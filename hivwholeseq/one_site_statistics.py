@@ -109,6 +109,7 @@ def get_allele_counts_insertions_from_file(bamfilename, length, qual_min=35,
 
 def get_allele_counts_insertions_from_file_unfiltered(bamfilename, length, qual_min=30,
                                                       match_len_min=10,
+                                                      skipreads=0,
                                                       maxreads=-1, VERBOSE=0):
     '''Get the allele counts and insertions'''
     # Prepare output structures
@@ -647,6 +648,9 @@ def plot_coverage(data_folder, adaID, fragment, counts, VERBOSE=0, savefig=False
 
 def plot_SFS_folded(data_folder, adaID, fragment, nu_filtered, VERBOSE=0, savefig=False):
     '''Plot the site frequency spectrum (folded)'''
+    if VERBOSE >= 1:
+        print 'Plotting folded SFS'
+
     from hivwholeseq.filenames import get_SFS_figure_filename as gff
     import matplotlib.pyplot as plt
     import numpy as np

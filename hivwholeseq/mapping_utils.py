@@ -265,13 +265,98 @@ def align_muscle(*seqs, **kwargs):
     return align
 
 
+def get_number_reads_open(bamfile):
+    '''Count the reads (not pairs) in an open BAM/SAM file'''
+    n_reads = sum(1 for read in bamfile)
+    bamfile.reset()
+    return n_reads
+
+
 def get_number_reads(bamfilename, format='bam'):
     '''Count the reads (not pairs) in a BAM/SAM file'''
     import pysam
     file_modes = {'bam': 'rb', 'sam': 'r'}
     with pysam.Samfile(bamfilename, file_modes[format]) as bamfile:
-        n_reads = sum(1 for read in bamfile)
+        n_reads = get_number_reads_open(bamfile)
     return n_reads
+
+
+def get_number_unmapped_reads_open(bamfile, format='bam'):
+    '''Count the number of unmapped reads (not pairs) in an open BAM/SAM file'''
+    n_reads = sum(1 for read in bamfile if read.is_unmapped)
+    bamfile.reset()
+    return n_reads
+
+
+def get_number_unmapped_reads(bamfilename, format='bam'):
+    '''Count the number of unmapped reads (not pairs) in a BAM/SAM file'''
+    import pysam
+    file_modes = {'bam': 'rb', 'sam': 'r'}
+    with pysam.Samfile(bamfilename, file_modes[format]) as bamfile:
+        n_reads = get_number_unmapped_reads_open(bamfile)
+    return n_reads
+
+
+def get_number_mapped_reads_open(bamfile, format='bam'):
+    '''Count the number of mapped reads (not pairs) in an open BAM/SAM file'''
+    n_reads = sum(1 for read in bamfile if not read.is_unmapped)
+    bamfile.reset()
+    return n_reads
+
+
+def get_number_mapped_reads(bamfilename, format='bam'):
+    '''Count the number of mapped reads (not pairs) in a BAM/SAM file'''
+    import pysam
+    file_modes = {'bam': 'rb', 'sam': 'r'}
+    with pysam.Samfile(bamfilename, file_modes[format]) as bamfile:
+        n_reads = get_number_mapped_reads_open(bamfile)
+    return n_reads
+
+
+def extract_mapped_reads_subsample_open(bamfile_in, n_reads, maxreads=-1, VERBOSE=0):
+    '''Extract read pair pointer from an open BAM file'''
+    import numpy as np
+
+    n_reads_tot = get_number_reads_open(bamfile_in) / 2
+
+    # Limit to the first part of the file
+    if maxreads == -1:
+        maxreads = n_reads_tot
+    else:
+        maxreads = min(n_reads_tot, maxreads)
+
+    # Pick random numbers among those
+    # Get the random indices of the reads to store
+    ind_store = np.arange(maxreads)
+    np.random.shuffle(ind_store)
+    ind_store = ind_store[:n_reads]
+    ind_store.sort()
+
+    if VERBOSE >= 2:
+        print 'Random indices between '+str(ind_store[0])+' and '+str(ind_store[-1])
+
+    # Copy reads
+    output_reads = []
+    n_written = 0
+    for i, (read1, read2) in enumerate(pair_generator(bamfile_in)):
+
+        if VERBOSE >= 2:
+            if not ((i+1) % 10000):
+                print i+1, n_written, ind_store[n_written]
+    
+        # If you hit a read pair, add it
+        if i == ind_store[n_written]:
+
+            output_reads.append((read1, read2))
+            n_written += 1
+    
+        # Break after the last one
+        if n_written >= n_reads:
+            break
+
+    bamfile_in.reset()
+
+    return output_reads
 
 
 def extract_mapped_reads_subsample_object(input_filename, n_reads,
@@ -625,7 +710,6 @@ def trim_read_pair_low_quality(read_pair,
 
         # If the trimmed read still has widespread low-q, it was not a trimming
         # problem: trash the pair (this happend almost never)
-        # NOTE: changed recently (20/01/14)
         if (phred[read_start: read_end] >= phred_min).mean() < 0.9:
             return True
 
@@ -830,6 +914,5 @@ def trim_read_pair_crossoverhangs(read_pair, trim=5, include_tests=False):
         if test_read_pair_integrity(read_pair):
             print 'trim_crossoverhangs (exit):'
             import ipdb; ipdb.set_trace()
-
 
 

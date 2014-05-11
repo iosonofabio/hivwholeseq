@@ -22,6 +22,7 @@ from hivwholeseq.filenames import get_demultiplex_summary_filename, get_raw_read
         get_premapped_file, get_read_filenames
 from hivwholeseq.adapter_info import adapters_illumina, foldername_adapter
 from hivwholeseq.fork_cluster import fork_quality_along_read as fork_self
+from hivwholeseq.mapping_utils import extract_mapped_reads_subsample_open
 
 
 
@@ -77,7 +78,9 @@ def quality_score_along_reads(read_len, reads_filenames,
 def quality_score_along_reads_mapped(read_len, bamfilename,
                                      insertsize_range=[400, 1000],
                                      skipreads=0,
-                                     maxreads=-1, VERBOSE=0):
+                                     maxreads=-1,
+                                     randomreads=True,
+                                     VERBOSE=0):
     '''Calculate the quality score along the reads'''
     from hivwholeseq.mapping_utils import trim_read_pair_crossoverhangs as trim_coh
     from hivwholeseq.mapping_utils import pair_generator
@@ -92,18 +95,29 @@ def quality_score_along_reads_mapped(read_len, bamfilename,
 
     # Iterate over all reads (using fast iterators)
     with pysam.Samfile(bamfilename, 'rb') as bamfile:
-        for i, reads in enumerate(pair_generator(bamfile)):
+        if not randomreads:
+            reads_all = []
+            for i, read_pair in enumerate(pair_generator(bamfile)):
+                if i < skipreads:
+                    continue
+    
+                if i == skipreads + maxreads:
+                    if VERBOSE:
+                        print 'Maximal number of read pairs reached:', maxreads
+                    break
+    
+                if VERBOSE and (not ((i + 1) % 10000)):
+                    print i + 1
 
-            if i < skipreads:
-                continue
+                reads_all.append(read_pair)
 
-            if i == skipreads + maxreads:
-                if VERBOSE:
-                    print 'Maximal number of read pairs reached:', maxreads
-                break
+        else:
+            reads_all = extract_mapped_reads_subsample_open(bamfile, maxreads,
+                                                            VERBOSE=VERBOSE)
 
-            if VERBOSE and (not ((i + 1) % 10000)):
-                print i + 1
+        print len(reads_all)
+
+        for reads in reads_all:
 
             # Check insert size
             read = reads[reads[0].is_reverse]
@@ -234,6 +248,8 @@ if __name__ == '__main__':
                         help='Show figure instead of saving it')
     parser.add_argument('--mapped', action='store_true',
                         help='Analyze mapped reads')
+    parser.add_argument('--random', action='store_true',
+                        help='Take random reads instead of consecutive ones')
     parser.add_argument('--insertsize_range', type=int, nargs=2,
                         default=(400, 1000),
                         help='Restrict to certain insert sizes')
@@ -249,6 +265,7 @@ if __name__ == '__main__':
     adaID = args.adaID
     savefig = args.savefig
     use_mapped = args.mapped
+    use_random = args.random
     insertsize_range = args.insertsize_range
     plotfull = args.plotfull
 
@@ -286,6 +303,7 @@ if __name__ == '__main__':
                                                    insertsize_range=insertsize_range,
                                                    skipreads=skipreads,
                                                    maxreads=maxreads,
+                                                   randomreads=use_random,
                                                    VERBOSE=VERBOSE)
 
     plot_cuts_quality_along_reads(data_folder, adaID, title,

@@ -89,6 +89,8 @@ def demultiplex_reads_single_index(data_folder, data_filenames, adapters_designe
     fouts['unclassified'] = [gzip.open(fn, 'wb', compresslevel=9)
                              for fn in get_unclassified_reads_filenames(data_folder, gzip=True)]
 
+    adapters_designed_inv = dict(map(reversed, adapters_designed))
+    adapters_strings = map(itemgetter(1), adapters_designed)
 
     # Make sure you close the files
     try:
@@ -121,10 +123,10 @@ def demultiplex_reads_single_index(data_folder, data_filenames, adapters_designe
 
                 # If the adapter does not match any know one,
                 # throw into wastebin folder
-                if adapter_string not in map(itemgetter(1), adapters_designed):
+                if adapter_string not in adapters_strings:
                     adaID = 'unclassified'
                 else:
-                    adaID = dict(map(reversed, adapters_designed))[adapter_string]
+                    adaID = adapters_designed_inv[adapter_string]
             
                 if VERBOSE >= 3:
                     print adaID
@@ -132,7 +134,7 @@ def demultiplex_reads_single_index(data_folder, data_filenames, adapters_designe
                 # Write sequences (append to file, manual but fast)
                 fouts[adaID][0].write("@%s\n%s\n+\n%s\n" % read1)
                 fouts[adaID][1].write("@%s\n%s\n+\n%s\n" % read2)
-                if adapter_string not in map(itemgetter(1), adapters_designed):
+                if adapter_string not in adapters_strings:
                     SeqIO.write(adapter, fouts['unclassified'][2], 'fastq')
 
     finally:
@@ -172,6 +174,8 @@ def demultiplex_reads_dual_index(data_folder, data_filenames, adapters_designed,
                              open(data_folder+'unclassified_reads/adapter2.fastq', 'w'),
                             )
 
+    adapters_designed_inv = dict(map(reversed, adapters_designed))
+    adapters_strings = map(itemgetter(1), adapters_designed)
 
     # Make sure you close the files
     try:
@@ -208,10 +212,10 @@ def demultiplex_reads_dual_index(data_folder, data_filenames, adapters_designed,
 
                 # If the adapter does not match any know one,
                 # throw into wastebin folder
-                if adapter_string not in map(itemgetter(1), adapters_designed):
+                if adapter_string not in adapters_strings:
                     adaID = 'unclassified'
                 else:
-                    adaID = dict(map(reversed, adapters_designed))[adapter_string]
+                    adaID = adapters_designed_inv[adapter_string]
             
                 if VERBOSE >= 3:
                     print adaID
@@ -219,7 +223,7 @@ def demultiplex_reads_dual_index(data_folder, data_filenames, adapters_designed,
                 # Write sequences (append to file, manual but fast)
                 fouts[adaID][0].write("@%s\n%s\n+\n%s\n" % read1)
                 fouts[adaID][1].write("@%s\n%s\n+\n%s\n" % read2)
-                if adapter_string not in map(itemgetter(1), adapters_designed):
+                if adapter_string not in adapters_strings:
                     SeqIO.write(adapter1, fouts['unclassified'][2], 'fastq')
                     SeqIO.write(adapter2, fouts['unclassified'][3], 'fastq')
 

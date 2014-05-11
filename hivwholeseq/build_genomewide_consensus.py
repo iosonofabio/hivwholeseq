@@ -99,7 +99,7 @@ def merge_allele_frequencies(data_folder, adaID, fragments, VERBOSE=0):
             nuf = [[frag], nus[frag]]
             nu.append(nuf)
 
-        # copy from the end of the overlap on
+        # else, copy from the end of the overlap on
         # FIXME: we could average the consensus zone out of indels...
         else:
             nuf = nu[-1]
@@ -110,7 +110,7 @@ def merge_allele_frequencies(data_folder, adaID, fragments, VERBOSE=0):
                 #(recursion is not the most efficient but -- oh, well)
                 nuf[1] = np.concatenate([nuf[1], nus[frag][:, start:]], axis=1)
             else:
-                tmp = np.zeros((nuf[1].shape[0], 10), 'S1')
+                tmp = np.zeros((nuf[1].shape[0], 10), float)
                 tmp[-1] = 1
                 nuf[1] = np.concatenate([nuf[1], tmp, nus[frag][:, start:]], axis=1)
 
@@ -163,6 +163,5 @@ if __name__ == '__main__':
         if do_nus:
             nu = merge_allele_frequencies(data_folder, adaID, fragments, VERBOSE=VERBOSE)
             for (frags, nuf) in nu:
-                output_filename = get_merged_allele_frequencies_filename(data_folder,
-                                                                         adaID, frags)
+                output_filename = get_merged_allele_frequencies_filename(data_folder, adaID, frags)
                 nuf.dump(output_filename)

@@ -18,13 +18,16 @@ from hivwholeseq.filenames import get_merged_allele_frequencies_filename
 def plot_minor_allele_frequency_filtered(data_folder, adaID, fragments, VERBOSE=0,
                                 savefig=False):
     '''Plot minor allele frequency along the genome''' 
-    nus = np.load(get_merged_allele_frequencies_filename(data_folder, adaID,
-                                                         fragments))
+    nus = np.load(get_merged_allele_frequencies_filename(data_folder, adaID, fragments))
 
     nu_min = np.ma.masked_all(nus.shape[-1])
     for pos, nutmp in enumerate(nus.T):
-        if not np.ma.is_masked(nutmp):
-            nu_min[pos] = np.sort(nutmp)[-2]
+        try:
+            if not np.ma.is_masked(nutmp):
+                nu_min[pos] = np.sort(nutmp)[-2]
+        except ValueError:
+            print pos, np.ma.is_masked(nutmp)
+            import ipdb; ipdb.set_trace()
 
     import matplotlib.pyplot as plt
     fig, ax = plt.subplots(1, 1, figsize=(15, 8))

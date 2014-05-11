@@ -2,7 +2,7 @@
 '''
 author:     Fabio Zanini
 date:       02/04/14
-content:    Get reads from the V3 loop from any one sample for Thomas Leitner,
+content:    Get reads from the p17 from any one sample for Thomas Leitner,
             with some data processing.
 '''
 # Modules
@@ -45,7 +45,7 @@ if __name__ == '__main__':
 
     VERBOSE = 1
     pname = '20097'
-    time = 336
+    timeind = -2
     fragment = 'F5'
     maxgap = 0
 
@@ -55,56 +55,51 @@ if __name__ == '__main__':
     for PCRtype in PCRtypes:
         if VERBOSE:
             print PCRtype
+        time = patient.times()[timeind]
         samplename = [s for (s, t) in izip(patient.samples, patient.times()) if \
                       (t == time) and PCRtype in s][0]
     
     
         # Make sure it's a multiple of three, in case they translate
-        # Plus the coordinates of Jan are a bit fuzzy, because the inner fwd primer
-        # length is only 25, not 30...
-        pos_V3_HXB2 = [6983, 7352]
-    
         ref_rec = load_HXB2()
         refm = np.array(ref_rec)
-        V3ref = ref_rec[pos_V3_HXB2[0]: pos_V3_HXB2[1]].seq
-    
+        pos_segm_HXB2 = [6497, 6900]	        # "extended" V1V2
+        print pos_segm_HXB2[1] - pos_segm_HXB2[0], ref_rec[pos_segm_HXB2[0]: pos_segm_HXB2[1]].seq.translate()
+     
         cons_rec = SeqIO.read(get_initial_consensus_filename(pname, fragment), 'fasta')
         cons = cons_rec.seq
         consm = np.array(cons_rec)
     
         ## Find the coordinates in the consensus
-        V3primer_inner_fwd = np.fromstring('ACAATGYACACATGGAATTARGCCA', 'S1')
-        seed = np.ma.array(V3primer_inner_fwd)
-        seed[(seed == 'Y') | (seed == 'R')] = np.ma.masked
+        segm_primer_inner_fwd = ref_rec[pos_segm_HXB2[0]: pos_segm_HXB2[0] + 30].seq.translate()
+        seed = np.array(segm_primer_inner_fwd)
         sl = len(seed)
-        n_matches = np.array([(consm[i: i + sl] == seed).sum() for i in xrange(len(consm) - sl)])
+        n_matches = np.array([(np.array(cons[i: i + 3 * sl].translate()) == seed).sum() for i in xrange(len(consm) - 3 * sl)])
         start = (n_matches).argmax()
-        if n_matches[start] < (sl - seed.mask.sum()) * 0.75:
+        if n_matches[start] < sl * 0.75:
             raise ValueError('Seed not found reliably')
-        start += sl
-        print 'V3 primer: fwd', start
+        print 'Segmnent primer: fwd', start
     
-        from Bio.Seq import reverse_complement as rc
-        V3primer_inner_rev = np.fromstring(rc('AGAAAAATTCYCCTCYACAATTAAA'), 'S1')
-        seed = np.ma.array(V3primer_inner_rev)
-        seed[(seed == 'Y') | (seed == 'R')] = np.ma.masked
+        segm_primer_inner_rev = ref_rec[pos_segm_HXB2[1] - 30: pos_segm_HXB2[1]].seq.translate()
+        seed = np.array(segm_primer_inner_rev)
         sl = len(seed)
-        n_matches = np.array([(consm[i: i + sl] == seed).sum() for i in xrange(len(consm) - sl)])
+        n_matches = np.array([(np.array(cons[i: i + 3 * sl].translate()) == seed).sum() for i in xrange(len(consm) - 3 * sl)])
         end = (n_matches).argmax()
-        if n_matches[end] < (sl - seed.mask.sum()) * 0.75:
+        if n_matches[end] < sl * 0.65:
             raise ValueError('Seed not found reliably')
-        print 'V3 primer: rev', end
+        end += 3 * sl
+        print 'Segment primer: rev', end
     
-        V3con = cons[start: end]
-        V3s = start
-        V3e = end
-        V3l = V3e - V3s
-        print V3con.translate()
+        segm_con = cons[start: end]
+        segm_s = start
+        segm_e = end
+        segm_l = segm_e - segm_s
+        print segm_l, segm_con.translate()
     
         # Go down to the reads (unfiltered, do a liberal filtering here)
         bamfilename = get_mapped_to_initial_filename(pname, samplename, fragment, filtered=False)
         with pysam.Samfile(bamfilename, 'rb') as bamfile:
-            reads_V3 = []
+            reads_segm = []
             
             from hivwholeseq.filter_mapped_reads import check_overhanging_reads, \
                     get_distance_from_consensus, trim_bad_cigar
@@ -184,28 +179,28 @@ if __name__ == '__main__':
 
                 # Cover both edges
                 start_fwd = read_pair[i_fwd].pos
-                if start_fwd > V3s:
+                if start_fwd > segm_s:
                     continue
     
                 end_fwd = start_fwd + sum(bl for (bt, bl) in read_pair[i_fwd].cigar if bt in (0, 2))
-                if end_fwd <= V3s:
+                if end_fwd <= segm_s:
                     continue
     
                 start_rev = read_pair[i_rev].pos
-                if start_rev >= V3e:
+                if start_rev >= segm_e:
                     continue
     
                 end_rev = start_rev + sum(bl for (bt, bl) in read_pair[i_rev].cigar if bt in (0, 2))
-                if end_rev < V3e:
+                if end_rev < segm_e:
                     continue
     
                 len_gap = start_rev - end_fwd
                 if len_gap > maxgap:
                     continue
     
-                reads_V3.append(read_pair)
+                reads_segm.append(read_pair)
             
-            print '# of reads covering the segment:', len(reads_V3)
+            print '# of reads covering the segment:', len(reads_segm)
         
             # Precompute conversion table
             SANGER_SCORE_OFFSET = ord("!")
@@ -213,8 +208,8 @@ if __name__ == '__main__':
             for letter in range(0, 255):
                 q_mapping[chr(letter)] = letter - SANGER_SCORE_OFFSET
         
-            reads_V3_fastq = []
-            for read_pair in reads_V3:
+            reads_segm_fastq = []
+            for read_pair in reads_segm:
                 i_fwd = read_pair[0].is_reverse
                 i_rev = not i_fwd
                 name = read_pair[i_fwd].qname
@@ -242,7 +237,7 @@ if __name__ == '__main__':
                         pos_read += bl
         
                     elif bt == 2:
-                        if (pos_read_start is None) and (pos_ref + bl > V3s):
+                        if (pos_read_start is None) and (pos_ref + bl > segm_s):
                             pos_read_start = pos_read
                                 
                         if (pos_read_start_rev is None) and (pos_ref + bl >= pos_ref_start_rev):
@@ -254,8 +249,8 @@ if __name__ == '__main__':
                         pos_ref += bl
         
                     elif bt == 0:
-                        if (pos_read_start is None) and (pos_ref + bl > V3s):
-                            pos_read_start = pos_read + V3s - pos_ref
+                        if (pos_read_start is None) and (pos_ref + bl > segm_s):
+                            pos_read_start = pos_read + segm_s - pos_ref
                                 
                         if (pos_read_start_rev is None) and (pos_ref + bl >= pos_ref_start_rev):
                             pos_read_start_rev = pos_read + pos_ref_start_rev - pos_ref
@@ -281,14 +276,14 @@ if __name__ == '__main__':
                     if bt == 1:
                         pos_read += bl
                     elif bt == 2:
-                        if pos_ref + bl >= V3e:
+                        if pos_ref + bl >= segm_e:
                             pos_read_end = pos_read
                             break
                         pos_ref += bl
         
                     elif bt == 0:
-                        if pos_ref + bl >= V3e:
-                            pos_read_end = pos_read + V3e - pos_ref
+                        if pos_ref + bl >= segm_e:
+                            pos_read_end = pos_read + segm_e - pos_ref
                             break
                         pos_ref += bl
                         pos_read += bl
@@ -301,7 +296,7 @@ if __name__ == '__main__':
         
                 # Merge the two reads
                 if pos_read_start_rev is None:
-                    gap_len = V3l - len(seq_fwd) - len(seq_rev)
+                    gap_len = segm_l - len(seq_fwd) - len(seq_rev)
                     #if gap_len != len_gap:
                     #    import ipdb; ipdb.set_trace()
                     seq = seq_fwd+('N' * gap_len)+seq_rev
@@ -374,7 +369,7 @@ if __name__ == '__main__':
                         raise ValueError('Seq MERGED has a different length from qual!?')
                 
                 # Convert to FASTQ
-                read_V3_fastq = SeqRecord(Seq(seq, ambiguous_dna),
+                read_segm_fastq = SeqRecord(Seq(seq, ambiguous_dna),
                                           id=id, name=name, description=descr)
             
                 # Get the qualities second
@@ -386,16 +381,16 @@ if __name__ == '__main__':
                 #qualities. We do this to bypass the length check imposed by the
                 #per-letter-annotations restricted dict. This is equivalent to:
                 #record.letter_annotations["phred_quality"] = qualities
-                dict.__setitem__(read_V3_fastq._per_letter_annotations,
+                dict.__setitem__(read_segm_fastq._per_letter_annotations,
                                  "phred_quality", qualities)
         
-                reads_V3_fastq.append(read_V3_fastq)
+                reads_segm_fastq.append(read_segm_fastq)
         
-        SeqIO.write(reads_V3_fastq, '/ebio/ag-neher/home/fzanini/tmp/seqs_V3_Thomas_'+PCRtype+'_'+str(time)+'.fastq', 'fastq')
-        SeqIO.write(reads_V3_fastq, '/ebio/ag-neher/home/fzanini/tmp/seqs_V3_Thomas_'+PCRtype+'_'+str(time)+'.fasta', 'fasta')
+        SeqIO.write(reads_segm_fastq, '/ebio/ag-neher/home/fzanini/tmp/seqs_segm_Thomas_'+PCRtype+'_'+str(time)+'.fastq', 'fastq')
+        SeqIO.write(reads_segm_fastq, '/ebio/ag-neher/home/fzanini/tmp/seqs_segm_Thomas_'+PCRtype+'_'+str(time)+'.fasta', 'fasta')
     
         from collections import Counter
-        seqs = [str(r.seq) for r in reads_V3_fastq]
+        seqs = [str(r.seq) for r in reads_segm_fastq]
         co = Counter(seqs)
         cos[PCRtype] = co
 

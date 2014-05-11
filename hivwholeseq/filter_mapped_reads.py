@@ -127,7 +127,7 @@ def plot_distance_histogram_sliding_window(data_folder, adaID, fragment,
         plt.close(fig)
 
 
-def get_distance_from_consensus(ref, reads, VERBOSE=0):
+def get_distance_from_consensus(ref, reads, threshold=None, VERBOSE=0):
     '''Get the number of mismatches (ins = 1, del = 1) from consensus'''
     ds = []
     for read in reads:
@@ -143,7 +143,13 @@ def get_distance_from_consensus(ref, reads, VERBOSE=0):
                 pos_ref += bl
             elif bt == 0:
                 seqb = np.fromstring(read.seq[pos_read: pos_read + bl], 'S1')
-                d += (seqb != ref[pos_ref: pos_ref + bl]).sum()
+                diffs = (seqb != ref[pos_ref: pos_ref + bl])
+                if threshold is not None:
+                    qualb = np.fromstring(read.qual[pos_read: pos_read + bl], np.int8) - 33
+                    diffquals = qualb >= threshold
+                    d += (diffs & diffquals).sum()
+                else:
+                    d += diffs.sum()
                 pos_ref += bl
                 pos_read += bl
         ds.append(d)
@@ -165,7 +171,8 @@ def check_overhanging_reads(reads, refl):
 
 
 def trim_bad_cigar(reads, match_len_min=match_len_min,
-                   trim_left=trim_bad_cigars, trim_right=trim_bad_cigars):
+                   trim_left=trim_bad_cigars, trim_right=trim_bad_cigars,
+                   cons=None):
     '''Trim away bad CIGARs from the sides'''
 
     for read in reads:
@@ -177,18 +184,6 @@ def trim_bad_cigar(reads, match_len_min=match_len_min,
         # If no good CIGARs, give up
         if not good_cigars.any():
             return True
-        
-        # FIXME: trim also good reads of a few bases, just for testing
-        # FIXME: we do not need this, but leave the code there for now
-        elif good_cigars.all():
-            continue
-            #trim_good = 0
-            #cigar = list(read.cigar)
-            #cigar[0] = (cigar[0][0], cigar[0][1] - trim_good)
-            #cigar[-1] = (cigar[-1][0], cigar[-1][1] - trim_good)
-            #start_read = trim_good
-            #end_read = start_read + sum(bl for (bt, bl) in cigar if bt in (0, 1))
-            #start_ref = read.pos + start_read
 
         else:
 

@@ -9,6 +9,7 @@ content:    After division into fragments, check quickly coverage and minor
 import argparse
 import numpy as np
 from Bio import SeqIO
+import matplotlib.pyplot as plt
 
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.miseq import read_types

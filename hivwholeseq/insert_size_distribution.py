@@ -198,6 +198,7 @@ if __name__ == '__main__':
 
     # Iterate over all requested samples
     for i, adaID in enumerate(adaIDs):
+        samplename = dataset['samples'][dataset['adapters'].index(adaID)]
         for j, fragment in enumerate(fragments):
 
             isz, h = get_insert_size_distribution(data_folder, adaID, fragment,
@@ -209,7 +210,7 @@ if __name__ == '__main__':
                            lw=2,
                            color=cm.jet(int(255.0 * (i *len(fragments) + j) / \
                                             (len(adaIDs) * len(fragments)))),
-                           label=adaID+', '+fragment,
+                           label=adaID+', '+samplename+', '+fragment,
                            savefig=savefig)
 
             if not savefig:

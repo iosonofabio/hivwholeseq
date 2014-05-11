@@ -91,14 +91,23 @@ if __name__ == '__main__':
 
             # Get coverage and counts
             counts = np.load(get_allele_counts_filename(data_folder, adaID, fragment))
+            if len(counts.shape) == 2:
+                import warnings
+                warnings.warn('Counts not divided by read type: will normalize instead of filter!')
+                nu_filtered = 1.0 * counts / counts.sum(axis=0)
     
-            # Filter the minor frequencies by comparing the read types
-            nu_filtered = filter_nus(counts)
+            else:
+                # Filter the minor frequencies by comparing the read types
+                nu_filtered = filter_nus(counts)
 
             # Write output
             write_frequency_files(data_folder, adaID, fragment, nu_filtered,
                                   VERBOSE=VERBOSE)
 
             if summary:
+                import matplotlib.pyplot as plt
+                was_interactive = plt.isinteractive()
+                plt.ioff()
                 plot_SFS_folded(data_folder, adaID, fragment, nu_filtered,
                                 VERBOSE=VERBOSE, savefig=True)
+                plt.interactive(was_interactive)

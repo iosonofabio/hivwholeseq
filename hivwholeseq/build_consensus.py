@@ -196,7 +196,7 @@ def build_consensus(bamfilename, len_reference, VERBOSE=0,
             consm = np.fromstring(cons, 'S1')
             seedm = np.fromstring(seed, 'S1')
             n_matches = [(consm[i: i + sl] == seedm).sum()
-                         for i in xrange(len(cons) - len(seed))]
+                         for i in xrange(len(cons) + 1 - len(seed))]
             pos_start = np.argmax(n_matches)
 
             # Try to only add non-bogus stuff

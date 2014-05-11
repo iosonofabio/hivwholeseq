@@ -102,6 +102,7 @@ def check_premap(seq_run, adaID, qual_min=30, match_len_min=10,
         title=', '.join(map(lambda x: ' '.join([x[0], str(x[1])]),
                             [['run', seq_run],
                              ['adaID', adaID],
+                             ['sample', samplename],
                              ['n_reads', maxreads],
                             ]))
     plot_coverage(counts,
@@ -109,7 +110,9 @@ def check_premap(seq_run, adaID, qual_min=30, match_len_min=10,
                   frags_pos_out=frags_pos_out,
                   title=title)
 
-
+    # SAVEFIG
+    from hivwholeseq.adapter_info import foldername_adapter
+    plt.savefig(data_folder+foldername_adapter(adaID)+'figures/coverage_premapped_'+samplename+'.png')
                 
 
 

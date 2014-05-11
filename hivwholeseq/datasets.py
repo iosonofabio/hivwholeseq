@@ -22,7 +22,7 @@ MiSeq_runs_list = [\
  },
 
  {'name': 'Tue28',
-  'description': 'Test run for the MiSeq and the PCR',
+  'description': 'Test run for the MiSeq and the PCR, TruSeq Nano',
   'date': '2013-07-30',
   'n_cycles': 500,
   'comments': 'MiSeq run28',
@@ -33,7 +33,7 @@ MiSeq_runs_list = [\
  },
 
  {'name': 'Tue37',
-  'description': 'Second library (first patient-only)',
+  'description': 'Second TruSeq Nano library (first patient-only)',
   'date': '2013-09-30',
   'n_cycles': 500,
   'comments': 'MiSeq run37',
@@ -65,7 +65,7 @@ MiSeq_runs_list = [\
  },
 
  {'name': 'Tue44',
-  'description': 'Second patient-only library with TrueSeq Nano',
+  'description': 'Second patient-only library with TruSeq Nano',
   'date': '2014-01-24',
   'n_cycles': 602,
   'folder': '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run44/',
@@ -83,7 +83,7 @@ MiSeq_runs_list = [\
  },
 
  {'name': 'Tue52',
-  'description': 'Third library with TrueSeq Nano',
+  'description': 'Third library with TruSeq Nano',
   'date': '2014-02-18',
   'n_cycles': 600,
   'folder': '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run52/',
@@ -98,6 +98,14 @@ MiSeq_runs_list = [\
   'n_cycles': 600,
   'folder': '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run59/',
   'raw_data': None, # ALREADY DEMULTIPLEXED!
+ },
+
+ {'name': 'Tuen3',
+  'description': 'Nextera XT + BluePippin for 14 patient samples',
+  'date': '2014-04-30',
+  'n_cycles': 600,
+  'folder': '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run_new3/', 
+  'raw_data': {'SRA': '/ebio/abt6_sra/years/2014/05_05/HIVSwedenNexteraXT/'},
  },
 
 
