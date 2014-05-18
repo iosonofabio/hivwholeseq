@@ -25,7 +25,7 @@ from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.primer_info import primers_coordinates_HXB2_inner as pcis
 from hivwholeseq.primer_info import primers_coordinates_HXB2_outer as pcos
 from hivwholeseq.primer_info import primers_inner, primers_outer
-from hivwholeseq.filenames import get_HXB2_entire, get_premapped_file, \
+from hivwholeseq.filenames import get_HXB2_entire, get_premapped_filename, \
         get_divided_filenames, get_divide_summary_filename, \
         get_reference_premap_filename
 from hivwholeseq.mapping_utils import pair_generator, convert_sam_to_bam
@@ -409,7 +409,7 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, fragments,
         primers_out_pos['rev'] = get_primer_positions(smat, primers_out['rev'], 'rev')[:, 1]
 
     # Input and output files
-    input_filename = get_premapped_file(data_folder, adaID, type='bam')
+    input_filename = get_premapped_filename(data_folder, adaID, type='bam')
     if not os.path.isfile(input_filename):
         convert_sam_to_bam(input_filename)
     output_filenames = get_divided_filenames(data_folder, adaID, fragments, type='bam')

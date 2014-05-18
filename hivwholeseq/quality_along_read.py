@@ -19,7 +19,7 @@ import pysam
 
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.filenames import get_demultiplex_summary_filename, get_raw_read_files, \
-        get_premapped_file, get_read_filenames
+        get_premapped_filename, get_read_filenames
 from hivwholeseq.adapter_info import adapters_illumina, foldername_adapter
 from hivwholeseq.fork_cluster import fork_quality_along_read as fork_self
 from hivwholeseq.mapping_utils import extract_mapped_reads_subsample_open
@@ -297,7 +297,7 @@ if __name__ == '__main__':
                                             maxreads=maxreads, VERBOSE=VERBOSE)
 
     else:
-        bamfilename = get_premapped_file(data_folder, adaID, type='bam')
+        bamfilename = get_premapped_filename(data_folder, adaID, type='bam')
         title = seq_run+', isizes '+str(insertsize_range)
         quality = quality_score_along_reads_mapped(read_len, bamfilename,
                                                    insertsize_range=insertsize_range,

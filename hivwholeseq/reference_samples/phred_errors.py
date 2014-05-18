@@ -13,7 +13,7 @@ from Bio import SeqIO
 import pysam
 
 from hivwholeseq.datasets import MiSeq_runs
-from hivwholeseq.filenames import get_premapped_file, get_reference_premap_filename, \
+from hivwholeseq.filenames import get_premapped_filename, get_reference_premap_filename, \
         get_consensus_filename, get_mapped_filename
 from hivwholeseq.mapping_utils import pair_generator, convert_sam_to_bam
 
@@ -31,7 +31,7 @@ def phred_errors_position(data_folder, adaID, n_cycles,
 
     if fragment == 'premapped':
         refseq = SeqIO.read(get_reference_premap_filename(data_folder, adaID), 'fasta')
-        input_filename = get_premapped_file(data_folder, adaID, type='bam')
+        input_filename = get_premapped_filename(data_folder, adaID, type='bam')
     else:
         refseq = SeqIO.read(get_consensus_filename(data_folder, adaID, fragment), 'fasta')
         input_filename = get_mapped_filename(data_folder, adaID, fragment, type='bam',

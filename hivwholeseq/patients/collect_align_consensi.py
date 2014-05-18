@@ -15,7 +15,7 @@ from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.filenames import get_merged_consensus_filename, get_consensus_filename
 from hivwholeseq.patients.filenames import get_consensi_alignment_genomewide_filename, \
         get_consensi_alignment_filename
-from hivwholeseq.patients.patients import get_patient
+from hivwholeseq.patients.patients import patients, get_patient
 from hivwholeseq.mapping_utils import align_muscle
 
 
@@ -100,50 +100,64 @@ if __name__ == '__main__':
 
 
     # Parse input args
-    parser = argparse.ArgumentParser(description='Update initial consensus')
-    parser.add_argument('--patient', required=True,
-                        help='Patient to analyze')
+    parser = argparse.ArgumentParser(description='Align consensi from all time points')
+    parser.add_argument('--patients', default=None, nargs='*',
+                        help='Patients to analyze')
     parser.add_argument('--fragments', nargs='*',
                         help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
 
     args = parser.parse_args()
-    pname = args.patient
+    pnames = args.patients
     fragments = args.fragments
     VERBOSE = args.verbose
 
-    # Get patient and the sequenced samples
-    patient = get_patient(pname)
+    if pnames is None:
+        pnames = [p.id for p in patients]
 
-    make_output_folders(pname)
+    for pname in pnames:
+        if VERBOSE >= 1:
+            print pname,
 
-    # If the script is called with no fragment, iterate over all
-    if not fragments:
-        fragments = ['F'+str(i) for i in xrange(1, 7)] + ['genomewide']
-    if VERBOSE >= 3:
-        print 'fragments', fragments
+        # Get patient and the sequenced samples
+        patient = get_patient(pname)
 
-    # Collect and align fragment by fragment
-    for fragment in fragments:
-        if fragment == 'genomewide':
-            continue
-        if VERBOSE >= 2:
-            print fragment,
-        consensi = get_consensi_frag(patient, fragment, VERBOSE=VERBOSE)
-        ali = align_consensi(consensi)
-        output_filename = get_consensi_alignment_filename(pname, fragment)
-        AlignIO.write(ali, output_filename, 'fasta')
-    if VERBOSE >= 2:
-        print
+        make_output_folders(pname)
 
-    # Collect and align genome wide consensi
-    if 'genomewide' in fragments:
-        consensi = get_consensi_genomewide(patient, VERBOSE=VERBOSE)
-    
-        # Align them
-        ali = align_consensi(consensi)
-    
-        # Write alignment
-        output_filename = get_consensi_alignment_genomewide_filename(pname)
-        AlignIO.write(ali, output_filename, 'fasta')
+        # If the script is called with no fragment, iterate over all
+        if not fragments:
+            fragments = ['F'+str(i) for i in xrange(1, 7)] + ['genomewide']
+        if VERBOSE >= 3:
+            print 'fragments', fragments
+
+        # Collect and align fragment by fragment
+        for fragment in fragments:
+            if fragment == 'genomewide':
+                continue
+            if VERBOSE >= 2:
+                print fragment,
+            consensi = get_consensi_frag(patient, fragment, VERBOSE=VERBOSE)
+            if len(consensi) < 2:
+                continue
+
+            ali = align_consensi(consensi)
+            output_filename = get_consensi_alignment_filename(pname, fragment)
+            AlignIO.write(ali, output_filename, 'fasta')
+        if (VERBOSE >= 2) and ('genomewide' not in fragments):
+            print
+
+        # Collect and align genome wide consensi
+        if 'genomewide' in fragments:
+            if VERBOSE >= 2:
+                print 'genomewide'
+            consensi = get_consensi_genomewide(patient, VERBOSE=VERBOSE)
+            if len(consensi) < 2:
+                continue
+        
+            # Align them
+            ali = align_consensi(consensi)
+        
+            # Write alignment
+            output_filename = get_consensi_alignment_genomewide_filename(pname)
+            AlignIO.write(ali, output_filename, 'fasta')

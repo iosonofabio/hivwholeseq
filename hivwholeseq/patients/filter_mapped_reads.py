@@ -209,7 +209,7 @@ if __name__ == '__main__':
             if summary:
                 sfn = get_filter_mapped_init_summary_filename(pname, samplename, fragment)
                 with open(sfn, 'w') as f:
-                    f.write('Call: python map_to_initial_consensus.py'+\
+                    f.write('Call: python filter_mapped_reads.py'+\
                             ' --patient '+pname+\
                             ' --samples '+samplename+\
                             ' --fragments '+fragment+\

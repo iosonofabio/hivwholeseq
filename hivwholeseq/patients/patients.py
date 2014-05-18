@@ -79,15 +79,7 @@ class patient(object):
 
 
 # Globals
-patients = [\
- patient('20097'),
- patient('15363'),
- patient('15823'),
- patient('15313'),
- patient('15376'),
- patient('20529'),
- ]
-
+patients = [patient(p) for p in set(sample_table['patient']) - set([np.nan])]
 patients_dict = {p.id: p for p in patients}
 
 

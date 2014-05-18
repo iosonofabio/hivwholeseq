@@ -79,11 +79,19 @@ def check_seq_gene_consistency(gene_seq, gene,
                                check_absence_stop=True,
                                VERBOSE=0):
     '''Check the consistency of a gene seq'''
-    if len(gene_seq) % 3:
+    if len(gene_seq) <= 0:
         if VERBOSE:
+            print 'WARNING: gene', gene, 'is empty'
+        return (False, 'is empty')
+
+    if len(gene_seq) % 3:
+        if VERBOSE and (gene not in ('tat1', 'tat2', 'rev1', 'rev2')):
             print 'WARNING: gene', gene, 'has a length which is not '+\
                     'a multiple of 3.'
-        return (False, 'has a length which is not multiple of 3')
+        if gene not in ('tat1', 'tat2', 'rev1', 'rev2'):
+            return (False, 'has a length which is not multiple of 3')
+        else:
+            return (True, 'has a length which is not multiple of 3 (OK)')
     
     # Check the translation
     prot_seq = gene_seq.translate()
@@ -316,9 +324,6 @@ def check_genes_consensus(conss, fragment, genes=genes_all, max_end_slippage=10,
 
         # Multi-exon genes
         else:
-            if VERBOSE:
-                print gene,
-
             gene_seq = Seq('', ambiguous_dna)
             gene_pos = []
             start_search = 0
@@ -329,7 +334,14 @@ def check_genes_consensus(conss, fragment, genes=genes_all, max_end_slippage=10,
                 if (fragment != 'genomewide') and (fragment not in fragments_exon):
                     continue
 
+                if VERBOSE and not len(gene_pos):
+                    print gene,
+
                 # Locate exon
+                if start_search >= len(conss):
+                    if VERBOSE >= 2:
+                        'exon not in consensus'
+                    continue
                 (exon_start, exon_end,
                  start_found, end_found) = locate_gene(conss[start_search:], exon,
                                                        VERBOSE=0)
@@ -465,22 +477,25 @@ if __name__ == '__main__':
 
         # Write output
         output_filename = get_initial_consensus_filename(pname, fragment)
-        #conss = str(SeqIO.read(output_filename, 'fasta').seq)
 
-        # Build consensus by assisted assembly
-        bamfilename = get_mapped_filename(data_folder, adaID, fragment,
-                                          filtered=True)
-        conss = build_consensus_from_mapped_reads(bamfilename,
-                                                  maxreads=3000,
-                                                  block_len=100,
-                                                  VERBOSE=VERBOSE - 1)
+        # Take consensus from folder, it was built by assisted assembly
+        cons_rec = SeqIO.read(get_consensus_filename(data_folder, adaID, fragment), 'fasta')
+        conss = str(cons_rec.seq)
+
+        ## Build consensus by assisted assembly
+        #bamfilename = get_mapped_filename(data_folder, adaID, fragment,
+        #                                  filtered=True)
+        #conss = build_consensus_from_mapped_reads(bamfilename,
+        #                                          maxreads=3000,
+        #                                          block_len=100,
+        #                                          VERBOSE=VERBOSE - 1)
 
         check_genes_consensus(conss, fragment, VERBOSE=VERBOSE)
 
         seq_in = SeqRecord(Seq(conss, unambiguous_dna),
                            id='cons_init_p'+pname,
                            name='cons_init_p'+pname,
-                           description='Initial consensus of patient '+pname)
+                           description='Initial consensus of patient '+pname+', fragment '+fragment)
 
         # If absent, just copy the thing over
         if not os.path.isfile(output_filename):
@@ -500,13 +515,16 @@ if __name__ == '__main__':
             
     # Merge all fragments if requested
     if 'genomewide' in fragments:
-        conss_frags = []
-        for fragment in ['F'+str(i) for i in xrange(1, 7)]:
-            output_filename = get_initial_consensus_filename(pname, fragment)
-            conss = str(SeqIO.read(output_filename, 'fasta').seq)
-            conss_frags.append(conss)
+        #conss_frags = []
+        #for fragment in ['F'+str(i) for i in xrange(1, 7)]:
+        #    output_filename = get_initial_consensus_filename(pname, fragment)
+        #    conss = str(SeqIO.read(output_filename, 'fasta').seq)
+        #    conss_frags.append(conss)
+        #conss_genomewide = merge_initial_consensi(conss_frags, VERBOSE=VERBOSE)
 
-        conss_genomewide = merge_initial_consensi(conss_frags, VERBOSE=VERBOSE)
+        # Take consensus from folder, it was built by assisted assembly
+        cons_gw_rec = SeqIO.read(get_consensus_filename(data_folder, adaID, 'genomewide'), 'fasta')
+        conss_genomewide = str(cons_gw_rec.seq)
         
         gene_seqs, genes_good, gene_poss = check_genes_consensus(conss_genomewide, 'genomewide', VERBOSE=VERBOSE)
         if all(genes_good.values()):

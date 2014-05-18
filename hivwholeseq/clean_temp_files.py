@@ -17,9 +17,9 @@ from hivwholeseq.datasets import MiSeq_runs
 # Functions
 def remove_premapped_tempfiles(data_folder, adaID, VERBOSE=0):
     '''Remove the part files of multi-threaded premapping'''
-    from hivwholeseq.filenames import get_premapped_file
+    from hivwholeseq.filenames import get_premapped_filename
 
-    dirname = os.path.dirname(get_premapped_file(data_folder, adaID, type='bam', part=1))+'/'
+    dirname = os.path.dirname(get_premapped_filename(data_folder, adaID, type='bam', part=1))+'/'
     fns = glob.glob(dirname+'premapped_*part*') + \
           glob.glob(dirname+'premapped_*unsorted*')  
     for fn in fns:
@@ -42,19 +42,31 @@ def remove_mapped_tempfiles(data_folder, adaID, fragment='F', VERBOSE=0):
             print 'File removed:', fn
 
 
-def remove_mapped_init_tempfiles(pname, samplename, fragment='F', VERBOSE=0):
+def remove_mapped_init_tempfiles(pname, samplename, fragment='F', VERBOSE=0, remove_chunks=False,
+                                 only_chunk=None):
     '''Remove the part files of multi-threaded mapping to initial patient consensus'''
     from hivwholeseq.patients.filenames import get_mapped_to_initial_filename
 
     dirname = os.path.dirname(get_mapped_to_initial_filename(pname,
                                                              samplename,
                                                              'F1'))+'/'
-    fns = glob.glob(dirname+fragment+'*_part*') + \
-          glob.glob(dirname+fragment+'*_unsorted*') + \
-          glob.glob(dirname+fragment+'_part*') + \
-          glob.glob(dirname+fragment+'_unsorted*') + \
-          glob.glob(dirname+fragment+'*.sam') + \
-          glob.glob(dirname+fragment+'*.00*.bam')
+    if only_chunk is None:
+        fns = glob.glob(dirname+fragment+'*_part*') + \
+              glob.glob(dirname+fragment+'*_unsorted*') + \
+              glob.glob(dirname+fragment+'_part*') + \
+              glob.glob(dirname+fragment+'_unsorted*') + \
+              glob.glob(dirname+fragment+'*.sam') + \
+              glob.glob(dirname+fragment+'*.00*.bam')
+    else:
+        fns = glob.glob(dirname+fragment+'*_part*_chunk_'+str(only_chunk)+'*') + \
+              glob.glob(dirname+fragment+'*_unsorted*_chunk_'+str(only_chunk)+'*') + \
+              glob.glob(dirname+fragment+'_part*_chunk_'+str(only_chunk)+'*') + \
+              glob.glob(dirname+fragment+'_unsorted*_chunk_'+str(only_chunk)+'*') + \
+              glob.glob(dirname+fragment+'_chunk_'+str(only_chunk)+'*.sam') + \
+              glob.glob(dirname+fragment+'_chunk_'+str(only_chunk)+'*.00*.bam')
+
+    if remove_chunks:
+        fns = fns + glob.glob(dirname+fragment+'*_chunk_*.bam')
     fns = frozenset(fns)
     for fn in fns:
         os.remove(fn)

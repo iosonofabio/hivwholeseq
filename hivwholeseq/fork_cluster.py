@@ -193,7 +193,11 @@ def fork_build_consensus(seq_run, adaID, fragment,
         print 'Forking to the cluster: adaID '+adaID+', fragment '+fragment
 
     JOBSCRIPT = JOBDIR+'build_consensus.py'
-    cluster_time = '0:59:59'
+    if fragment == 'genomewide':
+        cluster_time = '23:59:59'
+    else:
+        cluster_time = '0:59:59'
+
     vmem = '2G'
     call_list = ['qsub','-cwd',
                  '-b', 'y',
@@ -242,7 +246,7 @@ def fork_map_to_consensus(seq_run, adaID, fragment, VERBOSE=3, bwa=False,
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
                  '-N', 'm '+adaID+' '+fragment,
-                 '-l', 'h_rt='+cluster_time[maxreads <= 10000],
+                 '-l', 'h_rt='+cluster_time[0 < maxreads <= 10000],
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
                  '--run', seq_run,
@@ -381,7 +385,7 @@ def fork_extract_mutations(seq_run, adaID, VERBOSE=0, summary=True):
 
 
 def fork_get_coallele_counts(data_folder, adaID, fragment, VERBOSE=3, summary=True):
-    '''Fork self for each adapter ID and fragment'''
+    '''Fork coallele counts for each adapter ID and fragment'''
     if VERBOSE:
         print 'Forking to the cluster: adaID '+adaID+', fragment '+fragment
 
@@ -409,11 +413,43 @@ def fork_get_coallele_counts(data_folder, adaID, fragment, VERBOSE=3, summary=Tr
     return sp.check_output(call_list)
 
 
+def fork_split_for_mapping(seq_run, adaID, fragment, VERBOSE=0, maxreads=-1, chunk_size=10000):
+    '''Fork split reads for mapping for each adapter ID and fragment'''
+    if VERBOSE:
+        print 'Forking to the cluster: adaID '+adaID+', fragment '+fragment
+
+    JOBSCRIPT = JOBDIR+'split_reads_for_mapping.py'
+    cluster_time = '0:59:59'
+    vmem = '8G'
+    call_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'sfm '+adaID+' '+fragment,
+                 '-l', 'h_rt='+cluster_time,
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--run', seq_run,
+                 '--adaIDs', adaID,
+                 '--fragments', fragment,
+                 '--verbose', VERBOSE,
+                 '--maxreads', maxreads,
+                 '--chunksize', chunk_size,
+                ]
+    call_list = map(str, call_list)
+    if VERBOSE:
+        print ' '.join(call_list)
+    return sp.check_output(call_list)
+
+
+
 # PATIENTS
 def fork_map_to_initial_consensus(pname, samplename, fragment,
                                   VERBOSE=0, threads=1,
                                   n_pairs=-1, filter_reads=False,
-                                  summary=True):
+                                  summary=True,
+                                  only_chunks=[None]):
     '''Fork to the cluster for each sample and fragment'''
     if VERBOSE:
         print 'Forking to the cluster: patient '+pname+', sample '+\
@@ -423,13 +459,13 @@ def fork_map_to_initial_consensus(pname, samplename, fragment,
     cluster_time = ['23:59:59', '0:59:59']
     vmem = '8G'
 
-    qsub_list = ['qsub','-cwd',
+    call_list = ['qsub','-cwd',
                  '-b', 'y',
                  '-S', '/bin/bash',
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
                  '-N', 'm '+samplename+' '+fragment,
-                 '-l', 'h_rt='+cluster_time[threads >= 10],
+                 '-l', 'h_rt='+cluster_time[(only_chunks is not [None]) or (0 < n_pairs <= 10000)],
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
                  '--patient', pname,
@@ -441,13 +477,49 @@ def fork_map_to_initial_consensus(pname, samplename, fragment,
                  '--skiphash',
                 ]
     if filter_reads:
-        qsub.append('--filter')
+        call_list.append('--filter')
     if not summary:
         call_list.append('--no-summary')
-    qsub_list = map(str, qsub_list)
+    if only_chunks is not [None]:
+        call_list = call_list + ['--chunks'] + only_chunks
+    call_list = map(str, call_list)
     if VERBOSE:
-        print ' '.join(qsub_list)
-    return sp.check_output(qsub_list)
+        print ' '.join(call_list)
+    return sp.check_output(call_list)
+
+
+def fork_paste_mapped_chunks_to_initial_consensus(pname, samplename, fragment,
+                                                  VERBOSE=0, filter_reads=False,
+                                                  summary=True):
+    '''Fork to the cluster for each sample and fragment'''
+    if VERBOSE:
+        print 'Forking to the cluster: patient '+pname+', sample '+\
+                samplename+', fragment '+fragment
+
+    JOBSCRIPT = JOBDIR+'patients/paste_mapped_chunks.py'
+    cluster_time = '0:59:59'
+    vmem = '8G'
+
+    call_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'pc '+samplename+' '+fragment,
+                 '-l', 'h_rt='+cluster_time,
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--patient', pname,
+                 '--samples', samplename,
+                 '--fragments', fragment,
+                 '--verbose', VERBOSE,
+                ]
+    if not summary:
+        call_list.append('--no-summary')
+    call_list = map(str, call_list)
+    if VERBOSE:
+        print ' '.join(call_list)
+    return sp.check_output(call_list)
 
 
 def fork_filter_mapped_init(pname, samplename, fragment,

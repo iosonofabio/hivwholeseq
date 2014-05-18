@@ -26,7 +26,7 @@ import pysam
 
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.filenames import get_custom_reference_filename, \
-        get_HXB2_hash_file, get_read_filenames, get_premapped_file,\
+        get_HXB2_hash_file, get_read_filenames, get_premapped_filename,\
         get_reference_premap_filename, get_premap_summary_filename, \
         get_reference_premap_index_filename, get_reference_premap_hash_filename,\
         get_coverage_figure_filename, get_insert_size_distribution_cumulative_filename,\
@@ -43,7 +43,7 @@ from hivwholeseq.clean_temp_files import remove_premapped_tempfiles
 def make_output_folders(data_folder, adaID, VERBOSE=0, summary=True):
     '''Make output folders'''
     from hivwholeseq.generic_utils import mkdirs
-    outfiles = [get_premapped_file(data_folder, adaID)]
+    outfiles = [get_premapped_filename(data_folder, adaID)]
     if summary:
         outfiles.append(get_coverage_figure_filename(data_folder, adaID, 'premapped'))
     for outfile in outfiles:
@@ -164,7 +164,7 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
                      '--overwrite',
                      '-g', get_reference_premap_index_filename(data_folder, adaID, ext=False),
                      '-h', get_reference_premap_hash_filename(data_folder, adaID, ext=False), 
-                     '-o', get_premapped_file(data_folder, adaID, type='sam'),
+                     '-o', get_premapped_filename(data_folder, adaID, type='sam'),
                      '--substitutionrate='+subsrate,
                      '-M'] + input_filenames
         call_list = map(str, call_list)
@@ -177,12 +177,12 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
                 f.write('\nStampy premapped (single thread).\n')
 
         # Convert to compressed BAM
-        convert_sam_to_bam(get_premapped_file(data_folder, adaID, type='bam'))
+        convert_sam_to_bam(get_premapped_filename(data_folder, adaID, type='bam'))
 
         if summary:
             with open(summary_filename, 'a') as f:
                 f.write('\nSAM file converted to compressed BAM: '+\
-                        get_premapped_file(data_folder, adaID, type='bam')+'\n')
+                        get_premapped_filename(data_folder, adaID, type='bam')+'\n')
 
         return
 
@@ -212,7 +212,7 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
                      '--overwrite',
                      '-g', get_reference_premap_index_filename(data_folder, adaID, ext=False),
                      '-h', get_reference_premap_hash_filename(data_folder, adaID, ext=False), 
-                     '-o', get_premapped_file(data_folder, adaID, type='sam', part=(j+1)),
+                     '-o', get_premapped_filename(data_folder, adaID, type='sam', part=(j+1)),
                      '--processpart='+str(j+1)+'/'+str(threads),
                      '--substitutionrate='+subsrate,
                      '-M'] + input_filenames
@@ -224,7 +224,7 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
         job_IDs[j] = job_ID
 
     # Monitor output
-    output_file_parts = [get_premapped_file(data_folder, adaID, type='bam',
+    output_file_parts = [get_premapped_filename(data_folder, adaID, type='bam',
                                             part=(j+1)) for j in xrange(threads)]
     time_wait = 10 # secs
     while not jobs_done.all():
@@ -267,7 +267,7 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
     # Concatenate output files
     if VERBOSE >= 1:
         print 'Concatenate premapped reads: adaID '+adaID+'...',
-    output_filename = get_premapped_file(data_folder, adaID, type='bam', unsorted=True)
+    output_filename = get_premapped_filename(data_folder, adaID, type='bam', unsorted=True)
     pysam.cat('-o', output_filename, *output_file_parts)
     if VERBOSE >= 1:
         print 'done.'
@@ -279,7 +279,7 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
     # NOTE: we exclude the extension and the option -f because of a bug in samtools
     if VERBOSE >= 1:
         print 'Sort premapped reads: adaID '+adaID
-    output_filename_sorted = get_premapped_file(data_folder, adaID, type='bam', unsorted=False)
+    output_filename_sorted = get_premapped_filename(data_folder, adaID, type='bam', unsorted=False)
     pysam.sort('-n', output_filename, output_filename_sorted[:-4])
     if summary:
         with open(summary_filename, 'a') as f:
@@ -288,7 +288,7 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
     # Reheader the file without BAM -> SAM -> BAM
     if VERBOSE >= 1:
         print 'Reheader premapped reads: adaID '+adaID
-    header_filename = get_premapped_file(data_folder, adaID, type='sam', part=1)
+    header_filename = get_premapped_filename(data_folder, adaID, type='sam', part=1)
     pysam.reheader(header_filename, output_filename_sorted)
     if summary:
         with open(summary_filename, 'a') as f:
@@ -335,7 +335,7 @@ def report_coverage(data_folder, adaID, VERBOSE=0, summary=True):
     # Parse the BAM file
     unmapped = 0
     mapped = 0
-    bamfilename = get_premapped_file(data_folder, adaID, type='bam')
+    bamfilename = get_premapped_filename(data_folder, adaID, type='bam')
     with pysam.Samfile(bamfilename, 'rb') as bamfile:
         for read in bamfile:
             if read.is_unmapped or (not read.is_proper_pair) or (not len(read.cigar)):

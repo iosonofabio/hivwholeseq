@@ -33,25 +33,56 @@ def make_symlinks(dataset, VERBOSE=0):
     fn2 = unclass_fn+[fn for fn in os.listdir(unclass_fn) if 'L001_R2' in fn][0]
     
     dst_folder = data_folder+foldername_adapter(-1)
-    os.symlink(fn1, dst_folder+'read1.fastq.gz')
-    os.symlink(fn2, dst_folder+'read2.fastq.gz')
+    dst_fn1 = dst_folder+'read1.fastq.gz'
+    dst_fn2 = dst_folder+'read2.fastq.gz'
+    if not os.path.isfile(dst_fn1):
+        os.symlink(fn1, dst_fn1)
+    elif VERBOSE:
+            print dst_fn1, 'exists already'
+    if not os.path.isfile(dst_fn2):
+        os.symlink(fn1, dst_fn2)
+    elif VERBOSE:
+            print dst_fn2, 'exists already'
     if VERBOSE:
         print 'Unclassified reads symlinked'
 
     # Samples
     for (samplename, adaID) in izip(dataset['samples'], dataset['adapters']):
         sn = samplename
-        if (len(sn) > 5) and (sn[-5:] in ('_PCR1', '_PCR2')):
-            sn = sn[:-5]
-        sn = sn.replace('-', '')
         sample_fn = root_folder
+        sample_fnn = None
+
+        # FIXME: get subfolder: the sample name might differ, only trust the adaID
+        # FIXME: also not enough, because Stefan put all into the same folder... so
+        # I need to write heuristic... !
         for fn in os.listdir(sample_fn):
             if sn in fn:
-                sample_fn = sample_fn+fn+'/'
+                sample_fnn = sample_fn+fn+'/'
                 break
 
-        fn1 = sample_fn+[fn for fn in os.listdir(sample_fn) if 'L001_R1' in fn][0]
-        fn2 = sample_fn+[fn for fn in os.listdir(sample_fn) if 'L001_R2' in fn][0]
+        if sample_fnn is None:
+            if (len(sn) > 5) and (sn[-5:] in ('_PCR1', '_PCR2')):
+                sn = sn[:-5]
+
+            for fn in os.listdir(sample_fn):
+                if sn in fn:
+                    sample_fnn = sample_fn+fn+'/'
+                    break
+
+        if sample_fnn is None:
+            sn = sn.replace('-', '')
+            for fn in os.listdir(sample_fn):
+                if sn in fn:
+                    sample_fnn = sample_fn+fn+'/'
+                    break
+
+        if sample_fnn is None:
+            print samplename, adaID
+            import ipdb; ipdb.set_trace()
+            continue
+
+        fn1 = sample_fnn+[fn for fn in os.listdir(sample_fnn) if 'L001_R1' in fn][0]
+        fn2 = sample_fnn+[fn for fn in os.listdir(sample_fnn) if 'L001_R2' in fn][0]
         
         dst_folder = data_folder+foldername_adapter(adaID)
         os.symlink(fn1, dst_folder+'read1.fastq.gz')

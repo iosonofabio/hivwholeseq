@@ -11,7 +11,7 @@ import pysam
 import numpy as np
 
 from hivwholeseq.datasets import MiSeq_runs
-from hivwholeseq.filenames import get_mapped_filename, get_premapped_file, \
+from hivwholeseq.filenames import get_mapped_filename, get_premapped_filename, \
         get_insert_size_distribution_cumulative_filename, \
         get_insert_size_distribution_filename
 from hivwholeseq.mapping_utils import pair_generator, convert_sam_to_bam
@@ -30,7 +30,7 @@ def get_insert_size_distribution(data_folder, adaID, fragment, bins=None,
 
     # Open BAM file
     if fragment == 'premapped':
-        bamfilename = get_premapped_file(data_folder, adaID, type='bam')
+        bamfilename = get_premapped_filename(data_folder, adaID, type='bam')
     else:
         bamfilename = get_mapped_filename(data_folder, adaID, fragment, type='bam',
                                           filtered=True)

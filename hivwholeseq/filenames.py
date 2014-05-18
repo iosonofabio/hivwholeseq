@@ -196,7 +196,7 @@ def get_read_filenames(data_folder, adaID, fragment=None, suffix='',
     return filenames
 
 
-def get_premapped_file(data_folder, adaID, type='bam', bwa=False,
+def get_premapped_filename(data_folder, adaID, type='bam', bwa=False,
                        part=None, unsorted=False):
     '''Get the filename of the readed mapped to reference to split into fragments'''
     filename = 'premapped'
@@ -239,12 +239,15 @@ def get_divided_filenames(data_folder, adaID, fragments, type='bam'):
     return filenames
 
 
-def get_divided_filename(data_folder, adaID, fragment, type='bam'):
+def get_divided_filename(data_folder, adaID, fragment, type='bam', chunk=None):
     '''Get the filename of the BAM files divided for a single fragment'''
     filename = 'divided'
     filename = 'divided/'+filename
     filename = data_folder+foldername_adapter(adaID)+filename
-    filename = filename+'_'+fragment+'.'+type
+    filename = filename+'_'+fragment
+    if chunk is not None:
+        filename = filename+'_chunk_'+str(chunk)
+    filename = filename+'.'+type
     return filename
 
 

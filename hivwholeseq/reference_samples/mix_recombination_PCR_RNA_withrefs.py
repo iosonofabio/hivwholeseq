@@ -28,8 +28,8 @@ sd = {'mixPCR1': {'run': 'Tue48', 'adaID': 'N4-S1'},
       'mixPCR2': {'run': 'Tue48', 'adaID': 'N6-S1'},
       'mixPCR1Taq': {'run': 'Tue48', 'adaID': 'N5-S1'},
       'mixPCR2Taq': {'run': 'Tue48', 'adaID': 'N1-S3'},
-      'refB': {'run': 'Tue59', 'adaID': 'N3-S3'},
-      'refC': {'run': 'Tue59', 'adaID': 'N5-S4'},
+      'ref1': ,
+      'ref2': ,
      }
 
 

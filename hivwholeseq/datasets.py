@@ -29,7 +29,8 @@ MiSeq_runs_list = [\
   'folder': '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run28_test_samples/',
   'raw_data': {'read1': 'lane1_NoIndex_L001_R1_001.fastq',
                'adapter': 'lane1_NoIndex_L001_R2_001.fastq',
-               'read2': 'lane1_NoIndex_L001_R3_001.fastq'},
+               'read2': 'lane1_NoIndex_L001_R3_001.fastq',
+               'SRA': '/ebio/abt6_sra/years/2014/05_08/HIVSwedenTruSeqNanoAGNeher/'},
  },
 
  {'name': 'Tue37',
@@ -40,7 +41,8 @@ MiSeq_runs_list = [\
   'folder': '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run37/',
   'raw_data': {'read1': 'read1.fastq',
                'adapter': 'barcode.fastq',
-               'read2': 'read2.fastq'},
+               'read2': 'read2.fastq',
+               'SRA': '/ebio/abt6_sra/years/2014/05_08/HIVSwedenTruSeqNanoAGNeher/'},
  },
 
  {'name': 'Lina_nextera',
@@ -61,7 +63,8 @@ MiSeq_runs_list = [\
   'raw_data': {'read1': 'lane1_NoIndex_L001_R1_001.fastq',
                'read2': 'lane1_NoIndex_L001_R4_001.fastq',
                'adapter1': 'lane1_NoIndex_L001_R2_001.fastq',
-               'adapter2': 'lane1_NoIndex_L001_R3_001.fastq'},
+               'adapter2': 'lane1_NoIndex_L001_R3_001.fastq',
+               'SRA': '/ebio/abt6_sra/years/2014/05_08/HIVSwedenNexteraXTAGNeher/'},
  },
 
  {'name': 'Tue44',
@@ -71,7 +74,8 @@ MiSeq_runs_list = [\
   'folder': '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run44/',
   'raw_data': {'read1': 'lane1_NoIndex_L001_R1_001.fastq',
                'read2': 'lane1_NoIndex_L001_R3_001.fastq',
-               'adapter': 'lane1_NoIndex_L001_R2_001.fastq'},
+               'adapter': 'lane1_NoIndex_L001_R2_001.fastq',
+               'SRA': '/ebio/abt6_sra/years/2014/05_08/HIVSwedenTruSeqNanoAGNeher/'},
  },
 
  {'name': 'Tue48',
@@ -79,7 +83,7 @@ MiSeq_runs_list = [\
   'date': '2014-01-31',
   'n_cycles': 600,
   'folder': '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run48/',
-  'raw_data': None, # ALREADY DEMULTIPLEXED!
+  'raw_data': {'SRA': '/ebio/abt6_sra/years/2014/05_08/HIVSwedenNexteraXTBluePippinAGNeher/'},
  },
 
  {'name': 'Tue52',
@@ -89,7 +93,8 @@ MiSeq_runs_list = [\
   'folder': '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run52/',
   'raw_data': {'read1': 'lane1_NoIndex_L001_R1_001.fastq.gz',
                'read2': 'lane1_NoIndex_L001_R3_001.fastq.gz',
-               'adapter': 'lane1_NoIndex_L001_R2_001.fastq.gz'},
+               'adapter': 'lane1_NoIndex_L001_R2_001.fastq.gz',
+               'SRA': '/ebio/abt6_sra/years/2014/05_08/HIVSwedenTruSeqNanoAGNeher/'},
  },
 
  {'name': 'Tue59',
@@ -97,7 +102,7 @@ MiSeq_runs_list = [\
   'date': '2014-03-18',
   'n_cycles': 600,
   'folder': '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run59/',
-  'raw_data': None, # ALREADY DEMULTIPLEXED!
+  'raw_data': {'SRA': '/ebio/abt6_sra/years/2014/05_08/HIVSwedenNexteraXTBluePippinAGNeher/'},
  },
 
  {'name': 'Tuen3',
@@ -108,6 +113,13 @@ MiSeq_runs_list = [\
   'raw_data': {'SRA': '/ebio/abt6_sra/years/2014/05_05/HIVSwedenNexteraXT/'},
  },
 
+ {'name': 'Tuen6',
+  'description': 'TruSeqNano SA#3 plasmid, SE#5 PCR2, and emPCR',
+  'date': '2014-05-12',
+  'n_cycles': 600,
+  'folder': '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run_new6/', 
+  'raw_data': {'SRA': '/ebio/abt6_sra/years/2014/05_15/TruSeqNanoLibHIV/'},
+ },
 
 ]
 

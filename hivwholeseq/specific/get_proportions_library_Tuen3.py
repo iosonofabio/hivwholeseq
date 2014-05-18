@@ -10,7 +10,7 @@ from itertools import izip
 
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.mapping_utils import get_number_mapped_reads
-from hivwholeseq.filenames import get_premapped_file
+from hivwholeseq.filenames import get_premapped_filename
 
 
 # Globals
@@ -43,7 +43,7 @@ if __name__ == '__main__':
 
     n_mapped_reads = []
     for (adaID, samplename) in izip(adaIDs, samplenames):
-        bamfilename = get_premapped_file(data_folder, adaID)
+        bamfilename = get_premapped_filename(data_folder, adaID)
         n = get_number_mapped_reads(bamfilename)
         print adaID, samplename, n
         n_mapped_reads.append(n)

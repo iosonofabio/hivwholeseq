@@ -34,6 +34,7 @@ def get_initial_consensus_filename(pname, fragment,
 def get_mapped_to_initial_filename(pname, samplename, fragment, type='bam',
                                    part=None, unsorted=False,
                                    filtered=False,
+                                   only_chunk=None,
                                    root_data_folder=root_data_folder):
     '''Get the filename of the mapped reads to initial consensus'''
     filename = fragment
@@ -43,6 +44,8 @@ def get_mapped_to_initial_filename(pname, samplename, fragment, type='bam',
         filename = filename+'_unsorted'
     if filtered:
         filename = filename+'_filtered'
+    if only_chunk is not None:
+        filename = filename+'_chunk_'+str(only_chunk)
     filename = filename+'.'+type
     filename = samplename+'/mapped_to_initial/'+filename
     filename = get_foldername(pname, root_data_folder=root_data_folder)+filename
@@ -138,8 +141,17 @@ def get_correlation_PCR1_PCR2_aft_figure_filename(pname, fragment, samplename, f
 # SUMMARY
 def get_map_initial_summary_filename(pname, samplename, fragment,
                                      root_data_folder=root_data_folder):
-    '''Get the filename of the summary of the division into fragments'''
+    '''Get the filename of the summary of the map to initial consensus'''
     filename = 'summary_map_initial_'+fragment+'.txt'
+    filename = samplename+'/mapped_to_initial/'+filename
+    filename = get_foldername(pname, root_data_folder=root_data_folder)+filename
+    return filename
+
+
+def get_paste_mapped_chunks_initial_summary_filename(pname, samplename, fragment,
+                                                     root_data_folder=root_data_folder):
+    '''Get the filename of the summary of the pasting of chunk after mapping to initial consensus'''
+    filename = 'summary_paste_mapped_initial_'+fragment+'.txt'
     filename = samplename+'/mapped_to_initial/'+filename
     filename = get_foldername(pname, root_data_folder=root_data_folder)+filename
     return filename

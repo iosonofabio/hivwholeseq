@@ -15,7 +15,7 @@ from matplotlib import cm
 
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.miseq import read_types
-from hivwholeseq.filenames import get_premapped_file, get_reference_premap_filename, \
+from hivwholeseq.filenames import get_premapped_filename, get_reference_premap_filename, \
         get_fragment_positions_filename
 from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file_unfiltered
 from hivwholeseq.primer_info import primers_coordinates_HXB2_inner as pcis_HXB2
@@ -83,7 +83,7 @@ def check_premap(seq_run, adaID, qual_min=30, match_len_min=10,
     frags_pos_out = None
 
     # Open BAM and scan reads
-    input_filename = get_premapped_file(data_folder, adaID, type='bam')
+    input_filename = get_premapped_filename(data_folder, adaID, type='bam')
 
     # Count reads if requested
     if VERBOSE:

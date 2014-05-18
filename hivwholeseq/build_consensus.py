@@ -25,6 +25,7 @@ from hivwholeseq.mapping_utils import align_muscle
 from hivwholeseq.samples import samples
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.filenames import get_divided_filename, \
+        get_premapped_filename, \
         get_reference_premap_filename, \
         get_consensus_filename, \
         get_allele_counts_filename, \
@@ -71,6 +72,7 @@ def build_local_consensus(ali, VERBOSE=0, store_allele_counts=False):
 def build_consensus(bamfilename, len_reference, VERBOSE=0,
                     block_len_initial=100,
                     reads_per_alignment=31,
+                    accept_holes=False,
                     store_allele_counts=False):
     '''Build a consensus from premapped and divided reads'''
     if VERBOSE:
@@ -100,7 +102,7 @@ def build_consensus(bamfilename, len_reference, VERBOSE=0,
             print 'Block n', len(consensi_local) + 1, 
         for pos_first_block in xrange(len_reference):
             bamfile.reset()
-            reads = [read for read in bamfile if read.pos == pos_first_block]
+            reads = [read for read in bamfile if (read.is_proper_pair) and (read.pos == pos_first_block)]
             if not len(reads):
                 continue
 
@@ -119,17 +121,49 @@ def build_consensus(bamfilename, len_reference, VERBOSE=0,
                 print 'pos', pos_first_block, 'block len', block_len
             break
 
+        # Start consensus
+        if len(consensi_local) == 1:
+            consensus = [consensi_local[0]]
+            if store_allele_counts:
+                allcounts = [allcounts_local[0]]
+
+        # Divide reads by block (more efficient than scrolling the file every time)
+        # FIXME: extract random subsample, assign to blocks, and only complete the missing blocks!
+        reads_by_block = [[] for n_block in xrange((len_reference - pos_ref) // (block_len_initial // 2))]
+        bamfile.reset()
+        for read in bamfile:
+            if not read.is_proper_pair:
+                continue
+            pos_ref_tmp = pos_ref
+            n_block = 1
+            while (pos_ref_tmp < len_reference):
+                block_len_tmp = min(block_len, len_reference - pos_ref)
+                if (pos_ref_tmp - 100 < read.pos <= pos_ref_tmp) and \
+                   (read.pos + sum(bl for (bt, bl) in read.cigar
+                                   if bt in (0, 2)) >= pos_ref_tmp + block_len_tmp):
+                    reads_by_block[n_block - 1].append(read)
+                    break
+
+                pos_ref_tmp += block_len_initial // 2
+                n_block += 1
+
         # Add further local consensi
+        n_block = 1
         while (pos_ref < len_reference):
-            bamfile.reset()
             block_len = min(block_len, len_reference - pos_ref)
             if VERBOSE >= 2:
                 print 'Block n', len(consensi_local) + 1, 'pos', pos_ref, 'block len', block_len
-            # Get reads that cover the whole block
-            reads = [read for read in bamfile
-                     if (pos_ref - 100 < read.pos <= pos_ref) and \
-                        (read.pos + sum(bl for (bt, bl) in read.cigar
-                                        if bt in (0, 2)) >= pos_ref + block_len)]
+
+            ## Get reads that cover the whole block
+            #bamfile.reset()
+            #reads = [read for read in bamfile
+            #         if (read.is_proper_pair) and \
+            #            (pos_ref - 100 < read.pos <= pos_ref) and \
+            #            (read.pos + sum(bl for (bt, bl) in read.cigar
+            #                            if bt in (0, 2)) >= pos_ref + block_len)]
+
+            reads = reads_by_block[n_block - 1]
+            n_block += 1
 
             # Internal coverage holes are not tolerated, but the last block
             # is allowed to be missing
@@ -181,34 +215,83 @@ def build_consensus(bamfilename, len_reference, VERBOSE=0,
             consensi_local.append(cons_local)
             pos_ref += block_len_initial // 2
 
-    # Join blocks (from the left)
-    if VERBOSE >= 2:
-        print 'Join local consensi'
-    consensus = [consensi_local[0]]
-    if store_allele_counts:
-        allcounts = [allcounts_local[0]]
-    for j, cons in enumerate(consensi_local[1:], 1):
-        seed = consensus[-1][-20:]
-        sl = len(seed)
-        pos_start = cons.find(seed)
-        # Allow imperfect matches
-        if pos_start == -1:
-            consm = np.fromstring(cons, 'S1')
-            seedm = np.fromstring(seed, 'S1')
-            n_matches = [(consm[i: i + sl] == seedm).sum()
-                         for i in xrange(len(cons) + 1 - len(seed))]
-            pos_start = np.argmax(n_matches)
 
-            # Try to only add non-bogus stuff
-            if n_matches[pos_start] < 0.66 * sl:
-                pos_start = -1
-                if VERBOSE >= 4:
-                    print 'block n.', j, 'not joint!'
+            # Join blocks (from the left)
+            if len(consensi_local) == 1:
+                consensus = [consensi_local[0]]
+                if store_allele_counts:
+                    allcounts = [allcounts_local[0]]
+            elif len(consensi_local) > 1:
+                cons = cons_local
+                seed = consensus[-1][-20:]
+                sl = len(seed)
+                pos_start = cons.find(seed)
+                # Allow imperfect matches
+                if pos_start == -1:
+                    consm = np.fromstring(cons, 'S1')
+                    seedm = np.fromstring(seed, 'S1')
+                    n_matches = [(consm[i: i + sl] == seedm).sum()
+                                 for i in xrange(len(cons) + 1 - len(seed))]
+                    pos_start = np.argmax(n_matches)
+        
+                    # Try to only add non-bogus stuff
+                    if n_matches[pos_start] < 0.66 * sl:
+                        pos_start = -1
+                        if VERBOSE >= 4:
+                            print 'block n.', len(consensi_local) - 1, 'not joint!'
+        
+                if pos_start != -1:
+                    consensus.append(cons[pos_start + sl:])
+                    if store_allele_counts:
+                        allcounts.append(allcounts_local[-1][:, pos_start + sl:])
+                
+                elif accept_holes:
+                    consensus.append('N' * 10)
+                    consensus.append(cons)
+                    if store_allele_counts:
+                        tmpall = np.zeros((allcounts_local[-1].shape[0], 10), int)
+                        tmpall[-1] = 1
+                        allcounts.append(tmpall)
+                        allcounts.append(allcounts_local[-1])
 
-        if pos_start != -1:
-            consensus.append(cons[pos_start + sl:])
-            if store_allele_counts:
-                allcounts.append(allcounts_local[j][:, pos_start + sl:])
+
+    ## Join blocks (from the left)
+    #if VERBOSE >= 2:
+    #    print 'Join local consensi'
+    #consensus = [consensi_local[0]]
+    #if store_allele_counts:
+    #    allcounts = [allcounts_local[0]]
+    #for j, cons in enumerate(consensi_local[1:], 1):
+    #    seed = consensus[-1][-20:]
+    #    sl = len(seed)
+    #    pos_start = cons.find(seed)
+    #    # Allow imperfect matches
+    #    if pos_start == -1:
+    #        consm = np.fromstring(cons, 'S1')
+    #        seedm = np.fromstring(seed, 'S1')
+    #        n_matches = [(consm[i: i + sl] == seedm).sum()
+    #                     for i in xrange(len(cons) + 1 - len(seed))]
+    #        pos_start = np.argmax(n_matches)
+
+    #        # Try to only add non-bogus stuff
+    #        if n_matches[pos_start] < 0.66 * sl:
+    #            pos_start = -1
+    #            if VERBOSE >= 4:
+    #                print 'block n.', j, 'not joint!'
+
+    #    if pos_start != -1:
+    #        consensus.append(cons[pos_start + sl:])
+    #        if store_allele_counts:
+    #            allcounts.append(allcounts_local[j][:, pos_start + sl:])
+    #    
+    #    elif accept_holes:
+    #        consensus.append('N' * 10)
+    #        consensus.append(cons)
+    #        if store_allele_counts:
+    #            tmpall = np.zeros((allcounts_local[j].shape[0], 10), int)
+    #            tmpall[-1] = 1
+    #            allcounts.append(tmpall)
+    #            allcounts.append(allcounts_local[j])
         
     consensus = ''.join(consensus)
 
@@ -231,7 +314,7 @@ if __name__ == '__main__':
     parser.add_argument('--adaIDs', nargs='*',
                         help='Adapter IDs to analyze (e.g. TS2)')
     parser.add_argument('--fragments', nargs='*',
-                        help='Fragment to map (e.g. F1 F6i)')
+                        help='Fragment to map (e.g. F1 F6 genomewide)')
     parser.add_argument('--block-length', type=int, default=100, dest='block_len',
                         help='Length of each local consensus block')
     parser.add_argument('--reads-per-alignment', type=int, default=31,
@@ -274,6 +357,7 @@ if __name__ == '__main__':
         # If the script is called with no fragment, iterate over all
         if not fragments:
             fragments_sample = samples[samplename]['fragments']
+            fragments_sample.append('genomewide')
         else:
             from re import findall
             fragments_all = samples[samplename]['fragments']
@@ -282,6 +366,8 @@ if __name__ == '__main__':
                 frs = filter(lambda x: fragment in x, fragments_all)
                 if len(frs):
                     fragments_sample.append(frs[0])
+            if 'genomewide' in fragments:
+                fragments_sample.append('genomewide')
 
         if VERBOSE >= 3:
             print 'adaID '+adaID+': fragments '+' '.join(fragments_sample)
@@ -311,11 +397,19 @@ if __name__ == '__main__':
 
             if VERBOSE:
                 print seq_run, adaID, fragment
-            refseq = SeqIO.read(get_reference_premap_filename(data_folder, adaID, fragment), 'fasta')
-            bamfilename = get_divided_filename(data_folder, adaID, fragment, type='bam')
+            if fragment == 'genomewide':
+                refseq = SeqIO.read(get_reference_premap_filename(data_folder, adaID), 'fasta')
+                bamfilename = get_premapped_filename(data_folder, adaID, type='bam')
+                frag_out = fragment
+            else:
+                refseq = SeqIO.read(get_reference_premap_filename(data_folder, adaID, fragment), 'fasta')
+                bamfilename = get_divided_filename(data_folder, adaID, fragment, type='bam')
+                frag_out = fragment[:2]
+
             consensus = build_consensus(bamfilename, len(refseq), VERBOSE=VERBOSE,
                                         block_len_initial=block_len_initial,
                                         reads_per_alignment=n_reads_per_ali,
+                                        accept_holes=(fragment == 'genomewide'),
                                         store_allele_counts=store_allele_counts)
             if store_allele_counts:
                 (consensus, allele_counts) = consensus
@@ -323,7 +417,6 @@ if __name__ == '__main__':
             # Store to file
             if VERBOSE:
                 print 'Store to file'
-            frag_out = fragment[:2]
             name = samplename+'_seqrun_'+seq_run+'_adaID_'+adaID+'_'+frag_out+'_consensus'
             consensusseq = SeqRecord(Seq(consensus, ambiguous_dna), id=name, name=name)
 
