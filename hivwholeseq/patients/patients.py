@@ -80,6 +80,7 @@ class patient(object):
 
 # Globals
 patients = [patient(p) for p in set(sample_table['patient']) - set([np.nan])]
+patients.sort(key=lambda x: int(x.id))
 patients_dict = {p.id: p for p in patients}
 
 
