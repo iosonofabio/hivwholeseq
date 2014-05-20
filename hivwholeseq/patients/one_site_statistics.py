@@ -6,14 +6,56 @@ content:    Collection of functions to do single site statistics (allele counts,
             coverage, allele frequencies) on patients.
 '''
 # Modules
+import numpy as np
 from Bio.Seq import Seq
 from Bio.Alphabet.IUPAC import ambiguous_dna
+from Bio import SeqIO
 
 from hivwholeseq.miseq import alpha
 
 
 
 # Functions
+def get_allele_frequency_trajectories(pname, samples, fragment, qual_min=30, VERBOSE=0):
+    '''Scan the reads of all samples and write to a single file'''
+    if VERBOSE >= 1:
+        print 'Getting allele frequency trajectories:', pname
+
+    from hivwholeseq.patients.filenames import get_initial_consensus_filename, \
+            get_mapped_to_initial_filename, get_allele_frequency_trajectories_filename, \
+            get_allele_count_trajectories_filename
+    from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file, \
+            get_allele_counts_insertions_from_file_unfiltered, \
+            filter_nus
+
+    refseq = SeqIO.read(get_initial_consensus_filename(pname, fragment), 'fasta')
+
+    # Prepare output data structures
+    cos_traj = np.zeros((len(samples), len(alpha), len(refseq)), int)
+    nus_traj = np.zeros((len(samples), len(alpha), len(refseq)))
+    
+    for it, sample in enumerate(samples):
+        if VERBOSE >= 2:
+            print pname, it, sample
+
+        input_filename = get_mapped_to_initial_filename(pname, sample, fragment, type='bam')
+        (counts, inserts) = get_allele_counts_insertions_from_file_unfiltered(input_filename,
+                                                                   len(refseq),
+                                                                   qual_min=qual_min,
+                                                                   VERBOSE=VERBOSE)
+        # Take the total counts, blending in the read types
+        cou = counts.sum(axis=0)
+        cos_traj[it] = cou
+
+        # Take the filtered frequencies, blending in the read types
+        nu = filter_nus(counts)
+        nus_traj[it] = nu
+
+    #FIXME: test, etc.
+
+    return (cos_traj, nus_traj)
+
+
 def plot_allele_frequency_trajectories(times, nus, title='', VERBOSE=0,
                                        threshold=0.1, options=[], logit = False):
     '''Plot the allele frequency trajectories from a patient'''

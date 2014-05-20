@@ -22,39 +22,9 @@ from hivwholeseq.patients.filenames import get_initial_consensus_filename, \
         get_allele_count_trajectories_filename
 from hivwholeseq.patients.one_site_statistics import plot_allele_frequency_trajectories as plot_nus
 from hivwholeseq.patients.one_site_statistics import plot_allele_frequency_trajectories_3d as plot_nus_3d
+from hivwholeseq.patients.one_site_statistics import get_allele_frequency_trajectories
 from hivwholeseq.fork_cluster import fork_get_allele_frequency_trajectory as fork_self
 
-
-
-# Functions
-def get_allele_frequency_trajectories(patient, fragment, qual_min=35, VERBOSE=0):
-    '''Scan the reads of all samples and write to a single file'''
-    # Get the initial consensus
-    refseq = SeqIO.read(get_initial_consensus_filename(pname, fragment), 'fasta')
-
-    # Prepare output data structures
-    cos_traj = np.zeros((len(patient.samples), len(alpha), len(refseq)), int)
-    nus_traj = np.zeros((len(patient.samples), len(alpha), len(refseq)))
-    
-    
-    for it, sample in enumerate(patient.samples):
-        input_filename = get_mapped_to_initial_filename(pname, sample, fragment, type='bam')
-
-        (counts, inserts) = get_allele_counts_insertions_from_file_unfiltered(input_filename,
-                                                                   len(refseq),
-                                                                   qual_min=qual_min,
-                                                                   VERBOSE=VERBOSE)
-        # Take the total counts, blending in the read types
-        cou = counts.sum(axis=0)
-        cos_traj[it] = cou
-
-        # Take the filtered frequencies, blending in the read types
-        nu = filter_nus(counts)
-        nus_traj[it] = nu
-
-    #FIXME: test, etc.
-
-    return (cos_traj, nus_traj)
 
 
 # Script
@@ -67,7 +37,7 @@ if __name__ == '__main__':
     parser.add_argument('--fragments', nargs='*',
                         help='Fragments to analyze (e.g. F1 F6)')
     parser.add_argument('--verbose', type=int, default=0,
-                        help='Verbosity level [0-3]')
+                        help='Verbosity level [0-4]')
     parser.add_argument('--save', action='store_true',
                         help='Save the allele frequency trajectories to file')
     parser.add_argument('--submit', action='store_true',
@@ -99,7 +69,7 @@ if __name__ == '__main__':
     # If the script is called with no fragment, iterate over all
     if not fragments:
         fragments = ['F'+str(i) for i in xrange(1, 7)]
-    if VERBOSE >= 3:
+    if VERBOSE >= 2:
         print 'fragments', fragments
 
     # Iterate over samples and fragments
@@ -114,11 +84,11 @@ if __name__ == '__main__':
         if VERBOSE >= 1:
             print fragment
 
-        # Save new computation?
         act_filename = get_allele_count_trajectories_filename(pname, fragment)
         aft_filename = get_allele_frequency_trajectories_filename(pname, fragment)
+
         if save_to_file or (not os.path.isfile(aft_filename)):
-            (act, aft) = get_allele_frequency_trajectories(patient, fragment, VERBOSE=VERBOSE)
+            (act, aft) = get_allele_frequency_trajectories(pname, samplenames, fragment, VERBOSE=VERBOSE)
         else:
             aft = np.load(aft_filename)
             act = np.load(act_filename)

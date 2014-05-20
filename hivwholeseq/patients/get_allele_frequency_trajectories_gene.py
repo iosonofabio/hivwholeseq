@@ -73,7 +73,7 @@ if __name__ == '__main__':
         times = times[ind]
 
     from hivwholeseq.annotate_genomewide_consensus import annotate_sequence
-    cons_rec = SeqIO.read(get_initial_consensus_filename('20097', 'genomewide'), 'fasta')
+    cons_rec = SeqIO.read(get_initial_consensus_filename(pname, 'genomewide'), 'fasta')
     conss = str(cons_rec.seq)
         
     aft_filename = get_allele_frequency_trajectories_filename(pname, 'genomewide')
