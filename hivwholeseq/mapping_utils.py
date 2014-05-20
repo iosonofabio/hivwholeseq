@@ -264,6 +264,15 @@ def align_muscle(*seqs, **kwargs):
 
     return align
 
+def get_number_reads_fastq_open(handle):
+    '''Get the number of reads from a fastq file'''
+    from Bio.SeqIO.QualityIO import FastqGeneralIterator as FGI
+    pos = handle.tell()
+    read_iter = FGI(handle)
+    n_reads = sum(1 for r in read_iter)
+    handle.seek(pos)
+    return n_reads
+
 
 def get_number_reads_open(bamfile):
     '''Count the reads (not pairs) in an open BAM/SAM file'''

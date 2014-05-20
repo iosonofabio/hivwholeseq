@@ -2,8 +2,7 @@
 '''
 author:     Fabio Zanini
 date:       31/03/14
-content:    Measure in vitro recombination rates using two RNA templates, one from
-            subtype B and one from subtype C.
+content:    Measure in vitro recombination rates with emulsion PCR from plasmids.
 '''
 # Modules
 import os
@@ -28,10 +27,10 @@ from hivwholeseq.adapter_info import foldername_adapter
 
 
 # Globals
-sd = {'mixconv1542': {'run': 'Tuen6', 'adaID': 'TS2'},
-      'mixconv1968': {'run': 'Tuen6', 'adaID': 'TS5'},
-      'mixem1542': {'run': 'Tuen6', 'adaID': 'TS6'},
-      'mixem1968': {'run': 'Tuen6', 'adaID': 'TS12'},
+sd = {'mixconv1542': {'adaID': 'TS2'},
+      'mixconv1968': {'adaID': 'TS5'},
+      'mixem1542': {'adaID': 'TS6'},
+      'mixem1968': {'adaID': 'TS12'},
      }
 
 ref_names = ['NL4-3', 'SF162', 'F10']
@@ -45,9 +44,7 @@ if __name__ == '__main__':
 
     # Parse input args: this is used to call itself recursively
     parser = argparse.ArgumentParser(description='Errors in HIV pure strains')
-    parser.add_argument('--fragment', default='F2',
-                        help='Fragment to analyze (e.g. F2)')
-    parser.add_argument('--maxreads', type=int, default=100,
+    parser.add_argument('--maxreads', type=int, default=1000,
                         help='Number of reads analyzed')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
@@ -55,7 +52,6 @@ if __name__ == '__main__':
                         help='Mix to study (1542, 1968)')
 
     args = parser.parse_args()
-    fragment = args.fragment
     maxreads = args.maxreads
     VERBOSE = args.verbose
     PCRtype = args.PCRtype
@@ -84,22 +80,148 @@ if __name__ == '__main__':
     out_folder = data_folder+'emPCR_results/'
     ali_rec = AlignIO.read(out_folder+'ali_references_'+PCRtype+'.fasta', 'fasta')
     alim = np.array(ali_rec)
+    ali_names = ['NL4-3', 'SF162', 'F10']
 
     # Get polymorphic sites
     poss_poly = (-(alim == alim[0]).all(axis=0))
+    poss_polyd = (-(alim == alim[0]).all(axis=0)).nonzero()[0]
     if VERBOSE >= 3:
-        print 'Polymorphic positions:', poss_poly.nonzero()[0]
+        print 'Polymorphic positions:', poss_polyd
         if VERBOSE >= 4:
             import matplotlib.pyplot as plt
             fig, ax = plt.subplots(1, 1)
-            ax.plot(poss_poly, lw=2, c='k')
+            ax.plot(np.arange(len(poss_poly)), poss_poly, lw=2, c='k')
             ax.set_xlabel('Pos in amplicon [bp]')
             ax.set_ylabel('Polymorphic?')
 
             plt.ion()
             plt.show()
 
+    n_recs = {}
+    n_purs = {}
+    n_strains = {}
 
+    # Look at the mapped reads
+    for samplename in (mixconvname, mixemname):
+        if VERBOSE >= 2:
+            print '------------------------------------------------------------'
+            if samplename == mixconvname:
+                print 'CONVENTIONAL PCR'
+            else:
+                print 'EMULSION PCR'
+            print '------------------------------------------------------------'
+
+        n_pure = 0
+        n_recombinants = 0
+        n_strain = [0, 0, 0]
+
+        adaID = sd[samplename]['adaID']
+        mapped_filename = data_folder+foldername_adapter(adaID)+'mapped.sam'
+        # FIXME
+        mapped_filename = mapped_filename.replace('.sam', '_subset.sam')
+        with pysam.Samfile(mapped_filename, 'r') as samfile:
+            for irp, reads in enumerate(pair_generator(samfile)):
+                if irp == maxreads:
+                    break
+
+                if not reads[0].is_proper_pair:
+                    continue
+
+                alleles_pair = []
+                for read in reads:
+                    pos_start = read.pos
+                    pos_end = pos_start + sum(bl for (bt, bl) in read.cigar if bt in (0, 2))
+
+                    alleles_read = []
+                    pos_read = 0
+                    pos_ref = read.pos
+                    qual = np.fromstring(read.qual, np.int8) - 33
+                    for (bt, bl) in read.cigar:
+                        if bt == 1:
+                            pos_read += bl
+                        elif bt == 2:
+                            pos_ref += bl
+                            # NOTE: no gaps in ref alignment!
+                        else:
+                            all_block_ind = (poss_polyd >= pos_ref) & (poss_polyd < pos_ref + bl)
+                            if all_block_ind.sum():
+                                all_block_indi = all_block_ind.nonzero()[0]
+                                for pos_i in all_block_indi:
+                                    pos = poss_polyd[pos_i]
+                                    posb = pos - pos_ref
+                                    al = read.seq[pos_read + posb]
+                                    qualp = qual[pos_read + posb]
+                                    if qualp < 30:
+                                        continue
+                                    al_bit = np.zeros(alim.shape[0], bool)
+                                    for po in xrange(alim.shape[0]):
+                                        if al == alim[po, pos]:
+                                            al_bit[po] = True
+                                    alleles_read.append((pos, al_bit))
+
+                            pos_ref += bl
+                            pos_read += bl
+
+                    alleles_pair.append(alleles_read)
+
+                poss1 = map(itemgetter(0), alleles_pair[0])
+                poss2 = map(itemgetter(0), alleles_pair[1])
+                poss_all = sorted(set(poss1 + poss2))
+                alleles_ins = []
+                for pos in poss_all:
+                    if (pos in poss1) and (pos not in poss2):
+                        alleles_ins.append(alleles_pair[0][poss1.index(pos)])
+                    elif (pos not in poss1):
+                        alleles_ins.append(alleles_pair[1][poss2.index(pos)])
+                    else:
+                        al1 = alleles_pair[0][poss1.index(pos)][1]
+                        al2 = alleles_pair[1][poss2.index(pos)][1]
+                        if (al1 == al2).all():
+                            alleles_ins.append((pos, al1))
+
+                if not len(alleles_ins):
+                    continue
+
+                (poss, alls) = zip(*alleles_ins)
+                alls = np.vstack(alls)
+                strain = alls.sum(axis=0).argmax()
+                n_strain[strain] += 1
+
+                # Is it a recombinant?
+                is_rec = False
+                for i, alli in enumerate(alls.T):
+                    if i == strain:
+                        continue
+
+                    # Somewhat too loose criterion ;-)
+                    if (alli & (- alls.T[strain])).sum() >= 7:
+                        is_rec = True
+                
+                if is_rec:
+                    n_recombinants += 1
+                # Somewhat too loose criterion ;-)
+                elif len(alli) >= 15:
+                    n_pure += 1
+
+                if (VERBOSE >= 3) or ((VERBOSE >= 2) and is_rec):
+                    s1 = [str(p) for (p, v) in alleles_ins]
+                    s2 = ['   '.join(v.tostring().replace('\x00', ' ').replace('\x01', 'x')) for (p, v) in alleles_ins]
+                    print '\n'.join(map('\t'.join, zip(s1, s2)))
+                    print 'Strain:', strain + 1, '('+ali_names[strain]+')'
+                    print ''
+                    import time
+                    time.sleep(1)
+
+                #import ipdb; ipdb.set_trace()
+
+
+        n_recs[samplename] = n_recombinants
+        n_purs[samplename] = n_pure
+        n_strains[samplename] = n_strain
+
+    for key in n_recs:
+        print key, 'recs:', n_recs[key], 'pure:', n_purs[key], 'ratio:', 1.0 * n_recs[key] / n_purs[key], \
+                'strains:', n_strains[key]
 
     ## Open the reads to have a look
     ## convPCR
