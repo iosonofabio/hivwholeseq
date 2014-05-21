@@ -60,7 +60,7 @@ if __name__ == '__main__':
 
     fragments = ['F'+str(i) for i in xrange(1, 7)]
 
-    # Prepare output structures
+    # Prepare output data structures
     bins_to = np.insert(np.logspace(-2.5, 0, 10), 0, 0)
     bins_from = bins_to[(bins_to > 1e-3) & (bins_to < 0.5)]
     hist = np.zeros((len(bins_from) - 1, len(bins_to) - 1), float)
@@ -78,7 +78,6 @@ if __name__ == '__main__':
         times = times[ind]
         samplenames = [s for (i, s) in enumerate(samplenames) if i in ind] 
     
-        # Iterate over samples and fragments
         for gene in genes:
             for fragment in fragments:
         
@@ -124,7 +123,7 @@ if __name__ == '__main__':
                 gene_len = len(conss_gene)
     
                 # Collect counts
-                for i in xrange(aft.shape[0] - 1):
+                for i in xrange(aft_gene.shape[0] - 1):
                     hist_frag = np.histogram2d(aft_gene[i].ravel(), aft_gene[i + 1].ravel(),
                                                bins=[bins_from, bins_to])
                     hist += hist_frag[0]
