@@ -57,10 +57,11 @@ def get_allele_frequency_trajectories(pname, samples, fragment, qual_min=30, VER
 
 
 def plot_allele_frequency_trajectories(times, nus, title='', VERBOSE=0,
-                                       threshold=0.1, options=[]):
+                                       threshold=0.1, options=[], logit = False):
     '''Plot the allele frequency trajectories from a patient'''
     import matplotlib.pyplot as plt
     from matplotlib import cm
+    import numpy as np
 
     fig, ax = plt.subplots(1, 1)
     for i in xrange(nus.shape[2]):
@@ -82,19 +83,29 @@ def plot_allele_frequency_trajectories(times, nus, title='', VERBOSE=0,
                 else:
                     ls = '-'
 
-                ax.plot(times, nu + 1e-4, lw=1.5, ls=ls,
-                        color=cm.jet(int(255.0 * i / nus.shape[2])))
-
+                if logit:
+                    ax.plot(times, np.log10((nu + 1e-4)/(1-1e-4-nu)), lw=1.5, ls=ls,
+                            color=cm.jet(int(255.0 * i / nus.shape[2])))
+                else:
+                    ax.plot(times, nu + 1e-4, lw=1.5, ls=ls,
+                            color=cm.jet(int(255.0 * i / nus.shape[2])))
     ax.set_xlim(times[0] -10, times[-1] + 10)
     ax.set_xlabel('Time [days from initial sample]')
-    ax.set_ylim(9e-5, 1.5)
-    ax.set_yscale('log')
+    if logit:
+        ax.set_ylim(-4.1, 4.1)
+        tickloc = np.array([0.0001, 0.01, 0.5, 0.99, 0.9999])
+        ax.set_yticks(np.log10(tickloc/(1-tickloc)))
+        ax.set_yticklabels(map(str, tickloc))
+    else:
+        ax.set_ylim(9e-5, 1.5)
+        ax.set_yscale('log')
+
     ax.set_ylabel(r'$\nu$', fontsize=16)
     ax.set_title(title)
 
 
 def plot_allele_frequency_trajectories_3d(times, nus, title='', VERBOSE=0,
-                                          threshold=0.1):
+                                          threshold=0.1, logit=False):
     '''Plot the allele freq traj in 3D'''
     from mpl_toolkits.mplot3d import Axes3D
     from matplotlib import cm
@@ -109,14 +120,26 @@ def plot_allele_frequency_trajectories_3d(times, nus, title='', VERBOSE=0,
         for j in xrange(nus.shape[1]):
             nu = nus[:, j, i]
             if (nu[0] < 0.5) and (nu > threshold).any():
-                ax.plot(times, [i] * len(times), np.log10(nu + 1e-4),
-                        lw=2,
-                        color=cm.jet(int(255.0 * i / nus.shape[2])))
+                if logit:
+                    ax.plot(times, [i] * len(times), np.log10((nu + 1e-4)/(1-1e-4-nu)),
+                            lw=2,
+                            color=cm.jet(int(255.0 * i / nus.shape[2])))
+                else:
+                    ax.plot(times, [i] * len(times), np.log10(nu + 1e-4),
+                            lw=2,
+                            color=cm.jet(int(255.0 * i / nus.shape[2])))
 
     ax.set_xlim(times[0] -10, times[-1] + 10)
     ax.set_xlabel('Time [days from initial sample]')
     ax.set_ylabel('Position [bp]')
-    ax.set_zlim(-4.1, 0.1)
-    ax.set_zlabel(r'$\log_{10} \nu$', fontsize=18)
+    if logit:
+        ax.set_zlim(-4.1, 4.1)
+        tickloc = np.array([0.0001, 0.01, 0.5, 0.99, 0.9999])
+        ax.set_zticks(np.log10(tickloc/(1-tickloc)))
+        ax.set_zticklabels(map(str, tickloc))
+        ax.set_zlabel(r'$\nu$', fontsize=18)
+    else:
+        ax.set_zlim(-4.1, 0.1)
+        ax.set_zlabel(r'$\log_{10} \nu$', fontsize=18)
     ax.set_title(title)
     ax.grid(True)
