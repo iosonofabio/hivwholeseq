@@ -44,8 +44,8 @@ if __name__ == '__main__':
                         help='Execute the script in parallel on the cluster')
     parser.add_argument('--plot', nargs='?', default=None, const='2D',
                         help='Plot the allele frequency trajectories')
-    parser.add_argument('--logit',nargs='?', const=True, default=False,
-                        help='logit scale (log(x/(1-x))')
+    parser.add_argument('--logit', action='store_true',
+                        help='use logit scale (log(x/(1-x)) in the plots')
     parser.add_argument('--PCR1', action='store_true',
                         help='Show only PCR1 samples where possible (still computes all)')
 
@@ -57,6 +57,7 @@ if __name__ == '__main__':
     plot = args.plot
     submit = args.submit
     use_PCR1 = args.PCR1
+    use_logit = args.logit
 
     patient = get_patient(pname)
     times = patient.times()
@@ -108,9 +109,9 @@ if __name__ == '__main__':
             import matplotlib.pyplot as plt
 
             if plot in ('2D', '2d', ''):
-                plot_nus(times, aft, title='Patient '+pname+', '+fragment, VERBOSE=VERBOSE, logit = args.logit)
+                plot_nus(times, aft, title='Patient '+pname+', '+fragment, VERBOSE=VERBOSE, logit=use_logit)
             elif plot in ('3D', '3d'):
-                plot_nus_3d(times, aft, title='Patient '+pname+', '+fragment, VERBOSE=VERBOSE, logit = args.logit)
+                plot_nus_3d(times, aft, title='Patient '+pname+', '+fragment, VERBOSE=VERBOSE, logit=use_logit)
 
     if plot is not None:
         plt.tight_layout()

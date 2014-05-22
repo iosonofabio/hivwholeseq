@@ -57,7 +57,7 @@ def get_allele_frequency_trajectories(pname, samples, fragment, qual_min=30, VER
 
 
 def plot_allele_frequency_trajectories(times, nus, title='', VERBOSE=0,
-                                       threshold=0.1, options=[], logit = False):
+                                       threshold=0.1, options=[], logit=False):
     '''Plot the allele frequency trajectories from a patient'''
     import matplotlib.pyplot as plt
     from matplotlib import cm
@@ -93,9 +93,15 @@ def plot_allele_frequency_trajectories(times, nus, title='', VERBOSE=0,
     ax.set_xlabel('Time [days from initial sample]')
     if logit:
         ax.set_ylim(-4.1, 4.1)
+        trfun = lambda x: np.log10(x / (1 - x))
         tickloc = np.array([0.0001, 0.01, 0.5, 0.99, 0.9999])
-        ax.set_yticks(np.log10(tickloc/(1-tickloc)))
+        ax.set_yticks(trfun(tickloc))
         ax.set_yticklabels(map(str, tickloc))
+        from matplotlib.ticker import FixedLocator
+        ticklocminor = np.concatenate([[10**po * x for x in xrange(2 , 10)] for po in xrange(-4, -1)] + \
+                                      [[0.1 * x for x in xrange(2 , 9)]] + \
+                                      [[1 - 10**po * (10 - x) for x in xrange(2, 10)] for po in xrange(-2, -5, -1)])
+        ax.yaxis.set_minor_locator(FixedLocator(trfun(ticklocminor)))
     else:
         ax.set_ylim(9e-5, 1.5)
         ax.set_yscale('log')
@@ -134,9 +140,15 @@ def plot_allele_frequency_trajectories_3d(times, nus, title='', VERBOSE=0,
     ax.set_ylabel('Position [bp]')
     if logit:
         ax.set_zlim(-4.1, 4.1)
+        trfun = lambda x: np.log10(x / (1 - x))
         tickloc = np.array([0.0001, 0.01, 0.5, 0.99, 0.9999])
-        ax.set_zticks(np.log10(tickloc/(1-tickloc)))
+        ax.set_zticks(trfun(tickloc))
         ax.set_zticklabels(map(str, tickloc))
+        from matplotlib.ticker import FixedLocator
+        ticklocminor = np.concatenate([[10**po * x for x in xrange(2 , 10)] for po in xrange(-4, -1)] + \
+                                      [[0.1 * x for x in xrange(2 , 9)]] + \
+                                      [[1 - 10**po * (10 - x) for x in xrange(2, 10)] for po in xrange(-2, -5, -1)])
+        ax.zaxis.set_minor_locator(FixedLocator(trfun(ticklocminor)))
         ax.set_zlabel(r'$\nu$', fontsize=18)
     else:
         ax.set_zlim(-4.1, 0.1)
