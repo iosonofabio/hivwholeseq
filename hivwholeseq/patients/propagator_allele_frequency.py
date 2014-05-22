@@ -44,7 +44,7 @@ if __name__ == '__main__':
     submit = args.submit
 
     if pnames is None:
-        patients = [p for p in patients_all if (len(set(p.times())) >= 3) and (p.id != '15241')]
+        patients = [p for p in patients_all if (len(set(p.times())) >= 3)]
     else:
         patients = [p for p in patients_all if p.id in pnames]
 

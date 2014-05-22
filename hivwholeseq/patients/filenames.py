@@ -116,6 +116,15 @@ def get_allele_cocounts_filename(pname, samplename, fragment,
     return filename
 
 
+def get_coordinate_map_filename(pname, fragment, refname='HXB2',
+                                root_data_folder=root_data_folder):
+    '''Get the filename of the map to HXB2 or other ref coordinates'''
+    filename = 'map_coord_to_'+refname+'_'+fragment+'.dat'
+    filename = get_foldername(pname, root_data_folder=root_data_folder)+filename
+    return filename
+
+
+
 # FIGURES
 def get_figure_folder(pname):
     '''Get the folder for figures for this sample'''

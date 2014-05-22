@@ -110,4 +110,3 @@ def annotate_sequence_genes(seq_rec, fragment='genomewide', genes=genes_all,
 
 
 
-
