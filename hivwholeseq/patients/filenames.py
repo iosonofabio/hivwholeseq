@@ -146,6 +146,13 @@ def get_correlation_PCR1_PCR2_aft_figure_filename(pname, fragment, samplename, f
     return fn
 
 
+def get_coverage_to_initial_figure_filename(pname, fragment, format='png'):
+    '''Get the filename of the figure of coverage along the infection'''
+    folder = get_figure_folder(pname)
+    fn = folder+'coverage_'+fragment+'.png'
+    return fn
+
+
 
 # SUMMARY
 def get_map_initial_summary_filename(pname, samplename, fragment,
