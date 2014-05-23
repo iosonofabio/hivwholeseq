@@ -57,7 +57,8 @@ def get_allele_frequency_trajectories(pname, samples, fragment, qual_min=30, VER
 
 
 def plot_allele_frequency_trajectories(times, nus, title='', VERBOSE=0,
-                                       threshold=0.1, options=[], logit=False):
+                                       threshold=0.1, options=[], logit=False,
+                                       ntemplates=None):
     '''Plot the allele frequency trajectories from a patient'''
     import matplotlib.pyplot as plt
     from matplotlib import cm
@@ -84,11 +85,22 @@ def plot_allele_frequency_trajectories(times, nus, title='', VERBOSE=0,
                     ls = '-'
 
                 if logit:
-                    ax.plot(times, np.log10((nu + 1e-4)/(1-1e-4-nu)), lw=1.5, ls=ls,
-                            color=cm.jet(int(255.0 * i / nus.shape[2])))
+                    y = np.log10((nu + 1e-4)/(1-1e-4-nu))
                 else:
-                    ax.plot(times, nu + 1e-4, lw=1.5, ls=ls,
-                            color=cm.jet(int(255.0 * i / nus.shape[2])))
+                    y = nu + 1e-4
+                ax.plot(times, y, lw=1.5, ls=ls,
+                        color=cm.jet(int(255.0 * i / nus.shape[2])))
+
+    if ntemplates is not None:
+        depthmax = 1.0 / ntemplates
+        if logit:
+            y = np.log10(depthmax/(1 - depthmax))
+            print y
+        else:
+            y = depthmax
+        ax.plot(times, y, lw=3.5, ls='-',
+                color='k', label='Max depth (# templates)')
+
     ax.set_xlim(times[0] -10, times[-1] + 10)
     ax.set_xlabel('Time [days from initial sample]')
     if logit:
