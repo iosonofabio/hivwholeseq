@@ -98,8 +98,15 @@ if __name__ == '__main__':
     if (plot is not None):
         import matplotlib.pyplot as plt
         if plot in ('2D', '2d', ''):
+            # FIXME: the number of molecules to PCR depends on the number of
+            # fragments for that particular experiment... integrate Lina's table!
+            # Note: this refers to the TOTAL # of templates, i.e. the factor 2x for
+            # the two parallel RT-PCR reactions
+            ntemplates = patient.viral_load * 0.4 / 12 * 2
+            if use_PCR1:
+                ntemplates = ntemplates[ind]
             plot_nus(times, aft_gene, title='Patient '+pname+', '+gene, VERBOSE=VERBOSE,
-                     options=['syn-nonsyn'])
+                     options=['syn-nonsyn'], ntemplates=ntemplates)
         elif plot in ('3D', '3d'):
             plot_nus_3d(times, aft_gene, title='Patient '+pname+', '+gene, VERBOSE=VERBOSE)
 
