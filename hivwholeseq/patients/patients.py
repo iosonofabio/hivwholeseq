@@ -8,6 +8,7 @@ content:    Description module for HIV patients.
 import numpy as np
 
 from hivwholeseq.samples import sample_table
+from hivwholeseq.patients.read_patient_table import enrich_from_patient_sheet_dict
 
 
 # Classes
@@ -81,6 +82,8 @@ class patient(object):
 # Globals
 patients = [patient(p) for p in set(sample_table['patient']) - set([np.nan])]
 patients.sort(key=lambda x: int(x.id))
+for p in patients:
+    enrich_from_patient_sheet_dict(p)
 patients_dict = {p.id: p for p in patients}
 
 
