@@ -437,7 +437,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Update initial consensus')
     parser.add_argument('--patient', required=True,
                         help='Patient to analyze')
-    parser.add_argument('--fragments', nargs='*',
+    parser.add_argument('--fragments', nargs='+',
                         help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')

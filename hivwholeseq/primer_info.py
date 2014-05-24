@@ -117,3 +117,30 @@ def find_fragment(refseq, fragment):
         raise ValueError('No suitable combination of fwd/rev primers found')
 
     return (pos_start, pos_end)
+
+
+def find_primer_seq(seq, primer, from_right=False, threshold=0.7):
+    '''Find an ambiguous primer in a sequence'''
+    import numpy as np
+
+    refs = ''.join(seq)
+    refm = np.fromstring(refs, 'S1')
+    rl = len(refm)
+
+    seed = np.ma.array(np.fromstring(primer, 'S1'))
+    seed[seed == 'Y'] = np.ma.masked
+    seed[seed == 'R'] = np.ma.masked
+    seed[seed == 'W'] = np.ma.masked
+    seed[seed == 'N'] = np.ma.masked
+    sl = len(seed)
+    n_matches = np.array([(seed == refm[i: i + sl]).sum() for i in xrange(len(refm) - sl)], int)
+    if not from_right:
+        pos_start = np.argmax(n_matches)
+    else:
+        pos_start = len(n_matches) - 1 - np.argmax(n_matches[::-1])
+
+    if n_matches[pos_start] < threshold * (-seed.mask).sum():
+        raise ValueError('Start of fragment not found')
+
+    return pos_start
+
