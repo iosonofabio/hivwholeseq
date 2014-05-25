@@ -52,6 +52,8 @@ if __name__ == '__main__':
                         help='Save the plot to file')
     parser.add_argument('--plot', nargs='?', default=None, const='2D',
                         help='Plot the allele frequency trajectories')
+    parser.add_argument('--logit', action='store_true',
+                        help='use logit scale (log(x/(1-x)) in the plots')
     parser.add_argument('--PCR1', action='store_true',
                         help='Show only PCR1 samples where possible (still computes all)')
     
@@ -62,6 +64,7 @@ if __name__ == '__main__':
     save_to_file = args.save
     plot = args.plot
     saveplot = args.saveplot
+    use_logit = args.logit
     use_PCR1 = args.PCR1
 
     patient = get_patient(pname)
@@ -76,8 +79,10 @@ if __name__ == '__main__':
     cons_rec = SeqIO.read(get_initial_consensus_filename(pname, 'genomewide'), 'fasta')
     conss = str(cons_rec.seq)
         
-    aft_filename = get_allele_frequency_trajectories_filename(pname, 'genomewide')
-    aft = np.load(aft_filename)
+    #aft_filename = get_allele_frequency_trajectories_filename(pname, 'genomewide')
+    #aft = np.load(aft_filename)
+    aft = patient.get_allele_frequency_trajectories('genomewide')
+    act = patient.get_allele_count_trajectories('genomewide')
 
     # Extract gene from reference and allele freq trajectories
     from hivwholeseq.patients.build_initial_reference import check_genes_consensus
@@ -87,6 +92,13 @@ if __name__ == '__main__':
     gene_pos = gene_poss[gene]
     aft_gene = np.concatenate([aft[:, :, exon_pos[0]: exon_pos[1]]
                                for exon_pos in gene_pos], axis=2)
+    act_gene = np.concatenate([act[:, :, exon_pos[0]: exon_pos[1]]
+                               for exon_pos in gene_pos], axis=2)
+
+    # Exclude stuff with little counts from any time point (e.g. between inner and outer primers)
+    ind_cov = (act_gene.sum(axis=1) >= 100).all(axis=0)
+    aft[:, :, -ind_cov] = 0
+
     if save_to_file:
         aft_gene.dump(get_allele_frequency_trajectories_filename(pname, gene))
 
@@ -106,9 +118,9 @@ if __name__ == '__main__':
             if use_PCR1:
                 ntemplates = ntemplates[ind]
             plot_nus(times, aft_gene, title='Patient '+pname+', '+gene, VERBOSE=VERBOSE,
-                     options=['syn-nonsyn'], ntemplates=ntemplates)
+                     options=['syn-nonsyn'], ntemplates=ntemplates, logit=use_logit)
         elif plot in ('3D', '3d'):
-            plot_nus_3d(times, aft_gene, title='Patient '+pname+', '+gene, VERBOSE=VERBOSE)
+            plot_nus_3d(times, aft_gene, title='Patient '+pname+', '+gene, VERBOSE=VERBOSE, logit=use_logit)
 
         plt.tight_layout()
 

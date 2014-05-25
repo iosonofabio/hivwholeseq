@@ -74,7 +74,24 @@ class patient(object):
     def initial_sample(self):
         '''The initial sample used as a mapping reference'''
         return self.sample_table.iloc[0]
-        
+
+
+    def get_allele_frequency_trajectories(self, fragment_or_gene):
+        '''Get the allele frequency trajectories from files'''
+        from hivwholeseq.patients.filenames import get_allele_frequency_trajectories_filename
+        aft_filename = get_allele_frequency_trajectories_filename(self.id, fragment_or_gene)
+        aft = np.load(aft_filename)
+        return aft
+
+
+    def get_allele_count_trajectories(self, fragment_or_gene):
+        '''Get the allele count trajectories from files'''
+        from hivwholeseq.patients.filenames import get_allele_count_trajectories_filename
+        act_filename = get_allele_count_trajectories_filename(self.id, fragment_or_gene)
+        act = np.load(act_filename)
+        return act
+
+ 
 
 
 

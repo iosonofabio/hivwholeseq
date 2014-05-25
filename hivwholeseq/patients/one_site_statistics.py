@@ -95,7 +95,6 @@ def plot_allele_frequency_trajectories(times, nus, title='', VERBOSE=0,
         depthmax = 1.0 / ntemplates
         if logit:
             y = np.log10(depthmax/(1 - depthmax))
-            print y
         else:
             y = depthmax
         ax.plot(times, y, lw=3.5, ls='-',

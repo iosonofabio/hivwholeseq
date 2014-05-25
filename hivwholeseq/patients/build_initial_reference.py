@@ -51,8 +51,13 @@ from hivwholeseq.primer_info import fragments_genes
 def merge_initial_consensi(conss_frags, minimal_fraction_match=0.75, VERBOSE=0):
     '''Merge fragment consensi into a genome-wide one'''
     # Find overlaps
+    if VERBOSE:
+        print 'Starting with F1'
     conss_all = [conss_frags[0]]
-    for conss in conss_frags[1:]:
+    for ifr, conss in enumerate(conss_frags[1:], 2):
+        if VERBOSE:
+            print 'merging in F'+str(ifr)
+
         # Avoid the first few bases because of low coverage
         pos_seed_new = 30
         seed = conss[pos_seed_new: pos_seed_new + 30]
@@ -66,10 +71,19 @@ def merge_initial_consensi(conss_frags, minimal_fraction_match=0.75, VERBOSE=0):
                                 for i in xrange(len(refm) - sl)], int)
             pos_seed = len(refm) - 1 - np.argmax(n_match[::-1])
             if n_match[pos_seed] < minimal_fraction_match * sl:
-                raise ValueError('Cannot merge consensi!')
+                overlap_found = False
+                if VERBOSE:
+                    print 'WARNING: Cannot merge consensus F'+str(ifr)+' with previous ones'
+            else:
+                overlap_found = True
+        else:
+            overlap_found = True
 
-        conss_all[-1] = conss_all[-1][:pos_seed]
-        conss_all.append(conss[pos_seed_new:])
+        if overlap_found:
+            conss_all[-1] = conss_all[-1][:pos_seed]
+            conss_all.append(conss[pos_seed_new:])
+        else:
+            conss_all.append(('N' * 10) + conss)
 
     return ''.join(conss_all)
 
@@ -304,19 +318,28 @@ def check_genes_consensus(conss, fragment, genes=genes_all, max_end_slippage=10,
                     print msg
             else:
                 if VERBOSE:
-                    print 'WARNING: gene', gene, msg
+                    print 'WARNING: gene', gene, msg,
         
                 # No reference alignment and crap for exons
                 if len(gene) == 3:
         
                     ref = load_custom_reference('HXB2', 'gb')
                     gene_ref = extract_feature(ref, gene)
-                    prot_seq = gene_seq.translate()
-                    prot_ref = gene_ref.seq.translate()
+                    if ('N' * 10) not in str(gene_seq):
+                        print ''
+
+                        prot_seq = gene_seq.translate()
+                        prot_ref = gene_ref.seq.translate()
         
-                    ali = align_muscle(SeqRecord(prot_seq, id='cons'),
-                                       SeqRecord(prot_ref, id='ref'), sort=True)
-                    pretty_print_pairwise_ali(ali, 'cons', 'HXB2')
+                        ali = align_muscle(SeqRecord(prot_seq, id='cons'),
+                                           SeqRecord(prot_ref, id='ref'), sort=True)
+                        pretty_print_pairwise_ali(ali, 'cons', 'HXB2')
+
+                    else:
+                        print 'gene not fully sequenced!'
+
+                else:
+                    print ''
     
             genes_good[gene] = is_good
             gene_seqs[gene] = gene_seq
@@ -336,6 +359,12 @@ def check_genes_consensus(conss, fragment, genes=genes_all, max_end_slippage=10,
 
                 if VERBOSE and not len(gene_pos):
                     print gene,
+
+                if VERBOSE and (fragment == 'genomewide'):
+                    if not len(gene_pos):
+                        print ''
+                    print exon,
+
 
                 # Locate exon
                 if start_search >= len(conss):
@@ -515,16 +544,17 @@ if __name__ == '__main__':
             
     # Merge all fragments if requested
     if 'genomewide' in fragments:
-        #conss_frags = []
-        #for fragment in ['F'+str(i) for i in xrange(1, 7)]:
-        #    output_filename = get_initial_consensus_filename(pname, fragment)
-        #    conss = str(SeqIO.read(output_filename, 'fasta').seq)
-        #    conss_frags.append(conss)
-        #conss_genomewide = merge_initial_consensi(conss_frags, VERBOSE=VERBOSE)
+        conss_frags = []
+        for fragment in ['F'+str(i) for i in xrange(1, 7)]:
+            output_filename = get_initial_consensus_filename(pname, fragment)
+            conss = str(SeqIO.read(output_filename, 'fasta').seq)
+            conss_frags.append(conss)
+        conss_genomewide = merge_initial_consensi(conss_frags, VERBOSE=VERBOSE,
+                                                  minimal_fraction_match=0.75)
 
-        # Take consensus from folder, it was built by assisted assembly
-        cons_gw_rec = SeqIO.read(get_consensus_filename(data_folder, adaID, 'genomewide'), 'fasta')
-        conss_genomewide = str(cons_gw_rec.seq)
+        ## Take consensus from folder, it was built by assisted assembly
+        #cons_gw_rec = SeqIO.read(get_consensus_filename(data_folder, adaID, 'genomewide'), 'fasta')
+        #conss_genomewide = str(cons_gw_rec.seq)
         
         gene_seqs, genes_good, gene_poss = check_genes_consensus(conss_genomewide, 'genomewide', VERBOSE=VERBOSE)
         if all(genes_good.values()):

@@ -37,7 +37,7 @@ def merge_allele_frequency_trajectories(conss_genomewide, acss, VERBOSE=0):
     for pos in xrange(acss[0].shape[2]):
         acs[:, :, pos] = acss[0][:, :, pos]
 
-    # Blend in subsequent fragments
+    # Blend in subsequent fragments (does NOT require genomewide consensus to be complete!)
     for ifr, acsi in enumerate(acss[1:], 1):
         seed = alpha[acsi[0, :, :30].argmax(axis=0)]
         sl = len(seed)
@@ -83,7 +83,7 @@ def merge_allele_frequency_trajectories(conss_genomewide, acss, VERBOSE=0):
     # Normalize to frequencies
     afs = (1.0 * acs.swapaxes(0, 1) / acs.sum(axis=1)).swapaxes(0, 1)
 
-    return afs
+    return (acs, afs)
 
 
 
@@ -98,14 +98,17 @@ if __name__ == '__main__':
                         help='Verbosity level [0-3]')
     parser.add_argument('--save', action='store_true',
                         help='Save the allele frequency trajectories to file')
-    parser.add_argument('--plot', action='store_true',
+    parser.add_argument('--plot', nargs='?', default=None, const='2D',
                         help='Plot the allele frequency trajectories')
+    parser.add_argument('--PCR1', action='store_true',
+                        help='Show only PCR1 samples where possible (still computes all)')
 
     args = parser.parse_args()
     pname = args.patient
     VERBOSE = args.verbose
     save_to_file = args.save
     plot = args.plot
+    use_PCR1 = args.PCR1
 
     # Get patient and the sequenced samples (and sort them by date)
     patient = get_patient(pname)
@@ -126,16 +129,33 @@ if __name__ == '__main__':
     conss_genomewide = str(cons_rec.seq)
 
     # Merge allele counts
-    afs = merge_allele_frequency_trajectories(conss_genomewide, acss, VERBOSE=VERBOSE)
+    (acs, afs) = merge_allele_frequency_trajectories(conss_genomewide, acss, VERBOSE=VERBOSE)
 
     if save_to_file:
         afs.dump(get_allele_frequency_trajectories_filename(pname, 'genomewide'))
+        acs.dump(get_allele_count_trajectories_filename(pname, 'genomewide'))
 
-    if plot:
+    if plot is not None:
         import matplotlib.pyplot as plt
         times = patient.times()
-        plot_nus(times, afs, title='Patient '+pname, VERBOSE=VERBOSE)
-        plot_nus_3d(times, afs, title='Patient '+pname, VERBOSE=VERBOSE)
+        if use_PCR1:
+            samplenames = patient.samples
+            # Keep PCR2 only if PCR1 is absent
+            ind = np.nonzero(map(lambda x: ('PCR1' in x[1]) or ((times == times[x[0]]).sum() == 1),
+                                 enumerate(samplenames)))[0]
+            times = times[ind]
+            afs = afs[ind]
+        # FIXME: the number of molecules to PCR depends on the number of
+        # fragments for that particular experiment... integrate Lina's table!
+        # Note: this refers to the TOTAL # of templates, i.e. the factor 2x for
+        # the two parallel RT-PCR reactions
+        ntemplates = patient.viral_load * 0.4 / 12 * 2
+        if use_PCR1:
+            ntemplates = ntemplates[ind]
+        plot_nus(times, afs, title='Patient '+pname, VERBOSE=VERBOSE,
+                 ntemplates=ntemplates)
+        if plot in ('3D', '3d'):
+            plot_nus_3d(times, afs, title='Patient '+pname, VERBOSE=VERBOSE)
 
         plt.ion()
         plt.show()
