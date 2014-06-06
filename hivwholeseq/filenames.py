@@ -322,14 +322,27 @@ def get_mapped_phix_filename(data_folder, type='bam', filtered=False, sort=False
     return data_folder+'phix/'+filename
 
 
-def get_allele_counts_phix_filename(data_folder):
+def get_consensus_phix_filename(data_folder):
+    '''Get the filename of the consensus of PhiX'''
+    return data_folder+'phix/'+'consensus.fasta'
+
+
+def get_allele_counts_phix_filename(data_folder, qual_min=None):
     '''Get the filename of the allele counts of PhiX'''
-    return data_folder+'phix/'+'allele_counts.npy'
+    fn = data_folder+'phix/'+'allele_counts'
+    if qual_min is not None:
+        fn = fn+'_qualmin_'+str(qual_min)
+    fn = fn+'.npy'
+    return fn
 
 
-def get_insert_counts_phix_filename(data_folder):
+def get_insert_counts_phix_filename(data_folder, qual_min=None):
     '''Get the filename of the insert counts of PhiX'''
-    return data_folder+'phix/'+'insert_counts.pickle'
+    fn = data_folder+'phix/'+'insert_counts'
+    if qual_min is not None:
+        fn = fn+'_qualmin_'+str(qual_min)
+    fn = fn+'.pickle'
+    return fn
 
 
 def get_unclassified_reads_filenames(data_folder, filtered=False, gzip=False):

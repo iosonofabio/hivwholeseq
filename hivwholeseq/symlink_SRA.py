@@ -31,6 +31,7 @@ def make_symlinks(dataset, VERBOSE=0):
             break
     fn1 = unclass_fn+[fn for fn in os.listdir(unclass_fn) if 'L001_R1' in fn][0]
     fn2 = unclass_fn+[fn for fn in os.listdir(unclass_fn) if 'L001_R2' in fn][0]
+
     
     dst_folder = data_folder+foldername_adapter(-1)
     dst_fn1 = dst_folder+'read1.fastq.gz'
@@ -40,11 +41,14 @@ def make_symlinks(dataset, VERBOSE=0):
     elif VERBOSE:
             print dst_fn1, 'exists already'
     if not os.path.isfile(dst_fn2):
-        os.symlink(fn1, dst_fn2)
+        os.symlink(fn2, dst_fn2)
     elif VERBOSE:
             print dst_fn2, 'exists already'
     if VERBOSE:
         print 'Unclassified reads symlinked'
+
+    # FIXME
+    return
 
     # Samples
     for (samplename, adaID) in izip(dataset['samples'], dataset['adapters']):
@@ -70,7 +74,36 @@ def make_symlinks(dataset, VERBOSE=0):
                     break
 
         if sample_fnn is None:
+            if (len(sn) > 7) and (sn[-7:] in ('_PCR1-2', '_PCR2-2', '_PCR1-3', '_PCR2-3')):
+                sn = sn[:-7]
+
+            for fn in os.listdir(sample_fn):
+                if sn in fn:
+                    sample_fnn = sample_fn+fn+'/'
+                    break
+
+        if sample_fnn is None:
             sn = sn.replace('-', '')
+            for fn in os.listdir(sample_fn):
+                if sn in fn:
+                    sample_fnn = sample_fn+fn+'/'
+                    break
+
+        if sample_fnn is None:
+            sn = sn.replace('-', '')
+            if (len(sn) > 5) and (sn[-5:] in ('_PCR1', '_PCR2')):
+                sn = sn[:-5]
+
+            for fn in os.listdir(sample_fn):
+                if sn in fn:
+                    sample_fnn = sample_fn+fn+'/'
+                    break
+
+        if sample_fnn is None:
+            sn = sn.replace('-', '')
+            if (len(sn) > 6) and (sn[-6:] in ('_PCR12', '_PCR22', '_PCR13', '_PCR23')):
+                sn = sn[:-6]
+
             for fn in os.listdir(sample_fn):
                 if sn in fn:
                     sample_fnn = sample_fn+fn+'/'

@@ -1,7 +1,7 @@
 -------------------------------------------------------------------------------
 PIPELINE FOR HIV MISEQ SEQUENCING DATA
 -------------------------------------------------------------------------------
-LAST UPDATE: Jan 2014.
+LAST UPDATE: May 2014.
 
 0a. We get three FASTQ files from Joerg/Xi (and the Miseq):
  - read1
@@ -10,13 +10,12 @@ LAST UPDATE: Jan 2014.
 
 CHECKPOINT: quality score along reads. (quality_along_read.py)
 
+1a. Demultiplex by adapter and put into separate folders with the adapter IDs and
+   sample names. (demultiplex.py)
+
 OR
 
 0b. We get the demultiplexed files on the Short Reads Archive (SRA).
-
-1a. Demultiplex by adapter and put into separate folders with the adapter IDs and
-   sample names. (demultiplex.py)
-OR
 
 1b. Take demultiplexed reads from the SRA and symlink. (symlink_SRA.py)
 

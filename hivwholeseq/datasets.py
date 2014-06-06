@@ -121,6 +121,22 @@ MiSeq_runs_list = [\
   'raw_data': {'SRA': '/ebio/abt6_sra/years/2014/05_15/TruSeqNanoLibHIV/'},
  },
 
+ {'name': 'Tuen10',
+  'description': 'Repetition of run Tuen3 with different sample proportions',
+  'date': '2014-05-20',
+  'n_cycles': 500,
+  'folder': '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run_new10/',
+  'raw_data': {'SRA': '/ebio/abt6_sra/years/2014/05_22/HIVSwedenNexteraXT/'},
+ },
+
+ {'name': 'Tuen11',
+  'description': 'Repetition of run Tuen10 (MiSeq in another room, 600 bp kit)',
+  'date': '2014-05-25',
+  'n_cycles': 602,
+  'folder': '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/run_new11/',
+  'raw_data': {'SRA': '/ebio/abt6_sra/years/2014/05_30/HIVSwedenNexteraXT/'},
+ },
+
 ]
 
 # Add samples to the runs

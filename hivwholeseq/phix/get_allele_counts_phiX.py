@@ -13,13 +13,17 @@ import cPickle as pickle
 from collections import defaultdict
 import numpy as np
 from Bio import SeqIO
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
+from Bio.Alphabet.IUPAC import ambiguous_dna
 import pysam
 import argparse
 
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.miseq import alpha, read_types
 from hivwholeseq.filenames import get_phix_filename, get_mapped_phix_filename, \
-        get_allele_counts_phix_filename, get_insert_counts_phix_filename
+        get_allele_counts_phix_filename, get_insert_counts_phix_filename, \
+        get_consensus_phix_filename
 from hivwholeseq.mapping_utils import convert_sam_to_bam, get_ind_good_cigars
 
 
@@ -40,7 +44,7 @@ vmem = '8G'
 
 
 # Functions
-def fork_self(seq_run, maxreads=-1, VERBOSE=0):
+def fork_self(seq_run, maxreads=-1, VERBOSE=0, qual_min=None):
     '''Fork self for each adapter ID'''
 
     if VERBOSE:
@@ -51,7 +55,7 @@ def fork_self(seq_run, maxreads=-1, VERBOSE=0):
                  '-S', '/bin/bash',
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
-                 '-N', 'acn phiX',
+                 '-N', 'acpX'+seq_run,
                  '-l', 'h_rt='+cluster_time,
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
@@ -59,6 +63,8 @@ def fork_self(seq_run, maxreads=-1, VERBOSE=0):
                  '--maxreads', maxreads,
                  '--verbose', VERBOSE,
                 ]
+    if qual_min is not None:
+        qsub_list.extend(['--qual_min', qual_min])
     qsub_list = map(str, qsub_list)
     if VERBOSE >= 2:
         print ' '.join(qsub_list)
@@ -93,6 +99,8 @@ if __name__ == '__main__':
                         help='Verbosity level [0-3]')
     parser.add_argument('--maxreads', type=int, default=-1,
                         help='Maximal number of reads to analyze')
+    parser.add_argument('--qual_min', type=int, default=0,
+                        help='Maximal quality of nucleotides')
     parser.add_argument('--submit', action='store_true',
                         help='Execute the script in parallel on the cluster')
 
@@ -100,11 +108,12 @@ if __name__ == '__main__':
     seq_run = args.run
     VERBOSE = args.verbose
     maxreads = args.maxreads
+    qual_min = args.qual_min
     submit = args.submit
 
     # Submit to the cluster self if requested
     if submit:
-        fork_self(seq_run, maxreads=maxreads, VERBOSE=VERBOSE)
+        fork_self(seq_run, maxreads=maxreads, VERBOSE=VERBOSE, qual_min=qual_min)
         sys.exit()
 
     # Specify the dataset
@@ -112,12 +121,19 @@ if __name__ == '__main__':
     data_folder = dataset['folder']
 
     # Get counts
-    counts, inserts = get_allele_counts(data_folder, VERBOSE=VERBOSE, maxreads=maxreads)
+    counts, inserts = get_allele_counts(data_folder, VERBOSE=VERBOSE, maxreads=maxreads, qual_min=qual_min)
+    consm = alpha[counts.sum(axis=0).argmax(axis=0)]
+    cons_rec = SeqRecord(Seq(''.join(consm), ambiguous_dna),
+                         id='PhiX_consensus_run_'+seq_run,
+                         name='PhiX_consensus_run_'+seq_run,
+                         description='PhiX consensus run '+seq_run)
+
     
     # Save counts and inserts to file
-    allele_count_filename = get_allele_counts_phix_filename(data_folder)
-    insert_count_filename = get_insert_counts_phix_filename(data_folder)
+    allele_count_filename = get_allele_counts_phix_filename(data_folder, qual_min=qual_min)
+    insert_count_filename = get_insert_counts_phix_filename(data_folder, qual_min=qual_min)
     counts.dump(allele_count_filename)
+    SeqIO.write(cons_rec, get_consensus_phix_filename(data_folder), 'fasta')
     # Change defaultdict into plain dicts, for pickling
     inserts = {key: dict(value) for (key, value) in inserts.iteritems()}
     with open(insert_count_filename, 'w') as f:

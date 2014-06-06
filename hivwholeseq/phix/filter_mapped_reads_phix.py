@@ -49,7 +49,7 @@ def fork_self(seq_run, maxreads=-1, VERBOSE=0):
                  '-S', '/bin/bash',
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
-                 '-N', 'fmr phix',
+                 '-N', 'fpX'+seq_run,
                  '-l', 'h_rt='+cluster_time,
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,

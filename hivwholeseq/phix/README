@@ -1,0 +1,14 @@
+-------------------------------------------------------------------------------
+PIPELINE FOR HIV MISEQ SEQUENCING DATA: PHIX CONTROLS
+-------------------------------------------------------------------------------
+LAST UPDATE: May 2014.
+
+0. We get the symlinks to the unclassified reads (symlink_SRA.py)
+
+1. Map against phiX (map_phix.py)
+
+2. Filter mapped reads of non-phiX unclassified (contaminants, etc.) (filter_mapped_reads_phix.py)
+
+3. Get allele counts (get_allele_counts_phix.py)
+
+4. Get errors in phiX (errors_phiX.py) and errors as a function of phred (phred_errors_phix.py)

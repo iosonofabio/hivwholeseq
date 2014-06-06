@@ -29,6 +29,7 @@ from hivwholeseq.mapping_utils import extract_mapped_reads_subsample_open
 # Functions
 def quality_score_along_reads(read_len, reads_filenames,
                               skipreads=0,
+                              randomreads=False,
                               maxreads=-1, VERBOSE=0):
     '''Calculate the quality score along the reads'''
 
@@ -48,25 +49,61 @@ def quality_score_along_reads(read_len, reads_filenames,
         file_readmode = 'r'
 
     # Iterate over all reads (using fast iterators)
-    with openf(reads_filenames[0], file_readmode) as fh1,\
+    with openf(reads_filenames[0], file_readmode) as fh1, \
          openf(reads_filenames[1], file_readmode) as fh2:
+    
+        if randomreads:
+            if VERBOSE:
+                print 'Getting number of reads',
+            n_reads = sum(1 for read in FGI(fh1))
+            fh1.rewind()
+            if VERBOSE:
+                print n_reads
 
-        for i, reads in enumerate(izip(FGI(fh1), FGI(fh2))):
+            inds = np.arange(skipreads, n_reads)
+            np.random.shuffle(inds)
+            inds = inds[:maxreads]
+            inds.sort()
+            indi = 0
+            if VERBOSE:
+                print 'Random indices from ', inds[0], 'to', inds[-1]
 
-            if i < skipreads:
-                continue
+            for (i, reads) in enumerate(izip(FGI(fh1), FGI(fh2))):
+                if VERBOSE and (not ((i + 1) % 10000)):
+                    print i + 1
 
-            if i == skipreads + maxreads:
-                if VERBOSE:
-                    print 'Maximal number of read pairs reached:', maxreads
-                break
+                if (i != inds[indi]):
+                    continue
 
-            if VERBOSE and (not ((i + 1) % 10000)):
-                print i + 1
+                for ip, read in enumerate(reads):
+                    for j, qletter in enumerate(read[2]):
+                        quality[ip][j].append(q_mapping[qletter])
 
-            for ip, read in enumerate(reads):
-                for j, qletter in enumerate(read[2]):
-                    quality[ip][j].append(q_mapping[qletter])
+                indi += 1
+                if indi == maxreads:
+                    if VERBOSE:
+                        print 'Maximal number of read pairs reached:', maxreads
+                    break
+
+
+
+        else:
+
+            for (i, reads) in enumerate(izip(FGI(fh1), FGI(fh2))):
+                if i < skipreads:
+                    continue
+
+                if i == skipreads + maxreads:
+                    if VERBOSE:
+                        print 'Maximal number of read pairs reached:', maxreads
+                    break
+
+                if VERBOSE and (not ((i + 1) % 10000)):
+                    print i + 1
+
+                for ip, read in enumerate(reads):
+                    for j, qletter in enumerate(read[2]):
+                        quality[ip][j].append(q_mapping[qletter])
 
     for qual in quality:
         for qpos in qual:
@@ -294,6 +331,7 @@ if __name__ == '__main__':
 
         quality = quality_score_along_reads(read_len, reads_filenames,
                                             skipreads=skipreads,
+                                            randomreads=use_random,
                                             maxreads=maxreads, VERBOSE=VERBOSE)
 
     else:

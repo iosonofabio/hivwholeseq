@@ -67,15 +67,19 @@ def get_coverage(count):
     return coverage
 
 
-def load_allele_counts(data_folder, VERBOSE=0):
+def load_allele_counts(data_folder, VERBOSE=0, qual_min=None):
     '''Load the precomputer allele counts'''
-    allele_count_filename = get_allele_counts_phix_filename(data_folder)
-    counts = np.load(allele_count_filename)
+    if VERBOSE:
+        print 'Load allele counts'
+    ac_filename = get_allele_counts_phix_filename(data_folder, qual_min=qual_min)
+    counts = np.load(ac_filename)
     return counts
 
 
 def consensus_vs_reference(seq_run, counts=None, VERBOSE=0):
     '''Check the consensus sequence VS the phiX reference'''
+    if VERBOSE:
+        print 'Check consensus and reference'
     if counts is None:
         counts = load_allele_counts(MiSeq_runs[seq_run]['folder'], VERBOSE=VERBOSE)
 
@@ -111,16 +115,21 @@ def minor_alleles_along_genome(seq_run, qual_min=0, maxreads=-1, VERBOSE=0, plot
     '''Show the minor alleles along the phiX genome'''
 
     # Reload counts at different quality filter level
-    from hivwholeseq.phix.get_allele_counts_phiX import get_allele_counts as gac
-    (counts, _) = gac(MiSeq_runs[seq_run]['folder'], qual_min=qual_min,
-                      VERBOSE=VERBOSE, maxreads=maxreads)
+    if VERBOSE:
+        print 'Getting allele counts'
+    counts = load_allele_counts(MiSeq_runs[seq_run]['folder'], VERBOSE=VERBOSE,
+                                qual_min=qual_min)
 
     # Study the minor alleles (sequencing errors)
+    if VERBOSE:
+        print 'Get minor counts'
     count = get_count(counts)
     minor_counts = get_minor_counts(count)
     minor_nus = get_minor_nus(count)
 
     # Mean error frequency
+    if VERBOSE:
+        print 'Get error frequency'
     cov = get_coverage(count)
     print 'Average error frequency:',
     err_rate_avg = {}
@@ -131,6 +140,8 @@ def minor_alleles_along_genome(seq_run, qual_min=0, maxreads=-1, VERBOSE=0, plot
 
     # Plot
     if plot:
+        if VERBOSE:
+            print 'Plot'
         import matplotlib.pyplot as plt
         fig, axs = plt.subplots(1, 2, figsize=(13, 7))
         for key in count:
@@ -141,6 +152,7 @@ def minor_alleles_along_genome(seq_run, qual_min=0, maxreads=-1, VERBOSE=0, plot
         axs[0].set_title('Sequencing errors')
         axs[0].set_xlim(-100, len(minor_counts['fwd']) + 100)
         axs[0].set_yscale('log')
+        axs[0].grid(True)
         axs[0].legend()
     
         for key in count:
@@ -470,7 +482,7 @@ if __name__ == '__main__':
     parser.add_argument('--maxreads', type=int, default=-1,
                         help='Maximal number of reads to analyze')
     parser.add_argument('--qual_min', type=int, default=0,
-                        help='Maximal number of reads to analyze')
+                        help='Maximal quality of nucleotides')
     parser.add_argument('--plot', action='store_true',
                         help='Plot results')
 
@@ -492,7 +504,7 @@ if __name__ == '__main__':
         data_folder = dataset['folder']
     
         # Get allele counts
-        counts = load_allele_counts(data_folder, VERBOSE=VERBOSE)
+        counts = load_allele_counts(data_folder, VERBOSE=VERBOSE, qual_min=qual_min)
         data_runs[seq_run]['counts'] = counts
     
         # Check consensus
