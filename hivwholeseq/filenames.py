@@ -8,12 +8,14 @@ content:    Module containing all filenames of the analysis in one place.
 import os
 
 from hivwholeseq.adapter_info import foldername_adapter
+import hivwholeseq
 
 
 
 # Globals
 root_data_folder = '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/'
 reference_folder = root_data_folder+'reference/'
+table_filename = hivwholeseq.__path__[0] + '/tables/HIV_reservoir_all.xlsx'
 
 
 
