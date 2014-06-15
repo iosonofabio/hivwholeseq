@@ -17,20 +17,105 @@ from hivwholeseq.filenames import table_filename
 
 
 # Classes
-class SampleTable(pd.DataFrame):
+class SampleSeq(pd.Series):
+    @property
+    def _constructor(self):
+        return SampleSeq
+
+
+    @property
+    def folder(self):
+        '''The folder with the data on this sample'''
+        from hivwholeseq.filenames import get_seqrun_foldername
+        from hivwholeseq.adapter_info import foldername_adapter
+        seq_run = self.loc['seq run']
+        adaID = self.loc['adapter']
+        return get_seqrun_foldername(seq_run)+foldername_adapter(adaID)
+
+
+    @property
+    def sequencing_run(self):
+        '''The sequencing run object of this sample'''
+        return load_sequencing_run(self.loc['seq run'])
+
+
+    #TODO: make object oriented approach to separate regions
+    #@property
+    #def regional_samples(self):
+    #    '''Sample objects for each region'''
+    #    region = self._data
+
+
+    def get_read_filenames(self, **kwargs):
+        '''Get the filenames of the demultiplexed reads'''
+        from hivwholeseq.filenames import get_read_filenames as gfn
+        return gfn(self.folder, **kwargs)
+
+
+    def get_premapped_filename(self, **kwargs):
+        '''Get the filename of the readed premapped to reference'''
+        from hivwholeseq.filenames import get_premapped_filename as gfn
+        return gfn(self.folder, **kwargs)
+
+
+class SamplesSeq(pd.DataFrame):
+    '''Table of sequenced samples'''
+
+    @property
+    def _constructor(self):
+        return SamplesSeq
+
+
     def filter_seq_run(self, run):
         '''Get only the samples from one sequencing run'''
-        return self[self.run == run]
+        return self.loc[self.run == run]
 
 
     def filter_patient(self, patient_id, exclude_reps=True):
         '''Get only the samples from a specific patient'''
-        samples = self[self.patient == patient_id]
+        samples = self.loc[self.patient == patient_id]
         if exclude_reps:
             ind = [(len(sn) < 2) or (sn[-2:] not in ('-2', '-3')) for sn in samples.name.tolist()]
             samples = samples[ind]
         return samples
 
+
+class SequencingRun(pd.Series):
+    '''Sequencing run'''
+    @property
+    def _constructor(self):
+        return SequencingRun
+
+
+    _samples = None
+
+
+    @property
+    def folder(self):
+        '''The folder with the data on this sample'''
+        from hivwholeseq.filenames import get_seqrun_foldername
+        seq_run = self.name
+        return get_seqrun_foldername(seq_run)
+
+
+    @property
+    def samples(self):
+        '''The samples sequenced in this run'''
+        if self._samples is None:
+            self._samples = load_samples_sequenced(seq_run=self.name)
+        return self._samples
+
+
+    def itersamples(self):
+        '''Generator for samples in this run, each with extended attributes'''
+        for samplename, sample in self.samples.iterrows():
+            yield SampleSeq(sample)
+
+
+    @property
+    def adapters(self):
+        '''The adapters used in the sequencing run'''
+        return self.samples.adapter
 
 
 # Globals
@@ -366,7 +451,7 @@ sample_list = [\
  ]
 
 # Sample table using Pandas
-sample_table = SampleTable(sample_list)
+sample_table = SamplesSeq(sample_list)
 
 # Make a dictionary
 samples = {}
@@ -391,7 +476,7 @@ def load_samples_sequenced(seq_run=None):
     if seq_run is not None:
         sample_table = sample_table[sample_table['seq run'] == seq_run]
 
-    return sample_table
+    return SamplesSeq(sample_table)
 
 
 def load_sequencing_runs():
@@ -399,3 +484,11 @@ def load_sequencing_runs():
     seq_runs = pd.read_excel(table_filename, 'Sequencing runs',
                              index_col=0)
     return seq_runs
+
+
+def load_sequencing_run(seq_run):
+    '''Load a single sequencing run (with extended attributes)'''
+    seq_runs = load_sequencing_runs()
+    seq_run_obj = SequencingRun(seq_runs.loc[seq_run])
+    return seq_run_obj
+

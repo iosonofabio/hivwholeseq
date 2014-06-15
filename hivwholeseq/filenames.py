@@ -191,12 +191,13 @@ def get_HXB2_hash_file(fragment='F0', ext=True):
     return filename
 
 
-def get_read_filenames(data_folder, adaID, fragment=None, suffix='',
+def get_read_filenames(data_folder, adaID=None, fragment=None, suffix='',
                        gzip=False):
     '''Get the filenames of the demultiplexed reads'''
     filenames = ['read1', 'read2']
     for i,fn in enumerate(filenames):
-        fn = foldername_adapter(adaID)+fn
+        if adaID is not None:
+            fn = foldername_adapter(adaID)+fn
         fn = data_folder+fn+suffix+'.fastq'
         if gzip:
             fn = fn+'.gz' 
@@ -204,12 +205,13 @@ def get_read_filenames(data_folder, adaID, fragment=None, suffix='',
     return filenames
 
 
-def get_premapped_filename(data_folder, adaID, type='bam', bwa=False,
-                       part=None, unsorted=False):
+def get_premapped_filename(data_folder, adaID=None, type='bam', bwa=False,
+                           part=None, unsorted=False):
     '''Get the filename of the readed mapped to reference to split into fragments'''
     filename = 'premapped'
     filename = 'premapped/'+filename
-    filename = foldername_adapter(adaID)+filename
+    if adaID is not None:
+        filename = foldername_adapter(adaID)+filename
     if part is not None:
         filename = filename+'_part'+str(part)
     elif unsorted:
@@ -234,11 +236,13 @@ def get_fragment_positions_filename(data_folder, adaID):
     return data_folder+foldername_adapter(adaID)+filename
 
 
-def get_divided_filenames(data_folder, adaID, fragments, type='bam'):
+def get_divided_filenames(data_folder, adaID=None, fragments=None, type='bam'):
     '''Get the filenames of the BAM files divided by fragment'''
     filename = 'divided'
     filename = 'divided/'+filename
-    filename = data_folder+foldername_adapter(adaID)+filename
+    if adaID is not None:
+        filename = foldername_adapter(adaID)+filename
+    filename = data_folder+filename
     filenames = []
     for fragment in (list(fragments) + ['ambiguous', 'crossmapped',
                                         'unmapped', 'low_quality']):
@@ -247,11 +251,13 @@ def get_divided_filenames(data_folder, adaID, fragments, type='bam'):
     return filenames
 
 
-def get_divided_filename(data_folder, adaID, fragment, type='bam', chunk=None):
+def get_divided_filename(data_folder, adaID=None, fragment=None, type='bam', chunk=None):
     '''Get the filename of the BAM files divided for a single fragment'''
     filename = 'divided'
     filename = 'divided/'+filename
-    filename = data_folder+foldername_adapter(adaID)+filename
+    if adaID is not None:
+        filename = foldername_adapter(adaID)+filename
+    filename = data_folder+filename
     filename = filename+'_'+fragment
     if chunk is not None:
         filename = filename+'_chunk_'+str(chunk)
@@ -259,9 +265,11 @@ def get_divided_filename(data_folder, adaID, fragment, type='bam', chunk=None):
     return filename
 
 
-def get_mapped_filename(data_folder, adaID, fragment, type='bam', 
+def get_mapped_filename(data_folder, adaID=None, fragment=None, type='bam', 
                         bwa=False, filtered=False, sort=False, part=None, unsorted=False):
     '''Get the filename of the mapped reads onto consensus'''
+    if fragment is None:
+        raise ValueError('Select a fragment')
     filename = fragment
     if bwa:
         filename = filename + '_bwa'
@@ -275,7 +283,8 @@ def get_mapped_filename(data_folder, adaID, fragment, type='bam',
         filename = filename+'_unsorted'
 
     filename = 'mapped/'+filename+'.'+type
-    filename = foldername_adapter(adaID)+filename
+    if adaID is not None:
+        filename = foldername_adapter(adaID)+filename
     return data_folder+filename
 
 

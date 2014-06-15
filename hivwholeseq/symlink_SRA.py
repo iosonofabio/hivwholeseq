@@ -29,9 +29,10 @@ def make_output_folders(data_folder, adaIDs, VERBOSE=0):
             print 'Folder created:', data_folder+foldername_adapter(adaID)
 
 
-def make_symlinks(dataset, samples, VERBOSE=0):
+def make_symlinks(dataset, VERBOSE=0):
     '''Make symlinks for fastq.gz from the SRA'''
     seq_run = dataset.name
+    samples = dataset.samples
     data_folder = get_seqrun_foldername(seq_run)
     raw_root_folder = dataset.loc['raw data']
 
@@ -106,13 +107,10 @@ if __name__ == '__main__':
     seq_run = args.run
     VERBOSE = args.verbose
 
-    # Specify the dataset
-    dataset = load_sequencing_runs().loc[seq_run]
-    data_folder = get_seqrun_foldername(seq_run)
-    samples = load_samples_sequenced(seq_run=seq_run)
+    dataset = load_sequencing_run(seq_run)
+    data_folder = dataset.folder
 
-    adapters = samples.loc[:, 'adapter']
+    adapters = dataset.samples.adapter.tolist()
+    make_output_folders(data_folder, adapters, VERBOSE=VERBOSE)
 
-    make_output_folders(data_folder, adapters.tolist(), VERBOSE=VERBOSE)
-
-    make_symlinks(dataset, samples, VERBOSE=VERBOSE)
+    make_symlinks(dataset, VERBOSE=VERBOSE)

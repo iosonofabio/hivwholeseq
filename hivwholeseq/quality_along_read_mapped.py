@@ -23,7 +23,6 @@ from hivwholeseq.filenames import get_demultiplex_summary_filename, get_raw_read
 from hivwholeseq.adapter_info import adapters_illumina, foldername_adapter
 from hivwholeseq.fork_cluster import fork_quality_along_read as fork_self
 from hivwholeseq.mapping_utils import extract_mapped_reads_subsample_open
-from hivwholeseq.samples import load_sequencing_run
 
 
 
@@ -32,7 +31,7 @@ def quality_score_along_reads(read_len, reads_filenames,
                               skipreads=0,
                               randomreads=False,
                               maxreads=-1, VERBOSE=0):
-    '''Calculate the quality score along the reads'''
+ != 'nan'    '''Calculate the quality score along the reads'''
 
     quality = [[[] for j in xrange(read_len)] for i in xrange(2)]
 
@@ -56,7 +55,6 @@ def quality_score_along_reads(read_len, reads_filenames,
         if randomreads:
             if VERBOSE:
                 print 'Getting number of reads',
-                sys.stdout.flush()
             n_reads = sum(1 for read in FGI(fh1))
             fh1.rewind()
             if VERBOSE:
@@ -87,6 +85,8 @@ def quality_score_along_reads(read_len, reads_filenames,
                         print 'Maximal number of read pairs reached:', maxreads
                     break
 
+
+
         else:
 
             for (i, reads) in enumerate(izip(FGI(fh1), FGI(fh2))):
@@ -104,6 +104,83 @@ def quality_score_along_reads(read_len, reads_filenames,
                 for ip, read in enumerate(reads):
                     for j, qletter in enumerate(read[2]):
                         quality[ip][j].append(q_mapping[qletter])
+
+    for qual in quality:
+        for qpos in qual:
+            qpos.sort()
+
+    return quality
+
+
+def quality_score_along_reads_mapped(read_len, bamfilename,
+                                     insertsize_range=[400, 1000],
+                                     skipreads=0,
+                                     maxreads=-1,
+                                     randomreads=True,
+                                     VERBOSE=0):
+    '''Calculate the quality score along the reads'''
+    from hivwholeseq.mapping_utils import trim_read_pair_crossoverhangs as trim_coh
+    from hivwholeseq.mapping_utils import pair_generator
+
+    quality = [[[] for j in xrange(read_len)] for i in xrange(2)]
+
+    # Precompute conversion table
+    SANGER_SCORE_OFFSET = ord("!")
+    q_mapping = dict()
+    for letter in range(0, 255):
+        q_mapping[chr(letter)] = letter - SANGER_SCORE_OFFSET
+
+    # Iterate over all reads (using fast iterators)
+    with pysam.Samfile(bamfilename, 'rb') as bamfile:
+        if not randomreads:
+            reads_all = []
+            for i, read_pair in enumerate(pair_generator(bamfile)):
+                if i < skipreads:
+                    continue
+    
+                if i == skipreads + maxreads:
+                    if VERBOSE:
+                        print 'Maximal number of read pairs reached:', maxreads
+                    break
+    
+                if VERBOSE and (not ((i + 1) % 10000)):
+                    print i + 1
+
+                reads_all.append(read_pair)
+
+        else:
+            reads_all = extract_mapped_reads_subsample_open(bamfile, maxreads,
+                                                            VERBOSE=VERBOSE)
+
+        print len(reads_all)
+
+        for reads in reads_all:
+
+            # Check insert size
+            read = reads[reads[0].is_reverse]
+            if (read.is_unmapped or (not read.is_proper_pair) or \
+                (read.isize < insertsize_range[0]) or \
+                (read.isize >= insertsize_range[1])):
+                continue
+
+            trim_coh(reads, trim=5, include_tests=False)
+
+            pos_read = 0
+            for read in reads:
+                ip = read.is_read2
+                for (bt, bl) in read.cigar:
+                    if bt == 1:
+                        pos_read += bl
+                    elif bt == 2:
+                        pass
+                    elif bt == 0:
+                        qualb = read.qual[pos_read: pos_read + bl]
+                        poss_read = np.arange(pos_read, pos_read + bl)
+                        if read.is_reverse:
+                            poss_read = len(read.seq) - 1 - poss_read
+
+                        for j, qletter in izip(poss_read, qualb):
+                            quality[ip][j].append(q_mapping[qletter])
 
     for qual in quality:
         for qpos in qual:
@@ -194,48 +271,85 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Check quality along reads')
     parser.add_argument('--run', required=True,
                         help='Seq run to analyze (e.g. Tue28, test_tiny)')
-    parser.add_argument('--adaID', required=True,
+    parser.add_argument('--adaID', default=None,
                         help='Adapter IDs to analyze (e.g. TS2)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
+    parser.add_argument('--skipreads', type=int, default=0,
+                        help='Skip the first reads of the file')    
     parser.add_argument('--maxreads', type=int, default=-1,
                         help='Maximal number of reads to analyze')
     parser.add_argument('--submit', action='store_true', default=False,
                         help='Fork the job to the cluster via qsub')
     parser.add_argument('--no-savefig', action='store_false', dest='savefig',
                         help='Show figure instead of saving it')
+    parser.add_argument('--mapped', action='store_true',
+                        help='Analyze mapped reads')
+    parser.add_argument('--random', action='store_true',
+                        help='Take random reads instead of consecutive ones')
+    parser.add_argument('--insertsize_range', type=int, nargs=2,
+                        default=(400, 1000),
+                        help='Restrict to certain insert sizes')
+    parser.add_argument('--plotfull', action='store_true',
+                        help='Make full plots')
 
     args = parser.parse_args()
     seq_run = args.run
     VERBOSE = args.verbose
     submit = args.submit
+    skipreads = args.skipreads
     maxreads = args.maxreads
     adaID = args.adaID
     savefig = args.savefig
+    use_mapped = args.mapped
+    use_random = args.random
+    insertsize_range = args.insertsize_range
+    plotfull = args.plotfull
 
     if submit:
         fork_self(seq_run, VERBOSE=VERBOSE, maxreads=maxreads, savefig=savefig)
         sys.exit()
 
-    dataset = load_sequencing_run(seq_run)
-    data_folder = dataset.folder
-    read_len = dataset.cycles // 2
+    dataset = MiSeq_runs[seq_run]
+    data_folder = dataset['folder']
+    read_len = dataset['n_cycles'] / 2
 
-    reads_filenames = get_read_filenames(data_folder, adaID, gzip=True)
-    if not os.path.isfile(reads_filenames[0]):
-        reads_filenames = get_read_filenames(data_folder, adaID, gzip=False)
-    title = seq_run+', '+adaID
+    if (adaID is None) and use_mapped:
+        raise ValueError('Choose an adaID if you want to study mapped reads')
 
-    quality = quality_score_along_reads(read_len, reads_filenames,
-                                        randomreads=True,
-                                        maxreads=maxreads, VERBOSE=VERBOSE)
+    if not use_mapped:
+        if adaID is None:
+            data_filenames = get_raw_read_files(dataset)
+            reads_filenames = [data_filenames['read1'], data_filenames['read2']]
+            title = seq_run
+        else:
+            reads_filenames = get_read_filenames(data_folder, adaID, gzip=True)
+            if not os.path.isfile(reads_filenames[0]):
+                reads_filenames = get_read_filenames(data_folder, adaID, gzip=False)
+            title = seq_run+', '+adaID
+
+
+        quality = quality_score_along_reads(read_len, reads_filenames,
+                                            skipreads=skipreads,
+                                            randomreads=use_random,
+                                            maxreads=maxreads, VERBOSE=VERBOSE)
+
+    else:
+        bamfilename = get_premapped_filename(data_folder, adaID, type='bam')
+        title = seq_run+', isizes '+str(insertsize_range)
+        quality = quality_score_along_reads_mapped(read_len, bamfilename,
+                                                   insertsize_range=insertsize_range,
+                                                   skipreads=skipreads,
+                                                   maxreads=maxreads,
+                                                   randomreads=use_random,
+                                                   VERBOSE=VERBOSE)
 
     plot_cuts_quality_along_reads(data_folder, adaID, title,
                                   quality, VERBOSE=VERBOSE,
                                   savefig=savefig)
 
-    #if plotfull:
-    #    plot_quality_along_reads(data_folder, adaID, title,
-    #                             quality, VERBOSE=VERBOSE,
-    #                             savefig=savefig)
+    if plotfull:
+        plot_quality_along_reads(data_folder, adaID, title,
+                                 quality, VERBOSE=VERBOSE,
+                                 savefig=savefig)
 

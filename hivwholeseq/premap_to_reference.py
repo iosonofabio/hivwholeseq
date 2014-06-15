@@ -16,6 +16,7 @@ content:    Premap demultiplex reads to HXB2 (or other reference) 'as is',
                 4. generate report figures and summary file
 '''
 # Modules
+import sys
 import os
 import time
 import subprocess as sp
@@ -24,7 +25,6 @@ import numpy as np
 from Bio import SeqIO
 import pysam
 
-from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.filenames import get_custom_reference_filename, \
         get_HXB2_hash_file, get_read_filenames, get_premapped_filename,\
         get_reference_premap_filename, get_premap_summary_filename, \
@@ -34,8 +34,9 @@ from hivwholeseq.filenames import get_custom_reference_filename, \
 from hivwholeseq.mapping_utils import stampy_bin, subsrate, \
         convert_sam_to_bam, convert_bam_to_sam
 from hivwholeseq.fork_cluster import fork_premap as fork_self
-from hivwholeseq.samples import samples
 from hivwholeseq.clean_temp_files import remove_premapped_tempfiles
+
+from hivwholeseq.samples import load_sequencing_run
 
 
 
@@ -53,55 +54,83 @@ def make_output_folders(data_folder, adaID, VERBOSE=0, summary=True):
             print 'Folder created:', dirname
 
 
+def get_fragments(sample):
+    '''Get fragments for reference'''
+    fragments = sample.regions
+    if str(fragments) == 'nan':
+        if sample.PCR == 1:
+            fragments = ('F1o', 'F6o')
+        elif sample.PCR == 2:
+            fragments = ('F1i', 'F6i')
+        else:
+            if VERBOSE:
+                print 'Sample is neither PCR1 nor PCR2. Using whole reference.'
+            fragments = None
+    else:
+        if sample.PCR == 1:
+            fragments = [fr+'o' for fr in fragments]
+        elif sample.PCR == 2:
+            fragments = [fr+'i' for fr in fragments]
+        else:
+            raise ValueError('Sample is neither PCR1 nor PCR2')
+
+    return fragments
+
+
 def make_reference(data_folder, adaID, fragments, refname, VERBOSE=0, summary=True):
     '''Make reference sequence trimmed to the necessary parts'''
     from hivwholeseq.reference import load_custom_reference
     seq = load_custom_reference(refname)
-    smat = np.array(seq)
-
-    # Look for the first fwd and the last rev primers to trim the reference
-    # NOTE: this works even if F1 or F6 are missing (e.g. only F2-5 are seq-ed)!
-    from hivwholeseq.primer_info import primers_PCR
-    pr_fwd = primers_PCR[fragments[0]][0]
-    pr_rev = primers_PCR[fragments[-1]][1]
-
-    # Get all possible primers from ambiguous nucleotides and get the best match
-    from hivwholeseq.sequence_utils import expand_ambiguous_seq as eas
-    pr_fwd_mat = np.array(map(list, eas(pr_fwd)), 'S1')
-    n_matches_fwd = [(smat[i: i + len(pr_fwd)] == pr_fwd_mat).sum(axis=1).max()
-                     for i in xrange(len(seq) - len(pr_fwd))]
-    pr_fwd_pos = np.argmax(n_matches_fwd)
-
-    pr_rev_mat = np.array(map(list, eas(pr_rev)), 'S1')
-    n_matches_rev = [(smat[i: i + len(pr_rev)] == pr_rev_mat).sum(axis=1).max()
-                     for i in xrange(pr_fwd_pos + len(pr_fwd), len(seq) - len(pr_rev))]
-    # Here you come from the right, i.e. look in the 3' LTR first
-    pr_rev_pos = len(seq) - len(pr_rev) - 1 - np.argmax(n_matches_rev[::-1]) 
-
-    output = [['Reference name:', refname]]
-    output.append(['FWD primer:', fragments[0], str(pr_fwd_pos), pr_fwd])
-    output.append(['REV primer:', fragments[-1], str(pr_rev_pos), pr_rev])
-    output = '\n'.join(map(' '.join, output))
-    if VERBOSE:
-        print output
-
-    if summary:
-        with open(get_premap_summary_filename(data_folder, adaID), 'a') as f:
-            f.write(output)
-            f.write('\n')
-
-    # The reference includes both the first fwd primer and the last rev one
-    seq_trim = seq[pr_fwd_pos: pr_rev_pos + len(pr_rev)]
-    seq_trim.id = '_'.join([seq_trim.id, str(pr_fwd_pos + 1),
-                            str(pr_rev_pos + len(pr_rev))])
-    seq_trim.name = '_'.join([seq_trim.name, str(pr_fwd_pos + 1),
-                              str(pr_rev_pos + len(pr_rev))])
-    seq_trim.description = ' '.join([seq_trim.description,
-                                     'from', str(pr_fwd_pos + 1),
-                                     'to', str(pr_rev_pos + len(pr_rev)),
-                                     '(indices from 1, extremes included)'])
 
     output_filename = get_reference_premap_filename(data_folder, adaID)
+
+    if fragments is None:
+        seq_trim = seq
+    else:
+        # Look for the first fwd and the last rev primers to trim the reference
+        # NOTE: this works even if F1 or F6 are missing (e.g. only F2-5 are seq-ed)!
+        from hivwholeseq.primer_info import primers_PCR
+        pr_fwd = primers_PCR[fragments[0]][0]
+        pr_rev = primers_PCR[fragments[-1]][1]
+
+        smat = np.array(seq)
+
+        # Get all possible primers from ambiguous nucleotides and get the best match
+        from hivwholeseq.sequence_utils import expand_ambiguous_seq as eas
+        pr_fwd_mat = np.array(map(list, eas(pr_fwd)), 'S1')
+        n_matches_fwd = [(smat[i: i + len(pr_fwd)] == pr_fwd_mat).sum(axis=1).max()
+                         for i in xrange(len(seq) - len(pr_fwd))]
+        pr_fwd_pos = np.argmax(n_matches_fwd)
+
+        pr_rev_mat = np.array(map(list, eas(pr_rev)), 'S1')
+        n_matches_rev = [(smat[i: i + len(pr_rev)] == pr_rev_mat).sum(axis=1).max()
+                         for i in xrange(pr_fwd_pos + len(pr_fwd), len(seq) - len(pr_rev))]
+        # Here you come from the right, i.e. look in the 3' LTR first
+        pr_rev_pos = len(seq) - len(pr_rev) - 1 - np.argmax(n_matches_rev[::-1]) 
+
+        output = [['Reference name:', refname]]
+        output.append(['FWD primer:', fragments[0], str(pr_fwd_pos), pr_fwd])
+        output.append(['REV primer:', fragments[-1], str(pr_rev_pos), pr_rev])
+        output = '\n'.join(map(' '.join, output))
+        if VERBOSE:
+            print output
+
+        if summary:
+            with open(get_premap_summary_filename(data_folder, adaID), 'a') as f:
+                f.write(output)
+                f.write('\n')
+
+        # The reference includes both the first fwd primer and the last rev one
+        seq_trim = seq[pr_fwd_pos: pr_rev_pos + len(pr_rev)]
+        seq_trim.id = '_'.join([seq_trim.id, str(pr_fwd_pos + 1),
+                                str(pr_rev_pos + len(pr_rev))])
+        seq_trim.name = '_'.join([seq_trim.name, str(pr_fwd_pos + 1),
+                                  str(pr_rev_pos + len(pr_rev))])
+        seq_trim.description = ' '.join([seq_trim.description,
+                                         'from', str(pr_fwd_pos + 1),
+                                         'to', str(pr_rev_pos + len(pr_rev)),
+                                         '(indices from 1, extremes included)'])
+
     SeqIO.write(seq_trim, output_filename, 'fasta')
 
     if summary:
@@ -116,22 +145,27 @@ def make_index_and_hash(data_folder, adaID, VERBOSE=0, summary=True):
         print 'Making index and hash files: adaID', adaID
 
     # 1. Make genome index file for reference
-    sp.call([stampy_bin,
-             '--species="HIV"',
-             '--overwrite',
-             '-G', get_reference_premap_index_filename(data_folder, adaID, ext=False),
-             get_reference_premap_filename(data_folder, adaID),
-             ])
+    os.remove(get_reference_premap_index_filename(data_folder, adaID, ext=True))
+    stdout = sp.check_output([stampy_bin,
+                              '--species="HIV"',
+                              '--overwrite',
+                              '-G', get_reference_premap_index_filename(data_folder, adaID, ext=False),
+                              get_reference_premap_filename(data_folder, adaID),
+                              ],
+                              stderr=sp.STDOUT)
+    if VERBOSE:
+        print 'Built index: '+adaID
     
     # 2. Build a hash file for reference
-    sp.call([stampy_bin,
-             '--overwrite',
-             '-g', get_reference_premap_index_filename(data_folder, adaID, ext=False),
-             '-H', get_reference_premap_hash_filename(data_folder, adaID, ext=False),
-             ])
-
+    os.remove(get_reference_premap_hash_filename(data_folder, adaID, ext=True))
+    stdout = sp.check_output([stampy_bin,
+                              '--overwrite',
+                              '-g', get_reference_premap_index_filename(data_folder, adaID, ext=False),
+                              '-H', get_reference_premap_hash_filename(data_folder, adaID, ext=False),
+                              ],
+                              stderr=sp.STDOUT)
     if VERBOSE:
-        print 'Index and hash created'
+        print 'Built hash: '+adaID
 
     if summary:
         with open(get_premap_summary_filename(data_folder, adaID), 'a') as f:
@@ -205,7 +239,7 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
                      '-S', '/bin/bash',
                      '-o', JOBLOGOUT,
                      '-e', JOBLOGERR,
-                     '-N', 'pm '+adaID+' p'+str(j+1),
+                     '-N', adaID+' p'+str(j+1),
                      '-l', 'h_rt='+cluster_time[threads >= 30],
                      '-l', 'h_vmem='+vmem,
                      stampy_bin,
@@ -409,15 +443,18 @@ if __name__ == '__main__':
     summary = args.summary
 
     # Specify the dataset
-    dataset = MiSeq_runs[seq_run]
-    data_folder = dataset['folder']
+    dataset = load_sequencing_run(seq_run)
+    data_folder = dataset.folder
 
     # If the script is called with no adaID, iterate over all
-    if not adaIDs:
-        adaIDs = dataset['adapters']
+    samples = dataset.samples
+    if adaIDs is not None:
+        samples = samples.loc[samples.adapter.isin(adaIDs)]
 
     # Iterate over all adaIDs
-    for adaID in adaIDs:
+    for samplename, sample in samples.iterrows():
+
+        adaID = sample.adapter
 
         # Submit to the cluster self if requested
         if submit:
@@ -435,9 +472,7 @@ if __name__ == '__main__':
                         ' --reference '+refname+\
                         ' --verbose '+str(VERBOSE)+'\n')
 
-        samplename = dataset['samples'][dataset['adapters'].index(adaID)]
-        fragments = samples[samplename]['fragments']
-
+        fragments = get_fragments(sample)
         make_reference(data_folder, adaID, fragments, refname, VERBOSE=VERBOSE, summary=summary)
 
         make_index_and_hash(data_folder, adaID, VERBOSE=VERBOSE, summary=summary)
