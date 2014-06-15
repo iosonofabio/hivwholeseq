@@ -20,6 +20,12 @@ table_filename = hivwholeseq.__path__[0] + '/tables/HIV_reservoir_all.xlsx'
 
 
 # Functions
+def get_seqrun_foldername(seq_run):
+    '''Get the path of the folder for a sequencing run'''
+    fn = root_data_folder+seq_run+'/'
+    return fn
+
+
 def get_reference_premap_filename(data_folder, adaID, fragment=None):
     '''Get the filename of the reference used from premapping'''
     fn = 'reference'

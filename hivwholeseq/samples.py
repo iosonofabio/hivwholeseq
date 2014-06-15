@@ -12,6 +12,8 @@ content:    Description module for HIV samples from patients.
 # Modules
 import pandas as pd
 
+from hivwholeseq.filenames import table_filename
+
 
 
 # Classes
@@ -380,3 +382,20 @@ def date_to_integer(date):
     '''Convert a date in the format YYYY-M-D into an integer'''
     import datetime as dt
     return dt.date.toordinal(dt.datetime(*map(int, date.split('-'))))
+
+
+def load_samples_sequenced(seq_run=None):
+    '''Load samples sequenced from general table'''
+    sample_table = pd.read_excel(table_filename, 'Samples sequenced',
+                                 index_col=0)
+    if seq_run is not None:
+        sample_table = sample_table[sample_table['seq run'] == seq_run]
+
+    return sample_table
+
+
+def load_sequencing_runs():
+    '''Load sequencing runs from general table'''
+    seq_runs = pd.read_excel(table_filename, 'Sequencing runs',
+                             index_col=0)
+    return seq_runs

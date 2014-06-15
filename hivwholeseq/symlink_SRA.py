@@ -8,31 +8,45 @@ content:    Make symlink to raw (demultiplexed) data to the Short Read Archive.
 import os
 import argparse
 from itertools import izip
+import numpy as np
 
-from hivwholeseq.datasets import MiSeq_runs
-from hivwholeseq.demultiplex import make_output_folders, get_adapters_designed
 from hivwholeseq.adapter_info import foldername_adapter
+from hivwholeseq.samples import load_samples_sequenced, load_sequencing_runs
+from hivwholeseq.filenames import get_seqrun_foldername
 
 
 # Functions
-def make_symlinks(dataset, VERBOSE=0):
-    '''Make symlinks for fastq.gz from the SRA'''
-    import re
-    seq_run = int(re.findall(r'\d+$', dataset['name'])[0])
+def make_output_folders(data_folder, adaIDs, VERBOSE=0):
+    '''Make output folders for symlinking'''
+    from hivwholeseq.generic_utils import mkdirs
+    mkdirs(data_folder)
+    if VERBOSE >= 1:
+        print 'Folder created:', data_folder
 
-    root_folder = dataset['raw_data']['SRA']
-    data_folder = dataset['folder']
+    for adaID in adaIDs + [-1]:
+        mkdirs(data_folder+foldername_adapter(adaID))
+        if VERBOSE >= 1:
+            print 'Folder created:', data_folder+foldername_adapter(adaID)
+
+
+def make_symlinks(dataset, samples, VERBOSE=0):
+    '''Make symlinks for fastq.gz from the SRA'''
+    seq_run = dataset.name
+    data_folder = get_seqrun_foldername(seq_run)
+    raw_root_folder = dataset.loc['raw data']
+
+    import re
+    seq_run_int = int(re.findall(r'\d+$', seq_run)[0])
 
     # Unclassified reads
-    unclass_fn = root_folder+'../'
+    unclass_fn = '/'.join(raw_root_folder.split('/')[:-2])+'/'
     for fn in os.listdir(unclass_fn):
-        if ('illumina_M' in fn) and ('RunId'+'{:04d}'.format(seq_run) in fn):
+        if ('illumina_M' in fn) and ('RunId'+'{:04d}'.format(seq_run_int) in fn):
             unclass_fn = unclass_fn+fn+'/LaneId1/'
             break
     fn1 = unclass_fn+[fn for fn in os.listdir(unclass_fn) if 'L001_R1' in fn][0]
     fn2 = unclass_fn+[fn for fn in os.listdir(unclass_fn) if 'L001_R2' in fn][0]
 
-    
     dst_folder = data_folder+foldername_adapter(-1)
     dst_fn1 = dst_folder+'read1.fastq.gz'
     dst_fn2 = dst_folder+'read2.fastq.gz'
@@ -47,81 +61,34 @@ def make_symlinks(dataset, VERBOSE=0):
     if VERBOSE:
         print 'Unclassified reads symlinked'
 
-    # FIXME
-    return
-
     # Samples
-    for (samplename, adaID) in izip(dataset['samples'], dataset['adapters']):
-        sn = samplename
-        sample_fn = root_folder
-        sample_fnn = None
+    for sn, sample in samples.iterrows():
+        if str(sample['raw name']) != 'nan':
+            raw_fn = str(sample['raw name'])
+        elif str(sample['patient sample']) != 'nan':
+            raw_fn = str(sample['patient sample'])
+        else:
+            raise ValueError('Sample '+sn+': could not find raw data folder. Please fill in the table')
 
-        # FIXME: get subfolder: the sample name might differ, only trust the adaID
-        # FIXME: also not enough, because Stefan put all into the same folder... so
-        # I need to write heuristic... !
-        for fn in os.listdir(sample_fn):
-            if sn in fn:
-                sample_fnn = sample_fn+fn+'/'
-                break
+        sample_fn = raw_root_folder+[fn for fn in os.listdir(raw_root_folder) if raw_fn in fn][0]+'/'
 
-        if sample_fnn is None:
-            if (len(sn) > 5) and (sn[-5:] in ('_PCR1', '_PCR2')):
-                sn = sn[:-5]
-
-            for fn in os.listdir(sample_fn):
-                if sn in fn:
-                    sample_fnn = sample_fn+fn+'/'
-                    break
-
-        if sample_fnn is None:
-            if (len(sn) > 7) and (sn[-7:] in ('_PCR1-2', '_PCR2-2', '_PCR1-3', '_PCR2-3')):
-                sn = sn[:-7]
-
-            for fn in os.listdir(sample_fn):
-                if sn in fn:
-                    sample_fnn = sample_fn+fn+'/'
-                    break
-
-        if sample_fnn is None:
-            sn = sn.replace('-', '')
-            for fn in os.listdir(sample_fn):
-                if sn in fn:
-                    sample_fnn = sample_fn+fn+'/'
-                    break
-
-        if sample_fnn is None:
-            sn = sn.replace('-', '')
-            if (len(sn) > 5) and (sn[-5:] in ('_PCR1', '_PCR2')):
-                sn = sn[:-5]
-
-            for fn in os.listdir(sample_fn):
-                if sn in fn:
-                    sample_fnn = sample_fn+fn+'/'
-                    break
-
-        if sample_fnn is None:
-            sn = sn.replace('-', '')
-            if (len(sn) > 6) and (sn[-6:] in ('_PCR12', '_PCR22', '_PCR13', '_PCR23')):
-                sn = sn[:-6]
-
-            for fn in os.listdir(sample_fn):
-                if sn in fn:
-                    sample_fnn = sample_fn+fn+'/'
-                    break
-
-        if sample_fnn is None:
-            print samplename, adaID
-            import ipdb; ipdb.set_trace()
-            continue
-
-        fn1 = sample_fnn+[fn for fn in os.listdir(sample_fnn) if 'L001_R1' in fn][0]
-        fn2 = sample_fnn+[fn for fn in os.listdir(sample_fnn) if 'L001_R2' in fn][0]
+        fn1 = sample_fn+[fn for fn in os.listdir(sample_fn) if 'L001_R1' in fn][0]
+        fn2 = sample_fn+[fn for fn in os.listdir(sample_fn) if 'L001_R2' in fn][0]
         
+        adaID = sample['adapter']
         dst_folder = data_folder+foldername_adapter(adaID)
-        os.symlink(fn1, dst_folder+'read1.fastq.gz')
-        os.symlink(fn2, dst_folder+'read2.fastq.gz')
+        dst_fn1 = dst_folder+'read1.fastq.gz'
+        dst_fn2 = dst_folder+'read2.fastq.gz'
+        if not os.path.isfile(dst_fn1):
+            os.symlink(fn1, dst_fn1)
+        elif VERBOSE:
+                print dst_fn1, 'exists already'
+        if not os.path.isfile(dst_fn2):
+            os.symlink(fn2, dst_fn2)
+        elif VERBOSE:
+                print dst_fn2, 'exists already'
         if VERBOSE:
-            print samplename+' '+adaID+' reads symlinked'
+            print sn+' '+adaID+' reads symlinked'
 
 
 
@@ -140,13 +107,12 @@ if __name__ == '__main__':
     VERBOSE = args.verbose
 
     # Specify the dataset
-    dataset = MiSeq_runs[seq_run]
-    data_folder = dataset['folder']
+    dataset = load_sequencing_runs().loc[seq_run]
+    data_folder = get_seqrun_foldername(seq_run)
+    samples = load_samples_sequenced(seq_run=seq_run)
 
+    adapters = samples.loc[:, 'adapter']
 
-    adapters_designed = get_adapters_designed(dataset, VERBOSE=VERBOSE, summary=False)
+    make_output_folders(data_folder, adapters.tolist(), VERBOSE=VERBOSE)
 
-    make_output_folders(data_folder, adapters_designed, VERBOSE=VERBOSE,
-                        summary=False)
-
-    make_symlinks(dataset, VERBOSE=VERBOSE)
+    make_symlinks(dataset, samples, VERBOSE=VERBOSE)
