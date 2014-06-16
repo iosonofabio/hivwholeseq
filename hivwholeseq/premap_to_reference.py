@@ -145,7 +145,8 @@ def make_index_and_hash(data_folder, adaID, VERBOSE=0, summary=True):
         print 'Making index and hash files: adaID', adaID
 
     # 1. Make genome index file for reference
-    os.remove(get_reference_premap_index_filename(data_folder, adaID, ext=True))
+    if os.path.isfile(get_reference_premap_index_filename(data_folder, adaID, ext=True)):
+        os.remove(get_reference_premap_index_filename(data_folder, adaID, ext=True))
     stdout = sp.check_output([stampy_bin,
                               '--species="HIV"',
                               '--overwrite',
@@ -157,7 +158,8 @@ def make_index_and_hash(data_folder, adaID, VERBOSE=0, summary=True):
         print 'Built index: '+adaID
     
     # 2. Build a hash file for reference
-    os.remove(get_reference_premap_hash_filename(data_folder, adaID, ext=True))
+    if os.path.isfile(get_reference_premap_hash_filename(data_folder, adaID, ext=True)):
+        os.remove(get_reference_premap_hash_filename(data_folder, adaID, ext=True))
     stdout = sp.check_output([stampy_bin,
                               '--overwrite',
                               '-g', get_reference_premap_index_filename(data_folder, adaID, ext=False),
@@ -182,8 +184,6 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
     if summary:
         summary_filename = get_premap_summary_filename(data_folder, adaID)
 
-
-
     # Stampy can handle both gzipped and uncompressed fastq inputs
     input_filenames = get_read_filenames(data_folder, adaID, gzip=True)
     if not os.path.isfile(input_filenames[0]):
@@ -193,7 +193,6 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
 
     # parallelize if requested
     if threads == 1:
-
         call_list = [stampy_bin,
                      '--overwrite',
                      '-g', get_reference_premap_index_filename(data_folder, adaID, ext=False),
@@ -222,6 +221,9 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
 
     # Multithreading works as follows: call qsub + stampy, monitor the process
     # IDs with qstat at regular intervals, and finally merge results with pysam
+    output_file_parts = [get_premapped_filename(data_folder, adaID, type='bam',
+                                            part=(j+1)) for j in xrange(threads)]
+
     # Submit map script
     jobs_done = np.zeros(threads, bool)
     job_IDs = np.zeros(threads, 'S30')
@@ -258,8 +260,6 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
         job_IDs[j] = job_ID
 
     # Monitor output
-    output_file_parts = [get_premapped_filename(data_folder, adaID, type='bam',
-                                            part=(j+1)) for j in xrange(threads)]
     time_wait = 10 # secs
     while not jobs_done.all():
 
@@ -346,9 +346,12 @@ def report_insert_size(data_folder, adaID, seq_run, VERBOSE=0, summary=True):
     isz, h = get_insert_size_distribution(data_folder, adaID, 'premapped',
                                           bins=bins, maxreads=10000,
                                           VERBOSE=VERBOSE)
-    plot_cumulative_histogram(seq_run, adaID, 'premapped', isz, savefig=True,
+
+    plot_cumulative_histogram(data_folder, adaID, 'premapped', isz, savefig=True,
+                              title='run '+str(seq_run)+', adaID '+str(adaID)+', premap',
                               lw=2, c='b')
-    plot_histogram(seq_run, adaID, 'premapped', h, savefig=True,
+    plot_histogram(data_folder, adaID, 'premapped', h, savefig=True,
+                   title='run '+str(seq_run)+', adaID '+str(adaID)+', premap',
                    lw=2, color='b')
 
     if summary:
@@ -454,7 +457,7 @@ if __name__ == '__main__':
     # Iterate over all adaIDs
     for samplename, sample in samples.iterrows():
 
-        adaID = sample.adapter
+        adaID = str(sample.adapter)
 
         # Submit to the cluster self if requested
         if submit:

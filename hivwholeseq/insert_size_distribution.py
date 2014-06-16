@@ -76,7 +76,8 @@ def get_insert_size_distribution(data_folder, adaID, fragment, bins=None,
     return insert_sizes, h
 
 
-def plot_cumulative_histogram(seq_run, adaID, fragment, insert_sizes,
+def plot_cumulative_histogram(data_folder, adaID, fragment, insert_sizes,
+                              title=None,
                               show=False, savefig=False,
                               **kwargs):
     '''Plot cumulative histogram of insert sizes'''
@@ -85,7 +86,8 @@ def plot_cumulative_histogram(seq_run, adaID, fragment, insert_sizes,
     ax.plot(insert_sizes, np.linspace(0, 1, len(insert_sizes)), **kwargs)
     ax.set_xlabel('Insert size')
     ax.set_ylabel('Cumulative fraction')
-    ax.set_title('run '+str(seq_run)+', adaID '+str(adaID)+', '+fragment)
+    if title is not None:
+        ax.set_title(title)
 
     plt.tight_layout()
 
@@ -94,8 +96,6 @@ def plot_cumulative_histogram(seq_run, adaID, fragment, insert_sizes,
         plt.show()
 
     if savefig:
-        dataset = MiSeq_runs[seq_run]
-        data_folder = dataset['folder']
         output_filename = get_insert_size_distribution_cumulative_filename(data_folder,
                                                                            adaID,
                                                                            fragment)
@@ -105,7 +105,8 @@ def plot_cumulative_histogram(seq_run, adaID, fragment, insert_sizes,
         fig.savefig(output_filename)
 
 
-def plot_histogram(seq_run, adaID, fragment, h,
+def plot_histogram(data_folder, adaID, fragment, h,
+                   title=None,
                    ax=None,
                    show=False, savefig=False,
                    **kwargs):
@@ -113,9 +114,8 @@ def plot_histogram(seq_run, adaID, fragment, h,
     import matplotlib.pyplot as plt
     if ax is None:
         fig, ax = plt.subplots(1, 1)
-        ax.set_title('run '+str(seq_run)+', adaID '+str(adaID)+', '+fragment)
-    else:
-        ax.set_title('run '+str(seq_run))
+    if title is not None:
+        ax.set_title(title)
     x = 0.5 * (h[1][1:] + h[1][:-1])
     y = h[0]
     ax.plot(x, y, **kwargs)
@@ -129,8 +129,6 @@ def plot_histogram(seq_run, adaID, fragment, h,
         plt.show()
 
     if savefig:
-        dataset = MiSeq_runs[seq_run]
-        data_folder = dataset['folder']
         output_filename = get_insert_size_distribution_filename(data_folder, adaID,
                                                                 fragment)
 

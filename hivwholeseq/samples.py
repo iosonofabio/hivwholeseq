@@ -30,7 +30,7 @@ class SampleSeq(pd.Series):
         from hivwholeseq.adapter_info import foldername_adapter
         seq_run = self.loc['seq run']
         adaID = self.loc['adapter']
-        return get_seqrun_foldername(seq_run)+foldername_adapter(adaID)
+        return str(get_seqrun_foldername(seq_run)+foldername_adapter(adaID))
 
 
     @property
@@ -95,7 +95,7 @@ class SequencingRun(pd.Series):
         '''The folder with the data on this sample'''
         from hivwholeseq.filenames import get_seqrun_foldername
         seq_run = self.name
-        return get_seqrun_foldername(seq_run)
+        return str(get_seqrun_foldername(seq_run))
 
 
     @property
