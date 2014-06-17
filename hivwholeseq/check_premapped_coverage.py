@@ -21,7 +21,7 @@ from hivwholeseq.primer_info import primers_coordinates_HXB2_inner as pcis_HXB2
 from hivwholeseq.primer_info import primers_coordinates_HXB2_outer as pcos_HXB2
 from hivwholeseq.mapping_utils import get_number_reads
 
-from hivwholeseq.samples import load_sequencing_run
+from hivwholeseq.samples import load_sequencing_run, SampleSeq
 
 
 
@@ -67,8 +67,23 @@ def check_premap(data_folder, adaID, fragments, seq_run, samplename,
 
     fragpos_filename = get_fragment_positions_filename(data_folder, adaID)
     if os.path.isfile(fragpos_filename):
-        fragtmp = list(np.loadtxt(fragpos_filename, usecols=[0], dtype='S10'))
-        postmp = np.loadtxt(fragpos_filename, usecols=[1, 4], dtype=int)
+        # Load the fragment positions, considering mixed fragments (e.g. F5a+b)
+        fragtmp = []
+        postmp = []
+        with open(fragpos_filename, 'r') as f:
+            f.readline() #HEADER
+            for line in f:
+                fields = line[:-1].split('\t')
+                fragtmp.append(fields[0])
+                if 'inner' not in fields[1]:
+                    postmp.append([fields[1], fields[4]])
+                else:
+                    start = int(fields[1].split(',')[1].split(': ')[1].rstrip('}'))
+                    end = int(fields[4].split(',')[1].split(': ')[1].rstrip('}'))
+                    postmp.append([start, end])
+
+        postmp = np.array(postmp, int)
+
         frags_pos = np.array([postmp[fragtmp.index(fr)] for fr in fragments], int).T
 
     else:
@@ -148,8 +163,9 @@ if __name__ == '__main__':
         print 'adaIDs', samples.adapter
 
     for i, (samplename, sample) in enumerate(samples.iterrows()):
+        sample = SampleSeq(sample)
         adaID = sample.adapter
-        fragments = sample.regions.split(' ')
+        fragments = sample.regions_complete
 
         if VERBOSE:
             print seq_run, adaID

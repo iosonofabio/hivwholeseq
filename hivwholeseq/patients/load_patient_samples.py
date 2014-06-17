@@ -10,14 +10,11 @@ import argparse
 from Bio import SeqIO
 from Bio import AlignIO
 
-from hivwholeseq.samples import samples as samples_seq
-from hivwholeseq.datasets import MiSeq_runs
+from hivwholeseq.patients.patients import load_patients, load_patient, Patient
 from hivwholeseq.filenames import get_merged_consensus_filename, get_consensus_filename
 from hivwholeseq.patients.filenames import get_consensi_alignment_genomewide_filename, \
         get_consensi_alignment_filename
-from hivwholeseq.patients.patients import patients
 from hivwholeseq.mapping_utils import align_muscle
-
 
 
 # Script
@@ -32,7 +29,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     VERBOSE = args.verbose
 
-    # Get patient and the sequenced samples
-    for p in patients:
-        print p, tuple(p.dates(unique=True))
+    patients = load_patients()
+    for pname, p in patients.iterrows():
+        p = Patient(p)
+        print p.name
 

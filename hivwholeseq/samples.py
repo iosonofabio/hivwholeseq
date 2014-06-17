@@ -10,6 +10,7 @@ content:    Description module for HIV samples from patients.
             manually down here (until otherwise specified).
 '''
 # Modules
+import numpy as np
 import pandas as pd
 
 from hivwholeseq.filenames import table_filename
@@ -18,25 +19,40 @@ from hivwholeseq.filenames import table_filename
 
 # Classes
 class SampleSeq(pd.Series):
+    '''A sequenced sample (if something has been sequenced twice, they are separate)'''
+
+    def __init__(self, *args, **kwargs):
+        '''Initialize a sequenced sample'''
+        super(SampleSeq, self).__init__(*args, **kwargs)
+
+        from hivwholeseq.filenames import get_seqrun_foldername
+        from hivwholeseq.adapter_info import foldername_adapter
+        seq_run = self.loc['seq run']
+        adaID = self.loc['adapter']
+        self['folder'] = str(get_seqrun_foldername(seq_run)+foldername_adapter(adaID))
+
+
     @property
     def _constructor(self):
         return SampleSeq
 
 
     @property
-    def folder(self):
-        '''The folder with the data on this sample'''
-        from hivwholeseq.filenames import get_seqrun_foldername
-        from hivwholeseq.adapter_info import foldername_adapter
-        seq_run = self.loc['seq run']
-        adaID = self.loc['adapter']
-        return str(get_seqrun_foldername(seq_run)+foldername_adapter(adaID))
-
-
-    @property
     def sequencing_run(self):
         '''The sequencing run object of this sample'''
         return load_sequencing_run(self.loc['seq run'])
+
+
+    @property
+    def regions_complete(self):
+        '''Get the complete regions, e.g. F5ao'''
+        if self.PCR == 1:
+            PCR_suffix = 'o'
+        elif self.PCR == 2:
+            PCR_suffix = 'i'
+        else:
+            PCR_suffix = ''
+        return ['F'+fr+PCR_suffix for fr in self.regions.split(' ')]
 
 
     #TODO: make object oriented approach to separate regions
@@ -82,28 +98,20 @@ class SamplesSeq(pd.DataFrame):
 
 class SequencingRun(pd.Series):
     '''Sequencing run'''
+
+    def __init__(self, *args, **kwargs):
+        '''Initialize a sequencing run'''
+        super(SequencingRun, self).__init__(*args, **kwargs)
+
+        from hivwholeseq.filenames import get_seqrun_foldername
+        self['folder'] = str(get_seqrun_foldername(self.name))
+
+        self['samples'] = load_samples_sequenced(seq_run=self.name)
+
+
     @property
     def _constructor(self):
         return SequencingRun
-
-
-    _samples = None
-
-
-    @property
-    def folder(self):
-        '''The folder with the data on this sample'''
-        from hivwholeseq.filenames import get_seqrun_foldername
-        seq_run = self.name
-        return str(get_seqrun_foldername(seq_run))
-
-
-    @property
-    def samples(self):
-        '''The samples sequenced in this run'''
-        if self._samples is None:
-            self._samples = load_samples_sequenced(seq_run=self.name)
-        return self._samples
 
 
     def itersamples(self):
@@ -473,8 +481,11 @@ def load_samples_sequenced(seq_run=None):
     '''Load samples sequenced from general table'''
     sample_table = pd.read_excel(table_filename, 'Samples sequenced',
                                  index_col=0)
+    sample_table.index = pd.Index(map(str, sample_table.index))
+    sample_table.loc[:, 'patient sample'] = map(str, sample_table.loc[:, 'patient sample'])
+
     if seq_run is not None:
-        sample_table = sample_table[sample_table['seq run'] == seq_run]
+        sample_table = sample_table.loc[sample_table.loc[:, 'seq run'] == seq_run]
 
     return SamplesSeq(sample_table)
 

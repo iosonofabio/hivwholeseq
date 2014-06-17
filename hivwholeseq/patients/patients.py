@@ -6,80 +6,77 @@ content:    Description module for HIV patients.
 '''
 # Modules
 import numpy as np
+import pandas as pd
 
-from hivwholeseq.samples import sample_table
-from hivwholeseq.patients.read_patient_table import enrich_from_patient_sheet_dict
+from hivwholeseq.filenames import table_filename
+
 
 
 # Classes
-class patient(object):
+class Patient(pd.Series):
     '''HIV patient'''
-    def __init__(self, inp):
-        '''Initialize a patient from a dict, a string, or another patient'''
 
-        # Try copy constructor, then from dict, then from string
-        try:
-            for attr in ['id']:
-                setattr(self, attr, getattr(inp, attr))
-
-        except AttributeError:
-            try:
-                for attr in ['id']:
-                    setattr(self, attr, inp[attr])
-    
-            except TypeError:
-                self.id = inp
-                tmp = sample_table.filter_patient(self.id).sort(['date', 'name'])
-                tmp = tmp.set_index('name', drop=False)
-                del tmp['patient']
-                self.samples = tuple(tmp['name'])
-                self.sample_table = tmp
-
-    
-    def __repr__(self):
-        return 'patient(\''+self.id+'\')'
-    
-    
-    def __str__(self):
-        return 'Patient '+self.id
+    def __init__(self, *args, **kwargs):
+        '''Initialize a patient with all his samples'''
+        super(Patient, self).__init__(*args, **kwargs)
+        samples = load_samples_sequenced(patient=self.name)
+        del samples['patient']
+        self.samples = samples
 
 
-    def dates(self, unique=False):
+    @property
+    def _constructor(self):
+        return Patient
+
+
+    @property
+    def folder(self):
+        '''The folder with the data on this sample'''
+        from hivwholeseq.patients.filenames import get_foldername
+        return str(get_foldername(self.name))
+
+
+    def discard_nonsequenced_samples(self):
+        '''Discard all samples that have not been sequenced yet'''
+        from hivwholeseq.samples import load_samples_sequenced as lss
+        samples_sequenced = lss()
+        samples_sequenced_set = set(samples_sequenced.loc[:, 'patient sample']) - set(['nan'])
+        samples = self.samples.loc[self.samples.index.isin(samples_sequenced_set)]
+
+        # Add info on sequencing
+        samples_seq_col = []
+        for samplename in samples.index:
+            ind = samples_sequenced.loc[:, 'patient sample'] == samplename
+            samples_seq_col.append(samples_sequenced.loc[ind])
+        samples['samples seq'] = samples_seq_col
+
+        self.samples = samples
+
+
+    @property
+    def dates(self):
         '''Get the dates of sampling'''
-        dates = self.sample_table['date'].values
-        if unique:
-            dates = np.unique(dates)
-        return dates
+        return self.samples.date
 
     
-    def times(self, unique=False, subtract_initial=True):
+    @property
+    def times(self):
         '''Get the times as integers'''
-        from hivwholeseq.samples import date_to_integer as dti
-        times = np.array(map(dti, self.dates(unique=unique)), int)
-        if subtract_initial:
-            times -= times.min()
+        dates = self.dates
+        times = dates
         return times        
-
-
-    def print_sample_table(self):
-        '''Print longitudinal sample table'''
-        t = self.sample_table
-        for date in self.dates(unique=True):
-            rows = t.iloc[(t['date'] == date).nonzero()[0]]
-            del rows['description']
-            print rows
 
 
     @property
     def initial_sample(self):
         '''The initial sample used as a mapping reference'''
-        return self.sample_table.iloc[0]
+        return self.samples.iloc[0]
 
 
     def get_allele_frequency_trajectories(self, fragment_or_gene):
         '''Get the allele frequency trajectories from files'''
         from hivwholeseq.patients.filenames import get_allele_frequency_trajectories_filename
-        aft_filename = get_allele_frequency_trajectories_filename(self.id, fragment_or_gene)
+        aft_filename = get_allele_frequency_trajectories_filename(self.name, fragment_or_gene)
         aft = np.load(aft_filename)
         return aft
 
@@ -87,33 +84,37 @@ class patient(object):
     def get_allele_count_trajectories(self, fragment_or_gene):
         '''Get the allele count trajectories from files'''
         from hivwholeseq.patients.filenames import get_allele_count_trajectories_filename
-        act_filename = get_allele_count_trajectories_filename(self.id, fragment_or_gene)
+        act_filename = get_allele_count_trajectories_filename(self.name, fragment_or_gene)
         act = np.load(act_filename)
         return act
-
- 
-
-
-
-
-# Globals
-patients = [patient(p) for p in set(sample_table['patient']) - set([np.nan])]
-patients.sort(key=lambda x: int(x.id))
-for p in patients:
-    enrich_from_patient_sheet_dict(p)
-patients_dict = {p.id: p for p in patients}
 
 
 
 # Functions
-def get_patient(pname):
+def load_patients():
+    '''Load patients from general table'''
+    patients = pd.read_excel(table_filename, 'Patients',
+                             index_col=0)
+    patients.index = pd.Index(map(str, patients.index))
+    return patients
+
+
+def load_patient(pname):
     '''Get the patient from the sequences ones'''
-    if pname in patients_dict:
-        return patients_dict[pname]
-    else:
-        raise ValueError('Patient with this ID not found')
+    patients = load_patients()
+    patient = Patient(patients.loc[pname])
+    return patient
 
 
-def get_initial_sequenced_sample(patient):
-    '''Get the first sequenced sample to date (order of blood sampling)'''
-    return get_sequenced_samples(patient)[0]
+def load_samples_sequenced(patient=None):
+    '''Load patient samples sequenced from general table'''
+    sample_table = pd.read_excel(table_filename, 'Samples timeline sequenced',
+                                 index_col=0)
+
+    sample_table.index = pd.Index(map(str, sample_table.index))
+    sample_table.loc[:, 'patient'] = map(str, sample_table.loc[:, 'patient'])
+
+    if patient is not None:
+        sample_table = sample_table.loc[sample_table.loc[:, 'patient'] == patient]
+
+    return sample_table

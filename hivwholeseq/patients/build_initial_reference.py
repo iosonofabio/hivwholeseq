@@ -17,6 +17,7 @@ content:    Build the initial reference for the paitent.
 '''
 # Modules
 import os
+import sys
 import argparse
 import numpy as np
 from Bio import SeqIO
@@ -24,13 +25,12 @@ from Bio.Alphabet.IUPAC import ambiguous_dna, unambiguous_dna
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
-from hivwholeseq.datasets import MiSeq_runs
+from hivwholeseq.samples import SampleSeq
+from hivwholeseq.patients.patients import load_patient
 from hivwholeseq.miseq import alpha
 from hivwholeseq.filenames import get_consensus_filename
 from hivwholeseq.patients.filenames import get_initial_consensus_filename, \
         get_foldername
-from hivwholeseq.patients.patients import get_patient
-from hivwholeseq.samples import samples, date_to_integer
 from hivwholeseq.primer_info import primers_inner
 from hivwholeseq.primer_info import primers_coordinates_HXB2_inner as pci
 from hivwholeseq.one_site_statistics import \
@@ -476,7 +476,8 @@ if __name__ == '__main__':
     fragments = args.fragments
     VERBOSE = args.verbose
 
-    patient = get_patient(pname)
+    patient = load_patient(pname)
+    patient.discard_nonsequenced_samples()
 
     # If the script is called with no fragment, iterate over all
     # NOTE: This assumes that the fragment has been sequenced. If not, we should
@@ -487,18 +488,21 @@ if __name__ == '__main__':
         print 'fragments', fragments
 
     # Make dir for the patient if absent
-    pfolder = get_foldername(pname)
+    pfolder = patient.folder
     if not os.path.isdir(pfolder):
         os.mkdir(pfolder)
         if VERBOSE >= 1:
             print pname+': folder created.'
     
     # Get the first sequenced sample
-    sample_init = patient.initial_sample
-    seq_run = sample_init['run']
-    adaID = sample_init['adaID']
-    dataset = MiSeq_runs[seq_run]
-    data_folder = dataset['folder']
+    sample_init_pat = patient.initial_sample
+    # Take any sample, for a consensus it should not matter
+    sample_init = SampleSeq(sample_init_pat['samples seq'].iloc[0])
+
+    seq_run = sample_init['seq run']
+    adaID = sample_init['adapter']
+    dataset = sample_init.sequencing_run
+    data_folder = dataset.folder
 
     for fragment in fragments:
         if fragment == 'genomewide':
@@ -519,53 +523,53 @@ if __name__ == '__main__':
         #                                          block_len=100,
         #                                          VERBOSE=VERBOSE - 1)
 
-        check_genes_consensus(conss, fragment, VERBOSE=VERBOSE)
+        #check_genes_consensus(conss, fragment, VERBOSE=VERBOSE)
 
         seq_in = SeqRecord(Seq(conss, unambiguous_dna),
                            id='cons_init_p'+pname,
                            name='cons_init_p'+pname,
                            description='Initial consensus of patient '+pname+', fragment '+fragment)
 
-        # If absent, just copy the thing over
-        if not os.path.isfile(output_filename):
-            SeqIO.write(seq_in, output_filename, 'fasta')
-            if VERBOSE >= 1:
-                print pname+': initial consensus file created for sample', sample_init['name']
+        ## If absent, just copy the thing over
+        #if not os.path.isfile(output_filename):
+        #    SeqIO.write(seq_in, output_filename, 'fasta')
+        #    if VERBOSE >= 1:
+        #        print pname+': initial consensus file created for sample', sample_init['name']
 
-        # if present, check whether the sequences are the same (if so, no remapping
-        # is needed!). Overwrite the file anyway, because single samples carry
-        # their consensus (mapping reference) with them in the folder (not much
-        # overhead and MUUUCH cleaner than otherwise).
-        else:
-            seq_out = SeqIO.read(output_filename, 'fasta')
-            SeqIO.write(seq_in, output_filename, 'fasta')
-            if str(seq_in.seq) != str(seq_out.seq):
-                print 'NOTE: initial consensus updated to '+sample_init['name']+', remap!'
+        ## if present, check whether the sequences are the same (if so, no remapping
+        ## is needed!). Overwrite the file anyway, because single samples carry
+        ## their consensus (mapping reference) with them in the folder (not much
+        ## overhead and MUUUCH cleaner than otherwise).
+        #else:
+        #    seq_out = SeqIO.read(output_filename, 'fasta')
+        #    SeqIO.write(seq_in, output_filename, 'fasta')
+        #    if str(seq_in.seq) != str(seq_out.seq):
+        #        print 'NOTE: initial consensus updated to '+sample_init['name']+', remap!'
             
-    # Merge all fragments if requested
-    if 'genomewide' in fragments:
-        conss_frags = []
-        for fragment in ['F'+str(i) for i in xrange(1, 7)]:
-            output_filename = get_initial_consensus_filename(pname, fragment)
-            conss = str(SeqIO.read(output_filename, 'fasta').seq)
-            conss_frags.append(conss)
-        conss_genomewide = merge_initial_consensi(conss_frags, VERBOSE=VERBOSE,
-                                                  minimal_fraction_match=0.75)
+    ## Merge all fragments if requested
+    #if 'genomewide' in fragments:
+    #    conss_frags = []
+    #    for fragment in ['F'+str(i) for i in xrange(1, 7)]:
+    #        output_filename = get_initial_consensus_filename(pname, fragment)
+    #        conss = str(SeqIO.read(output_filename, 'fasta').seq)
+    #        conss_frags.append(conss)
+    #    conss_genomewide = merge_initial_consensi(conss_frags, VERBOSE=VERBOSE,
+    #                                              minimal_fraction_match=0.75)
 
-        ## Take consensus from folder, it was built by assisted assembly
-        #cons_gw_rec = SeqIO.read(get_consensus_filename(data_folder, adaID, 'genomewide'), 'fasta')
-        #conss_genomewide = str(cons_gw_rec.seq)
-        
-        gene_seqs, genes_good, gene_poss = check_genes_consensus(conss_genomewide, 'genomewide', VERBOSE=VERBOSE)
-        if all(genes_good.values()):
-            print 'Genomewide consensus approved: you can map the single fragments!'
+    #    ## Take consensus from folder, it was built by assisted assembly
+    #    #cons_gw_rec = SeqIO.read(get_consensus_filename(data_folder, adaID, 'genomewide'), 'fasta')
+    #    #conss_genomewide = str(cons_gw_rec.seq)
+    #    
+    #    gene_seqs, genes_good, gene_poss = check_genes_consensus(conss_genomewide, 'genomewide', VERBOSE=VERBOSE)
+    #    if all(genes_good.values()):
+    #        print 'Genomewide consensus approved: you can map the single fragments!'
 
-        output_filename = get_initial_consensus_filename(pname, 'genomewide')
-        seq_in = SeqRecord(Seq(conss_genomewide, unambiguous_dna),
-                           id='cons_gw_init_p'+pname,
-                           name='cons_gw_init_p'+pname,
-                           description='Initial genomewide consensus of patient '+pname)
-        SeqIO.write(seq_in, output_filename, 'fasta')
+    #    output_filename = get_initial_consensus_filename(pname, 'genomewide')
+    #    seq_in = SeqRecord(Seq(conss_genomewide, unambiguous_dna),
+    #                       id='cons_gw_init_p'+pname,
+    #                       name='cons_gw_init_p'+pname,
+    #                       description='Initial genomewide consensus of patient '+pname)
+    #    SeqIO.write(seq_in, output_filename, 'fasta')
 
         
 

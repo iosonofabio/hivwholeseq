@@ -21,9 +21,8 @@ from Bio.SeqRecord import SeqRecord
 from Bio.Alphabet.IUPAC import ambiguous_dna
 from Bio import AlignIO
 
+from hivwholeseq.samples import load_sequencing_run, SampleSeq
 from hivwholeseq.mapping_utils import align_muscle
-from hivwholeseq.samples import samples
-from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.filenames import get_divided_filename, \
         get_premapped_filename, \
         get_reference_premap_filename, \
@@ -341,26 +340,28 @@ if __name__ == '__main__':
     store_allele_counts = args.allele_counts
 
     # Specify the dataset
-    dataset = MiSeq_runs[seq_run]
-    data_folder = dataset['folder']
+    dataset = load_sequencing_run(seq_run)
+    data_folder = dataset.folder
 
     # If the script is called with no adaID, iterate over all
-    if not adaIDs:
-        adaIDs = dataset['adapters']
+    samples = dataset.samples
+    if adaIDs is not None:
+        samples = samples.loc[samples.adapter.isin(adaIDs)]
     if VERBOSE >= 3:
-        print 'adaIDs', adaIDs
+        print 'adaIDs', samples.adaters
 
     # Iterate over all requested samples
-    for adaID in adaIDs:
+    for samplename, sample in samples.iterrows():
+        sample = SampleSeq(sample)
+        adaID = sample.adapter
 
-        samplename = dataset['samples'][dataset['adapters'].index(adaID)]
         # If the script is called with no fragment, iterate over all
         if not fragments:
-            fragments_sample = samples[samplename]['fragments']
+            fragments_sample = sample.regions_complete
             fragments_sample.append('genomewide')
         else:
             from re import findall
-            fragments_all = samples[samplename]['fragments']
+            fragments_all = sample.regions_complete
             fragments_sample = []
             for fragment in fragments:
                 frs = filter(lambda x: fragment in x, fragments_all)
