@@ -11,12 +11,13 @@ import argparse
 import pysam
 from Bio.Alphabet import IUPAC
 from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
 from Bio.Blast import NCBIWWW, NCBIXML
 
-from hivwholeseq.datasets import MiSeq_runs
-from hivwholeseq.filenames import get_divided_filenames
-from hivwholeseq.mapping_utils import pair_generator
+from hivwholeseq.filenames import get_premapped_filename
+from hivwholeseq.mapping_utils import pair_generator, reads_to_seqrecord
 
+from hivwholeseq.samples import load_sequencing_run
 
 
 # Script
@@ -37,25 +38,46 @@ if __name__ == '__main__':
     VERBOSE = args.verbose
 
     # Specify the dataset
-    dataset = MiSeq_runs[seq_run]
-    data_folder = dataset['folder']
+    dataset = load_sequencing_run(seq_run)
+    data_folder = dataset.folder
 
     # Get the BAM filename 
-    input_filename = get_divided_filenames(data_folder, adaID, ['F6'], type='bam')[-2]
+    input_filename = get_premapped_filename(data_folder, adaID, type='bam')
 
     # Get unmapped reads and BLAST them
+    reads_unmapped = []
+    n_unmapped = 0
     with pysam.Samfile(input_filename, 'rb') as input_file:
         for reads in pair_generator(input_file):
-            if reads[0].is_unmapped:
-                seq = reads[0].seq
+            if not reads[0].is_unmapped:
+                continue
 
-                # BLAST it
-                seqb = Seq(seq, IUPAC.ambiguous_dna)
-                blast_xml = NCBIWWW.qblast("blastn", "nr", seqb)
-                blast_record = NCBIXML.read(blast_xml)
-                ali = blast_record.alignments
-                if len(ali):
-                    ali = ali[0]
-                    print ali.title
-                else:
-                    print 'No matches found'
+            n_unmapped += 1
+
+            # Take only the first part of read1, to make sure quality is high
+            seq = reads[reads[1].is_read1].seq[:200]
+            seqb = Seq(seq, IUPAC.ambiguous_dna)
+
+            # Save to file, to test local blast
+            reads_unmapped.append(reads[reads[1].is_read1])
+            if len(reads_unmapped) >= 100:
+                break
+
+            continue
+
+            # BLAST it
+            blast_xml = NCBIWWW.qblast("blastn", "nr", seqb)
+            blast_record = NCBIXML.read(blast_xml)
+            ali = blast_record.alignments
+            if len(ali):
+                ali = ali[0]
+                print ali.title
+            else:
+                print 'No matches found'
+
+        seqs_unmapped = reads_to_seqrecord(reads_unmapped)
+
+    from Bio import SeqIO
+    SeqIO.write(seqs_unmapped, '/ebio/ag-neher/home/fzanini/tmp/seqs_for_blast.fastq', 'fastq')
+    SeqIO.write(seqs_unmapped, '/ebio/ag-neher/home/fzanini/tmp/seqs_for_blast.fasta', 'fasta')
+

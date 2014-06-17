@@ -25,6 +25,7 @@ import numpy as np
 from Bio import SeqIO
 import pysam
 
+from hivwholeseq.samples import load_sequencing_run
 from hivwholeseq.filenames import get_custom_reference_filename, \
         get_HXB2_hash_file, get_read_filenames, get_premapped_filename,\
         get_reference_premap_filename, get_premap_summary_filename, \
@@ -36,7 +37,6 @@ from hivwholeseq.mapping_utils import stampy_bin, subsrate, \
 from hivwholeseq.fork_cluster import fork_premap as fork_self
 from hivwholeseq.clean_temp_files import remove_premapped_tempfiles
 
-from hivwholeseq.samples import load_sequencing_run
 
 
 

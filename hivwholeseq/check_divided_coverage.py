@@ -11,13 +11,13 @@ import numpy as np
 from Bio import SeqIO
 import matplotlib.pyplot as plt
 
-from hivwholeseq.datasets import MiSeq_runs
+from hivwholeseq.samples import load_sequencing_run
 from hivwholeseq.miseq import read_types
 from hivwholeseq.reference import load_HXB2
 from hivwholeseq.filenames import get_divided_filename, get_reference_premap_filename
 from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file
 from hivwholeseq.minor_allele_frequency import get_minor_allele_counts
-from hivwholeseq.samples import samples
+
 
 
 
@@ -55,13 +55,9 @@ def plot_coverage_minor_allele(counts, suptitle):
     
 
 
-def check_division(seq_run, adaID, fragment, qual_min=35,
+def check_division(data_folder, adaID, fragment, seq_run, qual_min=35,
                    reference='HXB2', maxreads=-1, VERBOSE=0):
     '''Check division into fragments: coverage, etc.'''
-    # Specify the dataset
-    dataset = MiSeq_runs[seq_run]
-    data_folder = dataset['folder']
-
     refseq = SeqIO.read(get_reference_premap_filename(data_folder, adaID, fragment),
                         'fasta')
 
@@ -111,26 +107,33 @@ if __name__ == '__main__':
     VERBOSE = args.verbose
 
     # Specify the dataset
-    dataset = MiSeq_runs[seq_run]
-    data_folder = dataset['folder']
+    dataset = load_sequencing_run(seq_run)
+    data_folder = dataset.folder
 
     # If the script is called with no adaID, iterate over all
-    if not adaIDs:
-        adaIDs = MiSeq_runs[seq_run]['adapters']
+    samples = dataset.samples
+    if adaIDs is not None:
+        samples = samples.loc[samples.adapter.isin(adaIDs)]
     if VERBOSE >= 3:
+        adaIDs = samples.adapter.tolist()
         print 'adaIDs', adaIDs
 
     # Iterate over samples and fragments
-    for adaID in adaIDs:
-        samplename = dataset['samples'][dataset['adapters'].index(adaID)]
-        fragments_sample = samples[samplename]['fragments']
+    for samplename, sample in samples.iterrows():
+        adaID = sample.adapter
+        PCR = int(sample.PCR)
+        if PCR == 1:
+            PCR_suffix = 'o'
+        elif PCR == 2:
+            PCR_suffix = 'i'
+        fragments_sample = [str('F'+fr+PCR_suffix) for fr in sample.regions.split(' ')]
         if VERBOSE:
-            print adaID, samplename
+            print adaID, samplename, fragments_sample
 
         for fragment in fragments_sample:
             frag_gen = fragment[:2]
             if (fragments is None) or (frag_gen in fragments):
-                check_division(seq_run, adaID, fragment,
+                check_division(data_folder, adaID, fragment, seq_run,
                                maxreads=maxreads,
                                VERBOSE=VERBOSE)
 

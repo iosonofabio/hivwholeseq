@@ -13,7 +13,6 @@ from Bio import SeqIO
 import matplotlib.pyplot as plt
 from matplotlib import cm
 
-from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.miseq import read_types
 from hivwholeseq.filenames import get_premapped_filename, get_reference_premap_filename, \
         get_fragment_positions_filename
@@ -21,7 +20,8 @@ from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_fi
 from hivwholeseq.primer_info import primers_coordinates_HXB2_inner as pcis_HXB2
 from hivwholeseq.primer_info import primers_coordinates_HXB2_outer as pcos_HXB2
 from hivwholeseq.mapping_utils import get_number_reads
-from hivwholeseq.samples import samples
+
+from hivwholeseq.samples import load_sequencing_run
 
 
 
@@ -58,17 +58,11 @@ def plot_coverage(counts, frags_pos=None, frags_pos_out=None,
     plt.tight_layout(rect=(0, 0, 1, 0.95)) 
 
 
-def check_premap(seq_run, adaID, qual_min=30, match_len_min=10,
+def check_premap(data_folder, adaID, fragments, seq_run, samplename,
+                 qual_min=30, match_len_min=10,
                  maxreads=-1, VERBOSE=0,
                  title=None):
     '''Check premap to reference: coverage, etc.'''
-
-    dataset = MiSeq_runs[seq_run]
-    data_folder = dataset['folder']
-
-    samplename = dataset['samples'][dataset['adapters'].index(adaID)]
-    fragments = samples[samplename]['fragments']
-
     refseq = SeqIO.read(get_reference_premap_filename(data_folder, adaID), 'fasta')
 
     fragpos_filename = get_fragment_positions_filename(data_folder, adaID)
@@ -113,7 +107,8 @@ def check_premap(seq_run, adaID, qual_min=30, match_len_min=10,
     # SAVEFIG
     from hivwholeseq.adapter_info import foldername_adapter
     plt.savefig(data_folder+foldername_adapter(adaID)+'figures/coverage_premapped_'+samplename+'.png')
-                
+
+    return (counts, inserts)
 
 
 
@@ -124,7 +119,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Check consensus')
     parser.add_argument('--run', required=True,
                         help='Seq run to analyze (e.g. Tue28)')
-    parser.add_argument('--adaIDs', nargs='*',
+    parser.add_argument('--adaIDs', nargs='+',
                         help='Adapter IDs to analyze (e.g. TS2)')
     parser.add_argument('--maxreads', type=int, default=1000,
                         help='Number of reads analyzed')
@@ -141,16 +136,21 @@ if __name__ == '__main__':
     titles = args.titles
 
     # Specify the dataset
-    dataset = MiSeq_runs[seq_run]
-    data_folder = dataset['folder']
+    dataset = load_sequencing_run(seq_run)
+    data_folder = dataset.folder
 
     # If the script is called with no adaID, iterate over all
-    if not adaIDs:
-        adaIDs = MiSeq_runs[seq_run]['adapters']
-    if VERBOSE >= 3:
-        print 'adaIDs', adaIDs
+    samples = dataset.samples
+    if adaIDs is not None:
+        samples = samples.loc[samples.adapter.isin(adaIDs)]
 
-    for i, adaID in enumerate(adaIDs):
+    if VERBOSE >= 3:
+        print 'adaIDs', samples.adapter
+
+    for i, (samplename, sample) in enumerate(samples.iterrows()):
+        adaID = sample.adapter
+        fragments = sample.regions.split(' ')
+
         if VERBOSE:
             print seq_run, adaID
         if titles is not None:
@@ -158,10 +158,11 @@ if __name__ == '__main__':
         else:
             title = None
 
-        check_premap(seq_run, adaID,
-                     maxreads=maxreads,
-                     VERBOSE=VERBOSE,
-                     title=title)
+        (counts, inserts) = check_premap(data_folder, adaID,
+                                         fragments, seq_run, samplename,
+                                         maxreads=maxreads,
+                                         VERBOSE=VERBOSE,
+                                         title=title)
 
     plt.ion()
     plt.show()

@@ -21,10 +21,10 @@ fragments_genes = {'gag': ['F1', 'F2'],
                    'rev': [['F4'], ['F5', 'F6']],
                    }
 
-# Note: the reverse primers get reverse complemented
+# Note: the reverse primers get reverse complemented (so everything is positive sense)
 primers_inner = {'F1': ['AAGTAGTGTGTGCCCGTCTGT', rc('TGCCAAAGAGTGATYTGAGGG')],
                  'F2': ['GGGCTGTTGGARATGTGG', rc('ACAAACTCCCAYTCAGGAATCCA')],
-                 'F3': ['GAAAGCATAGTRATATGGGGAAA', rc('CACCTGCCATCTGTTTTCCATA')],
+                 'F3a': ['GAAAGCATAGTRATATGGGGAAA', rc('CACCTGCCATCTGTTTTCCATA')],
                  'F4': ['TGGAAAGGTGAAGGGGCAG', rc('GTACACAGGCATGTGTRGCCCA')],
                  'F5a': ['TAAGAGAAAGAGCAGAAGACAGTGG', rc('CCAAATYCCYAGGAGCTGTTGATC')],
                  'F5b': ['TCTATTATGGRGTACCTGTRTGG', rc('CCAAATYCCYAGGAGCTGTTG')],
@@ -33,7 +33,9 @@ primers_inner = {'F1': ['AAGTAGTGTGTGCCCGTCTGT', rc('TGCCAAAGAGTGATYTGAGGG')],
 
 primers_outer = {'F1': ['CTCAATAAAGCTTGCCTTGAGTGC', rc('ACTGTATCATCTGCTCCTGTRTCT')],
                  'F2': ['AAATTGCAGGGCYCCTAG', rc('CTRTTAGCTGCCCCATCTACATAG')],
-                 'F3': ['CACACTAATGATGTAARACARTTAACAG', rc('TTCCATGTTYTAATCCTCATCCTGTCTAC')],
+                 'F3a': ['CACACTAATGATGTAARACARTTAACAG', rc('TTCCATGTTYTAATCCTCATCCTGTCTAC')],
+                 # NOTE: F3b rev might be degenerate, ask Lina (she's on holiday now)!!
+                 'F3b': ['CACACTAATGATGTAARACARTTAACAG', 'CAAGAATAAGTTCAGAAGTACACATCCC'],
                  'F4': ['CGGGTTTATTWCAGRGACAGCAGA', rc('GGGGTTAAYTTTACACATGGYTTTA')],
                  'F5a': ['GGCATYTCCTATGGCAGGAAGAAG', rc('GTGGTGCARATGAGTTTTCCAGAGCA')],
                  'F5b': ['AGAATAAGAGAAAGAGCAGAAGA', rc('ATGAGTTTTCCAGAGCANCCCCA')],
@@ -48,7 +50,7 @@ primers_PCR = dict([(fi+'i', si) for (fi, si) in primers_inner.iteritems()] + \
 # the last nucleotide + 1 (a la Python).
 primers_coordinates_HXB2_inner = {'F1': [[550, 571], [2251, 2272]],
                                   'F2': [[2021, 2039], [3776, 3799]],
-                                  'F3': [[3680, 3703], [5039, 5061]],
+                                  'F3a': [[3680, 3703], [5039, 5061]],
                                   'F4': [[4955, 4974], [6428, 6450]],
                                   'F5a': [[6197, 6222], [7988, 8012]],
                                   'F5b': [[6336, 6359], [7991, 8012]],
@@ -57,7 +59,8 @@ primers_coordinates_HXB2_inner = {'F1': [[550, 571], [2251, 2272]],
 
 primers_coordinates_HXB2_outer = {'F1': [[523, 547], [2323, 2347]],
                                   'F2': [[1997, 2015], [3868, 3892]],
-                                  'F3': [[3629, 3657], [5076, 5105]],
+                                  'F3a': [[3629, 3657], [5076, 5105]],
+                                  'F3b': [[3629, 3657], [5185, 5213]],
                                   'F4': [[4898, 4922], [6570, 6595]],
                                   'F5a': [[5959, 5982], [8015, 8041]],
                                   'F5b': [[6193, 6216], [8009, 8032]],
@@ -66,12 +69,6 @@ primers_coordinates_HXB2_outer = {'F1': [[523, 547], [2323, 2347]],
 
 
 # Functions
-def get_fragment_positions(fragments):
-    '''Get a dictionary of positions for the selected fragments'''
-    #TODO
-    pass
-
-
 def find_fragment(refseq, fragment):
     '''Find the coordinate of one fragment in the refseq'''
     import numpy as np

@@ -21,7 +21,6 @@ from Bio import SeqIO
 import pysam
 
 from hivwholeseq.miseq import alpha
-from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.primer_info import primers_coordinates_HXB2_inner as pcis
 from hivwholeseq.primer_info import primers_coordinates_HXB2_outer as pcos
 from hivwholeseq.primer_info import primers_inner, primers_outer
@@ -35,8 +34,8 @@ from hivwholeseq.mapping_utils import main_block_read_pair_low_quality as main_b
 from hivwholeseq.mapping_utils import trim_read_pair_low_quality as trim_low_quality
 from hivwholeseq.mapping_utils import trim_read_pair_crossoverhangs as trim_coh
 from hivwholeseq.fork_cluster import fork_trim_and_divide as fork_self
-from hivwholeseq.samples import samples
 
+from hivwholeseq.samples import load_sequencing_run
 
 
 # Functions
@@ -53,6 +52,8 @@ def make_output_folders(data_folder, adaID, VERBOSE=0):
 def store_reference_fragmented(data_folder, adaID, refseq, fragment_trim_poss_dict):
     '''Store FASTA files for the reference in fragments'''
     for fragment, poss in fragment_trim_poss_dict.iteritems():
+        if not np.isscalar(poss[0]):
+            poss = [poss[0]['inner'], poss[1]['inner']]
         refseq_frag = refseq[poss[0]: poss[1]]
         refseq_frag.id = refseq_frag.id+'_'+fragment
         refseq_frag.name = refseq_frag.name+'_'+fragment
@@ -90,30 +91,96 @@ def get_primer_positions(smat, fragments, type='both'):
         pr_old_pos = 0
         pr_old = ''
         for ifr, fragment in enumerate(fragments):
-            # Expand ambiguous primers in a list of all possible unambiguous ones,
-            # and look for the best approximate match between all primers and a
-            # sliding window in the HIV genome
-            pr = primers_PCR[fragment][j]
-            pr_mat = np.array(map(list, eas(pr)), 'S1')
-            n_matches = [(smat[i: i + len(pr)] == pr_mat).sum(axis=1).max()
-                         for i in xrange(pr_old_pos + len(pr_old),
-                                         len(smat) - len(pr) + 1)]
+            # Sometimes, the PCR is performed with different primer sets in parallel
+            # to get more DNA, so we must take the innermost to be conservative (we
+            # lose some reads, but the ones we keep are good).
+            # NOTE: F6 is not ambiguous, so we do not treat it specially here (see below)
+            if '+' in fragment:
+                if fragment[-1] == 'o':
+                    pcs = pcos
+                elif fragment[-1] == 'i':
+                    pcs = pcis
+                else:
+                    raise ValueError('Neither PCR1 nor PCR2??')
 
-            # NOTE: F6 rev lies in the LTR, so we risk reading the other LTR.
-            # Treat it as a special case: come from the right!
-            if j and ('F6' in fragment):
-                pr_pos = len(smat) - len(pr) - np.argmax(n_matches[::-1])
-            else:
+                fragment_subs = [fragment[:2]+fsub for fsub in fragment[2:-1].split('+')]
+                pco_inn = [pcs[fsub][j][not j] for fsub in fragment_subs]
+                if not j:
+                    fragment_inn = fragment_subs[np.argmax(pco_inn)]+fragment[-1]
+                    fragment_out = fragment_subs[np.argmin(pco_inn)]+fragment[-1]
+                else:
+                    fragment_inn = fragment_subs[np.argmin(pco_inn)]+fragment[-1]
+                    fragment_out = fragment_subs[np.argmax(pco_inn)]+fragment[-1]
+
+                if VERBOSE >= 3:
+                    print j, fragment_subs, pco_inn, fragment_inn, fragment_out
+
+                pr_pos_pair = {}
+                # Get the left first
+                if not j:
+                    fragment = fragment_out
+                    label = 'outer'
+                else:
+                    fragment = fragment_inn
+                    label = 'inner'
+
+                # Expand ambiguous primers in a list of all possible unambiguous ones,
+                # and look for the best approximate match between all primers and a
+                # sliding window in the HIV genome
+                pr = primers_PCR[fragment][j]
+                pr_mat = np.array(map(list, eas(pr)), 'S1')
+                n_matches = [(smat[i: i + len(pr)] == pr_mat).sum(axis=1).max()
+                             for i in xrange(pr_old_pos + len(pr_old),
+                                             len(smat) - len(pr) + 1)]
+
                 pr_pos = pr_old_pos + len(pr_old) + np.argmax(n_matches)
+                pr_pos_pair[label] = [pr_pos, pr_pos + len(pr)]
 
-            primer_poss[j].append([pr_pos, pr_pos + len(pr)])
+                # Get the right one second
+                if not j:
+                    fragment = fragment_inn
+                    label = 'inner'
+                else:
+                    fragment = fragment_out
+                    label = 'outer'
+
+                pr = primers_PCR[fragment][j]
+                pr_mat = np.array(map(list, eas(pr)), 'S1')
+                n_matches = [(smat[i: i + len(pr)] == pr_mat).sum(axis=1).max()
+                             for i in xrange(pr_pos,
+                                             len(smat) - len(pr) + 1)]
+
+                pr_pos = pr_pos + np.argmax(n_matches)
+                pr_pos_pair[label] = [pr_pos, pr_pos + len(pr)]
+
+            else:
+
+                # Expand ambiguous primers in a list of all possible unambiguous ones,
+                # and look for the best approximate match between all primers and a
+                # sliding window in the HIV genome
+                pr = primers_PCR[fragment][j]
+                pr_mat = np.array(map(list, eas(pr)), 'S1')
+                n_matches = [(smat[i: i + len(pr)] == pr_mat).sum(axis=1).max()
+                             for i in xrange(pr_old_pos + len(pr_old),
+                                             len(smat) - len(pr) + 1)]
+
+                # NOTE: F6 rev lies in the LTR, so we risk reading the other LTR.
+                # Treat it as a special case: come from the right!
+                if j and ('F6' in fragment):
+                    pr_pos = len(smat) - len(pr) - np.argmax(n_matches[::-1])
+                else:
+                    pr_pos = pr_old_pos + len(pr_old) + np.argmax(n_matches)
+
+                pr_pos_pair = [pr_pos, pr_pos + len(pr)]
+
+            primer_poss[j].append(pr_pos_pair)
             pr_old_pos = pr_pos
             pr_old = pr
 
     if type != 'both':
-        return np.array(primer_poss[type == 'rev'], int)
+        return primer_poss[type == 'rev']
     else:
-        return np.array(primer_poss, int)
+        return primer_poss
 
 
 def get_fragment_positions(smat, fragments):
@@ -126,13 +193,28 @@ def get_fragment_positions(smat, fragments):
     '''
     primer_poss = get_primer_positions(smat, fragments, type='both')
 
-    fragment_full_poss = [primer_poss[0, :, 0],
-                          primer_poss[1, :, 1]]
-    fragment_trim_poss = [primer_poss[0, :, 1],
-                          primer_poss[1, :, 0]]
+    # Convert into fragment ranges, by "transposing"
+    fragment_full_poss = []
+    fragment_trim_poss = []
+    for i in xrange(len(primer_poss[0])):
+        fragment_full_poss.append([0, 0])
+        fragment_trim_poss.append([0, 0])
+        for j in xrange(2):
+            pr_pos_pair = primer_poss[j][i]
 
-    return {'full': np.array(fragment_full_poss, int).T,
-            'trim': np.array(fragment_trim_poss, int).T}
+            # Is it a mixture of fragments (e.g. F5a+b)?
+            if 'inner' in pr_pos_pair:
+                pr_pos_full = {key: val[j] for key, val in pr_pos_pair.iteritems()}
+                pr_pos_trim = {key: val[not j] for key, val in pr_pos_pair.iteritems()}
+                fragment_full_poss[i][j] = pr_pos_full
+                fragment_trim_poss[i][j] = pr_pos_trim
+
+            else:
+                fragment_full_poss[i][j] = pr_pos_pair[j]
+                fragment_trim_poss[i][j] = pr_pos_pair[not j]
+    
+    return {'full': fragment_full_poss,
+            'trim': fragment_trim_poss}
 
 
 def test_fragment_assignment(reads, n_frag, len_frag, VERBOSE=True):
@@ -208,7 +290,7 @@ def test_outer_primer(reads, primers_out_pos, primers_out_seq, lref):
     return False
 
 
-def assign_to_fragment(reads, fragment_full_poss):
+def assign_to_fragment(reads, fragment_full_poss, VERBOSE=0):
     '''Assign read pair to fragments'''
     i_fwd = reads[0].is_reverse
     i_rev = not i_fwd
@@ -217,20 +299,52 @@ def assign_to_fragment(reads, fragment_full_poss):
     ins_start = reads[i_fwd].pos
     ins_end = reads[i_fwd].pos + reads[i_fwd].isize
 
-    # Fragment coordinates (including primers)
-    fragment_start, fragment_end = fragment_full_poss.T
+    # What fragments could the read pair come from?
+    frags_pot = []
+    for n_frag, (fr_start, fr_end) in enumerate(fragment_full_poss):
+        if np.isscalar(fr_start):
+            frag_ind = (ins_start >= fr_start) and (ins_end <= fr_end)
+            if frag_ind:
+                frags_pot.append(str(n_frag))
+        else:
+            for key in ('inner', 'outer'):
+                fr_startsub = fr_start[key]
+                fr_endsub = fr_end[key]
+                frag_ind = (ins_start >= fr_startsub) and (ins_end <= fr_endsub)
+                if frag_ind:
+                    frags_pot.append(str(n_frag)+'_'+key)
 
-    # If short inserts are not trimmed yet, we easily have the fwd read going
-    # beyond the "true" beginning of the reverse read, i.e.
-    #                reads[i_fwd].pos + reads[i_fwd].isize
-    # Ignore that stuff, it's being trimmed later on. For assignment, check only
-    # the insert AS A WHOLE.
-    frags_ins = ((ins_start >= fragment_start) &
-                 (ins_start < fragment_end) &
-                 (ins_end <= fragment_end) \
-                ).nonzero()[0]
+    # If no fragments are compatible, it's cross-boundary (PCR crazyness)
+    if len(frags_pot) == 0:
+        pair_identity = 'cross'
 
-    return frags_ins
+    # If it is ONLY compatible with an outer fragment from a region like F5a+b,
+    # we hereby declare it illegal! (one could be more gentle, but it's ok)
+    elif (len(frags_pot) == 1) and ('outer' in frags_pot[0]):
+        pair_identity = 'cross'
+
+    # If it is only compatible with one primer, it's ok
+    elif len(frags_pot) == 1:
+        pair_identity = frags_pot[0]
+
+    # Now the crazyness starts for stuff like F5a+b. There are several cases:
+    # - F5_inner + F5_outer: F5
+    # - F1 + F2: ambiguous
+    # - F4 + F5_inner + F5_outer: ambiguous
+    # - F5_inner + F5_outer + F6: ambiguous
+    # - F4 + F5_outer: ambiguous (!)
+    # - F5_outer + F6: ambiguous (!)
+    # and more if F4/F6 are also mixed fragments. The bottomline is: only something
+    # like Fx_inner + Fx_outer is good, the rest is ambiguous
+    elif (len(frags_pot) == 2) and ('inner' in frags_pot[0]) and ('outer' in frags_pot[1]):
+        pair_identity = frags_pot[0].split('_')[0]
+    
+    else:
+        pair_identity = 'ambiguous'
+
+    if VERBOSE >= 4:
+        print fragment_full_poss, ins_start, ins_end, pair_identity
+    return pair_identity
 
 
 def trim_primers(reads, frag_pos, include_tests=False):
@@ -368,7 +482,7 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, fragments,
     # Get the positions of fragment start/end, w/ and w/o primers
     frags_pos = get_fragment_positions(smat, fragments)
     store_reference_fragmented(data_folder, adaID, refseq,
-                               dict(zip(*[fragments, frags_pos['trim']])))
+                               dict(zip(fragments, frags_pos['trim'])))
     if summary:
         with open(get_divide_summary_filename(data_folder, adaID), 'a') as f:
             f.write('Primer positions (for fragments):\n')
@@ -383,6 +497,7 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, fragments,
     # for that fragment)
     # NOTE: the LTRs make no problem, because the rev outer primer of F6
     # is not in the reference anymore if F6 has undergone nested PCR
+    # FIXME: this might not work if we have mixed fragments (e.g. F5a+b) AND nesting
     from re import findall
     primers_out = {'fwd': [], 'rev': []}
     for i, fr in enumerate(fragments):
@@ -401,7 +516,6 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, fragments,
                                         'S1', ndmin=2)
                                for fr in primers_out['rev']],
                       }
-
     primers_out_pos = {'fwd': [], 'rev': []}
     if primers_out['fwd']:
         primers_out_pos['fwd'] = get_primer_positions(smat, primers_out['fwd'], 'fwd')[:, 0]
@@ -477,13 +591,17 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, fragments,
                     fo_um.write(reads[1])
                     continue
 
+                # FIXME: the following becomes a bit harder when we mix parallel
+                # PCRs, e.g. F5a+b, to get more product
+
                 # Assign to a fragment now, so that primer trimming is faster 
-                frags_pair = assign_to_fragment(reads, frags_pos['full'])
+                pair_identity = assign_to_fragment(reads, frags_pos['full'],
+                                                   VERBOSE=VERBOSE)
 
                 # 1. If no fragments are possible (e.g. one read crosses the
                 # fragment boundary, they map to different fragments), dump it
                 # into a special bucket
-                if len(frags_pair) == 0:
+                if pair_identity == 'cross':
                     n_crossfrag += 1
                     fo_cm.write(reads[0])
                     fo_cm.write(reads[1])
@@ -492,7 +610,7 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, fragments,
                 # 2. If 2+ fragments are possible (tie), put into a special bucket
                 # (essentially excluded, because we want two independent measurements
                 # in the overlapping region, but we might want to recover them)
-                elif len(frags_pair) > 1:
+                elif pair_identity == 'ambiguous':
                     n_ambiguous += 1
                     fo_am.write(reads[0])
                     fo_am.write(reads[1])
@@ -500,8 +618,11 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, fragments,
 
                 # 3. If the intersection is a single fragment, good: trim the primers
                 # NB: n_frag is the index IN THE POOL. If we sequence only F2-F5, F2 is n_frag = 0
-                n_frag = frags_pair[0]
-                trashed_primers = trim_primers(reads, frags_pos['trim'][n_frag],
+                n_frag = int(pair_identity)
+                frag_pos = frags_pos['trim'][n_frag]
+                if not np.isscalar(frag_pos[0]):
+                    frag_pos = [frag_pos[0]['inner'], frag_pos[1]['inner']]
+                trashed_primers = trim_primers(reads, frag_pos,
                                                include_tests=include_tests)
                 if trashed_primers or (reads[i_fwd].isize < 100):
                     n_unmapped += 1
@@ -533,8 +654,8 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, fragments,
 
                 # Change coordinates into the fragmented reference (primer-trimmed)
                 for read in reads:
-                    read.pos -= frags_pos['trim'][n_frag, 0]
-                    read.mpos -= frags_pos['trim'][n_frag, 0]
+                    read.pos -= frag_pos[0]
+                    read.mpos -= frag_pos[0]
 
                 # Here the tests
                 if include_tests:
@@ -595,7 +716,7 @@ if __name__ == '__main__':
                         help='Verbosity level [0-3]')
     parser.add_argument('--maxreads', type=int, default=-1,
                         help='Maximal number of reads to analyze')
-    parser.add_argument('--minisize', type=int, default=100,
+    parser.add_argument('--minisize', type=int, default=400,
                         help='Minimal insert size to keep')
     parser.add_argument('--submit', action='store_true',
                         help='Execute the script in parallel on the cluster')
@@ -615,18 +736,34 @@ if __name__ == '__main__':
     summary = args.summary
 
     # Specify the dataset
-    dataset = MiSeq_runs[seq_run]
-    data_folder = dataset['folder']
+    dataset = load_sequencing_run(seq_run)
+    data_folder = dataset.folder
 
     # Set the number of cycles of the kit (for trimming adapters in short inserts)
-    n_cycles = dataset['n_cycles']
+    n_cycles = dataset['cycles']
 
     # If the script is called with no adaID, iterate over all
-    if not adaIDs:
-        adaIDs = MiSeq_runs[seq_run]['adapters']
+    samples = dataset.samples
+    if adaIDs is not None:
+        samples = samples.loc[samples.adapter.isin(adaIDs)]
 
     # Iterate over all adaIDs
-    for adaID in adaIDs:
+    for (samplename, sample) in samples.iterrows():
+        if str(sample.PCR) == 'nan':
+            if VERBOSE:
+                print samplename+': PCR type not found, skipping'
+            continue
+
+        PCR = int(sample.PCR)
+        if PCR == 1:
+            PCR_suffix = 'o'
+        elif PCR ==2:
+            PCR_suffix = 'i'
+        else:
+            raise ValueError('PCR should be only 1 or 2')
+
+        fragments = [str('F'+fr+PCR_suffix) for fr in sample.regions.split(' ')]
+        adaID = sample.adapter
 
         # Submit to the cluster self if requested
         if submit:
@@ -650,9 +787,6 @@ if __name__ == '__main__':
                     f.write(' --include_tests')
                 f.write('\n')
 
-        samplename = dataset['samples'][dataset['adapters'].index(adaID)]
-        fragments = samples[samplename]['fragments']
-
         # Trim reads and assign them to a fragment (or discard)
         # Note: we pass over the file only once
         trim_and_divide_reads(data_folder, adaID, n_cycles, fragments,
@@ -660,4 +794,3 @@ if __name__ == '__main__':
                               minisize=minisize,
                               include_tests=include_tests,
                               summary=summary)
-        continue
