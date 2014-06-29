@@ -423,7 +423,7 @@ def report_coverage(data_folder, adaID, VERBOSE=0, summary=True):
 if __name__ == '__main__':
 
     # Parse input args
-    parser = argparse.ArgumentParser(description='Divide HIV reads into fragments')
+    parser = argparse.ArgumentParser(description='Map against HIV reference strain')
     parser.add_argument('--run', required=True,
                         help='MiSeq run to analyze (e.g. Tue28)')
     parser.add_argument('--adaIDs', nargs='*',
@@ -438,6 +438,8 @@ if __name__ == '__main__':
                         help='Use alternative reference (the file must exist)')
     parser.add_argument('--no-summary', action='store_false', dest='summary',
                         help='Do not save results in a summary file')
+    parser.add_argument('--trimmed', action='store_true',
+                        help='Use trimmed reads as input')
 
     args = parser.parse_args()
     seq_run = args.run
@@ -447,6 +449,7 @@ if __name__ == '__main__':
     threads = args.threads
     refname = args.reference
     summary = args.summary
+    use_trimmed = args.trimmed
 
     # Specify the dataset
     dataset = load_sequencing_run(seq_run)
@@ -466,18 +469,21 @@ if __name__ == '__main__':
         # Submit to the cluster self if requested
         if submit:
             fork_self(seq_run, adaID, VERBOSE=VERBOSE, threads=threads,
-                      reference=refname, summary=summary)
+                      reference=refname, summary=summary, trimmed=use_trimmed)
             continue
 
         make_output_folders(data_folder, adaID, VERBOSE=VERBOSE, summary=summary)
 
         if summary:
             with open(get_premap_summary_filename(data_folder, adaID), 'w') as f:
-                f.write('Call: python premap_to_reference.py --run '+seq_run+\
+                outstr = 'Call: python premap_to_reference.py --run '+seq_run+\
                         ' --adaIDs '+adaID+\
                         ' --threads '+str(threads)+\
                         ' --reference '+refname+\
-                        ' --verbose '+str(VERBOSE)+'\n')
+                        ' --verbose '+str(VERBOSE)+'\n'
+                if use_trimmed:
+                    outstr = outstr+' --trimmed\n'
+                f.write(outstr)
 
         fragments = get_fragments(sample)
         make_reference(data_folder, adaID, fragments, refname, VERBOSE=VERBOSE, summary=summary)

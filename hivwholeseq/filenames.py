@@ -195,13 +195,16 @@ def get_HXB2_hash_file(fragment='F0', ext=True):
 
 
 def get_read_filenames(data_folder, adaID=None, fragment=None, suffix='',
-                       gzip=False):
+                       gzip=False, trimmed=False):
     '''Get the filenames of the demultiplexed reads'''
     filenames = ['read1', 'read2']
     for i,fn in enumerate(filenames):
         if adaID is not None:
             fn = foldername_adapter(adaID)+fn
-        fn = data_folder+fn+suffix+'.fastq'
+        fn = data_folder+fn
+        if trimmed:
+            fn = fn+'_trimmed'
+        fn = fn+suffix+'.fastq'
         if gzip:
             fn = fn+'.gz' 
         filenames[i] = fn
@@ -552,6 +555,13 @@ def get_demultiplex_summary_filename(data_folder):
     '''Get the filename of the summary of demultiplex'''
     filename = 'summary_demultiplex.txt'
     filename = data_folder+filename
+    return filename
+
+
+def get_trim_summary_filename(data_folder, adaID):
+    '''Get the filename of the trim low quality'''
+    filename = 'summary_trim.txt'
+    filename = data_folder+foldername_adapter(adaID)+filename
     return filename
 
 

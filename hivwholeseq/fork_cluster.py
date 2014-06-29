@@ -85,8 +85,37 @@ def fork_demultiplex(seq_run, VERBOSE=0, maxreads=-1, summary=True):
     return sp.check_output(call_list)
 
 
+def fork_trim(seq_run, adaID, VERBOSE=0, summary=True):
+    '''Submit premap script to the cluster for each adapter ID'''
+    if VERBOSE:
+        print 'Forking to the cluster: adaID '+adaID
+
+    JOBSCRIPT = JOBDIR+'trim_reads_lowq.py'
+    cluster_time = '3:59:59'
+    vmem = '1G'
+    call_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'pm '+adaID,
+                 '-l', 'h_rt='+cluster_time,
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--run', seq_run,
+                 '--adaIDs', adaID,
+                 '--verbose', VERBOSE,
+                ]
+    if not summary:
+        call_list.append('--no-summary')
+    call_list = map(str, call_list)
+    if VERBOSE >= 2:
+        print ' '.join(call_list)
+    return sp.check_output(call_list)
+
+
 def fork_premap(seq_run, adaID, VERBOSE=0, bwa=False, threads=1,
-                reference='HXB2', summary=True):
+                reference='HXB2', summary=True, trimmed=False):
     '''Submit premap script to the cluster for each adapter ID'''
     if VERBOSE:
         print 'Forking to the cluster: adaID '+adaID
@@ -113,6 +142,9 @@ def fork_premap(seq_run, adaID, VERBOSE=0, bwa=False, threads=1,
                 ]
     if not summary:
         call_list.append('--no-summary')
+    if trimmed:
+        call_list.append('--trimmed')
+        
     call_list = map(str, call_list)
     if VERBOSE >= 2:
         print ' '.join(call_list)
