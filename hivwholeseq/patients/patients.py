@@ -73,6 +73,12 @@ class Patient(pd.Series):
         return self.samples.iloc[0]
 
 
+    def get_reference_filename(self, fragment, format='fasta'):
+        '''Get filename of the reference for mapping'''
+        from hivwholeseq.patients.filenames import get_initial_consensus_filename
+        return get_initial_consensus_filename(self.name, fragment, format)
+
+
     def get_allele_frequency_trajectories(self, fragment_or_gene):
         '''Get the allele frequency trajectories from files'''
         from hivwholeseq.patients.filenames import get_allele_frequency_trajectories_filename
@@ -87,6 +93,13 @@ class Patient(pd.Series):
         act_filename = get_allele_count_trajectories_filename(self.name, fragment_or_gene)
         act = np.load(act_filename)
         return act
+
+
+    @property
+    def transmission_date(self):
+        '''The most likely time of transmission'''
+        return self['last negative date'] + \
+                (self['first positive date'] - self['last negative date']) / 2
 
 
 

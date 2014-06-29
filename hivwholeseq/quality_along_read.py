@@ -195,7 +195,7 @@ if __name__ == '__main__':
     parser.add_argument('--run', required=True,
                         help='Seq run to analyze (e.g. Tue28, test_tiny)')
     parser.add_argument('--adaID', required=True,
-                        help='Adapter IDs to analyze (e.g. TS2)')
+                        help='Adapter ID to analyze (e.g. TS2)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
     parser.add_argument('--maxreads', type=int, default=-1,

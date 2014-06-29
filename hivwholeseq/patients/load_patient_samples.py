@@ -32,5 +32,8 @@ if __name__ == '__main__':
     patients = load_patients()
     for pname, p in patients.iterrows():
         p = Patient(p)
-        print p.name
+        n_samples = len(p.samples)
+        p.discard_nonsequenced_samples()
+        n_samples_seq = len(p.samples)
+        print p.name, n_samples, n_samples_seq, p.samples.index.tolist()
 

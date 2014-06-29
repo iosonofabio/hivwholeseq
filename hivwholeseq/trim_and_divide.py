@@ -518,9 +518,13 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, fragments,
                       }
     primers_out_pos = {'fwd': [], 'rev': []}
     if primers_out['fwd']:
-        primers_out_pos['fwd'] = get_primer_positions(smat, primers_out['fwd'], 'fwd')[:, 0]
+        primers_out_pos['fwd'] = map(itemgetter(0),
+                                     get_primer_positions(smat,
+                                                          primers_out['fwd'], 'fwd'))
     if primers_out['rev']:
-        primers_out_pos['rev'] = get_primer_positions(smat, primers_out['rev'], 'rev')[:, 1]
+        primers_out_pos['rev'] = map(itemgetter(1),
+                                     get_primer_positions(smat,
+                                                          primers_out['rev'], 'rev'))
 
     # Input and output files
     input_filename = get_premapped_filename(data_folder, adaID, type='bam')

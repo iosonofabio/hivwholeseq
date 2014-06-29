@@ -12,13 +12,12 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 import Bio.SeqIO as SeqIO
 
-from hivwholeseq.datasets import MiSeq_runs
+from hivwholeseq.samples import SampleSeq, load_sequencing_run
 from hivwholeseq.filenames import get_consensus_filename, \
         get_allele_frequencies_filename,\
         get_merged_consensus_filename, get_merged_allele_frequencies_filename
 from hivwholeseq.check_overlaps import get_overlapping_fragments, get_overlap, \
         check_overlap_consensus
-from hivwholeseq.samples import samples
 
 
 
@@ -139,19 +138,27 @@ if __name__ == '__main__':
     VERBOSE = args.verbose
 
     # Specify the dataset
-    dataset = MiSeq_runs[seq_run]
+    dataset = load_sequencing_run(seq_run)
     data_folder = dataset['folder']
 
     # If the script is called with no adaID, iterate over all
-    if not adaIDs:
-        adaIDs = dataset['adapters']
+    samples = dataset.samples
+    if adaIDs is not None:
+        samples = samples.loc[samples.adapter.isin(adaIDs)]
     if VERBOSE >= 3:
-        print 'adaIDs', adaIDs
+        print 'adaIDs', samples.adapter
 
-    for adaID in adaIDs:
+    for samplename, sample in samples.iterrows():
+        sample = SampleSeq(sample)
+        adaID = sample.adapter
 
-        samplename = dataset['samples'][dataset['adapters'].index(adaID)]
-        fragments = [fr[:2] for fr in samples[samplename]['fragments']]
+        if VERBOSE >= 1:
+            print adaID, samplename
+
+        fragments = [fr[:2] for fr in sample.regions_complete]
+
+        if (len(fragments) != 6) and (VERBOSE >= 1):
+            print 'WARNING: only '+str(len(fragments))+' regions found!'
 
         # Write one or more merged consensi
         consensus = merge_consensi(data_folder, adaID, fragments, VERBOSE=VERBOSE)

@@ -9,20 +9,20 @@ content:    Collect the allele frequencies of all samples to the initial
 # Modules
 import os
 import argparse
+from operator import itemgetter
 import numpy as np
 from Bio import SeqIO
 
 from hivwholeseq.miseq import alpha
-from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file, \
-        get_allele_counts_insertions_from_file_unfiltered, \
-        filter_nus
-from hivwholeseq.patients.patients import get_patient
+from hivwholeseq.patients.patients import load_patient
 from hivwholeseq.patients.filenames import get_initial_consensus_filename, \
         get_mapped_to_initial_filename, get_allele_frequency_trajectories_filename, \
         get_allele_count_trajectories_filename
-from hivwholeseq.patients.one_site_statistics import plot_allele_frequency_trajectories as plot_nus
-from hivwholeseq.patients.one_site_statistics import plot_allele_frequency_trajectories_3d as plot_nus_3d
-from hivwholeseq.patients.one_site_statistics import get_allele_frequency_trajectories
+from hivwholeseq.patients.one_site_statistics import \
+        plot_allele_frequency_trajectories_from_counts as plot_nus_from_act
+from hivwholeseq.patients.one_site_statistics import \
+        plot_allele_frequency_trajectories_from_counts_3d as plot_nus_from_act_3d
+from hivwholeseq.patients.one_site_statistics import get_allele_count_trajectories
 from hivwholeseq.fork_cluster import fork_get_allele_frequency_trajectory as fork_self
 
 
@@ -46,8 +46,8 @@ if __name__ == '__main__':
                         help='Plot the allele frequency trajectories')
     parser.add_argument('--logit', action='store_true',
                         help='use logit scale (log(x/(1-x)) in the plots')
-    parser.add_argument('--PCR1', action='store_true',
-                        help='Show only PCR1 samples where possible (still computes all)')
+    parser.add_argument('--PCR1', type=int, default=1,
+                        help='Take only PCR1 samples [0=off, 1=where both available, 2=always]')
 
     args = parser.parse_args()
     pname = args.patient
@@ -59,13 +59,9 @@ if __name__ == '__main__':
     use_PCR1 = args.PCR1
     use_logit = args.logit
 
-    patient = get_patient(pname)
-    times = patient.times()
-    samplenames = patient.samples
-    if use_PCR1:
-        # Keep PCR2 only if PCR1 is absent
-        ind = np.nonzero(map(lambda x: ('PCR1' in x[1]) or ((times == times[x[0]]).sum() == 1), enumerate(samplenames)))[0]
-        times = times[ind]
+    patient = load_patient(pname)
+    patient.discard_nonsequenced_samples()
+    samplenames = patient.samples.index
 
     # If the script is called with no fragment, iterate over all
     if not fragments:
@@ -78,8 +74,7 @@ if __name__ == '__main__':
 
         # Submit to the cluster self if requested (--save is assumed)
         if submit:
-            fork_self(pname, fragment,
-                      VERBOSE=VERBOSE)
+            fork_self(pname, fragment, VERBOSE=VERBOSE)
             continue
 
         if VERBOSE >= 1:
@@ -89,10 +84,13 @@ if __name__ == '__main__':
         aft_filename = get_allele_frequency_trajectories_filename(pname, fragment)
 
         if save_to_file or (not os.path.isfile(aft_filename)):
-            (act, aft) = get_allele_frequency_trajectories(pname, samplenames, fragment, VERBOSE=VERBOSE)
+            (sns, act) = get_allele_count_trajectories(pname, samplenames, fragment,
+                                                       use_PCR1=use_PCR1, VERBOSE=VERBOSE)
+            aft = 1.0 * act / act.sum(axis=0)
         else:
-            aft = np.load(aft_filename)
             act = np.load(act_filename)
+            aft = np.load(aft_filename)
+            sns = samplenames
 
         aft[np.isnan(aft)] = 0
         aft[(aft < 1e-5) | (aft > 1)] = 0
@@ -101,25 +99,33 @@ if __name__ == '__main__':
             act.dump(get_allele_count_trajectories_filename(pname, fragment))
             aft.dump(get_allele_frequency_trajectories_filename(pname, fragment))
 
-        if use_PCR1:
-            aft = aft[ind]
-            act = act[ind]
-
         if plot is not None:
             import matplotlib.pyplot as plt
 
+            ind = [i for i, (_, sample) in enumerate(patient.samples.iterrows())
+                   if sample.name in map(itemgetter(0), sns)]
+            samples = patient.samples.iloc[ind]
+            times = (samples.date - patient.transmission_date) / np.timedelta64(1, 'D')
+
             if plot in ('2D', '2d', ''):
+
                 # FIXME: the number of molecules to PCR depends on the number of
                 # fragments for that particular experiment... integrate Lina's table!
                 # Note: this refers to the TOTAL # of templates, i.e. the factor 2x for
                 # the two parallel RT-PCR reactions
-                ntemplates = patient.viral_load * 0.4 / 12 * 2
-                if use_PCR1:
-                    ntemplates = ntemplates[ind]
-                plot_nus(times, aft, title='Patient '+pname+', '+fragment, VERBOSE=VERBOSE, logit=use_logit,
-                         ntemplates=ntemplates)
+                ntemplates = samples.ix[ind, 'viral load'] * 0.4 / 12 * 2
+
+                plot_nus_from_act(times, act,
+                                  title='Patient '+pname+', '+fragment,
+                                  VERBOSE=VERBOSE, logit=use_logit,
+                                  ntemplates=ntemplates,
+                                  threshold=0.9)
+
             elif plot in ('3D', '3d'):
-                plot_nus_3d(times, aft, title='Patient '+pname+', '+fragment, VERBOSE=VERBOSE, logit=use_logit)
+                plot_nus_from_act_3d(times, act,
+                                     title='Patient '+pname+', '+fragment,
+                                     VERBOSE=VERBOSE, logit=use_logit,
+                                     threshold=0.9)
 
     if plot is not None:
         plt.tight_layout()

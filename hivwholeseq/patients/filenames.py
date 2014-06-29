@@ -26,31 +26,42 @@ def get_sample_foldername(pname, samplename):
     return fn
 
 
-def get_initial_consensus_filename(pname, fragment,
-                                   format='fasta'):
+def get_initial_consensus_filename(pname, fragment, format='fasta'):
     '''Get the filename of the initial consensus for a patient'''
     filename = 'consensus_initial_'+fragment+'.'+format
     filename = get_foldername(pname)+filename
     return filename
 
 
-def get_mapped_to_initial_filename(pname, samplename, fragment, type='bam',
+def get_mapped_to_initial_foldername(pname, samplename_pat, PCR=1):
+    '''Get the folder of mapped reads to initial consensus'''
+    fn = samplename_pat+'/PCR'+str(PCR)+'/mapped_to_initial/'
+    fn = get_foldername(pname)+fn
+    return fn
+
+
+def get_mapped_to_initial_filename(pname, samplename_pat, 
+                                   samplename, fragment, type='bam',
+                                   PCR=1,
                                    part=None, unsorted=False,
-                                   filtered=False,
                                    only_chunk=None):
     '''Get the filename of the mapped reads to initial consensus'''
-    filename = fragment
+    filename = samplename+'_'+fragment
     if part is not None:
         filename = filename+'_part'+str(part)
     elif unsorted:
         filename = filename+'_unsorted'
-    if filtered:
-        filename = filename+'_filtered'
     if only_chunk is not None:
         filename = filename+'_chunk_'+str(only_chunk)
     filename = filename+'.'+type
-    filename = samplename+'/mapped_to_initial/'+filename
-    filename = get_foldername(pname)+filename
+    filename = get_mapped_to_initial_foldername(pname, samplename_pat, PCR=PCR)+filename
+    return filename
+
+
+def get_mapped_filtered_filename(pname, samplename_pat, fragment, type='bam', PCR=1):
+    '''Get the filename of the mapped and filtered reads to initial consensus'''
+    filename = fragment+'.'+type
+    filename = get_mapped_to_initial_foldername(pname, samplename_pat, PCR=PCR)+filename
     return filename
 
 
@@ -88,6 +99,13 @@ def get_consensi_alignment_genomewide_filename(pname):
     return filename
 
 
+def get_allele_counts_filename(pname, samplename_pat, fragment, PCR=1, qual_min=30):
+    '''Get the filename of the allele counts for a patient sample'''
+    filename = 'allele_counts_'+fragment+'_qual'+str(qual_min)+'+'+'.npy'
+    filename = get_mapped_to_initial_foldername(pname, samplename_pat, PCR=PCR)+filename
+    return filename
+
+
 def get_allele_count_trajectories_filename(pname, fragment):
     '''Get the matrix with allele counts on the initial consensus'''
     filename = 'allele_counts_trajectories_'+fragment+'.npy'
@@ -114,6 +132,18 @@ def get_coordinate_map_filename(pname, fragment, refname='HXB2'):
     filename = 'map_coord_to_'+refname+'_'+fragment+'.dat'
     filename = get_foldername(pname)+filename
     return filename
+
+
+def get_multiple_sequence_alignment_sampleseq_filename(fragment):
+    '''Get the filename of the MSA  of sequenced samples'''
+    filename = 'consensi_ali.fasta'
+    return root_patient_folder+'all/'+filename
+
+
+def get_tree_sampleseq_filename(fragment):
+    '''Get the filename of the MSA  of sequenced samples'''
+    filename = 'consensi_tree.newick'
+    return root_patient_folder+'all/'+filename
 
 
 
@@ -147,25 +177,28 @@ def get_coverage_to_initial_figure_filename(pname, fragment, format='png'):
 
 
 # SUMMARY
-def get_map_initial_summary_filename(pname, samplename, fragment):
+def get_map_initial_summary_filename(pname, samplename_pat, samplename, fragment, PCR=1, only_chunk=None):
     '''Get the filename of the summary of the map to initial consensus'''
-    filename = 'summary_map_initial_'+fragment+'.txt'
-    filename = samplename+'/mapped_to_initial/'+filename
+    filename = 'summary_map_initial_'+samplename+'_'+fragment
+    if only_chunk is not None:
+        filename = filename+'_chunk_'+str(only_chunk)
+    filename = filename+'.txt'
+    filename = samplename_pat+'/PCR'+str(PCR)+'/mapped_to_initial/'+filename
     filename = get_foldername(pname)+filename
     return filename
 
 
-def get_paste_mapped_chunks_initial_summary_filename(pname, samplename, fragment):
+def get_paste_mapped_chunks_initial_summary_filename(pname, samplename_pat, samplename, fragment, PCR=1):
     '''Get the filename of the summary of the pasting of chunk after mapping to initial consensus'''
-    filename = 'summary_paste_mapped_initial_'+fragment+'.txt'
-    filename = samplename+'/mapped_to_initial/'+filename
+    filename = 'summary_paste_mapped_initial_'+samplename+'_'+fragment+'.txt'
+    filename = samplename_pat+'/PCR'+str(PCR)+'/mapped_to_initial/'+filename
     filename = get_foldername(pname)+filename
     return filename
 
 
-def get_filter_mapped_init_summary_filename(pname, samplename, fragment):
+def get_filter_mapped_init_summary_filename(pname, samplename_pat, fragment, PCR=1):
     '''Get the filename of the summary of the post-map filtering'''
     filename= 'summary_filter_mapped_init_'+fragment+'.txt'
-    filename = samplename+'/mapped_to_initial/'+filename
+    filename = samplename_pat+'/PCR'+str(PCR)+'/mapped_to_initial/'+filename
     filename = get_foldername(pname)+filename
     return filename

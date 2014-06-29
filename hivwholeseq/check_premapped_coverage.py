@@ -36,6 +36,7 @@ def plot_coverage(counts, frags_pos=None, frags_pos_out=None,
     ax.plot(cov_tot.T, lw=2, c='k', label=read_types)
     ax.set_xlabel('Position [bases]')
     ax.set_ylabel('Coverage')
+    ax.grid(True)
 
     # If the fragments positions are marked, plot them
     # Inner primers
@@ -83,6 +84,12 @@ def check_premap(data_folder, adaID, fragments, seq_run, samplename,
                     postmp.append([start, end])
 
         postmp = np.array(postmp, int)
+        # NOTE: In a lot of old files, it says F3o instead of F3ao
+        if 'F3o' in fragtmp:
+            fragtmp[fragtmp.index('F3o')] = 'F3ao'
+        elif 'F3i' in fragtmp:
+            fragtmp[fragtmp.index('F3i')] = 'F3ai'
+
 
         frags_pos = np.array([postmp[fragtmp.index(fr)] for fr in fragments], int).T
 

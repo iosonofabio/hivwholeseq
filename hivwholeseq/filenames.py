@@ -54,13 +54,16 @@ def get_reference_premap_hash_filename(data_folder, adaID, ext=True):
     return fn
 
 
-def get_consensus_filename(data_folder, adaID, fragment, trim_primers=True):
+def get_consensus_filename(data_folder, adaID=None, fragment=None, trim_primers=True):
     '''Find the filename of the final consensus'''
-    filename = 'consensus_'+fragment
+    filename = 'consensus'
+    if fragment is not None:
+        filename = filename+'_'+fragment
     if not trim_primers:
         filename = filename+'_with_primers'
     filename = filename+'.fasta'
-    filename = foldername_adapter(adaID)+filename
+    if adaID is not None:
+        filename = foldername_adapter(adaID)+filename
     return data_folder+filename
 
 
@@ -373,11 +376,13 @@ def get_unclassified_reads_filenames(data_folder, filtered=False, gzip=False):
     return filenames
 
 
-def get_merged_consensus_filename(data_folder, adaID,
+def get_merged_consensus_filename(data_folder, adaID=None,
                                   fragments=['F1', 'F2', 'F3', 'F4', 'F5', 'F6']):
     '''Get the merged consensus of several fragments'''
     filename = 'consensus_'+'-'.join(fragments)+'.fasta'
-    filename = data_folder+foldername_adapter(adaID)+filename
+    if adaID is not None:
+        filename = foldername_adapter(adaID)+filename
+    filename = data_folder+filename
     return filename
 
 

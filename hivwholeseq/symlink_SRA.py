@@ -11,7 +11,7 @@ from itertools import izip
 import numpy as np
 
 from hivwholeseq.adapter_info import foldername_adapter
-from hivwholeseq.samples import load_samples_sequenced, load_sequencing_runs
+from hivwholeseq.samples import load_samples_sequenced, load_sequencing_run
 from hivwholeseq.filenames import get_seqrun_foldername
 
 
@@ -69,9 +69,11 @@ def make_symlinks(dataset, VERBOSE=0):
         elif str(sample['patient sample']) != 'nan':
             raw_fn = str(sample['patient sample'])
         else:
-            raise ValueError('Sample '+sn+': could not find raw data folder. Please fill in the table')
+            print 'ERROR: Sample '+sn+': could not find raw data folder. Please fill in the table'
+            continue
 
-        sample_fn = raw_root_folder+[fn for fn in os.listdir(raw_root_folder) if raw_fn in fn][0]+'/'
+        sample_fn = raw_root_folder+[fn for fn in os.listdir(raw_root_folder) 
+                                     if raw_fn.replace('4204', '4202').replace('VK00', 'VK09') in fn][0]+'/'
 
         fn1 = sample_fn+[fn for fn in os.listdir(sample_fn) if 'L001_R1' in fn][0]
         fn2 = sample_fn+[fn for fn in os.listdir(sample_fn) if 'L001_R2' in fn][0]

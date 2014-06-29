@@ -445,15 +445,14 @@ def fork_split_for_mapping(seq_run, adaID, fragment, VERBOSE=0, maxreads=-1, chu
 
 
 # PATIENTS
-def fork_map_to_initial_consensus(pname, samplename, fragment,
+def fork_map_to_initial_consensus(samplename, fragment,
                                   VERBOSE=0, threads=1,
                                   n_pairs=-1, filter_reads=False,
                                   summary=True,
                                   only_chunks=[None]):
     '''Fork to the cluster for each sample and fragment'''
     if VERBOSE:
-        print 'Forking to the cluster: patient '+pname+', sample '+\
-                samplename+', fragment '+fragment
+        print 'Forking to the cluster: sample '+samplename+', fragment '+fragment
 
     JOBSCRIPT = JOBDIR+'patients/map_to_initial_consensus.py'
     cluster_time = ['23:59:59', '0:59:59']
@@ -464,11 +463,10 @@ def fork_map_to_initial_consensus(pname, samplename, fragment,
                  '-S', '/bin/bash',
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
-                 '-N', 'm '+samplename+' '+fragment,
-                 '-l', 'h_rt='+cluster_time[(only_chunks is not [None]) or (0 < n_pairs <= 10000)],
+                 '-N', 'm '+samplename[:4]+' '+fragment,
+                 '-l', 'h_rt='+cluster_time[(only_chunks != [None]) or (0 < n_pairs <= 10000)],
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
-                 '--patient', pname,
                  '--samples', samplename,
                  '--fragments', fragment,
                  '--verbose', VERBOSE,
@@ -480,7 +478,7 @@ def fork_map_to_initial_consensus(pname, samplename, fragment,
         call_list.append('--filter')
     if not summary:
         call_list.append('--no-summary')
-    if only_chunks is not [None]:
+    if only_chunks != [None]:
         call_list = call_list + ['--chunks'] + only_chunks
     call_list = map(str, call_list)
     if VERBOSE:
@@ -522,16 +520,15 @@ def fork_paste_mapped_chunks_to_initial_consensus(pname, samplename, fragment,
     return sp.check_output(call_list)
 
 
-def fork_filter_mapped_init(pname, samplename, fragment,
+def fork_filter_mapped_init(samplename, fragment,
                             VERBOSE=0, n_pairs=-1,
                             summary=True):
     '''Fork to the cluster for each sample and fragment'''
     if VERBOSE:
-        print 'Forking to the cluster: patient '+pname+', sample '+\
-                samplename+', fragment '+fragment
+        print 'Forking to the cluster: sample '+samplename+', fragment '+fragment
 
     JOBSCRIPT = JOBDIR+'patients/filter_mapped_reads.py'
-    cluster_time = '3:59:59'
+    cluster_time = '23:59:59'
     vmem = '8G'
 
     qsub_list = ['qsub','-cwd',
@@ -543,7 +540,6 @@ def fork_filter_mapped_init(pname, samplename, fragment,
                  '-l', 'h_rt='+cluster_time,
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
-                 '--patient', pname,
                  '--samples', samplename,
                  '--fragments', fragment,
                  '--verbose', VERBOSE,
@@ -555,6 +551,37 @@ def fork_filter_mapped_init(pname, samplename, fragment,
     if VERBOSE:
         print ' '.join(qsub_list)
     return sp.check_output(qsub_list)
+
+
+def fork_get_allele_counts_patient(samplename_pat, fragment, VERBOSE=0, qual_min=30):
+    '''Fork to the cluster for each sample and fragment'''
+    if VERBOSE:
+        print 'Forking to the cluster: '+samplename_pat+', fragment '+fragment
+
+    JOBSCRIPT = JOBDIR+'patients/get_allele_counts.py'
+    cluster_time = '0:59:59'
+    vmem = '2G'
+
+    qsub_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'ac '+fragment,
+                 '-l', 'h_rt='+cluster_time,
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--samples', samplename_pat,
+                 '--fragments', fragment,
+                 '--verbose', VERBOSE,
+                 '--save',
+                 '--qualmin', qual_min,
+                ]
+    qsub_list = map(str, qsub_list)
+    if VERBOSE:
+        print ' '.join(qsub_list)
+    return sp.check_output(qsub_list)
+
 
 
 def fork_get_allele_frequency_trajectory(pname, fragment, VERBOSE=0):

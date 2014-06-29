@@ -52,7 +52,22 @@ class SampleSeq(pd.Series):
             PCR_suffix = 'i'
         else:
             PCR_suffix = ''
-        return ['F'+fr+PCR_suffix for fr in self.regions.split(' ')]
+        
+        regions = self.regions.split(' ')
+        if len(regions):
+            return ['F'+fr+PCR_suffix for fr in regions]
+        else:
+            return []
+
+
+    @property
+    def regions_generic(self):
+        '''Get the complete regions, e.g. F5ao'''        
+        regions = self.regions.split(' ')
+        if len(regions):
+            return ['F'+fr[0] for fr in regions]
+        else:
+            return []
 
 
     #TODO: make object oriented approach to separate regions
@@ -72,6 +87,16 @@ class SampleSeq(pd.Series):
         '''Get the filename of the readed premapped to reference'''
         from hivwholeseq.filenames import get_premapped_filename as gfn
         return gfn(self.folder, **kwargs)
+
+
+    def get_consensus_filename(self, fragment, **kwargs):
+        '''Get the filename of the consensus'''
+        from hivwholeseq.filenames import get_consensus_filename as gfn
+        from hivwholeseq.filenames import get_merged_consensus_filename as gfn2
+        if fragment != 'genomewide':
+            return gfn(self.folder, adaID=None, fragment=fragment, **kwargs)
+        else:
+            return gfn2(self.folder, adaID=None, **kwargs)
 
 
 class SamplesSeq(pd.DataFrame):
@@ -124,6 +149,19 @@ class SequencingRun(pd.Series):
     def adapters(self):
         '''The adapters used in the sequencing run'''
         return self.samples.adapter
+
+
+    def discard_nondivided_samples(self):
+        '''Discard samples that have no divided reads (e.g. SA, random hexamers)'''
+        import os
+        from hivwholeseq.filenames import get_divided_filename
+        ind = []
+        for sample in self.itersamples():
+            frag = sample.regions_complete[0]
+            div = os.path.isfile(get_divided_filename(self.folder, sample.adapter, frag))
+            ind.append(div)
+        self.samples = self.samples.loc[ind]
+
 
 
 # Globals
@@ -483,6 +521,8 @@ def load_samples_sequenced(seq_run=None):
                                  index_col=0)
     sample_table.index = pd.Index(map(str, sample_table.index))
     sample_table.loc[:, 'patient sample'] = map(str, sample_table.loc[:, 'patient sample'])
+    sample_table.loc[:, 'regions'] = map(str, sample_table.loc[:, 'regions'])
+    sample_table.loc[sample_table.loc[:, 'regions'] == 'nan', 'regions'] = ''
 
     if seq_run is not None:
         sample_table = sample_table.loc[sample_table.loc[:, 'seq run'] == seq_run]

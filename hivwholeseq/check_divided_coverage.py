@@ -36,6 +36,7 @@ def plot_coverage_minor_allele(counts, suptitle):
     axs[0].plot(cov_tot.T, lw=2, c='k', label=read_types)
     axs[0].set_xlabel('Position [bases]')
     axs[0].set_ylabel('Coverage')
+    axs[0].grid(True)
 
     for i, nu_minor in enumerate(nus_minor):
         color = cm.jet(int(255.0 * i / len(read_types)))
@@ -46,6 +47,7 @@ def plot_coverage_minor_allele(counts, suptitle):
     axs[1].set_xlabel('Position [bases]')
     axs[1].set_ylabel('Minor allele frequency')
     axs[1].set_yscale('log')
+    axs[1].grid(True)
     fig.suptitle(suptitle, fontsize=18)
 
     plt.tight_layout(rect=(0, 0, 1, 0.95))

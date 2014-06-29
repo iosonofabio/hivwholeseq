@@ -5,30 +5,38 @@ author:     Fabio Zanini
 date:       25/10/13
 content:    Map reads to the initial consensus of the patient (in order to have
             the whole patient data aligned to one reference).
+
+            This script must cope with a flexible sequencing schedule, e.g.
+            repeated runs, some fragments in one run and some in another, etc.
+            It accepts a list of either patients XOR samples. Samples can be
+            either sequenced samples or patient samples, in which case we iterate
+            over sequencing runs that contribute to them.
 '''
 # Modules
+import sys
 import os
 import time
 import argparse
 import subprocess as sp
 import numpy as np
+import pandas as pd
 import pysam
 import warnings
 
+from hivwholeseq.samples import SampleSeq
+from hivwholeseq.patients.patients import load_patients, load_patient, Patient
 from hivwholeseq.generic_utils import mkdirs
 from hivwholeseq.filenames import get_divided_filename
-from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.mapping_utils import stampy_bin, subsrate, \
         convert_sam_to_bam, convert_bam_to_sam, get_number_reads
-from hivwholeseq.samples import samples as samples_seq
-from hivwholeseq.patients.patients import get_patient
 from hivwholeseq.patients.filenames import get_initial_index_filename, \
         get_initial_hash_filename, get_initial_consensus_filename, \
-        get_mapped_to_initial_filename, get_map_initial_summary_filename, \
-        get_filter_mapped_init_summary_filename
+        get_mapped_to_initial_filename, get_mapped_to_initial_foldername, \
+        get_map_initial_summary_filename
 from hivwholeseq.fork_cluster import fork_map_to_initial_consensus as fork_self
 from hivwholeseq.clean_temp_files import remove_mapped_init_tempfiles
-from hivwholeseq.patients.filter_mapped_reads import filter_mapped_reads
+from hivwholeseq.patients.patients import load_samples_sequenced as lssp
+from hivwholeseq.samples import load_samples_sequenced as lss
 
 
 
@@ -39,16 +47,19 @@ stampy_sensitive = True     # Default: False
 
 
 # Functions
-def make_output_folders(pname, sample, VERBOSE=0):
+def make_output_folders(pname, samplename, PCR=1, VERBOSE=0):
     '''Make the output folders if necessary for hash and map'''
     hash_foldername = os.path.dirname(get_initial_hash_filename(pname, 'F0'))
-    map_foldername = os.path.dirname(get_mapped_to_initial_filename(pname, sample, 'F0'))
-    foldernames = [hash_foldername, map_foldername]
+    map_foldername = get_mapped_to_initial_foldername(pname, samplename, PCR=PCR)
 
-    for dirname in foldernames:
-        mkdirs(dirname)
+    if not os.path.isdir(hash_foldername):
+        mkdirs(hash_foldername)
         if VERBOSE:
-            print 'Folder created:', dirname
+            print 'Folder created:', hash_foldername
+
+    mkdirs(map_foldername)
+    if VERBOSE:
+        print 'Folder created:', map_foldername
 
 
 def make_index_and_hash(pname, fragment, VERBOSE=0):
@@ -75,34 +86,56 @@ def make_index_and_hash(pname, fragment, VERBOSE=0):
         print 'Built hash: '+pname+' '+fragment
 
 
-def map_stampy_singlethread(patient, samplename, fragment, VERBOSE=0, n_pairs=-1,
+def map_stampy_singlethread(sample, fragment, VERBOSE=0, n_pairs=-1,
                             summary=True, only_chunk=None):
     '''Map using stampy, single thread (no cluster queueing race conditions)'''
-    pname = patient.id
-    sample = patient.sample_table.loc[samplename]
-    seq_run = sample['run']
-    data_folder = MiSeq_runs[seq_run]['folder']
-    adaID = sample['adaID']
+    pname = sample.patient
+    samplename_pat = sample['patient sample']
+    seq_run = sample['seq run']
+    data_folder = sample.sequencing_run['folder']
+    adaID = sample['adapter']
+    PCR = int(sample.PCR)
 
     if VERBOSE:
-        print 'Map via stampy (single thread): '+pname+' '+samplename+' '+fragment
+        print 'Map via stampy (single thread): '+samplename+' '+fragment
 
     if summary:
-        summary_filename = get_map_initial_summary_filename(pname, samplename, fragment)
+        summary_filename = get_map_initial_summary_filename(pname, samplename_pat, 
+                                                            samplename, fragment,
+                                                            PCR=PCR)
 
     # Specific fragment (e.g. F5 --> F5bi)
-    frag_spec = filter(lambda x: fragment in x, sample['fragments'])
+    frag_spec = filter(lambda x: fragment in x, sample.regions_complete)
     if not len(frag_spec):
-        raise ValueError(str(patient)+', '+samplename+': fragment '+fragment+' not found.')
-    frag_spec = frag_spec[0]
+        if summary:
+            with open(summary_filename, 'a') as f:
+                f.write('Failed (specific fragment for '+fragment+'not found).\n')
 
-    input_filename = get_divided_filename(data_folder, adaID, frag_spec, type='bam', chunk=only_chunk)
+        raise ValueError(samplename+': fragment '+fragment+' not found.')
+    else:
+        frag_spec = frag_spec[0]
+
+    input_filename = get_divided_filename(data_folder, adaID, frag_spec, type='bam',
+                                          chunk=only_chunk)
+    # NOTE: we introduced fragment nomenclature late, e.g. F3a. Check for that
+    if not os.path.isfile(input_filename):
+        if fragment == 'F3':
+            input_filename = input_filename.replace('F3a', 'F3')
+
+    # Check existance of input file, because stampy creates output anyway
+    if not os.path.isfile(input_filename):
+        if summary:
+            with open(summary_filename, 'a') as f:
+                f.write('Failed (input file for mapping not found).\n')
+
+        raise ValueError(samplename+', fragment '+fragment+': input file not found.')
 
     # Extract subsample of reads if requested
     if n_pairs > 0:
         from hivwholeseq.mapping_utils import extract_mapped_reads_subsample
-        input_filename_sub = get_mapped_to_initial_filename(pname, samplename,
-                                                            fragment,
+        input_filename_sub = get_mapped_to_initial_filename(pname, samplename_pat,
+                                                            samplename, fragment,
+                                                            PCR=PCR,
                                                             type='bam')[:-4]+\
                 '_unmapped.bam'
         n_written = extract_mapped_reads_subsample(input_filename,
@@ -110,7 +143,9 @@ def map_stampy_singlethread(patient, samplename, fragment, VERBOSE=0, n_pairs=-1
                                                    n_pairs, VERBOSE=VERBOSE)
 
     # Get output filename
-    output_filename = get_mapped_to_initial_filename(pname, samplename, fragment,
+    output_filename = get_mapped_to_initial_filename(pname, samplename_pat, 
+                                                     samplename, fragment,
+                                                     PCR=PCR,
                                                      type='sam', only_chunk=only_chunk)
 
     # Map
@@ -134,9 +169,10 @@ def map_stampy_singlethread(patient, samplename, fragment, VERBOSE=0, n_pairs=-1
         print ' '.join(call_list)
     sp.call(call_list)
 
-    output_filename_bam = get_mapped_to_initial_filename(pname, samplename,
-                                                         fragment,
+    output_filename_bam = get_mapped_to_initial_filename(pname, samplename_pat,
+                                                         samplename, fragment,
                                                          type='bam',
+                                                         PCR=PCR,
                                                          only_chunk=only_chunk)
     convert_sam_to_bam(output_filename_bam)
 
@@ -147,7 +183,10 @@ def map_stampy_singlethread(patient, samplename, fragment, VERBOSE=0, n_pairs=-1
     if only_chunk is None:
         if VERBOSE >= 1:
             print 'Remove temporary files: sample '+samplename
-        remove_mapped_init_tempfiles(pname, samplename, fragment, VERBOSE=VERBOSE, only_chunk=only_chunk)
+        remove_mapped_init_tempfiles(pname, samplename_pat,
+                                     samplename, fragment,
+                                     PCR=PCR,
+                                     VERBOSE=VERBOSE, only_chunk=only_chunk)
 
     if summary:
         with open(summary_filename, 'a') as f:
@@ -158,7 +197,7 @@ def map_stampy_singlethread(patient, samplename, fragment, VERBOSE=0, n_pairs=-1
         os.remove(input_filename_sub)
 
 
-def map_stampy_multithread(patient, samplename, fragment, VERBOSE=0, threads=2, summary=True):
+def map_stampy_multithread(sample, fragment, VERBOSE=0, threads=2, summary=True):
     '''Map using stampy, multithread (via cluster requests, queueing race conditions possible)'''
     import hivwholeseq
     JOBDIR = hivwholeseq.__path__[0].rstrip('/')+'/'
@@ -308,11 +347,11 @@ def map_stampy_multithread(patient, samplename, fragment, VERBOSE=0, threads=2, 
             f.write('\n')
 
 
-def map_stampy(patient, samplename, fragment, VERBOSE=0, threads=1, n_pairs=-1,
+def map_stampy(sample, fragment, VERBOSE=0, threads=1, n_pairs=-1,
                summary=True, only_chunk=None):
     '''Map using stampy'''
     if threads == 1:
-        map_stampy_singlethread(patient, samplename, fragment,
+        map_stampy_singlethread(sample, fragment,
                                 VERBOSE=VERBOSE, n_pairs=n_pairs,
                                 summary=summary, only_chunk=only_chunk)
 
@@ -322,7 +361,7 @@ def map_stampy(patient, samplename, fragment, VERBOSE=0, threads=1, n_pairs=-1,
         elif only_chunk:
             raise ValueError('Cannot multithread a chunk - why would you do this?')
 
-        map_stampy_multithread(patient, samplename, fragment, threads=threads,
+        map_stampy_multithread(sample, fragment, threads=threads,
                                VERBOSE=VERBOSE, summary=summary)
 
 
@@ -333,8 +372,7 @@ def get_number_chunks(pname, samplename, fragment, VERBOSE=0):
     data_folder = MiSeq_runs[seq_run]['folder']
     adaID = sample['adaID']
     # Has this fragment been sequenced in that sample?
-    frag_spec = filter(lambda x: fragment in x,
-                       sample['fragments'])
+    frag_spec = filter(lambda x: fragment in x, sample['fragments'])
     if not len(frag_spec):
         warnings.warn(pname+', '+samplename+': fragment '+fragment+' not found.')
         return
@@ -356,10 +394,11 @@ if __name__ == '__main__':
 
     # Parse input args
     parser = argparse.ArgumentParser(description='Map to initial consensus')
-    parser.add_argument('--patient', required=True,
-                        help='Patient to analyze')
-    parser.add_argument('--samples', nargs='+',
-                        help='Samples to map (e.g. VL98-1253 VK03-4298)')
+    pats_or_samples = parser.add_mutually_exclusive_group(required=True)
+    pats_or_samples.add_argument('--patients', nargs='+',
+                                 help='Patient to analyze')
+    pats_or_samples.add_argument('--samples', nargs='+',
+                                 help='Samples to map (e.g. VL98-1253 VK03-4298)')
     parser.add_argument('--fragments', nargs='+',
                         help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('--maxreads', type=int, default=-1,
@@ -370,8 +409,6 @@ if __name__ == '__main__':
                         help='Verbosity level [0-3]')
     parser.add_argument('--threads', type=int, default=1,
                         help='Number of threads to use for mapping')
-    parser.add_argument('--filter', action='store_true',
-                        help='Filter reads immediately after mapping')
     parser.add_argument('--skiphash', action='store_true',
                         help=argparse.SUPPRESS)
     parser.add_argument('--no-summary', action='store_false', dest='summary',
@@ -380,25 +417,39 @@ if __name__ == '__main__':
                         help='Only map some chunks (cluster optimization): 0 for automatic detection')
 
     args = parser.parse_args()
-    pname = args.patient
-    samples = args.samples
+    pnames = args.patients
+    samplenames = args.samples
     fragments = args.fragments
     submit = args.submit
     VERBOSE = args.verbose
     threads = args.threads
     n_pairs = args.maxreads
-    filter_reads = args.filter
     skip_hash = args.skiphash
     summary = args.summary
     only_chunks = args.chunks
 
-    patient = get_patient(pname)
+    # Collect all sequenced samples from patients
+    samples_pat = lssp()
+    if pnames is not None:
+        samples_seq = []
+        for pname in pnames:
+            patient = load_patient(pname)
+            patient.discard_nonsequenced_samples()
+            for samplename_pat, sample_pat in patient.samples.iterrows():
+                samples_seq.append(sample_pat['samples seq'])
+        samples_seq = pd.concat(samples_seq)
 
-    # If no samples are mentioned, use all sequenced ones
-    if not samples:
-        samples = patient.samples
-    if VERBOSE >= 3:
-        print 'samples', samples
+    else:
+        samples_seq = lss()
+        ind = samples_pat.index.isin(samplenames)
+        if ind.sum():
+            samplenames_pat = samples_pat.index[ind]
+            samples_seq = samples_seq.loc[samples_seq['patient sample'].isin(samplenames_pat)]
+        else:
+            samples_seq = samples_seq.loc[samples_seq.index.isin(samplenames)]
+
+    if VERBOSE >= 2:
+        print 'samples', samples_seq.index.tolist()
 
     # If the script is called with no fragment, iterate over all
     if not fragments:
@@ -406,17 +457,31 @@ if __name__ == '__main__':
     if VERBOSE >= 3:
         print 'fragments', fragments
 
-    sample_init = patient.initial_sample
+    for samplename, sample in samples_seq.iterrows():
+        sample = SampleSeq(sample)
 
-    for sample in samples:
-        make_output_folders(pname, sample, VERBOSE=VERBOSE)
+        samplename_pat = sample['patient sample']
+        sample_pat = samples_pat.loc[samplename_pat] 
+        sample['patient'] = pname = sample_pat.patient
+        PCR = int(sample.PCR)
 
-    for fragment in fragments:
+        if VERBOSE:
+            print samplename, samplename_pat, pname, PCR
+
         if not skip_hash:
-            make_index_and_hash(pname, fragment, VERBOSE=VERBOSE)
-            
-        for samplename in samples:
+            make_output_folders(pname, samplename_pat, PCR=PCR, VERBOSE=VERBOSE)
 
+        for fragment in fragments:
+            if VERBOSE:
+                print fragment
+
+            if not skip_hash:
+                make_index_and_hash(pname, fragment, VERBOSE=VERBOSE)
+    
+            # only_chunks is used when we fragment the mapping into small aliquots
+            # to use the short_queue on the cluster (it's a hack). [0] means all
+            # chunks, automatically detected by the presence of the input files;
+            # [None] means normal mapping, [1, 2, ..] means to map only those chunks.
             if only_chunks == [0]:
                 only_chunks_sample = range(1, get_number_chunks(pname, samplename, fragment, VERBOSE=VERBOSE) + 1)
             else:
@@ -425,55 +490,34 @@ if __name__ == '__main__':
             for only_chunk in only_chunks_sample:
     
                 if submit:
-                    fork_self(pname, samplename, fragment,
+                    fork_self(samplename, fragment,
                               VERBOSE=VERBOSE, threads=threads,
                               n_pairs=n_pairs,
-                              filter_reads=filter_reads,
                               summary=summary,
                               only_chunks=[only_chunk])
                     continue
     
                 if summary:
-                    sfn = get_map_initial_summary_filename(pname, samplename, fragment)
+                    sfn = get_map_initial_summary_filename(pname, samplename_pat,
+                                                           samplename, fragment,
+                                                           PCR=PCR, only_chunk=only_chunk)
                     with open(sfn, 'w') as f:
                         f.write('Call: python map_to_initial_consensus.py'+\
-                                ' --patient '+pname+\
                                 ' --samples '+samplename+\
                                 ' --fragments '+fragment+\
                                 ' --threads '+str(threads)+\
                                 ' --verbose '+str(VERBOSE))
                         if n_pairs != -1:
                             f.write(' --maxreads '+str(n_pairs))
-                        if filter_reads:
-                            f.write(' --filter')
+                        if only_chunk is not None:
+                            f.write('--chunks '+str(only_chunk))
                         f.write('\n')
     
     
-                map_stampy(patient, samplename, fragment,
+                map_stampy(sample, fragment,
                            VERBOSE=VERBOSE, threads=threads, n_pairs=n_pairs,
                            summary=summary, only_chunk=only_chunk)
-    
-                if filter_reads:
-                    if only_chunk is not None:
-                        print 'Post-map filtering only AFTER the chunks are pasted together!'
-                        continue
 
-                    if summary:
-                        sfn = get_filter_mapped_init_summary_filename(pname, samplename, fragment)
-                        with open(sfn, 'w') as f:
-                            f.write('Call: python filter_mapped_reads.py'+\
-                                    ' --patient '+pname+\
-                                    ' --samples '+samplename+\
-                                    ' --fragments '+fragment+\
-                                    ' --verbose '+str(VERBOSE))
-                            if n_pairs != -1:
-                                f.write(' --maxreads '+str(n_pairs))
-                            f.write('\n')
-
-
-                    filter_mapped_reads(pname, samplename, fragment,
-                                        VERBOSE=VERBOSE, maxreads=n_pairs,
-                                        summary=summary)
 
 
 

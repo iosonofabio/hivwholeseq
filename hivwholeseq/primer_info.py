@@ -12,14 +12,22 @@ from Bio.Seq import reverse_complement as rc
 
 # Globals
 fragments_genes = {'gag': ['F1', 'F2'],
-                   'pol': ['F2'],
+                   'pol': ['F1', 'F2', 'F3', 'F4'],
                    'env': ['F4', 'F5', 'F6'],
                    'vif': ['F4'],
                    'vpr': ['F4'],
                    'vpu': ['F4'],
-                   'tat': [['F4'], ['F5', 'F6']],
-                   'rev': [['F4'], ['F5', 'F6']],
+                   'tat': [['F4'], ['F6']],
+                   'rev': [['F4'], ['F6']],
+                   #'nef': ['F6']
                    }
+
+fragments_exons = {g: frs for (g, frs) in fragments_genes.iteritems()
+                   if g not in ('tat', 'rev')}
+fragments_exons['tat1'] = fragments_genes['tat'][0]
+fragments_exons['tat2'] = fragments_genes['tat'][1]
+fragments_exons['rev1'] = fragments_genes['rev'][0]
+fragments_exons['rev2'] = fragments_genes['rev'][1]
 
 # Note: the reverse primers get reverse complemented (so everything is positive sense)
 primers_inner = {'F1': ['AAGTAGTGTGTGCCCGTCTGT', rc('TGCCAAAGAGTGATYTGAGGG')],
@@ -67,6 +75,8 @@ primers_coordinates_HXB2_outer = {'F1': [[523, 547], [2323, 2347]],
                                   'F6': [[7784, 7807], [9591, 9614]],
                                  }
 
+primers_coordinates_HXB2 = dict([(fi+'i', si) for (fi, si) in primers_coordinates_HXB2_inner.iteritems()] + \
+                                [(fo+'o', so) for (fo, so) in primers_coordinates_HXB2_outer.iteritems()])
 
 # Functions
 def find_fragment(refseq, fragment):

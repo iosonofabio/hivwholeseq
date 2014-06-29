@@ -57,7 +57,7 @@ def make_output_folders(data_folder, adaID, VERBOSE=0, summary=True):
 def get_fragments(sample):
     '''Get fragments for reference'''
     fragments = sample.regions
-    if str(fragments) == 'nan':
+    if str(fragments) in ('', 'nan'):
         if sample.PCR == 1:
             fragments = ('F1o', 'F6o')
         elif sample.PCR == 2:
@@ -67,12 +67,15 @@ def get_fragments(sample):
                 print 'Sample is neither PCR1 nor PCR2. Using whole reference.'
             fragments = None
     else:
+        fragments = fragments.split(' ')
         if sample.PCR == 1:
-            fragments = [fr+'o' for fr in fragments]
+            fragments = ['F'+fr+'o' for fr in fragments]
         elif sample.PCR == 2:
-            fragments = [fr+'i' for fr in fragments]
+            fragments = ['F'+fr+'i' for fr in fragments]
         else:
             raise ValueError('Sample is neither PCR1 nor PCR2')
+
+    print fragments
 
     return fragments
 
@@ -453,10 +456,11 @@ if __name__ == '__main__':
     samples = dataset.samples
     if adaIDs is not None:
         samples = samples.loc[samples.adapter.isin(adaIDs)]
+    if VERBOSE >= 2:
+        print samples.index.tolist()
 
     # Iterate over all adaIDs
     for samplename, sample in samples.iterrows():
-
         adaID = str(sample.adapter)
 
         # Submit to the cluster self if requested
