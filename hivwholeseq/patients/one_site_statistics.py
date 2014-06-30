@@ -205,17 +205,22 @@ def plot_allele_frequency_trajectories_from_counts(times, act, title='', VERBOSE
                     y = np.log10((nu + 1e-4)/(1-1e-4-nu))
                 else:
                     y = nu + 1e-4
-                ax.plot(times, y, lw=1.5, ls=ls,
+                ax.plot(t, y, lw=1.5, ls=ls,
                         color=cm.jet(int(255.0 * i / act.shape[2])))
 
     if ntemplates is not None:
         depthmax = 1.0 / ntemplates
         if logit:
-            y = np.log10(depthmax/(1 - depthmax))
+            y1 = np.log10(depthmax/(1 - depthmax))
+            y2 = np.log10((1 - depthmax)/ depthmax)
+            ax.plot(times, y1, lw=3.5, ls='-',
+                    color='k', label='Max depth (# templates)')
+            ax.plot(times, y2, lw=3.5, ls='-',
+                    color='k')
         else:
             y = depthmax
-        ax.plot(times, y, lw=3.5, ls='-',
-                color='k', label='Max depth (# templates)')
+            ax.plot(times, y, lw=3.5, ls='-',
+                    color='k', label='Max depth (# templates)')
 
     ax.set_xlim(times[0] -10, times[-1] + 10)
     ax.set_xlabel('Time [days from initial sample]')

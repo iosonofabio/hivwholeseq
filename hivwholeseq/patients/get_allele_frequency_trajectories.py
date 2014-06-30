@@ -4,7 +4,7 @@
 author:     Fabio Zanini
 date:       01/11/13
 content:    Collect the allele frequencies of all samples to the initial
-            consensus and save them as a matrix into a single trajectory file.
+            consensus by collecting from matrices of single patient samples.
 '''
 # Modules
 import os
@@ -38,10 +38,8 @@ if __name__ == '__main__':
                         help='Fragments to analyze (e.g. F1 F6)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-4]')
-    parser.add_argument('--save', action='store_true',
-                        help='Save the allele frequency trajectories to file')
-    parser.add_argument('--submit', action='store_true',
-                        help='Execute the script in parallel on the cluster')
+    #parser.add_argument('--submit', action='store_true',
+    #                    help='Execute the script in parallel on the cluster')
     parser.add_argument('--plot', nargs='?', default=None, const='2D',
                         help='Plot the allele frequency trajectories')
     parser.add_argument('--logit', action='store_true',
@@ -53,9 +51,8 @@ if __name__ == '__main__':
     pname = args.patient
     fragments = args.fragments
     VERBOSE = args.verbose
-    save_to_file = args.save
     plot = args.plot
-    submit = args.submit
+    #submit = args.submit
     use_PCR1 = args.PCR1
     use_logit = args.logit
 
@@ -72,10 +69,10 @@ if __name__ == '__main__':
     # Iterate over samples and fragments
     for fragment in fragments:
 
-        # Submit to the cluster self if requested (--save is assumed)
-        if submit:
-            fork_self(pname, fragment, VERBOSE=VERBOSE)
-            continue
+        ## Submit to the cluster self if requested
+        #if submit:
+        #    fork_self(pname, fragment, VERBOSE=VERBOSE)
+        #    continue
 
         if VERBOSE >= 1:
             print fragment
@@ -83,29 +80,23 @@ if __name__ == '__main__':
         act_filename = get_allele_count_trajectories_filename(pname, fragment)
         aft_filename = get_allele_frequency_trajectories_filename(pname, fragment)
 
-        if save_to_file or (not os.path.isfile(aft_filename)):
-            (sns, act) = get_allele_count_trajectories(pname, samplenames, fragment,
-                                                       use_PCR1=use_PCR1, VERBOSE=VERBOSE)
-            aft = 1.0 * act / act.sum(axis=0)
-        else:
-            act = np.load(act_filename)
-            aft = np.load(aft_filename)
-            sns = samplenames
+        # Collect allele counts from patient samples, and return only positive hits
+        # sns contains sample names and PCR types
+        (sns, act) = get_allele_count_trajectories(pname, samplenames, fragment,
+                                                   use_PCR1=use_PCR1, VERBOSE=VERBOSE)
 
+        ind = [i for i, (_, sample) in enumerate(patient.samples.iterrows())
+               if sample.name in map(itemgetter(0), sns)]
+        samples = patient.samples.iloc[ind]
+        times = (samples.date - patient.transmission_date) / np.timedelta64(1, 'D')
+
+        # FIXME: use masked arrays?
+        aft = 1.0 * act / act.sum(axis=0)
         aft[np.isnan(aft)] = 0
         aft[(aft < 1e-5) | (aft > 1)] = 0
 
-        if save_to_file:
-            act.dump(get_allele_count_trajectories_filename(pname, fragment))
-            aft.dump(get_allele_frequency_trajectories_filename(pname, fragment))
-
         if plot is not None:
             import matplotlib.pyplot as plt
-
-            ind = [i for i, (_, sample) in enumerate(patient.samples.iterrows())
-                   if sample.name in map(itemgetter(0), sns)]
-            samples = patient.samples.iloc[ind]
-            times = (samples.date - patient.transmission_date) / np.timedelta64(1, 'D')
 
             if plot in ('2D', '2d', ''):
 
@@ -113,7 +104,7 @@ if __name__ == '__main__':
                 # fragments for that particular experiment... integrate Lina's table!
                 # Note: this refers to the TOTAL # of templates, i.e. the factor 2x for
                 # the two parallel RT-PCR reactions
-                ntemplates = samples.ix[ind, 'viral load'] * 0.4 / 12 * 2
+                ntemplates = samples['viral load'] * 0.4 / 12 * 2
 
                 plot_nus_from_act(times, act,
                                   title='Patient '+pname+', '+fragment,
