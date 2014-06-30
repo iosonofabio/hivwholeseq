@@ -26,7 +26,6 @@ import warnings
 from hivwholeseq.samples import SampleSeq
 from hivwholeseq.patients.patients import load_patients, load_patient, Patient
 from hivwholeseq.generic_utils import mkdirs
-from hivwholeseq.filenames import get_divided_filename
 from hivwholeseq.mapping_utils import stampy_bin, subsrate, \
         convert_sam_to_bam, convert_bam_to_sam, get_number_reads
 from hivwholeseq.patients.filenames import get_initial_index_filename, \
@@ -47,6 +46,20 @@ stampy_sensitive = True     # Default: False
 
 
 # Functions
+def get_input_filename(data_folder, adaID, frag_spec, type='bam', only_chunk=None,
+                       filtered=True):
+    '''Get filename of input for mapping to initial consensus'''
+    # We should take reads filtered after mapping to the auto-consensus
+    if filtered:
+        from hivwholeseq.filenames import get_mapped_filename
+        frag_gen = frag_spec[:2]
+        fn = get_mapped_filename(data_folder, adaID, frag_gen, type='bam', filtered=True)
+    else:
+        from hivwholeseq.filenames import get_divided_filename
+        fn = get_divided_filename(data_folder, adaID, frag_spec, type='bam', chunk=only_chunk)
+    return fn
+
+
 def make_output_folders(pname, samplename, PCR=1, VERBOSE=0):
     '''Make the output folders if necessary for hash and map'''
     hash_foldername = os.path.dirname(get_initial_hash_filename(pname, 'F0'))
@@ -115,8 +128,8 @@ def map_stampy_singlethread(sample, fragment, VERBOSE=0, n_pairs=-1,
     else:
         frag_spec = frag_spec[0]
 
-    input_filename = get_divided_filename(data_folder, adaID, frag_spec, type='bam',
-                                          chunk=only_chunk)
+    input_filename = get_input_filename(data_folder, adaID, frag_spec, type='bam', chunk=only_chunk)
+
     # NOTE: we introduced fragment nomenclature late, e.g. F3a. Check for that
     if not os.path.isfile(input_filename):
         if fragment == 'F3':
@@ -224,7 +237,7 @@ def map_stampy_multithread(sample, fragment, VERBOSE=0, threads=2, summary=True)
         raise ValueError(str(patient)+', '+samplename+': fragment '+fragment+' not found.')
     frag_spec = frag_spec[0]
 
-    input_filename = get_divided_filename(data_folder, adaID, frag_spec, type='bam')
+    input_filename = get_input_filename(data_folder, adaID, frag_spec, type='bam')
 
     # Submit map scripts in parallel to the cluster
     jobs_done = np.zeros(threads, bool)
@@ -380,10 +393,10 @@ def get_number_chunks(pname, samplename, fragment, VERBOSE=0):
         frag_spec = frag_spec[0]
 
     n_chunks = 0
-    input_filename = get_divided_filename(data_folder, adaID, frag_spec, type='bam', chunk=n_chunks+1)
+    input_filename = get_input_filename(data_folder, adaID, frag_spec, type='bam', chunk=n_chunks+1)
     while(os.path.isfile(input_filename)):
         n_chunks += 1
-        input_filename = get_divided_filename(data_folder, adaID, frag_spec, type='bam', chunk=n_chunks+1)
+        input_filename = get_input_filename(data_folder, adaID, frag_spec, type='bam', chunk=n_chunks+1)
 
     return n_chunks
 
