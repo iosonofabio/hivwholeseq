@@ -22,43 +22,49 @@ from hivwholeseq.minor_allele_frequency import get_minor_allele_counts
 
 
 # Functions
-def plot_coverage_minor_allele(counts, suptitle):
+def plot_coverage(counts, suptitle, minor_allele=False):
     '''Plot the coverage and the minor allele frequency'''
     cov = counts.sum(axis=1)
     cov_tot = cov.sum(axis=0)
     counts_minor = get_minor_allele_counts(counts)[1, :, :, 1]
-    # Use pseudocounts so-so (it is only rough)
-    nus_minor = 1.0 * counts_minor / (1 + cov)
 
     import matplotlib.pyplot as plt
     from matplotlib import cm
-    fig, axs = plt.subplots(1, 2, figsize=(10, 6))
-    axs[0].plot(cov_tot.T, lw=2, c='k', label=read_types)
-    axs[0].set_xlabel('Position [bases]')
-    axs[0].set_ylabel('Coverage')
-    axs[0].grid(True)
 
-    for i, nu_minor in enumerate(nus_minor):
-        color = cm.jet(int(255.0 * i / len(read_types)))
-        axs[1].plot(nu_minor, label=read_types, c=color)
-        axs[1].scatter(np.arange(counts.shape[-1]), nu_minor,
-                       s=30, c=color,
-                       label=read_types)
-    axs[1].set_xlabel('Position [bases]')
-    axs[1].set_ylabel('Minor allele frequency')
-    axs[1].set_yscale('log')
-    axs[1].grid(True)
+    if not minor_allele:
+        fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+    else:
+        fig, axs = plt.subplots(1, 2, figsize=(10, 6))
+        ax = axs[0]
+    ax.plot(cov_tot.T, lw=2, c='k', label=read_types)
+    ax.set_xlabel('Position [bases]')
+    ax.set_ylabel('Coverage')
+    ax.grid(True)
+
+    if minor_allele:
+        # Use pseudocounts so-so (it is only rough)
+        nus_minor = 1.0 * counts_minor / (1 + cov)
+
+        for i, nu_minor in enumerate(nus_minor):
+            color = cm.jet(int(255.0 * i / len(read_types)))
+            axs[1].plot(nu_minor, label=read_types, c=color)
+            axs[1].scatter(np.arange(counts.shape[-1]), nu_minor,
+                           s=30, c=color,
+                           label=read_types)
+        axs[1].set_xlabel('Position [bases]')
+        axs[1].set_ylabel('Minor allele frequency')
+        axs[1].set_yscale('log')
+        axs[1].grid(True)
+
     fig.suptitle(suptitle, fontsize=18)
-
     plt.tight_layout(rect=(0, 0, 1, 0.95))
 
     plt.ion()
     plt.show()
-    
 
 
 def check_division(data_folder, adaID, fragment, seq_run, qual_min=35,
-                   reference='HXB2', maxreads=-1, VERBOSE=0):
+                   reference='HXB2', maxreads=-1, VERBOSE=0, minor_allele=False):
     '''Check division into fragments: coverage, etc.'''
     refseq = SeqIO.read(get_reference_premap_filename(data_folder, adaID, fragment),
                         'fasta')
@@ -77,11 +83,7 @@ def check_division(data_folder, adaID, fragment, seq_run, qual_min=35,
                          ['fragment', fragment],
                          ['maxreads', maxreads],
                         ]))
-    plot_coverage_minor_allele(counts,
-                               suptitle=title)
-
-
-                
+    plot_coverage(counts, suptitle=title, minor_allele=minor_allele)
 
 
 
@@ -89,7 +91,8 @@ def check_division(data_folder, adaID, fragment, seq_run, qual_min=35,
 if __name__ == '__main__':
 
     # Parse input args
-    parser = argparse.ArgumentParser(description='Check consensus')
+    parser = argparse.ArgumentParser(description='Check consensus',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     parser.add_argument('--run', required=True,
                         help='Seq run to analyze (e.g. Tue28)')
     parser.add_argument('--adaIDs', nargs='*',
@@ -100,6 +103,8 @@ if __name__ == '__main__':
                         help='Number of reads analyzed')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
+    parser.add_argument('--minor-allele', action='store_true', dest='minor_allele',
+                        help='Plot also minor allele')
 
     args = parser.parse_args()
     seq_run = args.run
@@ -107,6 +112,7 @@ if __name__ == '__main__':
     fragments = args.fragments
     maxreads = args.maxreads
     VERBOSE = args.verbose
+    use_minor_allele = args.minor_allele
 
     # Specify the dataset
     dataset = load_sequencing_run(seq_run)
@@ -137,6 +143,7 @@ if __name__ == '__main__':
             if (fragments is None) or (frag_gen in fragments):
                 check_division(data_folder, adaID, fragment, seq_run,
                                maxreads=maxreads,
-                               VERBOSE=VERBOSE)
+                               VERBOSE=VERBOSE,
+                               minor_allele=use_minor_allele)
 
 

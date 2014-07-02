@@ -12,9 +12,13 @@ content:    Take all consensi from sequenced samples connected to patient sample
 import os
 import sys
 import argparse
+import numpy as np
+import pandas as pd
 from Bio import SeqIO
 from Bio import AlignIO
+from Bio import Phylo
 
+from hivwholeseq.patients.patients import load_patient
 from hivwholeseq.patients.patients import load_samples_sequenced as lssp
 from hivwholeseq.samples import load_samples_sequenced as lss
 from hivwholeseq.samples import SampleSeq
@@ -22,6 +26,59 @@ from hivwholeseq.filenames import get_consensus_filename
 from hivwholeseq.mapping_utils import align_muscle
 from hivwholeseq.patients.filenames import get_multiple_sequence_alignment_sampleseq_filename, \
         get_tree_sampleseq_filename
+
+
+# Globals
+
+
+# Functions
+def calculate_tree(aln, outgroup=None, VERBOSE=0):
+    '''
+    takes a biopython alignment and an outgroup sequences, writes a temporary alignment
+    and builds a tree using fasttree
+    '''
+    import subprocess, gzip
+    from StringIO import StringIO
+    from Bio import SeqIO, Phylo
+    
+    fasttree_bin = '/ebio/ag-neher/home/fzanini/bin/fasttree'
+    home_folder = '/ebio/ag-neher/home/fzanini/'
+
+    tmp_filename = home_folder+'tmp/tmp_'+str(np.random.randint(1000000000))+'.fasta.gz'
+    with gzip.open(tmp_filename, 'w') as outfile:
+        if outgroup is not None:
+            SeqIO.write(outgroup, outfile, 'fasta')
+        AlignIO.write(aln, outfile, 'fasta')
+
+    try:
+        if VERBOSE >= 2:
+            print "building tree of file", tmp_filename
+        fasttree_cmd = [fasttree_bin, '-nt']
+        ps = subprocess.Popen(('gunzip', '-c', tmp_filename),
+                              stdout=subprocess.PIPE)
+        fasttree_output = subprocess.check_output(fasttree_cmd,
+                                                  stdin=ps.stdout,
+                                                  stderr=subprocess.STDOUT)
+        ps.wait()
+
+        #all fasttree output is returned as byte string, parse and write tree to file
+        biopython_tree = Phylo.read(StringIO(fasttree_output.split('\n')[-2]), 'newick')
+        if outgroup is not None:
+            # determine the root clade, root, and ladderize
+            outgroup_clade = [z for z in biopython_tree.get_terminals()
+                              if z.name.startswith(outgroup.name)][0]
+            biopython_tree.root_with_outgroup(outgroup_clade)
+            biopython_tree.ladderize()
+            biopython_tree.prune(outgroup_clade)
+            if VERBOSE >= 2:
+                print 'Rooted and ladderized'
+
+        biopython_tree.root.branch_length = 0.001
+
+    finally:
+        os.remove(tmp_filename)
+
+    return biopython_tree
 
 
 
@@ -77,9 +134,6 @@ if __name__ == '__main__':
         else:
             samples_seq = samples_seq.loc[samples_seq['patient sample'] != 'nan']
 
-    #FIXME run18 is not saved yet
-    samples_seq = samples_seq.loc[samples_seq['seq run'] != 'Tuen18']
-
     if VERBOSE >= 2:
         print 'samples', samples_seq.index.tolist()
 
@@ -106,14 +160,14 @@ if __name__ == '__main__':
             seq_run = sample['seq run']
             adaID = sample.adapter
 
-            if VERBOSE:
+            if VERBOSE >= 1:
                 print samplename, seq_run, adaID,
 
             cons_fn = get_consensus_filename(data_folder, adaID, fragment)
             if os.path.isfile(cons_fn):
                 if VERBOSE >= 3:
                     print 'consensus found'
-                else:
+                elif VERBOSE >= 1:
                     print ''
                 consensus = SeqIO.read(cons_fn, 'fasta')
                 consensus.description = consensus.description+', patient '+sample.patient
@@ -135,10 +189,6 @@ if __name__ == '__main__':
         # Make tree
         if VERBOSE:
             print 'Build tree'
-        fasttree_bin = '/ebio/ag-neher/home/fzanini/bin/fasttree'
         tree_fn = get_tree_sampleseq_filename(fragment)
-        import subprocess as sp
-        output_check = sp.check_output([fasttree_bin,
-                                        #'-out', tree_fn,
-                                        '-nt', ali_fn])
-
+        tree = calculate_tree(ali, VERBOSE=VERBOSE)
+        Phylo.write(tree, tree_fn, 'newick')

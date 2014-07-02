@@ -24,7 +24,8 @@ from hivwholeseq.fork_cluster import fork_get_allele_counts_patient as fork_self
 if __name__ == '__main__':
 
     # Parse input args
-    parser = argparse.ArgumentParser(description='Get allele frequency trajectories')
+    parser = argparse.ArgumentParser(description='Get allele frequency trajectories',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     pats_or_samples = parser.add_mutually_exclusive_group(required=True)
     pats_or_samples.add_argument('--patients', nargs='+',
                                  help='Patient to analyze')

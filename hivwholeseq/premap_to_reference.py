@@ -423,7 +423,8 @@ def report_coverage(data_folder, adaID, VERBOSE=0, summary=True):
 if __name__ == '__main__':
 
     # Parse input args
-    parser = argparse.ArgumentParser(description='Map against HIV reference strain')
+    parser = argparse.ArgumentParser(description='Map against HIV reference strain',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     parser.add_argument('--run', required=True,
                         help='MiSeq run to analyze (e.g. Tue28)')
     parser.add_argument('--adaIDs', nargs='*',

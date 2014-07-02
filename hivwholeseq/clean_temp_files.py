@@ -10,9 +10,6 @@ import glob
 import subprocess as sp
 import argparse
 
-from hivwholeseq.datasets import MiSeq_runs
-
-
 
 # Functions
 def remove_premapped_tempfiles(data_folder, adaID, VERBOSE=0):

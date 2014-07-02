@@ -9,13 +9,11 @@ import argparse
 from operator import itemgetter
 import numpy as np
 
-from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.miseq import alpha, read_types
 from hivwholeseq.filenames import get_allele_counts_filename, get_coverage_filename, \
         get_allele_frequencies_filename
 from hivwholeseq.adapter_info import load_adapter_table
 from hivwholeseq.one_site_statistics import filter_nus
-from hivwholeseq.samples import samples
 
 
 

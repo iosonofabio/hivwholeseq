@@ -205,7 +205,8 @@ def filter_mapped_reads(sample, fragment,
 if __name__ == '__main__':
 
     # Parse input args
-    parser = argparse.ArgumentParser(description='Filter mapped reads')
+    parser = argparse.ArgumentParser(description='Filter mapped reads',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     pats_or_samples = parser.add_mutually_exclusive_group(required=True)
     pats_or_samples.add_argument('--patients', nargs='+',
                                  help='Patient to analyze')

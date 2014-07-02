@@ -322,8 +322,9 @@ def get_number_mapped_reads(bamfilename, format='bam'):
     return n_reads
 
 
-def extract_mapped_reads_subsample_open(bamfile_in, n_reads, maxreads=-1, VERBOSE=0):
-    '''Extract read pair pointer from an open BAM file'''
+def extract_mapped_reads_subsample_open(bamfile_in, n_reads, maxreads=-1, VERBOSE=0,
+                                        pairs=True):
+    '''Extract random reads or read pairs (pointers) from an open BAM file'''
     import numpy as np
 
     n_reads_tot = get_number_reads_open(bamfile_in) / 2
@@ -345,6 +346,8 @@ def extract_mapped_reads_subsample_open(bamfile_in, n_reads, maxreads=-1, VERBOS
         print 'Random indices between '+str(ind_store[0])+' and '+str(ind_store[-1])
 
     # Copy reads
+    if not pairs:
+        ind_readrand = np.random.rand(maxreads) > 0.5
     output_reads = []
     n_written = 0
     for i, (read1, read2) in enumerate(pair_generator(bamfile_in)):
@@ -356,7 +359,10 @@ def extract_mapped_reads_subsample_open(bamfile_in, n_reads, maxreads=-1, VERBOS
         # If you hit a read pair, add it
         if i == ind_store[n_written]:
 
-            output_reads.append((read1, read2))
+            if pairs:
+                output_reads.append((read1, read2))
+            else:
+                output_reads.append((read1, read2)[ind_readrand[n_written]])
             n_written += 1
     
         # Break after the last one

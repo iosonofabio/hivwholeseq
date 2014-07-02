@@ -19,6 +19,46 @@ from hivwholeseq.filenames import get_consensus_filename, get_reference_premap_f
 from seqanpy import align_global
 
 
+# Functions
+def score_consensus(sample, VERBOSE=0):
+    '''Score a consensus based on completeness and quality'''
+    data_folder = sample.sequencing_run.folder
+    adaID = sample.adapter
+
+    frag_spec = filter(lambda x: fragment in x, sample.regions_complete)
+    if not len(frag_spec):
+        field = ''
+        return (True, '')
+
+    fn = get_consensus_filename(data_folder, adaID, fragment)
+    if not os.path.isfile(fn):
+        return (False, 'MISS')
+
+    frag_spec = frag_spec[0]
+    fn_ref = get_reference_premap_filename(data_folder, adaID, frag_spec)
+    if not os.path.isfile(fn_ref):
+        if frag_spec[:3] == 'F3a':
+            frag_spec = frag_spec.replace('a', '')
+            fn_ref = get_reference_premap_filename(data_folder, adaID, frag_spec)
+            if not os.path.isfile(fn_ref):
+                return (False, 'MISSREF')
+        else:
+            return (False, 'MISSREF')
+
+    ref = SeqIO.read(fn_ref, 'fasta')
+    cons = SeqIO.read(fn, 'fasta')
+    if len(cons) < len(ref) - 200:
+        return (False, 'SHORT')
+    elif len(cons) > len(ref) + 200:
+        return (False, 'LONG')
+
+    #ali = align_global(str(ref.seq), str(cons.seq), band=200)
+    #alim1 = np.fromstring(ali[1], 'S1')
+    #alim2 = np.fromstring(ali[2], 'S1')
+    #if (alim1 != alim2).sum() >
+    return (True, 'OK')
+
+
 
 # Script
 if __name__ == '__main__':
@@ -95,52 +135,26 @@ if __name__ == '__main__':
     if VERBOSE >= 3:
         print 'fragments', fragments
 
-    linelen = 95
+    linelen = 49 + 11 * len(fragments)
     print '-' * linelen
     for samplename, sample in samples_seq.iterrows():
         sample = SampleSeq(sample)
+        seq_run = sample['seq run']
         data_folder = sample.sequencing_run.folder
         adaID = sample.adapter
 
-        line = '{:<27s}'.format(sample.name)+' | '
+        line = ' | '.join(['{:<27s}'.format(sample.name),
+                           '{:<8s}'.format(seq_run),
+                           '{:<6s}'.format(adaID),
+                           '',
+                          ])
 
         for fragment in fragments:
-            done = False
-            frag_spec = filter(lambda x: fragment in x, sample.regions_complete)
-            if not len(frag_spec):
-                field = ''
-                done = True
+            (score, field) = score_consensus(sample, VERBOSE=VERBOSE)
 
-            if not done:
-                frag_spec = frag_spec[0]
-                fn = get_consensus_filename(data_folder, adaID, fragment)
-                if not os.path.isfile(fn):
-                    field = 'MISS'
-                    done = True
-
-            if not done:
-               fn_ref = get_reference_premap_filename(data_folder, adaID, frag_spec)
-               if not os.path.isfile(fn_ref):
-                   field = 'MISSREF'
-                   done = True
-
-            if not done:
-               ref = SeqIO.read(fn_ref, 'fasta')
-               cons = SeqIO.read(fn, 'fasta')
-               if len(cons) < len(ref) - 200:
-                   field = 'SHORT'
-                   done = True
-               elif len(cons) > len(ref) + 200:
-                   field = 'LONG'
-                   done = True
-
-            if not done:
-                   #ali = align_global(str(ref.seq), str(cons.seq), band=200)
-                   #alim1 = np.fromstring(ali[1], 'S1')
-                   #alim2 = np.fromstring(ali[2], 'S1')
-                   #if (alim1 != alim2).sum() >
-                   field = 'OK'
-                   done = True
+            # NOTE: Tue52 is essentially failed, maybe we discard
+            if (seq_run == 'Tue52') and len(field):
+                field = '('+field+')'
 
             line = line+'{:^8s}'.format(field)+' | '
 

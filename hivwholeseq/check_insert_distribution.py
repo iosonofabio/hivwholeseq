@@ -143,7 +143,8 @@ def plot_histogram(data_folder, adaID, fragment, h,
 if __name__ == '__main__':
 
     # Input arguments
-    parser = argparse.ArgumentParser(description='Get allele counts')
+    parser = argparse.ArgumentParser(description='Get allele counts',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     parser.add_argument('--run', required=True,
                         help='Seq run to analyze (e.g. Tue28)')
     parser.add_argument('--adaIDs', nargs='*',

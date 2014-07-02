@@ -138,8 +138,9 @@ def check_premap(data_folder, adaID, fragments, seq_run, samplename,
 if __name__ == '__main__':
 
     # Parse input args
-    parser = argparse.ArgumentParser(description='Check consensus')
-    parser.add_argument('--run', required=True,
+    parser = argparse.ArgumentParser(description='Check consensus',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
+    parser.add_argument('--runs', required=True, nargs='+',
                         help='Seq run to analyze (e.g. Tue28)')
     parser.add_argument('--adaIDs', nargs='+',
                         help='Adapter IDs to analyze (e.g. TS2)')
@@ -151,41 +152,41 @@ if __name__ == '__main__':
                         help='Give a title to the figure')
 
     args = parser.parse_args()
-    seq_run = args.run
+    seq_runs = args.runs
     adaIDs = args.adaIDs
     maxreads = args.maxreads
     VERBOSE = args.verbose
     titles = args.titles
 
-    # Specify the dataset
-    dataset = load_sequencing_run(seq_run)
-    data_folder = dataset.folder
+    for seq_run in seq_runs:
+        dataset = load_sequencing_run(seq_run)
+        data_folder = dataset.folder
 
-    # If the script is called with no adaID, iterate over all
-    samples = dataset.samples
-    if adaIDs is not None:
-        samples = samples.loc[samples.adapter.isin(adaIDs)]
+        # If the script is called with no adaID, iterate over all
+        samples = dataset.samples
+        if adaIDs is not None:
+            samples = samples.loc[samples.adapter.isin(adaIDs)]
 
-    if VERBOSE >= 3:
-        print 'adaIDs', samples.adapter
+        if VERBOSE >= 3:
+            print 'adaIDs', samples.adapter
 
-    for i, (samplename, sample) in enumerate(samples.iterrows()):
-        sample = SampleSeq(sample)
-        adaID = sample.adapter
-        fragments = sample.regions_complete
+        for i, (samplename, sample) in enumerate(samples.iterrows()):
+            sample = SampleSeq(sample)
+            adaID = sample.adapter
+            fragments = sample.regions_complete
 
-        if VERBOSE:
-            print seq_run, adaID
-        if titles is not None:
-            title = titles[i]
-        else:
-            title = None
+            if VERBOSE:
+                print seq_run, adaID
+            if titles is not None:
+                title = titles[i]
+            else:
+                title = None
 
-        (counts, inserts) = check_premap(data_folder, adaID,
-                                         fragments, seq_run, samplename,
-                                         maxreads=maxreads,
-                                         VERBOSE=VERBOSE,
-                                         title=title)
+            (counts, inserts) = check_premap(data_folder, adaID,
+                                             fragments, seq_run, samplename,
+                                             maxreads=maxreads,
+                                             VERBOSE=VERBOSE,
+                                             title=title)
 
     plt.ion()
     plt.show()

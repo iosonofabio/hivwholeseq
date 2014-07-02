@@ -136,13 +136,13 @@ def get_coordinate_map_filename(pname, fragment, refname='HXB2'):
 
 def get_multiple_sequence_alignment_sampleseq_filename(fragment):
     '''Get the filename of the MSA  of sequenced samples'''
-    filename = 'consensi_ali.fasta'
+    filename = 'consensi_ali_'+fragment+'.fasta'
     return root_patient_folder+'all/'+filename
 
 
 def get_tree_sampleseq_filename(fragment):
     '''Get the filename of the MSA  of sequenced samples'''
-    filename = 'consensi_tree.newick'
+    filename = 'consensi_tree_'+fragment+'.newick'
     return root_patient_folder+'all/'+filename
 
 

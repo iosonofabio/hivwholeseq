@@ -711,7 +711,8 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, fragments,
 if __name__ == '__main__':
 
     # Parse input args
-    parser = argparse.ArgumentParser(description='Trim and divide reads into fragments')
+    parser = argparse.ArgumentParser(description='Trim and divide reads into fragments',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     parser.add_argument('--run', required=True,
                         help='Sequencing run to analyze (e.g. Tue28)')
     parser.add_argument('--adaIDs', nargs='*',

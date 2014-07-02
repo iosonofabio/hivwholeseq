@@ -406,7 +406,8 @@ def get_number_chunks(pname, samplename, fragment, VERBOSE=0):
 if __name__ == '__main__':
 
     # Parse input args
-    parser = argparse.ArgumentParser(description='Map to initial consensus')
+    parser = argparse.ArgumentParser(description='Map to initial consensus',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     pats_or_samples = parser.add_mutually_exclusive_group(required=True)
     pats_or_samples.add_argument('--patients', nargs='+',
                                  help='Patient to analyze')

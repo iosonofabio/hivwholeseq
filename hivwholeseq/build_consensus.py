@@ -114,6 +114,7 @@ def build_consensus(bamfilename, len_reference, VERBOSE=0,
     # 1. collect reads uniformly across the fragment
     # 2. make local consensi
     # 3. join into fragmentwide consensus
+    consensus = None
     consensi_local = []
     if store_allele_counts:
         allcounts_local = []
@@ -178,7 +179,6 @@ def build_consensus(bamfilename, len_reference, VERBOSE=0,
         # Stack local consensi on top of the first one
         n_block = 1
         while (pos_ref < len_reference):
-
             block_len = min(block_len, len_reference - pos_ref)
             if block_len < block_len_initial // 2:
                 break
@@ -277,11 +277,11 @@ def build_consensus(bamfilename, len_reference, VERBOSE=0,
             pos_ref += block_len_initial // 2
 
             # Join block <-- to the stack
-            if len(consensi_local) == 1:
+            if consensus is None:
                 consensus = [consensi_local[0]]
                 if store_allele_counts:
                     allcounts = [allcounts_local[0]]
-            elif len(consensi_local) > 1:
+            else:
                 cons = cons_local
                 seed = consensus[-1][-20:]
                 sl = len(seed)
@@ -314,6 +314,9 @@ def build_consensus(bamfilename, len_reference, VERBOSE=0,
                         allcounts.append(tmpall)
                         allcounts.append(allcounts_local[-1])
 
+    if consensus is None:
+        raise ValueError('Consensus is still None: unable to build!')
+
     consensus = ''.join(consensus)
 
     if store_allele_counts:
@@ -329,7 +332,8 @@ def build_consensus(bamfilename, len_reference, VERBOSE=0,
 if __name__ == '__main__':
 
     # Parse input args
-    parser = argparse.ArgumentParser(description='Build consensus, iteratively')
+    parser = argparse.ArgumentParser(description='Build consensus by mapping-assisted assembly',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     parser.add_argument('--run', required=True,
                         help='Seq run to analyze (e.g. Tue28)')
     parser.add_argument('--adaIDs', nargs='*',

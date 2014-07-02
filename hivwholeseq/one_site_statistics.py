@@ -109,9 +109,12 @@ def get_allele_counts_insertions_from_file(bamfilename, length, qual_min=35,
 
 def get_allele_counts_insertions_from_file_unfiltered(bamfilename, length, qual_min=30,
                                                       match_len_min=10,
-                                                      skipreads=0,
                                                       maxreads=-1, VERBOSE=0):
-    '''Get the allele counts and insertions'''
+    '''Get the allele counts and insertions
+    
+    Parameters:
+       - maxreads: limit the counts to a random subset of the reads of this size
+    '''
     # Prepare output structures
     counts = np.zeros((len(read_types), len(alpha), length), int)
     # Note: the data structure for inserts is a nested dict with:
@@ -123,8 +126,16 @@ def get_allele_counts_insertions_from_file_unfiltered(bamfilename, length, qual_
     # Note: the reads should already be filtered of unmapped stuff at this point
     with pysam.Samfile(bamfilename, 'rb') as bamfile:
 
+        if maxreads != -1:
+            from hivwholeseq.mapping_utils import extract_mapped_reads_subsample_open
+            read_iter = extract_mapped_reads_subsample_open(bamfile, maxreads,
+                                                            VERBOSE=VERBOSE,
+                                                            pairs=False)
+        else:
+            read_iter = bamfile
+
         # Iterate over single reads
-        for i, read in enumerate(bamfile):
+        for i, read in enumerate(read_iter):
 
             # Max number of reads
             if i == maxreads:

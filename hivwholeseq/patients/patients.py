@@ -126,6 +126,11 @@ def load_samples_sequenced(patient=None):
 
     sample_table.index = pd.Index(map(str, sample_table.index))
     sample_table.loc[:, 'patient'] = map(str, sample_table.loc[:, 'patient'])
+    # FIXME: the number of molecules to PCR depends on the number of
+    # fragments for that particular experiment... integrate Lina's table!
+    # Note: this refers to the TOTAL # of templates, i.e. the factor 2x for
+    # the two parallel RT-PCR reactions
+    sample_table['n templates'] = sample_table['viral load'] * 0.4 / 12 * 2
 
     if patient is not None:
         sample_table = sample_table.loc[sample_table.loc[:, 'patient'] == patient]

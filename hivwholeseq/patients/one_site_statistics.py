@@ -21,7 +21,7 @@ def get_allele_count_trajectories(pname, samplenames, fragment, use_PCR1=1,
                                            VERBOSE=0):
     '''Get allele counts for a single patient sample'''
     if VERBOSE >= 1:
-        print 'Getting allele counts:', pname, samplename_pat, fragment
+        print 'Getting allele counts:', pname, fragment
 
     from hivwholeseq.patients.filenames import get_initial_consensus_filename, \
             get_allele_counts_filename
@@ -223,7 +223,7 @@ def plot_allele_frequency_trajectories_from_counts(times, act, title='', VERBOSE
                     color='k', label='Max depth (# templates)')
 
     ax.set_xlim(times[0] -10, times[-1] + 10)
-    ax.set_xlabel('Time [days from initial sample]')
+    ax.set_xlabel('Time [days from transmission]')
     if logit:
         ax.set_ylim(-4.1, 4.1)
         trfun = lambda x: np.log10(x / (1 - x))
