@@ -11,15 +11,15 @@ genes = ('gag', 'pol', 'env', 'vif', 'vpr', 'vpu', 'tat', 'rev')
 gag_edges = ['ATGGGTGCGAGAGCGTCAGTA', 'GACCCCTCGTCACAATAA']
 pol_edges = ['TTTTTTAGGGAAAATTTG', 'ACAGGATGAGGATTAG']
 env_edges = ['ATGAGAGTGANGGNGANNNNGANGA',
-             'TAAGACAGGGCNNGGAAAGNANTTTGCTATAA']
+             'TAAGACAGGGCNNGGAAAGNNNTTTGCNATAA']
 vif_edges = ['ATGGAAAACAGATGGCAGGTGA', 'ACAATGAATGGACACTAG']
 vpr_edges = ['ATGGAACAAGCCCCAGAAGACCAG', 'AATGGATCCAGTAGATCCTAA']
 vpu_edges = ['ATGCAACCTATACCAATAGTAGCAATAGTAGCATTAGTAGTAGCAATAATAATAGCAATAGTTGTGTGGTCC',             
              'GGGATGTTGATGATCTGTAG']
-tat_edges = ['ATGGAGCCAGTAGATCCTAACC', 'ATCAAAGCA',
+tat_edges = ['ATGGAGCCAGTAGATCCTAACC', 'TCATCAANNTNCTNTANCAAAGCA',
              'ACCCNNNNCCCA', 'CAGAGACAGATCCATTCGATTAG']
 
-rev_edges = ['ATGGCAGGAAGAAGC', 'ATCAAAGCA',
+rev_edges = ['ATGGCAGGAAGAAGC', 'TCATCAANNTNCTNTANCAAAGCA',
              'ACCCNNNNCCCA', 'ACAGTATTGGAGTCAGGAACTAAAGAATAG']
 
 gene_edges = {'gag': gag_edges,
@@ -189,15 +189,17 @@ def locate_gene(refseq, gene, minimal_fraction_match='auto', VERBOSE=0,
 
 
     if VERBOSE:
+        print '{:<5s}'.format(gene),
+
         if start_found:
-            print 'Gene start:', start,
+            print 'start: '+'{:>8d}'.format(start),
         else:
-            print 'Gene start not found',
+            print 'start not found',
 
         if end_found:
-            print 'Gene end:', end
+            print 'end: '+'{:>8d}'.format(end)
         else:
-            print 'Gene end not found'
+            print 'end not found'
 
     if (not start_found) and (not end_found):
         start = end = -1

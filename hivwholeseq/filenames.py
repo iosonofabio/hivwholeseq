@@ -272,11 +272,14 @@ def get_divided_filename(data_folder, adaID=None, fragment=None, type='bam', chu
 
 
 def get_mapped_filename(data_folder, adaID=None, fragment=None, type='bam', 
-                        bwa=False, filtered=False, sort=False, part=None, unsorted=False):
+                        bwa=False, filtered=False, sort=False, part=None, unsorted=False,
+                        rescue=False):
     '''Get the filename of the mapped reads onto consensus'''
     if fragment is None:
         raise ValueError('Select a fragment')
     filename = fragment
+    if rescue:
+        filename = filename + '_rescue'
     if bwa:
         filename = filename + '_bwa'
     if filtered:
@@ -591,9 +594,12 @@ def get_build_consensus_summary_filename(data_folder, adaID, fragment='general',
     return filename
 
 
-def get_map_summary_filename(data_folder, adaID, fragment):
+def get_map_summary_filename(data_folder, adaID, fragment, rescue=False):
     '''Get the filename of the summary of the division into fragments'''
-    filename = 'summary_map'+fragment+'.txt'
+    filename = 'summary_map'+fragment
+    if rescue:
+        filename = filename+'_rescue'
+    filename = filename+'.txt'
     filename = 'mapped/'+filename
     filename = data_folder+foldername_adapter(adaID)+filename
     return filename

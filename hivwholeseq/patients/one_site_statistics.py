@@ -40,17 +40,26 @@ def get_allele_count_trajectories(pname, samplenames, fragment, use_PCR1=1,
                 if os.path.isfile(fn):
                     fns.append(fn)
                     samplenames_out.append((samplename_pat, PCR))
+                    if VERBOSE >= 3:
+                        print samplename_pat, PCR
+
         elif use_PCR1 == 1:
             if os.path.isfile(fn1):
                 fns.append(fn1)
                 samplenames_out.append((samplename_pat, 1))
+                if VERBOSE >= 3:
+                    print samplename_pat, 1
             elif os.path.isfile(fn2):
                 fns.append(fn2)
                 samplenames_out.append((samplename_pat, 2))
+                if VERBOSE >= 3:
+                    print samplename_pat, 2
         elif use_PCR1 == 2:
             if os.path.isfile(fn1):
                 fns.append(fn1)
                 samplenames_out.append((samplename_pat, 1))
+                if VERBOSE >= 3:
+                    print samplename_pat, 1
 
     act = np.zeros((len(fns), len(alpha), len(refseq)), int)
     for i, fn in enumerate(fns):

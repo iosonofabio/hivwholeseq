@@ -109,4 +109,91 @@ def annotate_sequence_genes(seq_rec, fragment='genomewide', genes=genes_all,
         seq_rec.features.append(feature)
 
 
+def find_seed_imperfect(seq, seed, threshold=0.7, VERBOSE=0):
+    '''Imperfect match of a seed to a sequence'''
+    import numpy as np
 
+    seed = ''.join(seed)
+    seq = ''.join(seq)
+    pos = seq.find(seed)
+    if pos != -1:
+        return pos
+
+    seed = np.fromstring(seed, 'S1')
+    seq = np.fromstring(seq, 'S1')
+    sl = len(seed)
+    seql = len(seq)
+    n_match = [(seed == seq[i: i + sl]).sum() for i in xrange(seql - sl)]
+    pos = np.argmax(n_match)
+    if n_match[pos] >= threshold * sl:
+        return pos
+
+    raise ValueError('Seed not found at specified threshold ('+str(threshold)+')')
+
+
+def rfind_seed_imperfect(seq, seed, threshold=0.7, VERBOSE=0):
+    '''Imperfect match of a seed to a sequence, from the right'''
+    import numpy as np
+
+    seed = ''.join(seed)
+    seq = ''.join(seq)
+    pos = seq.rfind(seed)
+    if pos != -1:
+        return pos
+
+    seed = np.fromstring(seed, 'S1')
+    seq = np.fromstring(seq, 'S1')
+    sl = len(seed)
+    seql = len(seq)
+    n_match = [(seed == seq[i: i + sl]).sum() for i in xrange(seql - sl)]
+    pos = len(n_match) - 1 - np.argmax(n_match[::-1])
+    if n_match[pos] >= threshold * sl:
+        return pos
+
+    raise ValueError('Seed not found at specified threshold ('+str(threshold)+')')
+
+
+def merge_sequences(seqs, minimal_fraction_match=0.75, skip_initial=30, VERBOSE=0):
+    '''Merge sequences from subsequent fragments into a genomewide one'''
+    import numpy as np
+
+    seqs = map(''.join, seqs)
+
+    if VERBOSE:
+        print 'Start with F1'
+    seqs_all = [seqs[0]]
+    for ifr, seq in enumerate(seqs[1:], 2):
+        if VERBOSE:
+            print 'merging in F'+str(ifr),
+
+        # Avoid the first few bases because of low coverage
+        pos_seed_new = skip_initial
+        seed = seq[pos_seed_new: pos_seed_new + 30]
+        # Find seed from the right and allow imperfect matches
+        pos_seed = seqs_all[-1].rfind(seed)
+        if pos_seed != -1:
+            overlap_found = True
+        else:
+            refm = np.fromstring(seqs_all[-1], 'S1')
+            seed = np.fromstring(seed, 'S1')
+            sl = len(seed)
+            n_match = np.array([(refm[i: i + sl] == seed).sum()
+                                for i in xrange(len(refm) - sl)], int)
+            pos_seed = len(n_match) - 1 - np.argmax(n_match[::-1])
+            if n_match[pos_seed] >= minimal_fraction_match * sl:
+                overlap_found = True
+            else:
+                overlap_found = False
+                if VERBOSE:
+                    print 'WARNING: Cannot merge consensus F'+str(ifr)+\
+                            ' with previous ones'
+
+        if overlap_found:
+            seqs_all[-1] = seqs_all[-1][:pos_seed]
+            seqs_all.append(seq[pos_seed_new:])
+            if VERBOSE:
+                print 'merged, total length:', len(''.join(seqs_all))
+        else:
+            seqs_all.append(('N' * 10) + seq)
+
+    return ''.join(seqs_all)

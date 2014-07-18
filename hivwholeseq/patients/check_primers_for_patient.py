@@ -9,14 +9,18 @@ content:    Use the overlap to check on conservation of primers, to decide for
 import os
 import argparse
 import numpy as np
+from itertools import izip
+from collections import defaultdict
+from Bio.SeqRecord import SeqRecord
+from Bio.Seq import Seq
+from Bio.Alphabet.IUPAC import ambiguous_dna
 from Bio import SeqIO
 from Bio.Seq import reverse_complement as rc
 
-from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.miseq import alpha
 from hivwholeseq.patients.filenames import get_initial_consensus_filename, \
-        get_allele_count_trajectories_filename
-from hivwholeseq.patients.patients import get_patient
+        get_allele_count_trajectories_filename, get_primers_filename
+from hivwholeseq.patients.patients import load_patient
 from hivwholeseq.primer_info import primers_outer, find_primer_seq
 from hivwholeseq.sequence_utils import expand_ambiguous_seq
 
@@ -33,13 +37,16 @@ if __name__ == '__main__':
                         help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
+    parser.add_argument('--save', action='store_true',
+                        help='Save patient primers to file')
 
     args = parser.parse_args()
     pname = args.patient
     fragments = args.fragments
     VERBOSE = args.verbose
+    use_save = args.save
 
-    patient = get_patient(pname)
+    patient = load_patient(pname)
 
      # If the script is called with no fragment, iterate over all
     # NOTE: This assumes that the fragment has been sequenced. If not, we should
@@ -48,8 +55,10 @@ if __name__ == '__main__':
         fragments = ['F'+str(i) for i in xrange(1, 7)]
     if VERBOSE >= 3:
         print 'fragments', fragments
-   
     
+    primers_std = defaultdict(dict)
+    primers_clo = defaultdict(dict)
+    primers_pat = defaultdict(dict)
     for fragment in fragments:
         print fragment
         # Check the overlap from the left for fwd primer, unless F1
@@ -58,8 +67,11 @@ if __name__ == '__main__':
             cons_fn_left = get_initial_consensus_filename(pname, frag_left)
             cons_left = SeqIO.read(cons_fn_left, 'fasta')
 
+            # Only use the best-performing primers...
             if fragment == 'F5':
                 frag_spec = 'F5a'
+            elif fragment == 'F3':
+                frag_spec = 'F3b'
             else:
                 frag_spec = fragment
 
@@ -68,27 +80,45 @@ if __name__ == '__main__':
 
             pos = find_primer_seq(cons_left, primer_fwd)
             primer_fwd_pat = str(cons_left[pos: pos + len(primer_fwd)].seq)
+            primer_fwd_patm = np.fromstring(primer_fwd_pat, 'S1')
+
+            primer_fwd_expsm = np.array([np.fromstring(pre, 'S1') for pre in primer_fwd_exps], 'S1')
+            primer_fwd_closest = primer_fwd_exps[(primer_fwd_expsm == primer_fwd_patm).sum(axis=1).argmax()]
 
             if primer_fwd_pat in primer_fwd_exps:
                 status = 'OK'
             else:
                 status = 'FAIL'
-                primer_fwd_expsm = np.array([np.fromstring(pre, 'S1') for pre in primer_fwd_exps], 'S1')
-                primer_fwd_closest = primer_fwd_exps[(primer_fwd_expsm == primer_fwd_pat).argmin()]
 
             print 'FWD:', status
-            print 'Designed:\t\t', primer_fwd
+            print 'Designed:\t\t', '5\'', primer_fwd, '3\''
             if status == 'FAIL':
-                print 'Design (closest)\t', primer_fwd_closest
-            print 'Patient:\t\t', primer_fwd_pat
+                print 'Design (closest):\t', '5\'', primer_fwd_closest, '3\''
+                print '                 \t  ', 
+                match_string = []
+                for nuc_des, nuc_pat in izip(primer_fwd_closest, primer_fwd_pat):
+                    if nuc_des != nuc_pat:
+                        match_string.append('x')
+                    else:
+                        match_string.append(' ')
+                print ''.join(match_string)
+
+            print 'Patient:\t\t', '5\'', primer_fwd_pat, '3\''
+
+            primers_std[fragment]['fwd'] = primer_fwd
+            primers_clo[fragment]['fwd'] = primer_fwd_closest
+            primers_pat[fragment]['fwd'] = primer_fwd_pat
 
             if status == 'FAIL':
                 act_filename = get_allele_count_trajectories_filename(pname, frag_left)
-                act = np.load(act_filename)
-                ac_pr = act[0, :, pos: pos + len(primer_fwd)]
-                ind = (np.fromstring(primer_fwd_closest, 'S1') != np.fromstring(primer_fwd_pat, 'S1')).nonzero()[0]
-                for i in ind:
-                    print i, primer_fwd_closest[i], primer_fwd_pat[i], ac_pr[:, i]
+                if not os.path.isfile(act_filename):
+                    print 'Allele count filename not found.'
+                else:
+                    act = np.load(act_filename)
+                    ac_pr = act[0, :, pos: pos + len(primer_fwd)]
+                    ind = (np.fromstring(primer_fwd_closest, 'S1') != np.fromstring(primer_fwd_pat, 'S1')).nonzero()[0]
+                    for i in ind:
+                        print i, primer_fwd_closest[i], primer_fwd_pat[i], ac_pr[:, i]
 
         # Check overlap from the right for rev primer
         if fragment != 'F6':
@@ -98,6 +128,8 @@ if __name__ == '__main__':
 
             if fragment == 'F5':
                 frag_spec = 'F5a'
+            elif fragment == 'F3':
+                frag_spec = 'F3b'
             else:
                 frag_spec = fragment
 
@@ -107,34 +139,86 @@ if __name__ == '__main__':
 
             pos = find_primer_seq(cons_right, primer_rev_rc)
             primer_rev_pat = rc(str(cons_right[pos: pos + len(primer_rev_rc)].seq))
+            primer_rev_patm = np.fromstring(primer_rev_pat, 'S1')
+
+            primer_rev_expsm = np.array([np.fromstring(pre, 'S1') for pre in primer_rev_exps], 'S1')
+            primer_rev_closest = primer_rev_exps[(primer_rev_expsm == primer_rev_patm).sum(axis=1).argmax()]
 
             if primer_rev_pat in primer_rev_exps:
                 status = 'OK'
             else:
                 status = 'FAIL'
-                primer_rev_expsm = np.array([np.fromstring(pre, 'S1') for pre in primer_rev_exps], 'S1')
-                primer_rev_closest = primer_rev_exps[(primer_rev_expsm == primer_rev_pat).argmin()]
 
             print 'REV:', status
-            print 'Designed:\t\t', primer_rev
+            print 'Designed:\t\t', '5\'', primer_rev, '3\''
             if status == 'FAIL':
-                print 'Design (closest):\t', primer_rev_closest
-            print 'Patient:\t\t', primer_rev_pat
+                print 'Design (closest):\t', '5\'', primer_rev_closest, '3\''
+                print '                 \t  ', 
+                match_string = []
+                for nuc_des, nuc_pat in izip(primer_rev_closest, primer_rev_pat):
+                    if nuc_des != nuc_pat:
+                        match_string.append('x')
+                    else:
+                        match_string.append(' ')
+                print ''.join(match_string)
+            print 'Patient:\t\t', '5\'', primer_rev_pat, '3\''
+
+            primers_std[fragment]['rev'] = primer_rev
+            primers_clo[fragment]['rev'] = primer_rev_closest
+            primers_pat[fragment]['rev'] = primer_rev_pat
 
             if status == 'FAIL':
                 act_filename = get_allele_count_trajectories_filename(pname, frag_right)
-                act = np.load(act_filename)
-                ac_pr = act[0, :, pos: pos + len(primer_rev)]
-                tmp = ac_pr[0].copy()
-                ac_pr[0] = ac_pr[3]
-                ac_pr[3] = tmp
-                tmp = ac_pr[1].copy()
-                ac_pr[1] = ac_pr[2]
-                ac_pr[2] = tmp
-                ac_pr = ac_pr[:, ::-1]
+                if not os.path.isfile(act_filename):
+                    print 'Allele count filename not found.'
+                else:
+                    act = np.load(act_filename)
+                    ac_pr = act[0, :, pos: pos + len(primer_rev)]
+                    tmp = ac_pr[0].copy()
+                    ac_pr[0] = ac_pr[3]
+                    ac_pr[3] = tmp
+                    tmp = ac_pr[1].copy()
+                    ac_pr[1] = ac_pr[2]
+                    ac_pr[2] = tmp
+                    ac_pr = ac_pr[:, ::-1]
 
-                ind = (np.fromstring(primer_rev_closest, 'S1') != np.fromstring(primer_rev_pat, 'S1')).nonzero()[0]
-                for i in ind:
-                    print i, primer_rev_closest[i], primer_rev_pat[i], ac_pr[:, i]
+                    ind = (np.fromstring(primer_rev_closest, 'S1') != np.fromstring(primer_rev_pat, 'S1')).nonzero()[0]
+                    for i in ind:
+                        print i, primer_rev_closest[i], primer_rev_pat[i], ac_pr[:, i]
 
         print ''
+
+    if use_save:
+        fn = get_primers_filename(pname, format='fasta')
+        
+        seqs = []
+        for fragment in primers_pat:
+            for sense in primers_pat[fragment]:
+                pr_std = primers_std[fragment][sense]
+                pr_clo = primers_clo[fragment][sense]
+                pr_pat = primers_pat[fragment][sense]
+                
+                pr_std = SeqRecord(Seq(pr_std, ambiguous_dna),
+                                   id=fragment+sense+'StandardPrimer',
+                                   name=fragment+sense+'StandardPrimer',
+                                   description=fragment+', '+sense+', standard primer',
+                                  )
+                seqs.append(pr_std)
+
+                pr_clo = SeqRecord(Seq(pr_clo, ambiguous_dna),
+                                   id=fragment+sense+'StandardPrimerClosest',
+                                   name=fragment+sense+'StandardPrimerClosest',
+                                   description=fragment+', '+sense+', standard primer, closest non-ambiguous',
+                                  )
+                seqs.append(pr_clo)
+
+                pr_pat = SeqRecord(Seq(pr_pat, ambiguous_dna),
+                                   id=fragment+sense+'Pat'+pname,
+                                   name=fragment+sense+'Pat'+pname,
+                                   description=fragment+', '+sense+', patient '+pname,
+                                  )
+                seqs.append(pr_pat)
+
+        SeqIO.write(seqs, fn, 'fasta')
+
+

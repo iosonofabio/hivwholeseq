@@ -15,10 +15,9 @@ import matplotlib.pyplot as plt
 from hivwholeseq.samples import load_sequencing_run, SampleSeq
 from hivwholeseq.miseq import read_types
 from hivwholeseq.reference import load_HXB2
-from hivwholeseq.filenames import get_divided_filename, get_reference_premap_filename
-from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file
+from hivwholeseq.filenames import get_mapped_filename, get_consensus_filename
+from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file_unfiltered
 from hivwholeseq.minor_allele_frequency import get_minor_allele_counts
-from hivwholeseq.samples import load_samples_sequenced as lss
 
 
 
@@ -65,30 +64,21 @@ def plot_coverage(counts, suptitle, minor_allele=False):
     plt.show()
 
 
-def check_division(data_folder, adaID, fragment, seq_run, qual_min=35,
-                   reference='HXB2', maxreads=-1, VERBOSE=0, minor_allele=False):
+def check_coverage(data_folder, adaID, fragment, seq_run, qual_min=35,
+                   reference='HXB2', maxreads=-1, VERBOSE=0,
+                   rescue=False,
+                   minor_allele=False):
     '''Check division into fragments: coverage, etc.'''
-    ref_fn = get_reference_premap_filename(data_folder, adaID, fragment)
-
-    # FIXME: old nomenclature for F3a
-    if not os.path.isfile(ref_fn):
-        if fragment[:2] == 'F3':
-            ref_fn = ref_fn.replace('F3a', 'F3')
-
+    ref_fn = get_consensus_filename(data_folder, adaID, fragment)
     refseq = SeqIO.read(ref_fn, 'fasta')
 
-    # Scan reads
-    input_filename = get_divided_filename(data_folder, adaID, fragment, type='bam')
+    input_filename = get_mapped_filename(data_folder, adaID, fragment, type='bam',
+                                         rescue=rescue)
 
-    # FIXME: old nomenclature for F3a
-    if not os.path.isfile(input_filename):
-        if fragment[:2] == 'F3':
-            input_filename = input_filename.replace('F3a', 'F3')
-
-    counts, inserts = get_allele_counts_insertions_from_file(input_filename,
-                                                             len(refseq),
-                                                             maxreads=maxreads,
-                                                             VERBOSE=VERBOSE)
+    counts, inserts = get_allele_counts_insertions_from_file_unfiltered(input_filename,
+                                                                        len(refseq),
+                                                                        maxreads=maxreads,
+                                                                        VERBOSE=VERBOSE)
 
     # Plot results
     title=', '.join(map(lambda x: ' '.join([x[0], str(x[1])]),
@@ -105,13 +95,10 @@ def check_division(data_folder, adaID, fragment, seq_run, qual_min=35,
 if __name__ == '__main__':
 
     # Parse input args
-    parser = argparse.ArgumentParser(description='Check consensus',
+    parser = argparse.ArgumentParser(description='Check coverage after mapping',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
-    runs_or_samples = parser.add_mutually_exclusive_group(required=True)
-    runs_or_samples.add_argument('--runs', nargs='+',
-                                 help='Seq run to analyze (e.g. Tue28)')
-    runs_or_samples.add_argument('--samples', nargs='+',
-                                 help='Samples to analyze (e.g. 31440_PCR1')
+    parser.add_argument('--run', required=True,
+                        help='Seq run to analyze (e.g. Tue28)')
     parser.add_argument('--adaIDs', nargs='*',
                         help='Adapter IDs to analyze (e.g. TS2)')
     parser.add_argument('--fragments', nargs='*',
@@ -122,49 +109,46 @@ if __name__ == '__main__':
                         help='Verbosity level [0-3]')
     parser.add_argument('--minor-allele', action='store_true', dest='minor_allele',
                         help='Plot also minor allele')
+    parser.add_argument('--rescue', action='store_true',
+                        help='Look at to-be-rescued reads (less stringent mapping)')
 
     args = parser.parse_args()
-    samplenames = args.samples
-    seq_runs = args.runs
+    seq_run = args.run
     adaIDs = args.adaIDs
     fragments = args.fragments
     maxreads = args.maxreads
     VERBOSE = args.verbose
     use_minor_allele = args.minor_allele
+    use_rescue = args.rescue
 
-    samples = lss()
-    if samplenames is not None:
-        samples = samples.loc[samples.index.isin(samplenames)]
+    # Specify the dataset
+    dataset = load_sequencing_run(seq_run)
+    data_folder = dataset.folder
 
-    else:
-        ind = np.zeros(len(samples), bool)
-        for seq_run in seq_runs:
-            dataset = load_sequencing_run(seq_run)
-            data_folder = dataset.folder
-            samples_run = dataset.samples
-            # If the script is called with no adaID, iterate over all
-            if adaIDs is not None:
-                samples_run = samples_run.loc[samples_run.adapter.isin(adaIDs)]
+    # If the script is called with no adaID, iterate over all
+    samples = dataset.samples
+    if adaIDs is not None:
+        samples = samples.loc[samples.adapter.isin(adaIDs)]
+    if VERBOSE >= 3:
+        adaIDs = samples.adapter.tolist()
+        print 'adaIDs', adaIDs
 
-            ind |= samples.index.isin(samples_run.index)
-
-        samples = samples.loc[ind]
-
-    for i, (samplename, sample) in enumerate(samples.iterrows()):
+    # Iterate over samples and fragments
+    for samplename, sample in samples.iterrows():
         sample = SampleSeq(sample)
-        seq_run = sample['seq run']
-        data_folder = sample.sequencing_run.folder
         adaID = sample.adapter
-        fragments_sample = sample.regions_complete
+        fragments_sample = sample.regions_generic
         if VERBOSE:
-            print seq_run, adaID, samplename, fragments_sample
+            print adaID, samplename, fragments_sample
 
         for fragment in fragments_sample:
-            frag_gen = fragment[:2]
-            if (fragments is None) or (frag_gen in fragments):
-                check_division(data_folder, adaID, fragment, seq_run,
-                               maxreads=maxreads,
-                               VERBOSE=VERBOSE,
-                               minor_allele=use_minor_allele)
+            if (fragments is not None) and (fragment not in fragments):
+                continue
+
+            check_coverage(data_folder, adaID, fragment, seq_run,
+                           maxreads=maxreads,
+                           VERBOSE=VERBOSE,
+                           rescue=use_rescue,
+                           minor_allele=use_minor_allele)
 
 

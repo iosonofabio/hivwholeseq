@@ -20,9 +20,11 @@ def get_foldername(pname):
     return foldername
 
 
-def get_sample_foldername(pname, samplename):
+def get_sample_foldername(pname, samplename, PCR=None):
     '''Get the folder name of the data from a patient sample'''
     fn = get_foldername(pname)+samplename+'/'
+    if PCR is not None:
+        fn = fn+'PCR'+str(PCR)+'/'
     return fn
 
 
@@ -33,10 +35,16 @@ def get_initial_consensus_filename(pname, fragment, format='fasta'):
     return filename
 
 
+def get_primers_filename(pname, format='fasta'):
+    '''Get the filename with the patient-specific primers'''
+    filename = 'primers_'+pname+'.'+format
+    filename = get_foldername(pname)+filename
+    return filename
+
+
 def get_mapped_to_initial_foldername(pname, samplename_pat, PCR=1):
     '''Get the folder of mapped reads to initial consensus'''
-    fn = samplename_pat+'/PCR'+str(PCR)+'/mapped_to_initial/'
-    fn = get_foldername(pname)+fn
+    fn = get_sample_foldername(pname, samplename_pat, PCR=PCR)+'mapped_to_initial/'
     return fn
 
 
@@ -102,7 +110,7 @@ def get_consensi_alignment_genomewide_filename(pname):
 def get_allele_counts_filename(pname, samplename_pat, fragment, PCR=1, qual_min=30):
     '''Get the filename of the allele counts for a patient sample'''
     filename = 'allele_counts_'+fragment+'_qual'+str(qual_min)+'+'+'.npy'
-    filename = get_mapped_to_initial_foldername(pname, samplename_pat, PCR=PCR)+filename
+    filename = get_sample_foldername(pname, samplename_pat, PCR=PCR)+filename
     return filename
 
 

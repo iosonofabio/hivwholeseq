@@ -29,10 +29,20 @@ def check_similarity_initial_sample(refseq, sample_seq, fragment, VERBOSE=0, max
 
     from seqanpy import align_global
     (score, ali1, ali2) = align_global(str(refseq.seq), str(consseq.seq), band=50)
+
+    # PCR2 samples are shorter: if the consensus got complemented by PCR1 wings,
+    # ignore the wings
+    if int(sample_seq.PCR) == 2:
+        start = len(ali2) - len(ali2.lstrip('-'))
+        end = len(ali2.rstrip('-'))
+        ali1 = ali1[start: end]
+        ali2 = ali2[start: end]
+
     alim = np.zeros((2, len(ali1)), 'S1')
     alim[0] = np.fromstring(ali1, 'S1')
     alim[1] = np.fromstring(ali2, 'S1')
     n_diff = (alim[0] != alim[1]).sum()
+
     if VERBOSE >= 2:
         print fragment+': difference between ref and initial consensus:', n_diff
 
@@ -150,6 +160,33 @@ def get_gene_HXB2(genename):
         return exon_HXB2
 
 
+def get_frame(geneseq, gene_HXB2, genename, VERBOSE=0):
+    '''Get the frame by aligning the proteins'''
+    from seqanpy import align_local
+    from Bio.Seq import translate
+    from numpy import argmax
+
+    geneseq = ''.join(geneseq)
+    gene_HXB2 = ''.join(gene_HXB2)
+
+    if genename in ('tat1', 'rev1'):
+        gene_HXB2 = gene_HXB2[:len(gene_HXB2) - (len(gene_HXB2) % 3)]
+    elif genename in ('tat2', 'rev2'):
+        gene_HXB2 = gene_HXB2[len(gene_HXB2) % 3:]
+
+    prot_HXB2 = translate(gene_HXB2)
+
+    scores = []
+    for frame in xrange(3):
+        tmp = geneseq[frame:]
+        tmp = tmp[:len(tmp) - (len(tmp) % 3)]
+        tmp = translate(tmp)
+        (score, ali1, ali2) = align_local(prot_HXB2, tmp)
+        scores.append(score)
+
+    return argmax(scores)
+
+
 def check_length_fragment(refseq, frag_spec, VERBOSE=0, tolerance=50):
     '''Check the length of the fragment compared to HXB2'''
     fragment = frag_spec[:2]
@@ -231,7 +268,7 @@ def check_F1(refseq, spec, VERBOSE=0):
 
 def check_F2(refseq, spec, VERBOSE=0):
     '''Check fragment F2: gag, pol'''
-    check = check_length_fragment(refseq, 'F2'+spec, VERBOSE=VERBOSE, tolerance=50)
+    check = check_length_fragment(refseq, 'F2'+spec, VERBOSE=VERBOSE, tolerance=80)
     if not check:
         return False
 
@@ -331,10 +368,50 @@ def check_F3(refseq, spec, VERBOSE=0):
 
 
 def check_F4(refseq, spec, VERBOSE=0):
-    '''Check fragment F4: vif, vpr, vpu, tat1, rev1, env'''
+    '''Check fragment F4: pol, vif, vpr, vpu, tat1, rev1, env'''
     check = check_length_fragment(refseq, 'F4'+spec, VERBOSE=VERBOSE, tolerance=50)
     if not check:
         return False
+
+    # Check pol (there should be end)
+    genename = 'pol'
+    (start, end, start_found, end_found) = locate_gene(refseq, genename, VERBOSE=VERBOSE)
+    if (not end_found):
+        print 'ERROR: end of '+genename+' not found in F4!'
+        return False
+    elif VERBOSE >= 3:
+        print 'OK: end of '+genename+' found'
+
+    geneseq = refseq[:end]
+    gene_HXB2 = get_gene_HXB2(genename)
+    frame = get_frame(geneseq, gene_HXB2, genename)
+    geneseq = geneseq[frame:]
+    geneseq = geneseq[:len(geneseq) - (len(geneseq) % 3)]
+    gene = geneseq.seq
+    prot = gene.translate()
+    check = check_has_end(prot, genename, VERBOSE=VERBOSE)
+    # it can end a bit early or late
+    if not check:
+        gene_new = refseq.seq[frame:]
+        gene_new = gene_new[:len(gene_new) - (len(gene_new) % 3)]
+        prot_new = gene_new.translate()
+        end_new = prot_new.find('*')
+
+        end_diff = (frame + 3 * end_new) - end
+        if 0 < end_diff < 200:
+            print genename.upper()+' ENDS '+str(end_new - len(prot) + 1)+' AMINO ACIDS DOWNSTREAM!'
+            prot = prot_new[:end_new + 1]
+        elif -200 < end_diff < 0:
+            print genename.upper()+' ENDS '+str(len(prot) - 1 - end_new)+' AMINO ACIDS UPSTREAM!'
+            prot = prot_new[:end_new + 1]
+        else:
+            return False
+
+    check = check_has_premature_stops(prot, genename, VERBOSE=VERBOSE)
+    if not check:
+        print prot
+        return False
+
 
     # Check env (there should be the start)
     genename = 'env'
@@ -483,7 +560,7 @@ def check_F4(refseq, spec, VERBOSE=0):
         print 'OK: start and end of '+genename+' found'
     
     gene_HXB2 = get_gene_HXB2(genename)
-    check = check_has_similar_length(end - start, len(gene_HXB2), genename, VERBOSE=VERBOSE, maxdiff=15)
+    check = check_has_similar_length(end - start, len(gene_HXB2), genename, VERBOSE=VERBOSE, maxdiff=35)
     if not check:
         return False
 
@@ -560,6 +637,41 @@ def check_F5(refseq, spec, VERBOSE=0):
     if not check:
         return False
 
+    # Check vpu (should be complete in F5ao)
+    if spec_inner == 'ao':
+        genename = 'vpu'
+        (start, end, start_found, end_found) = locate_gene(refseq, genename, VERBOSE=VERBOSE)
+        if (not start_found) or (not end_found):
+            print 'ERROR: '+genename+' not found in F4!'
+            return False
+        elif VERBOSE >= 3:
+            print 'OK: start and end of '+genename+' found'
+        
+        gene_HXB2 = get_gene_HXB2(genename)
+        check = check_has_similar_length(end - start, len(gene_HXB2), genename, VERBOSE=VERBOSE, maxdiff=15)
+        if not check:
+            return False
+
+        geneseq = refseq[start: end]
+        gene = geneseq.seq
+        check = check_has_complete_codons(gene, genename, VERBOSE=VERBOSE)
+        if not check:
+            return False
+
+        prot = gene.translate()
+        check = check_start_aminoacid(prot, genename, VERBOSE=VERBOSE)
+        if not check:
+            print 'ERROR IN VPU STARTING CODON, CONTINUING!'
+            #return False
+
+        check = check_has_end(prot, genename, VERBOSE=VERBOSE)
+        if not check:
+            return False
+
+        check = check_has_premature_stops(prot, genename, VERBOSE=VERBOSE)
+        if not check:
+            return False
+
     return True
 
 
@@ -571,7 +683,7 @@ def check_F6(refseq, spec, VERBOSE=0):
 
     # Check env (there should be end)
     genename = 'env'
-    (start, end, start_found, end_found) = locate_gene(refseq, 'env', VERBOSE=VERBOSE)
+    (start, end, start_found, end_found) = locate_gene(refseq, genename, VERBOSE=VERBOSE)
     if (not end_found):
         print 'ERROR: end of '+genename+' not found in F6!'
         return False
@@ -579,12 +691,29 @@ def check_F6(refseq, spec, VERBOSE=0):
         print 'OK: end of '+genename+' found'
 
     geneseq = refseq[:end]
-    geneseq = geneseq[len(geneseq) % 3:]
+    gene_HXB2 = get_gene_HXB2(genename)
+    frame = get_frame(geneseq, gene_HXB2, genename)
+    geneseq = geneseq[frame:]
+    geneseq = geneseq[:len(geneseq) - (len(geneseq) % 3)]
     gene = geneseq.seq
     prot = gene.translate()
     check = check_has_end(prot, genename, VERBOSE=VERBOSE)
+    # env can end a bit early or late
     if not check:
-        return False
+        gene_new = refseq.seq[frame:]
+        gene_new = gene_new[:len(gene_new) - (len(gene_new) % 3)]
+        prot_new = gene_new.translate()
+        end_new = prot_new.find('*')
+
+        end_diff = (frame + 3 * end_new) - end
+        if 0 < end_diff < 200:
+            print 'ENV ENDS '+str(end_new - len(prot) + 1)+' AMINO ACIDS DOWNSTREAM!'
+            prot = prot_new[:end_new + 1]
+        elif -200 < end_diff < 0:
+            print 'ENV ENDS '+str(len(prot) - 1 - end_new)+' AMINO ACIDS UPSTREAM!'
+            prot = prot_new[:end_new + 1]
+        else:
+            return False
 
     check = check_has_premature_stops(prot, genename, VERBOSE=VERBOSE)
     if not check:
@@ -628,7 +757,8 @@ def check_F6(refseq, spec, VERBOSE=0):
 
     # NOTE: rev2 overlaps with env gp41 and can have insertions or deletions
     gene_HXB2 = get_gene_HXB2(genename)
-    check = check_has_similar_length(end - start, len(gene_HXB2), genename, VERBOSE=VERBOSE, maxdiff=45)
+    check = check_has_similar_length(end - start, len(gene_HXB2), genename,
+                                     VERBOSE=VERBOSE, maxdiff=45)
     if not check:
         return False
 
@@ -640,11 +770,25 @@ def check_F6(refseq, spec, VERBOSE=0):
     if not check:
         # rev2 can end a bit early
         end_new = prot.rfind('*')
-        if end_new == -1:
-            return False
-        if len(prot) - 1 - end_new < 20:
-            print 'REV2 ENDS '+str(len(prot) - end_new - 1)+' AMINO ACIDS TOO EARLY!'
-            prot = prot[:end_new + 1]
+        if end_new != -1:
+            if len(prot) - 1 - end_new < 20:
+                print 'REV2 ENDS '+str(len(prot) - end_new - 1)+' AMINO ACIDS UPSTREAM!'
+                prot = prot[:end_new + 1]
+            else:
+                return False
+        else:
+            # rev2 can also end quite a bit late
+            gene_new = refseq.seq[start:]
+            gene_new = gene_new[(end - start) % 3:]
+            gene_new = gene_new[:len(gene_new) - (len(gene_new) % 3)]
+            prot_new = gene_new.translate()
+            end_new = prot_new.find('*')
+
+            if (start + 3 * end_new) - end < 200:
+                print 'REV2 ENDS '+str(end_new - len(prot) + 1)+' AMINO ACIDS DOWNSTREAM!'
+                prot = prot_new[:end_new + 1]
+            else:
+                return False
 
     check = check_has_premature_stops(prot, genename, VERBOSE=VERBOSE)
     if not check:
@@ -658,7 +802,8 @@ def check_genomewide(refseq, VERBOSE=0):
     # Check single-exon genes
     length_tolerance = {'gag': 30, 'pol': 30, 'env': 70, 'vpr': 15, 'vpu': 15}
     for genename, tol in length_tolerance.iteritems():
-        (start, end, start_found, end_found) = locate_gene(refseq, genename, VERBOSE=VERBOSE)
+        (start, end,
+         start_found, end_found) = locate_gene(refseq, genename, VERBOSE=VERBOSE)
         if (not start_found) or (not end_found):
             print 'ERROR: '+genename+' not found in genomewide!'
             return False
@@ -674,7 +819,18 @@ def check_genomewide(refseq, VERBOSE=0):
         gene = geneseq.seq
         check = check_has_complete_codons(gene, genename, VERBOSE=VERBOSE)
         if not check:
-            return False
+            # sometimes the gene ends a few nucleotides upstream, and there is a
+            # frameshift mutation that screws up
+            gene_new = refseq.seq[start:]
+            gene_new = gene_new[:len(gene_new) - (len(gene_new) % 3)]
+            prot_new = gene_new.translate()
+            end_new = prot_new.find('*')
+            end_diff = start + (3 * end_new + 3) - end
+            if -90 < end_diff < 0:
+                print genename.upper()+' ENDS '+str((end - start) // 3 - end_new - 1)+' AMINO ACIDS UPSTREAM!'
+                gene = gene_new[:3 * (end_new + 1)]
+            else:
+                return False
 
         prot = gene.translate()
         check = check_start_aminoacid(prot, genename, VERBOSE=VERBOSE)
@@ -686,7 +842,22 @@ def check_genomewide(refseq, VERBOSE=0):
 
         check = check_has_end(prot, genename, VERBOSE=VERBOSE)
         if not check:
-            return False
+            # sometimes a gene is a bit longer
+            gene_new = refseq.seq[start:]
+            gene_new = gene_new[:len(gene_new) - (len(gene_new) % 3)]
+            prot_new = gene_new.translate()
+            end_new = prot_new.find('*')
+            end_diff = start + (3 * end_new + 3) - end
+            if -90 < end_diff < 0:
+                print genename.upper()+' ENDS '+str((end - start) // 3 - end_new - 1)+' AMINO ACIDS UPSTREAM!'
+                gene = gene_new[:3 * (end_new + 1)]
+                prot = gene.translate()
+            elif 0 < end_diff < 90:
+                print genename.upper()+' ENDS '+str(end_new + 1 - (end - start) // 3)+' AMINO ACIDS DOWNSTREAM!'
+                gene = gene_new[:3 * (end_new + 1)]
+                prot = gene.translate()
+            else:
+                return False
 
         check = check_has_premature_stops(prot, genename, VERBOSE=VERBOSE)
         if not check:
@@ -702,7 +873,8 @@ def check_genomewide(refseq, VERBOSE=0):
         print 'OK: start and end of '+genename+' found'
     
     gene_HXB2 = get_gene_HXB2(genename)
-    check = check_has_similar_length(end - start, len(gene_HXB2), genename, VERBOSE=VERBOSE, maxdiff=15)
+    check = check_has_similar_length(end - start, len(gene_HXB2), genename,
+                                     VERBOSE=VERBOSE, maxdiff=15)
     if not check:
         return False
 
@@ -786,12 +958,39 @@ def check_genomewide(refseq, VERBOSE=0):
             return False
 
         geneseq = refseq[start: end]
-        geneseq = geneseq[len(geneseq) % 3:]
+        frame = get_frame(geneseq, gene_HXB2, genename, VERBOSE=VERBOSE)
+        geneseq = geneseq[frame:]
         gene = geneseq.seq
         prot = gene.translate()
         check = check_has_end(prot, genename, VERBOSE=VERBOSE)
         if not check:
-            return False
+            if genename != 'rev2':
+                return False
+
+            else:
+                # rev2 can end a bit early
+                end_new = prot.rfind('*')
+                if end_new != -1:
+                    if len(prot) - 1 - end_new < 20:
+                        print 'REV2 ENDS '+str(len(prot) - end_new - 1)+' AMINO ACIDS UPSTREAM!'
+                        prot = prot[:end_new + 1]
+                        end = start + frame + 3 * (end_new + 1)
+                    else:
+                        return False
+                else:
+                    # rev2 can also end quite a bit late
+                    gene_new = refseq.seq[start:]
+                    gene_new = gene_new[(end - start) % 3:]
+                    gene_new = gene_new[:len(gene_new) - (len(gene_new) % 3)]
+                    prot_new = gene_new.translate()
+                    end_new = prot_new.find('*')
+
+                    if (start + 3 * end_new) - end < 200:
+                        print 'REV2 ENDS '+str(end_new - len(prot) + 1)+' AMINO ACIDS DOWNSTREAM!'
+                        prot = prot_new[:end_new + 1]
+                        end = start + ((end - start) % 3) + 3 * (end_new + 1)
+                    else:
+                        return False
 
         check = check_has_premature_stops(prot, genename, VERBOSE=VERBOSE)
         if not check:
@@ -893,8 +1092,8 @@ if __name__ == '__main__':
         patient.discard_nonsequenced_samples()
 
         # Check whether patient has at least three time points, else ignore
-        if patient.samples.shape[0] < 3:
-            print 'WARNING: patient has less than three samples sequenced. Skipping.'
+        if patient.samples.shape[0] < 2:
+            print 'WARNING: patient has less than two samples sequenced. Skipping.'
             continue
     
         sample_init = patient.initial_sample
@@ -910,7 +1109,6 @@ if __name__ == '__main__':
 
             if VERBOSE:
                 print 'Initial sample:', sample_init_seq.name, sample_init_seq['seq run'], sample_init_seq.adapter
-
 
             # Check whether a reference exists at all
             ref_fn = patient.get_reference_filename(fragment)
@@ -930,8 +1128,18 @@ if __name__ == '__main__':
                 if not use_force:
                     sys.exit()
 
+            # Get the specific fragment for this consensus
+            # NOTE: we only recently started hiding the frag spec in the reference name
+            tmp = refseq.name.split('_')[-1]
+            if (len(tmp) >= 3) and (tmp[:2] == fragment):
+                frag_spec = tmp
+            else:
+                frag_spec = [fr for fr in frag_specs if fragment in fr][0]
+                # NOTE: we always use outer primer references, if the initial sample
+                # is PCR2 we complement by taking the wings from a later one
+                frag_spec = frag_spec.replace('i', 'o')
+
             # Check whether genes are fine
-            frag_spec = [fr for fr in frag_specs if fragment in fr][0]
             check = check_genes(refseq, frag_spec, VERBOSE=VERBOSE)
             if not check:
                 print 'ERROR in', fragment
@@ -955,6 +1163,8 @@ if __name__ == '__main__':
         #            str(n_diff)+' differences)'
         #    continue
         
+        if VERBOSE:
+            print 'Genomewide'
         check = check_genes(refseq, 'genomewide', VERBOSE=VERBOSE)
         if not check:
             print 'ERROR in genomewide'

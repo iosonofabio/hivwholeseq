@@ -73,7 +73,7 @@ def make_symlinks(dataset, VERBOSE=0):
             continue
 
         sample_fn = raw_root_folder+[fn for fn in os.listdir(raw_root_folder) 
-                                     if raw_fn.replace('4204', '4202').replace('VK00', 'VK09') in fn][0]+'/'
+                                     if raw_fn in fn][0]+'/'
 
         fn1 = sample_fn+[fn for fn in os.listdir(sample_fn) if 'L001_R1' in fn][0]
         fn2 = sample_fn+[fn for fn in os.listdir(sample_fn) if 'L001_R2' in fn][0]

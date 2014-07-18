@@ -15,8 +15,7 @@ from Bio import SeqIO
 
 from hivwholeseq.miseq import alpha
 from hivwholeseq.patients.patients import load_patient
-from hivwholeseq.patients.filenames import get_initial_consensus_filename, \
-        get_mapped_to_initial_filename, get_allele_frequency_trajectories_filename, \
+from hivwholeseq.patients.filenames import get_allele_frequency_trajectories_filename, \
         get_allele_count_trajectories_filename
 from hivwholeseq.patients.one_site_statistics import \
         plot_allele_frequency_trajectories_from_counts as plot_nus_from_act

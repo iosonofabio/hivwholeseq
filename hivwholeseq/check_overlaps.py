@@ -16,7 +16,6 @@ from itertools import izip
 import Bio.SeqIO as SeqIO
 import Bio.AlignIO as AlignIO
 
-from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.filenames import get_consensus_filename, \
         get_allele_counts_filename, get_coverage_filename, \
         get_overlap_nu_figure_filename
@@ -38,10 +37,8 @@ def get_overlap(data_folder, adaID, frag1, frag2, VERBOSE=0):
     '''Find the overlap coordinates for the two fragments'''
     from hivwholeseq.mapping_utils import align_muscle
 
-    seq1 = SeqIO.read(get_consensus_filename(data_folder, adaID, frag1,
-                                             trim_primers=True), 'fasta')
-    seq2 = SeqIO.read(get_consensus_filename(data_folder, adaID, frag2,
-                                             trim_primers=True), 'fasta')
+    seq1 = SeqIO.read(get_consensus_filename(data_folder, adaID, frag1), 'fasta')
+    seq2 = SeqIO.read(get_consensus_filename(data_folder, adaID, frag2), 'fasta')
     sm1 = np.array(seq1)
     sm2 = np.array(seq2)
 
@@ -52,7 +49,7 @@ def get_overlap(data_folder, adaID, frag1, frag2, VERBOSE=0):
     found = False
     trials = 0
     while (not found) and (trials < 3):
-        for pos in xrange(len(seq1) - 500, len(seq1) - seed_len):
+        for pos in xrange(len(seq1) - 700, len(seq1) - seed_len):
             if (sm1[pos: pos + seed_len] == seed).sum() >= matches_min - trials:
                 found = True
                 start_s2 = pos
@@ -64,7 +61,7 @@ def get_overlap(data_folder, adaID, frag1, frag2, VERBOSE=0):
         return None
 
     if VERBOSE >= 3:
-        print 'Beginning of s2 found in s1'
+        print 'Beginning of '+frag2+' found in '+frag1
 
     # In an ideal world, the overlap is a holy place in which no indels happen.
     # We cannot assume that, sadly. However, we can search from the other side
@@ -73,7 +70,7 @@ def get_overlap(data_folder, adaID, frag1, frag2, VERBOSE=0):
     seed = sm1[-seed_len:]
     trials = 0
     while (not found) and (trials < 3):
-        for pos in xrange(500):
+        for pos in xrange(700):
             if (sm2[pos: pos + seed_len] == seed).sum() >= matches_min - trials:
                 found = True
                 end_s1 = pos + seed_len
@@ -84,7 +81,7 @@ def get_overlap(data_folder, adaID, frag1, frag2, VERBOSE=0):
         return None
 
     if VERBOSE >= 3:
-        print 'End of s1 found in s2'
+        print 'End of '+frag1+' found in '+frag2
 
     # Align
     ali = align_muscle(seq1[start_s2:], seq2[:end_s1])

@@ -61,9 +61,8 @@ class Patient(pd.Series):
     
     @property
     def times(self):
-        '''Get the times as integers'''
-        dates = self.dates
-        times = dates
+        '''Get the times as days from transmission'''
+        times = (self.dates - self.transmission_date) / np.timedelta64(1, 'D')
         return times        
 
 
@@ -77,6 +76,12 @@ class Patient(pd.Series):
         '''Get filename of the reference for mapping'''
         from hivwholeseq.patients.filenames import get_initial_consensus_filename
         return get_initial_consensus_filename(self.name, fragment, format)
+
+
+    def get_reference(self, fragment):
+        '''Get the reference for a fragment'''
+        from Bio import SeqIO
+        return SeqIO.read(self.get_reference_filename(fragment), 'fasta')
 
 
     def get_allele_frequency_trajectories(self, fragment_or_gene):
@@ -136,3 +141,15 @@ def load_samples_sequenced(patient=None):
         sample_table = sample_table.loc[sample_table.loc[:, 'patient'] == patient]
 
     return sample_table
+
+
+def filter_patients_n_times(patients, n_times=3):
+    '''Find what patients have at least n_times time points sequenced'''
+    ind = np.zeros(len(patients), bool)
+    for i, (pname, patient) in enumerate(patients.iterrows()):
+        patient = Patient(patient)
+        patient.discard_nonsequenced_samples()
+        if len(patient.times) >= n_times:
+            ind[i] = True
+
+    return ind

@@ -189,6 +189,11 @@ def build_consensus(bamfilename, len_reference, VERBOSE=0,
             reads = reads_by_block[n_block - 1]
             n_block += 1
 
+            #FIXME
+            #if n_block >= 2:
+            #    print pos_ref, pos_ref + block_len
+            #    import ipdb; ipdb.set_trace()
+
             # Internal coverage holes are not tolerated, but the last block
             # is allowed to be missing. However, we should try to squeeze out
             # all the bases by rescanning the reads a last time with less strict
@@ -264,6 +269,11 @@ def build_consensus(bamfilename, len_reference, VERBOSE=0,
             if not full_cover:
                 seqs.sort(key=len, reverse=True)
                 seqs = seqs[:n_reads_per_ali]
+
+            #FIXME
+            #if n_block >= 2:
+            #    print pos_ref, pos_ref + block_len
+            #    import ipdb; ipdb.set_trace()
 
             # Make local consensus
             cons_local = build_local_consensus(seqs, VERBOSE=VERBOSE,
@@ -430,8 +440,15 @@ if __name__ == '__main__':
                 bamfilename = get_premapped_filename(data_folder, adaID, type='bam')
                 frag_out = fragment
             else:
-                refseq = SeqIO.read(get_reference_premap_filename(data_folder, adaID, fragment), 'fasta')
+                fn = get_reference_premap_filename(data_folder, adaID, fragment)
                 bamfilename = get_divided_filename(data_folder, adaID, fragment, type='bam')
+
+                #FIXME: old nomenclature for F3a is F3
+                if not os.path.isfile(fn) and fragment[:3] == 'F3a':
+                    fn = get_reference_premap_filename(data_folder, adaID, 'F3'+fragment[-1])
+                    bamfilename = get_divided_filename(data_folder, adaID, 'F3'+fragment[-1], type='bam')
+
+                refseq = SeqIO.read(fn, 'fasta')
                 frag_out = fragment[:2]
 
             consensus = build_consensus(bamfilename, len(refseq), VERBOSE=VERBOSE,

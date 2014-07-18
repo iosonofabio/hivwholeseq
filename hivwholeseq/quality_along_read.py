@@ -17,7 +17,6 @@ from itertools import izip
 from Bio.SeqIO.QualityIO import FastqGeneralIterator as FGI
 import pysam
 
-from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.filenames import get_demultiplex_summary_filename, get_raw_read_files, \
         get_premapped_filename, get_read_filenames
 from hivwholeseq.adapter_info import adapters_illumina, foldername_adapter
@@ -191,7 +190,8 @@ def plot_cuts_quality_along_reads(data_folder, adaID, title, quality, VERBOSE=0,
 if __name__ == '__main__':
 
     # Parse input args
-    parser = argparse.ArgumentParser(description='Check quality along reads')
+    parser = argparse.ArgumentParser(description='Check quality along reads',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     parser.add_argument('--run', required=True,
                         help='Seq run to analyze (e.g. Tue28, test_tiny)')
     parser.add_argument('--adaID', required=True,

@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # vim: fdm=indent
 '''
 author:     Fabio Zanini
@@ -22,18 +23,21 @@ from hivwholeseq.primer_info import primers_coordinates_HXB2_outer as pcos_HXB2
 from hivwholeseq.mapping_utils import get_number_reads
 
 from hivwholeseq.samples import load_sequencing_run, SampleSeq
+from hivwholeseq.samples import load_samples_sequenced as lss
+from hivwholeseq.fork_cluster import fork_premapped_coverage as fork_self
 
 
 
 # Functions
-def plot_coverage(counts, frags_pos=None, frags_pos_out=None,
+def plot_coverage(counts, offset_x=0, frags_pos=None, frags_pos_out=None,
                   title=None):
     '''Plot the coverage and the minor allele frequency'''
     cov = counts.sum(axis=1)
     cov_tot = cov.sum(axis=0)
 
     fig, ax = plt.subplots(1, 1, figsize=(11, 8))
-    ax.plot(cov_tot.T, lw=2, c='k', label=read_types)
+    ax.plot(np.arange(len(cov_tot.T)) + offset_x, cov_tot.T, lw=2, c='k',
+            label=read_types)
     ax.set_xlabel('Position [bases]')
     ax.set_ylabel('Coverage')
     ax.grid(True)
@@ -42,16 +46,16 @@ def plot_coverage(counts, frags_pos=None, frags_pos_out=None,
     # Inner primers
     if frags_pos is not None:
         for i, frag_pos in enumerate(frags_pos.T):
-            ax.plot(frag_pos, 2 * [(0.97 - 0.03 * (i % 2)) * ax.get_ylim()[1]],
+            ax.plot(frag_pos + offset_x, 2 * [(0.97 - 0.03 * (i % 2)) * ax.get_ylim()[1]],
                     c=cm.jet(int(255.0 * i / len(frags_pos.T))), lw=2)
 
     # Outer primers
     if frags_pos_out is not None:
         for i, frag_pos in enumerate(frags_pos_out.T):
-            ax.plot(frag_pos, 2 * [(0.96 - 0.03 * (i % 2)) * ax.get_ylim()[1]],
+            ax.plot(frag_pos + offset_x, 2 * [(0.96 - 0.03 * (i % 2)) * ax.get_ylim()[1]],
                     c=cm.jet(int(255.0 * i / len(frags_pos_out.T))), lw=2)
 
-    ax.set_xlim(-500, 9500)
+    ax.set_xlim(0, 10000)
 
     if title is not None:
         ax.set_title(title, fontsize=18)
@@ -62,9 +66,13 @@ def plot_coverage(counts, frags_pos=None, frags_pos_out=None,
 def check_premap(data_folder, adaID, fragments, seq_run, samplename,
                  qual_min=30, match_len_min=10,
                  maxreads=-1, VERBOSE=0,
+                 savefig=True,
                  title=None):
     '''Check premap to reference: coverage, etc.'''
     refseq = SeqIO.read(get_reference_premap_filename(data_folder, adaID), 'fasta')
+    # FIXME: do this possibly better than parsing the description!
+    fields = refseq.description.split()
+    refseq_start = int(fields[fields.index('(indices') - 3])
 
     fragpos_filename = get_fragment_positions_filename(data_folder, adaID)
     if os.path.isfile(fragpos_filename):
@@ -122,13 +130,14 @@ def check_premap(data_folder, adaID, fragments, seq_run, samplename,
                              ['n_reads', maxreads],
                             ]))
     plot_coverage(counts,
+                  offset_x=refseq_start,
                   frags_pos=frags_pos,
                   frags_pos_out=frags_pos_out,
                   title=title)
 
-    # SAVEFIG
-    from hivwholeseq.adapter_info import foldername_adapter
-    plt.savefig(data_folder+foldername_adapter(adaID)+'figures/coverage_premapped_'+samplename+'.png')
+    if savefig:
+        from hivwholeseq.adapter_info import foldername_adapter
+        plt.savefig(data_folder+foldername_adapter(adaID)+'figures/coverage_premapped_'+samplename+'.png')
 
     return (counts, inserts)
 
@@ -140,8 +149,11 @@ if __name__ == '__main__':
     # Parse input args
     parser = argparse.ArgumentParser(description='Check consensus',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
-    parser.add_argument('--runs', required=True, nargs='+',
-                        help='Seq run to analyze (e.g. Tue28)')
+    runs_or_samples = parser.add_mutually_exclusive_group(required=True)
+    runs_or_samples.add_argument('--runs', nargs='+',
+                                 help='Seq run to analyze (e.g. Tue28)')
+    runs_or_samples.add_argument('--samples', nargs='+',
+                                 help='Samples to analyze (e.g. 31440_PCR1')
     parser.add_argument('--adaIDs', nargs='+',
                         help='Adapter IDs to analyze (e.g. TS2)')
     parser.add_argument('--maxreads', type=int, default=1000,
@@ -150,44 +162,72 @@ if __name__ == '__main__':
                         help='Verbosity level [0-3]')
     parser.add_argument('--titles', nargs='*', default=None,
                         help='Give a title to the figure')
+    parser.add_argument('--submit', action='store_true',
+                        help='Execute the script in parallel on the cluster')
+    parser.add_argument('--noshow', action='store_false', dest='show',
+                        help='Do not show the plot, just save it')
+    parser.add_argument('--persist', action='store_true',
+                        help='Plot show blocks thread')
 
     args = parser.parse_args()
+    samplenames = args.samples
     seq_runs = args.runs
     adaIDs = args.adaIDs
+    submit = args.submit
     maxreads = args.maxreads
     VERBOSE = args.verbose
     titles = args.titles
+    show = args.show
+    persist = args.persist
 
-    for seq_run in seq_runs:
-        dataset = load_sequencing_run(seq_run)
-        data_folder = dataset.folder
+    if persist:
+        plt.ioff()
 
-        # If the script is called with no adaID, iterate over all
-        samples = dataset.samples
-        if adaIDs is not None:
-            samples = samples.loc[samples.adapter.isin(adaIDs)]
+    samples = lss()
+    if samplenames is not None:
+        samples = samples.loc[samples.index.isin(samplenames)]
 
-        if VERBOSE >= 3:
-            print 'adaIDs', samples.adapter
+    else:
+        ind = np.zeros(len(samples), bool)
+        for seq_run in seq_runs:
+            dataset = load_sequencing_run(seq_run)
+            data_folder = dataset.folder
+            samples_run = dataset.samples
+            # If the script is called with no adaID, iterate over all
+            if adaIDs is not None:
+                samples_run = samples_run.loc[samples_run.adapter.isin(adaIDs)]
 
-        for i, (samplename, sample) in enumerate(samples.iterrows()):
-            sample = SampleSeq(sample)
-            adaID = sample.adapter
-            fragments = sample.regions_complete
+            ind |= samples.index.isin(samples_run.index)
 
-            if VERBOSE:
-                print seq_run, adaID
-            if titles is not None:
-                title = titles[i]
-            else:
-                title = None
+        samples = samples.loc[ind]
 
-            (counts, inserts) = check_premap(data_folder, adaID,
-                                             fragments, seq_run, samplename,
-                                             maxreads=maxreads,
-                                             VERBOSE=VERBOSE,
-                                             title=title)
+    for i, (samplename, sample) in enumerate(samples.iterrows()):
+        sample = SampleSeq(sample)
+        seq_run = sample['seq run']
+        data_folder = sample.sequencing_run.folder
+        adaID = sample.adapter
+        fragments = sample.regions_complete
 
-    plt.ion()
-    plt.show()
+        if VERBOSE:
+            print seq_run, adaID
+        
+        if submit:
+            fork_self(samplename, maxreads=maxreads, VERBOSE=VERBOSE)
+            continue
+
+        if titles is not None:
+            title = titles[i]
+        else:
+            title = None
+
+        (counts, inserts) = check_premap(data_folder, adaID,
+                                         fragments, seq_run, samplename,
+                                         maxreads=maxreads,
+                                         VERBOSE=VERBOSE,
+                                         title=title)
+
+    if show and (not submit):
+        if not persist:
+            plt.ion()
+        plt.show()
 

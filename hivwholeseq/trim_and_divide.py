@@ -740,7 +740,6 @@ if __name__ == '__main__':
     include_tests = args.test
     summary = args.summary
 
-    # Specify the dataset
     dataset = load_sequencing_run(seq_run)
     data_folder = dataset.folder
 
@@ -752,7 +751,6 @@ if __name__ == '__main__':
     if adaIDs is not None:
         samples = samples.loc[samples.adapter.isin(adaIDs)]
 
-    # Iterate over all adaIDs
     for (samplename, sample) in samples.iterrows():
         if str(sample.PCR) == 'nan':
             if VERBOSE:

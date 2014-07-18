@@ -40,7 +40,7 @@ def fork_quality_along_read(seq_run, VERBOSE=0, maxreads=-1, savefig=True):
                  '-S', '/bin/bash',
                  '-o', JOBLOGOUT,
                  '-e', JOBLOGERR,
-                 '-N', 'demux',
+                 '-N', 'quaalo',
                  '-l', 'h_rt='+cluster_time,
                  '-l', 'h_vmem='+vmem,
                  JOBSCRIPT,
@@ -114,7 +114,7 @@ def fork_trim(seq_run, adaID, VERBOSE=0, summary=True):
     return sp.check_output(call_list)
 
 
-def fork_premap(seq_run, adaID, VERBOSE=0, bwa=False, threads=1,
+def fork_premap(seq_run, adaID, VERBOSE=0, threads=1,
                 reference='HXB2', summary=True, trimmed=False):
     '''Submit premap script to the cluster for each adapter ID'''
     if VERBOSE:
@@ -123,7 +123,7 @@ def fork_premap(seq_run, adaID, VERBOSE=0, bwa=False, threads=1,
     JOBSCRIPT = JOBDIR+'premap_to_reference.py'
     # It is hard to tell whether 1h is sufficient, because the final sorting takes
     # quite some time. So for now give up and require 2h.
-    cluster_time = ['23:59:59', '3:59:59']
+    cluster_time = ['71:59:59', '3:59:59']
     vmem = '8G'
     call_list = ['qsub','-cwd',
                  '-b', 'y',
@@ -147,6 +147,34 @@ def fork_premap(seq_run, adaID, VERBOSE=0, bwa=False, threads=1,
         
     call_list = map(str, call_list)
     if VERBOSE >= 2:
+        print ' '.join(call_list)
+    return sp.check_output(call_list)
+
+
+def fork_premapped_coverage(samplename, VERBOSE=0, maxreads=-1):
+    '''Submit premap coverage to the cluster'''
+    if VERBOSE:
+        print 'Forking to the cluster'
+
+    JOBSCRIPT = JOBDIR+'check_premapped_coverage.py'
+    cluster_time = '00:59:59'
+    vmem = '1G'
+    call_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'pcov '+samplename,
+                 '-l', 'h_rt='+cluster_time,
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--samples', samplename,
+                 '--verbose', VERBOSE,
+                 '--maxreads', maxreads,
+                 '--persist',
+                ]
+    call_list = map(str, call_list)
+    if VERBOSE:
         print ' '.join(call_list)
     return sp.check_output(call_list)
 
@@ -257,7 +285,7 @@ def fork_build_consensus(seq_run, adaID, fragment,
     return sp.check_output(call_list)
 
 
-def fork_map_to_consensus(seq_run, adaID, fragment, VERBOSE=3, bwa=False,
+def fork_map_to_consensus(seq_run, adaID, fragment, VERBOSE=3,
                           threads=1, maxreads=-1, filter_reads=False,
                           summary=True):
     '''Submit map script for each adapter ID and fragment
@@ -288,8 +316,6 @@ def fork_map_to_consensus(seq_run, adaID, fragment, VERBOSE=3, bwa=False,
                  '--threads', threads,
                  '--maxreads', maxreads
                 ]
-    if bwa:
-        call_list.append('--bwa')
     if filter_reads:
         call_list.append('--filter')
     if not summary:

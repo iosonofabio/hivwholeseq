@@ -15,14 +15,12 @@ from Bio import SeqIO
 
 
 # Horizontal import of modules from this folder
-from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.adapter_info import load_adapter_table
 from hivwholeseq.filenames import get_consensus_filename, get_mapped_filename, \
         get_filter_mapped_summary_filename, get_mapped_suspicious_filename
 from hivwholeseq.mapping_utils import get_ind_good_cigars, convert_sam_to_bam,\
         pair_generator, get_range_good_cigars
 from hivwholeseq.fork_cluster import fork_filter_mapped as fork_self
-from hivwholeseq.samples import samples
 
 
 

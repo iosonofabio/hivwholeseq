@@ -220,116 +220,116 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
                 f.write('\nSAM file converted to compressed BAM: '+\
                         get_premapped_filename(data_folder, adaID, type='bam')+'\n')
 
-        return
+    else:
 
-    # Multithreading works as follows: call qsub + stampy, monitor the process
-    # IDs with qstat at regular intervals, and finally merge results with pysam
-    output_file_parts = [get_premapped_filename(data_folder, adaID, type='bam',
-                                            part=(j+1)) for j in xrange(threads)]
+        # Multithreading works as follows: call qsub + stampy, monitor the process
+        # IDs with qstat at regular intervals, and finally merge results with pysam
+        output_file_parts = [get_premapped_filename(data_folder, adaID, type='bam',
+                                                part=(j+1)) for j in xrange(threads)]
 
-    # Submit map script
-    jobs_done = np.zeros(threads, bool)
-    job_IDs = np.zeros(threads, 'S30')
-    
-    # Submit map call
-    import hivwholeseq
-    JOBDIR = hivwholeseq.__path__[0].rstrip('/')+'/'
-    JOBLOGOUT = JOBDIR+'logout'
-    JOBLOGERR = JOBDIR+'logerr'
-    cluster_time = ['23:59:59', '1:59:59']
-    vmem = '8G'
-    for j in xrange(threads):
-        call_list = ['qsub','-cwd',
-                     '-b', 'y',
-                     '-S', '/bin/bash',
-                     '-o', JOBLOGOUT,
-                     '-e', JOBLOGERR,
-                     '-N', adaID+' p'+str(j+1),
-                     '-l', 'h_rt='+cluster_time[threads >= 30],
-                     '-l', 'h_vmem='+vmem,
-                     stampy_bin,
-                     '--overwrite',
-                     '-g', get_reference_premap_index_filename(data_folder, adaID, ext=False),
-                     '-h', get_reference_premap_hash_filename(data_folder, adaID, ext=False), 
-                     '-o', get_premapped_filename(data_folder, adaID, type='sam', part=(j+1)),
-                     '--processpart='+str(j+1)+'/'+str(threads),
-                     '--substitutionrate='+subsrate,
-                     '-M'] + input_filenames
-        call_list = map(str, call_list)
-        if VERBOSE >= 2:
-            print ' '.join(call_list)
-        job_ID = sp.check_output(call_list)
-        job_ID = job_ID.split()[2]
-        job_IDs[j] = job_ID
-
-    # Monitor output
-    time_wait = 10 # secs
-    while not jobs_done.all():
-
-        # Sleep some time
-        time.sleep(time_wait)
-
-        # Get the output of qstat to check the status of jobs
-        qstat_output = sp.check_output(['qstat'])
-        qstat_output = qstat_output.split('\n')[:-1] # The last is an empty line
-        if VERBOSE >=3:
-            print qstat_output
-        if len(qstat_output) < 3:
-            jobs_done[:] = True
-            break
-        else:
-            qstat_output = [line.split()[0] for line in qstat_output[2:]]
-
-        time_wait = 10 # secs
+        # Submit map script
+        jobs_done = np.zeros(threads, bool)
+        job_IDs = np.zeros(threads, 'S30')
+        
+        # Submit map call
+        import hivwholeseq
+        JOBDIR = hivwholeseq.__path__[0].rstrip('/')+'/'
+        JOBLOGOUT = JOBDIR+'logout'
+        JOBLOGERR = JOBDIR+'logerr'
+        cluster_time = ['23:59:59', '1:59:59']
+        vmem = '8G'
         for j in xrange(threads):
-            if jobs_done[j]:
-                continue
+            call_list = ['qsub','-cwd',
+                         '-b', 'y',
+                         '-S', '/bin/bash',
+                         '-o', JOBLOGOUT,
+                         '-e', JOBLOGERR,
+                         '-N', adaID+' p'+str(j+1),
+                         '-l', 'h_rt='+cluster_time[threads >= 30],
+                         '-l', 'h_vmem='+vmem,
+                         stampy_bin,
+                         '--overwrite',
+                         '-g', get_reference_premap_index_filename(data_folder, adaID, ext=False),
+                         '-h', get_reference_premap_hash_filename(data_folder, adaID, ext=False), 
+                         '-o', get_premapped_filename(data_folder, adaID, type='sam', part=(j+1)),
+                         '--processpart='+str(j+1)+'/'+str(threads),
+                         '--substitutionrate='+subsrate,
+                         '-M'] + input_filenames
+            call_list = map(str, call_list)
+            if VERBOSE >= 2:
+                print ' '.join(call_list)
+            job_ID = sp.check_output(call_list)
+            job_ID = job_ID.split()[2]
+            job_IDs[j] = job_ID
 
-            if job_IDs[j] not in qstat_output:
-                # Convert to BAM for merging
-                if VERBOSE >= 1:
-                    print 'Convert premapped reads to BAM for merging: adaID '+\
-                           adaID+', part '+str(j+1)+ ' of '+ \
-                           str(threads)
-                convert_sam_to_bam(output_file_parts[j])
-                # We do not need to wait if we did the conversion (it takes
-                # longer than some secs)
-                time_wait = 0
-                jobs_done[j] = True
+        # Monitor output
+        time_wait = 10 # secs
+        while not jobs_done.all():
 
-    if summary:
-        with open(summary_filename, 'a') as f:
-            f.write('Stampy premapped ('+str(threads)+' threads).\n')
+            # Sleep some time
+            time.sleep(time_wait)
 
-    # Concatenate output files
-    if VERBOSE >= 1:
-        print 'Concatenate premapped reads: adaID '+adaID+'...',
-    output_filename = get_premapped_filename(data_folder, adaID, type='bam', unsorted=True)
-    pysam.cat('-o', output_filename, *output_file_parts)
-    if VERBOSE >= 1:
-        print 'done.'
-    if summary:
-        with open(summary_filename, 'a') as f:
-            f.write('BAM files concatenated (unsorted).\n')
+            # Get the output of qstat to check the status of jobs
+            qstat_output = sp.check_output(['qstat'])
+            qstat_output = qstat_output.split('\n')[:-1] # The last is an empty line
+            if VERBOSE >=3:
+                print qstat_output
+            if len(qstat_output) < 3:
+                jobs_done[:] = True
+                break
+            else:
+                qstat_output = [line.split()[0] for line in qstat_output[2:]]
 
-    # Sort the file by read names (to ensure the pair_generator)
-    # NOTE: we exclude the extension and the option -f because of a bug in samtools
-    if VERBOSE >= 1:
-        print 'Sort premapped reads: adaID '+adaID
-    output_filename_sorted = get_premapped_filename(data_folder, adaID, type='bam', unsorted=False)
-    pysam.sort('-n', output_filename, output_filename_sorted[:-4])
-    if summary:
-        with open(summary_filename, 'a') as f:
-            f.write('Joint BAM file sorted.\n')
+            time_wait = 10 # secs
+            for j in xrange(threads):
+                if jobs_done[j]:
+                    continue
 
-    # Reheader the file without BAM -> SAM -> BAM
-    if VERBOSE >= 1:
-        print 'Reheader premapped reads: adaID '+adaID
-    header_filename = get_premapped_filename(data_folder, adaID, type='sam', part=1)
-    pysam.reheader(header_filename, output_filename_sorted)
-    if summary:
-        with open(summary_filename, 'a') as f:
-            f.write('Joint BAM file reheaded.\n')
+                if job_IDs[j] not in qstat_output:
+                    # Convert to BAM for merging
+                    if VERBOSE >= 1:
+                        print 'Convert premapped reads to BAM for merging: adaID '+\
+                               adaID+', part '+str(j+1)+ ' of '+ \
+                               str(threads)
+                    convert_sam_to_bam(output_file_parts[j])
+                    # We do not need to wait if we did the conversion (it takes
+                    # longer than some secs)
+                    time_wait = 0
+                    jobs_done[j] = True
+
+        if summary:
+            with open(summary_filename, 'a') as f:
+                f.write('Stampy premapped ('+str(threads)+' threads).\n')
+
+        # Concatenate output files
+        if VERBOSE >= 1:
+            print 'Concatenate premapped reads: adaID '+adaID+'...',
+        output_filename = get_premapped_filename(data_folder, adaID, type='bam', unsorted=True)
+        pysam.cat('-o', output_filename, *output_file_parts)
+        if VERBOSE >= 1:
+            print 'done.'
+        if summary:
+            with open(summary_filename, 'a') as f:
+                f.write('BAM files concatenated (unsorted).\n')
+
+        # Sort the file by read names (to ensure the pair_generator)
+        # NOTE: we exclude the extension and the option -f because of a bug in samtools
+        if VERBOSE >= 1:
+            print 'Sort premapped reads: adaID '+adaID
+        output_filename_sorted = get_premapped_filename(data_folder, adaID, type='bam', unsorted=False)
+        pysam.sort('-n', output_filename, output_filename_sorted[:-4])
+        if summary:
+            with open(summary_filename, 'a') as f:
+                f.write('Joint BAM file sorted.\n')
+
+        # Reheader the file without BAM -> SAM -> BAM
+        if VERBOSE >= 1:
+            print 'Reheader premapped reads: adaID '+adaID
+        header_filename = get_premapped_filename(data_folder, adaID, type='sam', part=1)
+        pysam.reheader(header_filename, output_filename_sorted)
+        if summary:
+            with open(summary_filename, 'a') as f:
+                f.write('Joint BAM file reheaded.\n')
 
     if VERBOSE >= 1:
         print 'Remove temporary files: adaID '+adaID

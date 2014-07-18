@@ -10,8 +10,6 @@ import numpy as np
 from Bio import SeqIO
 import matplotlib.pyplot as plt
 
-from hivwholeseq.datasets import MiSeq_runs
-from hivwholeseq.samples import samples
 from hivwholeseq.filenames import get_merged_consensus_filename as gmcf
 
 
