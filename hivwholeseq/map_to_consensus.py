@@ -129,12 +129,18 @@ def map_stampy(data_folder, adaID, fragment, VERBOSE=0, threads=1,
 
     frag_gen = fragment[:2]
 
-    # Set mapping penalty scores based on fragment
-    if frag_gen not in ('F3', 'F5'):
-        stampy_gapopen = 60	        # Default: 40
+    # Set mapping penalty scores: softer for rescues and F3 and F5
+    global subsrate
+    if rescue:
+        subsrate = '0.2'
+        stampy_gapopen = 5	    # Default: 40
+        stampy_gapextend = 1 	    # Default: 3
+
+    elif frag_gen not in ('F3', 'F5'):
+        stampy_gapopen = 60	    # Default: 40
         stampy_gapextend = 5 	    # Default: 3
     else:
-        stampy_gapopen = 30	        # Default: 40
+        stampy_gapopen = 30	    # Default: 40
         stampy_gapextend = 2 	    # Default: 3
 
     if VERBOSE:
@@ -180,10 +186,13 @@ def map_stampy(data_folder, adaID, fragment, VERBOSE=0, threads=1,
         # Take only a (random) subsample: stampy uses the fraction of reads
         # intead of the number
         if maxreads > 0:
-            n_pairs_tot = get_number_reads(input_filename, 'bam') / 2
-            frac_pairs = 1.0 * maxreads / n_pairs_tot
-            random_seed = np.random.randint(1e5)
-            call_list.append('-s', frac_pairs + random_seed)
+            # FIXME: figure out the -s option and the --numrecords option
+            call_list.extend(['--numrecords', maxreads])
+            
+            #n_pairs_tot = get_number_reads(input_filename, 'bam') / 2
+            #frac_pairs = 1.0 * maxreads / n_pairs_tot
+            #random_seed = np.random.randint(1e5)
+            #call_list.extend(['-s', frac_pairs + random_seed])
 
         call_list = call_list + ['-M', input_filename]
         call_list = map(str, call_list)
@@ -313,7 +322,7 @@ def map_stampy(data_folder, adaID, fragment, VERBOSE=0, threads=1,
     # FIXME: check whether temp files are all deleted
     if VERBOSE >= 1:
         print 'Remove temporary files: adaID '+adaID+', fragment '+frag_gen
-    remove_mapped_tempfiles(data_folder, adaID, frag_gen, VERBOSE=VERBOSE)
+    remove_mapped_tempfiles(data_folder, adaID, frag_gen, VERBOSE=VERBOSE, rescue=rescue)
     if summary:
         with open(summary_filename, 'a') as f:
             f.write('Temp mapping files removed.\n')
@@ -422,9 +431,8 @@ if __name__ == '__main__':
                         f.write(' --filter')
                     f.write('\n')
 
-            if not use_rescue:
-                make_index_and_hash(data_folder, adaID, fragment, VERBOSE=VERBOSE,
-                                    summary=summary)
+            make_index_and_hash(data_folder, adaID, fragment, VERBOSE=VERBOSE,
+                                summary=summary)
 
             cluster_time = estimate_cluster_time(threads, filter_reads,
                                                  VERBOSE=VERBOSE) 

@@ -25,7 +25,7 @@ def remove_premapped_tempfiles(data_folder, adaID, VERBOSE=0):
             print 'File removed:', fn
 
 
-def remove_mapped_tempfiles(data_folder, adaID, fragment='F', VERBOSE=0):
+def remove_mapped_tempfiles(data_folder, adaID, fragment='F', VERBOSE=0, rescue=False):
     '''Remove the part files of multi-threaded mapping'''
     from hivwholeseq.filenames import get_mapped_filename
 
@@ -33,6 +33,9 @@ def remove_mapped_tempfiles(data_folder, adaID, fragment='F', VERBOSE=0):
     fns = glob.glob(dirname+fragment+'*_part*') + \
           glob.glob(dirname+fragment+'*_unsorted*') + \
           glob.glob(dirname+fragment+'*.00*.bam')
+    if rescue:
+        fns.append(dirname+fragment+'_rescue.sam')
+
     for fn in fns:
         os.remove(fn)
         if VERBOSE >= 3:

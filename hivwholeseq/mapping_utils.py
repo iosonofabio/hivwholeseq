@@ -5,11 +5,8 @@ date:       22/08/13
 content:    Settings of stampy used by our mapping scripts.
 '''
 # Globals
-stampy_bin = '/ebio/ag-neher/share/programs/bundles/stampy-1.0.22/stampy.py'
+from hivwholeseq.filenames import stampy_bin, bwa_bin, spades_bin
 subsrate = '0.05'
-bwa_bin = '/ebio/ag-neher/share/programs/bin/bwa'
-spades_bin = '/ebio/ag-neher/share/programs/bundles/SPAdes-2.5.0-Linux/bin/spades.py'
-
 
 
 
