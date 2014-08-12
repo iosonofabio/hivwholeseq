@@ -10,7 +10,11 @@ LAST UPDATE: Feb 2014.
 2. Build the consensus at the initial time point, against which everything will
    be mapped. Perform check on frameshifts in genes and similia. (build_initial_reference.py)
 
+CHECKPOINT: check initial reference
+
 3. Map everything to the initial consensus. (map_to_initial_consensus.py)
+
+(3b. Filter again)
 
 4. We build allele frequency trajectories (get_allele_frequency_trajectories.py)
 -------------------------------------------------------------------------------

@@ -28,22 +28,13 @@ from hivwholeseq.filenames import get_divided_filename, \
         get_reference_premap_filename, \
         get_consensus_filename, \
         get_allele_counts_filename, \
-        get_build_consensus_summary_filename
+        get_build_consensus_summary_filename, \
+        get_reference_consensus_ali_filename
 from hivwholeseq.fork_cluster import fork_build_consensus as fork_self
 
 
 
 # Functions
-def get_reference_all_filename(data_folder, adaID, fragment, ext=True):
-    '''Get the file with the cumulated consensi'''
-    from hivwholeseq.filenames import foldername_adapter
-    fn = '_'.join(['consensus', 'reference', 'ali', fragment])
-    fn = data_folder+foldername_adapter(adaID)+fn
-    if ext:
-        fn = fn+'.fasta'
-    return fn
-
-
 def build_local_consensus(seqs, VERBOSE=0, store_allele_counts=False, full_cover=True):
     '''Build a local consensus from an MSA'''
     # There is only ONE tricky point: what to do if some reads do not cover the whole
@@ -477,6 +468,10 @@ if __name__ == '__main__':
             if VERBOSE >= 2:
                 print ali[:, :30]
                 print ali[:, -30:]
+                print 'Lenghts: ref', len(refseq), 'consensus', len(consensusseq)
+                len_ali = ali.get_alignment_length()
+                n_diff = sum(ali[0, i] != ali[1, i] for i in xrange(len_ali))
+                print 'Differences from ref:', n_diff, '('+'{:3.1f}'.format(100.0 * n_diff / len_ali)+'%)'
 
             # Ungap consensus
             consensusseq = SeqRecord(ali[1].seq, id=name, name=name)
@@ -487,7 +482,7 @@ if __name__ == '__main__':
             outfile = get_consensus_filename(data_folder, adaID, frag_out, trim_primers=True)
             SeqIO.write(consensusseq, outfile, 'fasta')
 
-            AlignIO.write(ali, get_reference_all_filename(data_folder, adaID, fragment), 'fasta')
+            AlignIO.write(ali, get_reference_consensus_ali_filename(data_folder, adaID, fragment), 'fasta')
 
             if store_allele_counts:
                 allele_counts.dump(get_allele_counts_filename(data_folder, adaID, frag_out))

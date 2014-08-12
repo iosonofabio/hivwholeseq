@@ -20,7 +20,8 @@ from hivwholeseq.adapter_info import load_adapter_table, foldername_adapter
 from hivwholeseq.mapping_utils import stampy_bin, subsrate, convert_sam_to_bam, \
         convert_bam_to_sam, get_number_reads
 from hivwholeseq.filenames import get_consensus_filename, get_mapped_filename,\
-        get_read_filenames, get_divided_filename, get_map_summary_filename
+        get_read_filenames, get_divided_filename, get_map_summary_filename, \
+        get_reference_consensus_ali_filename        
 from hivwholeseq.filter_mapped_reads import match_len_min, trim_bad_cigars
 from hivwholeseq.filter_mapped_reads import filter_reads as filter_mapped_reads
 from hivwholeseq.fork_cluster import fork_map_to_consensus as fork_self
@@ -43,6 +44,32 @@ vmem = '8G'
 
 
 # Functions
+def check_consensus_length(data_folder, adaID, fragment, VERBOSE=0):
+    '''Check consensus length, and if too short or absent complain'''
+    from Bio import AlignIO
+    ali_fn = get_reference_consensus_ali_filename(data_folder, adaID, fragment)
+    if not os.path.isfile(ali_fn):
+        if VERBOSE >= 2:
+            print 'Consensus alignment to reference not found', adaID, fragment
+        return False
+
+    ali = AlignIO.read(ali_fn, 'fasta')
+    len_ref = len(ali[0].seq.ungap('-'))
+    len_cons = len(ali[1].seq.ungap('-'))
+    if len_cons < len_ref - 200:
+        if VERBOSE >= 2:
+            print 'Consensus alignment to reference too short: ref', len_ref, 'cons:', len_cons
+        return False
+    elif len_cons > len_ref + 200:
+        if VERBOSE >= 2:
+            print 'Consensus alignment to reference too long: ref', len_ref, 'cons:', len_cons
+        return False
+
+    if VERBOSE >= 2:
+        print 'Consensus checked, has approximately the right length: ref', len_ref, 'cons:', len_cons
+    return True
+
+
 def estimate_cluster_time(threads, filter_reads, VERBOSE=0):
     '''Estimate which queue to request on the cluster'''
     if (threads >= 15) and (not filter_reads):
@@ -113,7 +140,7 @@ def make_index_and_hash(data_folder, adaID, fragment, VERBOSE=0, summary=True):
         print 'Built hash: '+adaID+' '+frag_gen
 
     if summary:
-        with open(get_map_summary_filename(data_folder, adaID, fragment), 'a') as f:
+        with open(get_map_summary_filename(data_folder, adaID, frag_gen), 'a') as f:
             f.write('\n')
             f.write('Stampy index and hash written.')
             f.write('\n')
@@ -123,11 +150,11 @@ def map_stampy(data_folder, adaID, fragment, VERBOSE=0, threads=1,
                cluster_time='23:59:59', maxreads=-1, summary=True,
                rescue=False):
     '''Map using stampy'''
-    if summary:
-        summary_filename = get_map_summary_filename(data_folder, adaID, fragment,
-                                                    rescue=rescue)
-
     frag_gen = fragment[:2]
+
+    if summary:
+        summary_filename = get_map_summary_filename(data_folder, adaID, frag_gen,
+                                                    rescue=rescue)
 
     # Set mapping penalty scores: softer for rescues and F3 and F5
     global subsrate
@@ -334,7 +361,8 @@ def map_stampy(data_folder, adaID, fragment, VERBOSE=0, threads=1,
 if __name__ == '__main__':
 
     # Parse input args
-    parser = argparse.ArgumentParser(description='Divide HIV reads into fragments')
+    parser = argparse.ArgumentParser(description='Map reads to sample consensus',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     parser.add_argument('--run', required=True,
                         help='Seq run to analyze (e.g. Tue28)')
     parser.add_argument('--adaIDs', nargs='*',
@@ -355,6 +383,8 @@ if __name__ == '__main__':
                         help='Do not save results in a summary file')
     parser.add_argument('--rescue', action='store_true',
                         help='Look at to-be-rescued reads (less stringent mapping)')
+    parser.add_argument('--only-patient', action='store_true', dest='use_pats',
+                        help='Map only patient samples')
 
     args = parser.parse_args()
     seq_run = args.run
@@ -367,6 +397,7 @@ if __name__ == '__main__':
     filter_reads = args.filter
     summary = args.summary
     use_rescue = args.rescue
+    use_pats = args.use_pats
 
     dataset = load_sequencing_run(seq_run)
     data_folder = dataset.folder
@@ -384,6 +415,11 @@ if __name__ == '__main__':
         if str(sample.PCR) == 'nan':
             if VERBOSE:
                 print samplename+': PCR type not found, skipping'
+            continue
+
+        if use_pats and (sample['patient sample'] == 'nan'):
+            if VERBOSE:
+                print samplename+': not a patient sample, skipping'
             continue
 
         adaID = sample.adapter
@@ -405,9 +441,11 @@ if __name__ == '__main__':
         # Iterate over fragments
         for fragment in fragments_sample:
 
+            frag_gen = fragment[:2]
+
             # Submit to the cluster self if requested
             if submit:
-                fork_self(seq_run, adaID, fragment,
+                fork_self(seq_run, adaID, frag_gen,
                           VERBOSE=VERBOSE,
                           threads=threads, maxreads=maxreads,
                           filter_reads=filter_reads,
@@ -416,13 +454,13 @@ if __name__ == '__main__':
                 continue
 
             if summary:
-                sfn = get_map_summary_filename(data_folder, adaID, fragment,
+                sfn = get_map_summary_filename(data_folder, adaID, frag_gen,
                                                rescue=use_rescue)
                 with open(sfn, 'w') as f:
                     f.write('Call: python map_to_consensus.py'+\
                             ' --run '+seq_run+\
                             ' --adaIDs '+adaID+\
-                            ' --fragments '+fragment+\
+                            ' --fragments '+frag_gen+\
                             ' --threads '+str(threads)+\
                             ' --verbose '+str(VERBOSE))
                     if maxreads != -1:
@@ -430,6 +468,12 @@ if __name__ == '__main__':
                     if filter_reads:
                         f.write(' --filter')
                     f.write('\n')
+
+            
+            if not check_consensus_length(data_folder, adaID, fragment, VERBOSE=VERBOSE):
+                if VERBOSE:
+                    print 'Consensus not suitable for mapping:', adaID, fragment
+                continue
 
             make_index_and_hash(data_folder, adaID, fragment, VERBOSE=VERBOSE,
                                 summary=summary)

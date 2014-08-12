@@ -287,7 +287,7 @@ def fork_build_consensus(seq_run, adaID, fragment,
 
 def fork_map_to_consensus(seq_run, adaID, fragment, VERBOSE=3,
                           threads=1, maxreads=-1, filter_reads=False,
-                          summary=True):
+                          summary=True, rescue=False):
     '''Submit map script for each adapter ID and fragment
     
     Note on cluster runtime: we require less than 1 hr ONLY for tests, i.e. if
@@ -320,6 +320,8 @@ def fork_map_to_consensus(seq_run, adaID, fragment, VERBOSE=3,
         call_list.append('--filter')
     if not summary:
         call_list.append('--no-summary')
+    if rescue:
+        call_list.append('--rescue')
     call_list = map(str, call_list)
     if VERBOSE:
         print ' '.join(call_list)

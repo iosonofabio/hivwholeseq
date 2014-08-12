@@ -33,6 +33,7 @@ def remove_mapped_tempfiles(data_folder, adaID, fragment='F', VERBOSE=0, rescue=
     fns = glob.glob(dirname+fragment+'*_part*') + \
           glob.glob(dirname+fragment+'*_unsorted*') + \
           glob.glob(dirname+fragment+'*.00*.bam')
+    fns.append(dirname+fragment+'.sam')
     if rescue:
         fns.append(dirname+fragment+'_rescue.sam')
 

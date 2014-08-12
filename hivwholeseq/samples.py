@@ -80,13 +80,6 @@ class SampleSeq(pd.Series):
             return []
 
 
-    #TODO: make object oriented approach to separate regions
-    #@property
-    #def regional_samples(self):
-    #    '''Sample objects for each region'''
-    #    region = self._data
-
-
     def get_read_filenames(self, **kwargs):
         '''Get the filenames of the demultiplexed reads'''
         from hivwholeseq.filenames import get_read_filenames as gfn
@@ -99,6 +92,12 @@ class SampleSeq(pd.Series):
         return gfn(self.folder, **kwargs)
 
 
+    def get_divided_filename(self, fragment, **kwargs):
+        '''Get the filename of the divided and trimmed reads'''
+        from hivwholeseq.filenames import get_divided_filename as gfn
+        return gfn(self.folder, adaID=None, fragment=fragment, **kwargs)
+
+
     def get_consensus_filename(self, fragment, **kwargs):
         '''Get the filename of the consensus'''
         from hivwholeseq.filenames import get_consensus_filename as gfn
@@ -107,6 +106,13 @@ class SampleSeq(pd.Series):
             return gfn(self.folder, adaID=None, fragment=fragment, **kwargs)
         else:
             return gfn2(self.folder, adaID=None, **kwargs)
+
+
+    def get_mapped_filename(self, fragment, **kwargs):
+        '''Get the filename of the mapped reads'''
+        from hivwholeseq.filenames import get_mapped_filename as gfn
+        return gfn(self.folder, adaID=None, fragment=fragment, **kwargs)
+
 
 
 class SamplesSeq(pd.DataFrame):

@@ -76,6 +76,15 @@ def get_consensus_filename(data_folder, adaID=None, fragment=None, trim_primers=
     return data_folder+filename
 
 
+def get_reference_consensus_ali_filename(data_folder, adaID, fragment, ext=True):
+    '''Get the file with the cumulated consensi'''
+    fn = '_'.join(['consensus', 'reference', 'ali', fragment])
+    fn = data_folder+foldername_adapter(adaID)+fn
+    if ext:
+        fn = fn+'.fasta'
+    return fn
+
+
 def get_consensus_old_filename(data_folder, adaID, fragment, trim_primers=True):
     '''Find the filename of the final consensus'''
     filename = 'consensus_old_'+fragment
