@@ -342,7 +342,14 @@ def filter_reads(data_folder,
     bamfilename = get_mapped_filename(data_folder, adaID, frag_gen, type='bam',
                                       filtered=False)
     if not os.path.isfile(bamfilename):
-        convert_sam_to_bam(bamfilename)
+        samfilename = get_mapped_filename(data_folder, adaID, frag_gen, type='sam',
+                                          filtered=False)
+        if os.path.isfile(samfilename):
+            convert_sam_to_bam(bamfilename)
+        else:
+            if VERBOSE >= 1:
+                print 'ERROR: '+adaID+', mapped file not found.'
+            return
 
     outfilename = get_mapped_filename(data_folder, adaID, frag_gen, type='bam',
                                      filtered=True)

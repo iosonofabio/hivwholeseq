@@ -7,8 +7,10 @@ content:    Basic script to obtain the data from a seq run, e.g. adapters, sampl
 '''
 # Modules
 import os
+import sys
 import argparse
 
+from hivwholeseq.generic_utils import getchar
 from hivwholeseq.samples import SampleSeq, load_sequencing_run
 from hivwholeseq.patients.patients import load_samples_sequenced as lssp
 
@@ -45,7 +47,6 @@ def print_info(name, gfn, frs=None):
 
 
 
-
 # Script
 if __name__ == '__main__':
 
@@ -56,10 +57,13 @@ if __name__ == '__main__':
                         help='Seq run to analyze (e.g. Tue28, test_tiny)')
     parser.add_argument('--nopatients', action='store_false', dest='use_pats',
                         help='Include non-patient samples (e.g. reference strains)')
+    parser.add_argument('--interactive', action='store_true',
+                        help='Interactive mode')
     
     args = parser.parse_args()
     seq_run = args.run
     use_pats = args.use_pats
+    use_interactive = args.interactive
 
     samples_pat = lssp()
     dataset = load_sequencing_run(seq_run)
@@ -84,3 +88,14 @@ if __name__ == '__main__':
         print_info('Filtered', lambda x: sample.get_mapped_filename(x, filtered=True), sample.regions_generic)
 
         print ''
+
+        if use_interactive:
+            print 'Press q to exit',
+            sys.stdout.flush()
+            ch = getchar()
+            if ch.lower() in ['q']:
+                print 'stopped'
+                break
+            else:
+                sys.stdout.write("\x1b[1A")
+                print ''

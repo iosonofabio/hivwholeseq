@@ -5,6 +5,7 @@ date:       04/08/14
 content:    Check the distance of mapped reads to their consesus, to spot contamination.
 '''
 # Modules
+import sys
 import os
 import argparse
 from operator import itemgetter
@@ -14,7 +15,7 @@ from Bio import SeqIO
 from matplotlib import cm
 import matplotlib.pyplot as plt
 
-from hivwholeseq.samples import load_sequencing_run, SampleSeq
+from hivwholeseq.samples import load_sequencing_runs, SampleSeq, load_samples_sequenced
 from hivwholeseq.filenames import get_consensus_filename, get_mapped_filename, \
         get_filter_mapped_summary_filename, get_mapped_suspicious_filename
 from hivwholeseq.mapping_utils import get_ind_good_cigars, convert_sam_to_bam,\
@@ -65,14 +66,15 @@ def get_distance_from_reference(ref, reads, pairs=True, threshold=None, VERBOSE=
     return np.array(ds, int)
 
 
-def get_distance_histogram(data_folder, adaID, fragment, maxreads=1000, VERBOSE=0):
+def get_distance_histogram(data_folder, adaID, fragment, maxreads=1000, VERBOSE=0,
+                           filtered=False):
     '''Get the distance of reads from their consensus'''
     reffilename = get_consensus_filename(data_folder, adaID, fragment)
     refseq = SeqIO.read(reffilename, 'fasta')
     ref = np.array(refseq)
 
     bamfilename = get_mapped_filename(data_folder, adaID, fragment, type='bam',
-                                      filtered=False)
+                                      filtered=filtered)
 
     with pysam.Samfile(bamfilename, 'rb') as bamfile:
         n_pairs = 0
@@ -94,7 +96,8 @@ def get_distance_histogram(data_folder, adaID, fragment, maxreads=1000, VERBOSE=
     return h
 
 
-def plot_distance_histogram(h, cumulative=True, title='', ax=None, **kwargs):
+def plot_distance_histogram(h, cumulative=True, title='', ax=None,
+                            cutoff=30, **kwargs):
     '''Plot distance histogram'''
     if ax is None:
         fig, ax = plt.subplots()
@@ -109,6 +112,9 @@ def plot_distance_histogram(h, cumulative=True, title='', ax=None, **kwargs):
     else:
         ax.plot(np.arange(len(h)), h, lw=2, **kwargs)
         ax.set_ylabel('# read pairs')
+
+    if cutoff is not None:
+        ax.axvline(cutoff, color='k', lw=2)
 
     ax.set_xlabel('Hamming distance from consensus')
     ax.set_xlim(-1, 201)
@@ -128,7 +134,7 @@ if __name__ == '__main__':
     # Input arguments
     parser = argparse.ArgumentParser(description='Check distance histogram from consensus',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
-    parser.add_argument('--run', required=True,
+    parser.add_argument('--runs', required=True, nargs='+',
                         help='Seq run to analyze (e.g. 28, 37)')
     parser.add_argument('--adaIDs', nargs='*',
                         help='Adapter IDs to analyze (e.g. 2 16)')
@@ -138,24 +144,27 @@ if __name__ == '__main__':
                         help=('Verbosity level [0-3]'))
     parser.add_argument('--maxreads', type=int, default=1000,
                         help='Maximal number of reads to analyze')
+    parser.add_argument('--filtered', action='store_true',
+                        help='Analyze filtered reads')
 
     args = parser.parse_args()
-    seq_run = args.run
+    seq_runs = args.runs
     adaIDs = args.adaIDs
     fragments = args.fragments
     VERBOSE = args.verbose
     maxreads = args.maxreads
-
-    # Specify the dataset
-    dataset = load_sequencing_run(seq_run)
-    data_folder = dataset.folder
+    use_filtered = args.filtered
 
     # If the script is called with no adaID, iterate over all
-    samples = dataset.samples
+    samples = load_samples_sequenced(seq_runs=seq_runs)
     if adaIDs is not None:
         samples = samples.loc[samples.adapter.isin(adaIDs)]
     if VERBOSE >= 3:
         print 'adaIDs', samples.adapter
+
+    if len(samples) == 0:
+        print 'WARNING: no samples found.'
+        sys.exit()
 
     hists = []
     for (samplename, sample) in samples.iterrows():
@@ -165,13 +174,14 @@ if __name__ == '__main__':
             print samplename
 
         sample = SampleSeq(sample)
+        data_folder = sample.seqrun_folder
+        seq_run = sample['seq run']
+        adaID = sample.adapter
 
         if str(sample.PCR) == 'nan':
             if VERBOSE >= 1:
                 print 'PCR type not found, skipping'
             continue
-
-        adaID = sample.adapter
 
         if not fragments:
             fragments_sample = sample.regions_generic
@@ -181,22 +191,27 @@ if __name__ == '__main__':
             print 'adaID '+adaID+': fragments '+' '.join(fragments_sample)
 
         for fragment in fragments_sample:
+            if VERBOSE >= 1:
+                print fragment,
 
             bamfilename = get_mapped_filename(data_folder, adaID, fragment, type='bam',
-                                              filtered=False)
+                                              filtered=use_filtered)
             if not os.path.isfile(bamfilename):
                 if VERBOSE >= 1:
                     print 'missing mapped file, skipping'
                 continue
 
-            dist_hist = get_distance_histogram(data_folder, adaID, fragment, VERBOSE=VERBOSE, maxreads=maxreads)
+            dist_hist = get_distance_histogram(data_folder, adaID, fragment, VERBOSE=VERBOSE, maxreads=maxreads,
+                                               filtered=use_filtered)
             label = [seq_run, adaID, samplename, fragment, dist_hist.sum()]
             hists.append((dist_hist, label))
+
+        print ''
     
     if len(hists) == 1:
         label = ', '.join(hists[0][1][:-1])+' ('+str(hists[0][1][-1])+')'
         plot_distance_histogram(hists[0][0], title=label)
-    else:
+    elif len(hists) > 1:
         fig, ax = plt.subplots()
         for i, h in enumerate(hists):
             color = cm.jet(1.0 * i / len(hists))
@@ -206,14 +221,16 @@ if __name__ == '__main__':
             elif len(samples) == 1:
                 del label[2]
                 del label[1]
-            del label[0]
+            if len(seq_runs) == 1:
+                del label[0]
             label = ', '.join(label[:-1])+' ('+str(label[-1])+')'
             plot_distance_histogram(h[0], label=label, ax=ax, color=color)
 
         ax.legend(loc=1, fontsize=10)
-        title = seq_run
-        if len(fragments_sample) == 1:
-            title = title+', '+fragment
-        elif len(samples) == 1:
-            title = title+', '+adaID+', '+samplename
-        ax.set_title(title)
+        if len(seq_runs) == 1:
+            title = seq_run
+            if len(fragments_sample) == 1:
+                title = title+', '+fragment
+            elif len(samples) == 1:
+                title = title+', '+adaID+', '+samplename
+            ax.set_title(title)

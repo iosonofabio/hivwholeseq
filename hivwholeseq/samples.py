@@ -38,6 +38,7 @@ class SampleSeq(pd.Series):
         seq_run = self.loc['seq run']
         adaID = self.loc['adapter']
         self['folder'] = str(get_seqrun_foldername(seq_run)+foldername_adapter(adaID))
+        self['seqrun_folder'] = str(get_seqrun_foldername(seq_run))
 
 
     @property
@@ -147,7 +148,7 @@ class SequencingRun(pd.Series):
         from hivwholeseq.filenames import get_seqrun_foldername
         self['folder'] = str(get_seqrun_foldername(self.name))
 
-        self['samples'] = load_samples_sequenced(seq_run=self.name)
+        self['samples'] = load_samples_sequenced(seq_runs=[self.name])
 
 
     @property
@@ -181,7 +182,7 @@ class SequencingRun(pd.Series):
 
 
 # Functions
-def load_samples_sequenced(seq_run=None):
+def load_samples_sequenced(seq_runs=None):
     '''Load samples sequenced from general table'''
     sample_table = pd.read_excel(table_filename, 'Samples sequenced',
                                  index_col=0)
@@ -190,20 +191,23 @@ def load_samples_sequenced(seq_run=None):
     sample_table.loc[:, 'regions'] = map(str, sample_table.loc[:, 'regions'])
     sample_table.loc[sample_table.loc[:, 'regions'] == 'nan', 'regions'] = ''
 
-    if seq_run is not None:
-        sample_table = sample_table.loc[sample_table.loc[:, 'seq run'] == seq_run]
+    if seq_runs is not None:
+        sample_table = sample_table.loc[sample_table.loc[:, 'seq run'].isin(seq_runs)]
 
     return SamplesSeq(sample_table)
 
 
-def load_sequencing_runs():
+def load_sequencing_runs(seq_runs=None):
     '''Load sequencing runs from general table'''
     global _sequencing_runs
     if _sequencing_runs is None:
-        seq_runs = pd.read_excel(table_filename, 'Sequencing runs',
+        seq_runs_in = pd.read_excel(table_filename, 'Sequencing runs',
                                  index_col=0)
-        _sequencing_runs = seq_runs
-    return _sequencing_runs
+        _sequencing_runs = seq_runs_in
+
+    if seq_runs is not None:
+        seq_runs_in = _sequencing_runs.loc[_sequencing_runs.index.isin(seq_runs)]
+    return seq_runs_in
 
 
 def load_sequencing_run(seq_run):
