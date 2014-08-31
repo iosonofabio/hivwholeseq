@@ -12,7 +12,7 @@ import argparse
 import numpy as np
 from Bio import SeqIO
 
-from hivwholeseq.patients.filenames import get_initial_consensus_filename, \
+from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_mapped_filtered_filename, get_allele_counts_filename
 from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file as gac
 from hivwholeseq.patients.patients import load_samples_sequenced as lssp
@@ -78,7 +78,7 @@ if __name__ == '__main__':
                 continue
 
             pname = sample_pat.patient
-            refseq = SeqIO.read(get_initial_consensus_filename(pname, fragment), 'fasta')
+            refseq = SeqIO.read(get_initial_reference_filename(pname, fragment), 'fasta')
             counts_sample = [None, None]
 
             # Look for both PCR1 and PCR2, and see what you find

@@ -11,7 +11,7 @@ import numpy as np
 from Bio import SeqIO
 
 from hivwholeseq.patients.patients import get_patient
-from hivwholeseq.patients.filenames import get_initial_consensus_filename
+from hivwholeseq.patients.filenames import get_initial_reference_filename
 from hivwholeseq.sequence_utils import correct_genbank_features_load
 
 
@@ -49,7 +49,7 @@ if __name__ == '__main__':
 
     seqs = []
     for fragment in fragments:
-        fn = get_initial_consensus_filename(pname, fragment, format=seqformat)
+        fn = get_initial_reference_filename(pname, fragment, format=seqformat)
         seq_rec = SeqIO.read(fn, seqformat)
         if seqformat in ['gb', 'genbank']:
             correct_genbank_features_load(seq_rec)
@@ -68,6 +68,6 @@ if __name__ == '__main__':
                 print 'Storing sequence in genbank format'
             from hivwholeseq.sequence_utils import correct_genbank_features_save
             correct_genbank_features_save(seq_rec)
-            fngb = get_initial_consensus_filename(pname, fragment, format='gb')
+            fngb = get_initial_reference_filename(pname, fragment, format='gb')
             SeqIO.write(seq_rec, fngb, 'gb')
 

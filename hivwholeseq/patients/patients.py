@@ -74,8 +74,8 @@ class Patient(pd.Series):
 
     def get_reference_filename(self, fragment, format='fasta'):
         '''Get filename of the reference for mapping'''
-        from hivwholeseq.patients.filenames import get_initial_consensus_filename
-        return get_initial_consensus_filename(self.name, fragment, format)
+        from hivwholeseq.patients.filenames import get_initial_reference_filename
+        return get_initial_reference_filename(self.name, fragment, format)
 
 
     def get_reference(self, fragment):

@@ -14,7 +14,7 @@ from seqanpy import align_overlap
 
 from hivwholeseq.miseq import alpha
 from hivwholeseq.patients.patients import load_patient
-from hivwholeseq.patients.filenames import get_initial_consensus_filename, \
+from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_mapped_to_initial_filename, get_allele_frequency_trajectories_filename, \
         get_allele_count_trajectories_filename
 from hivwholeseq.patients.one_site_statistics import \
@@ -125,7 +125,7 @@ if __name__ == '__main__':
         acts.append(acsi)
 
     # Get the initial genomewide consensus
-    cons_filename = get_initial_consensus_filename(pname, 'genomewide')
+    cons_filename = get_initial_reference_filename(pname, 'genomewide')
     cons_rec = SeqIO.read(cons_filename, 'fasta')
     conss_genomewide = str(cons_rec.seq)
 

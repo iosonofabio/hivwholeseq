@@ -18,7 +18,7 @@ from Bio import SeqIO
 from Bio.Seq import reverse_complement as rc
 
 from hivwholeseq.miseq import alpha
-from hivwholeseq.patients.filenames import get_initial_consensus_filename, \
+from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_allele_count_trajectories_filename, get_primers_filename
 from hivwholeseq.patients.patients import load_patient
 from hivwholeseq.primer_info import primers_outer, find_primer_seq
@@ -64,7 +64,7 @@ if __name__ == '__main__':
         # Check the overlap from the left for fwd primer, unless F1
         if fragment != 'F1':
             frag_left = 'F'+str(int(fragment[1]) - 1)
-            cons_fn_left = get_initial_consensus_filename(pname, frag_left)
+            cons_fn_left = get_initial_reference_filename(pname, frag_left)
             cons_left = SeqIO.read(cons_fn_left, 'fasta')
 
             # Only use the best-performing primers...
@@ -123,7 +123,7 @@ if __name__ == '__main__':
         # Check overlap from the right for rev primer
         if fragment != 'F6':
             frag_right = 'F'+str(int(fragment[1]) + 1)
-            cons_fn_right = get_initial_consensus_filename(pname, frag_right)
+            cons_fn_right = get_initial_reference_filename(pname, frag_right)
             cons_right = SeqIO.read(cons_fn_right, 'fasta')
 
             if fragment == 'F5':

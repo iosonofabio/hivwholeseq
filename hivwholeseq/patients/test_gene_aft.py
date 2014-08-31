@@ -15,7 +15,7 @@ from Bio.Seq import Seq
 from hivwholeseq.miseq import alpha
 from hivwholeseq.mapping_utils import align_muscle
 from hivwholeseq.patients.patients import get_patient
-from hivwholeseq.patients.filenames import get_initial_consensus_filename, \
+from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_allele_frequency_trajectories_filename, \
         get_consensi_alignment_filename
 from hivwholeseq.genome_info import locate_gene
@@ -62,7 +62,7 @@ if __name__ == '__main__':
     # Get initial consensus and compare with reference (check for erroneous indels)
     # TODO: for now only genes within a single fragment and one exon (pol, not tat)
     fragment = gene_fragments[gene]        
-    cons = SeqIO.read(get_initial_consensus_filename(pname, fragment), 'fasta')
+    cons = SeqIO.read(get_initial_reference_filename(pname, fragment), 'fasta')
     
     (gene_start, gene_end,
      start_found, end_found) = locate_gene(cons, gene, VERBOSE=VERBOSE)

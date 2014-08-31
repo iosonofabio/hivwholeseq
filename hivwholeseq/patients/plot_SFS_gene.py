@@ -17,7 +17,7 @@ from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_fi
         get_allele_counts_insertions_from_file_unfiltered, \
         filter_nus
 from hivwholeseq.patients.patients import get_patient
-from hivwholeseq.patients.filenames import get_initial_consensus_filename, \
+from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_mapped_to_initial_filename, get_allele_frequency_trajectories_filename, \
         get_allele_count_trajectories_filename
 from hivwholeseq.patients.one_site_statistics import plot_allele_frequency_trajectories as plot_nus
@@ -118,7 +118,7 @@ if __name__ == '__main__':
 
             # Extract gene from reference and allele freq trajectories
             from hivwholeseq.patients.build_initial_reference import check_genes_consensus
-            cons_rec = SeqIO.read(get_initial_consensus_filename(pname, fragment), 'fasta')
+            cons_rec = SeqIO.read(get_initial_reference_filename(pname, fragment), 'fasta')
             conss = str(cons_rec.seq)
             gene_seqs, genes_good, gene_poss = check_genes_consensus(conss, fragment, genes=[gene],
                                                                      VERBOSE=VERBOSE)

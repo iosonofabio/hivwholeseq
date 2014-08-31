@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 
 from hivwholeseq.miseq import alpha
 from hivwholeseq.patients.patients import patients as patients_all
-from hivwholeseq.patients.filenames import get_initial_consensus_filename, \
+from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_allele_frequency_trajectories_filename, \
         get_allele_count_trajectories_filename
 
@@ -107,7 +107,7 @@ if __name__ == '__main__':
     
                 # Extract gene from reference and allele freq trajectories
                 from hivwholeseq.patients.build_initial_reference import check_genes_consensus
-                cons_rec = SeqIO.read(get_initial_consensus_filename(pname, fragment), 'fasta')
+                cons_rec = SeqIO.read(get_initial_reference_filename(pname, fragment), 'fasta')
                 conss = str(cons_rec.seq)
                 gene_seqs, genes_good, gene_poss = check_genes_consensus(conss, fragment, genes=[gene],
                                                                          VERBOSE=VERBOSE)

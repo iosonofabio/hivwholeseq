@@ -23,11 +23,11 @@ def get_allele_count_trajectories(pname, samplenames, fragment, use_PCR1=1,
     if VERBOSE >= 1:
         print 'Getting allele counts:', pname, fragment
 
-    from hivwholeseq.patients.filenames import get_initial_consensus_filename, \
+    from hivwholeseq.patients.filenames import get_initial_reference_filename, \
             get_allele_counts_filename
     from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file
 
-    refseq = SeqIO.read(get_initial_consensus_filename(pname, fragment), 'fasta')
+    refseq = SeqIO.read(get_initial_reference_filename(pname, fragment), 'fasta')
     fns = []
     samplenames_out = []
     for samplename_pat in samplenames:
@@ -74,14 +74,14 @@ def get_allele_frequency_trajectories(pname, samples, fragment, qual_min=30, VER
     if VERBOSE >= 1:
         print 'Getting allele frequency trajectories:', pname, fragment
 
-    from hivwholeseq.patients.filenames import get_initial_consensus_filename, \
+    from hivwholeseq.patients.filenames import get_initial_reference_filename, \
             get_mapped_to_initial_filename, get_allele_frequency_trajectories_filename, \
             get_allele_count_trajectories_filename
     from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file, \
             get_allele_counts_insertions_from_file_unfiltered, \
             filter_nus
 
-    refseq = SeqIO.read(get_initial_consensus_filename(pname, fragment), 'fasta')
+    refseq = SeqIO.read(get_initial_reference_filename(pname, fragment), 'fasta')
 
     # Prepare output data structures
     cos_traj = np.zeros((len(samples), len(alpha), len(refseq)), int)

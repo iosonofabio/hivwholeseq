@@ -22,7 +22,7 @@ from hivwholeseq.mapping_utils import stampy_bin, subsrate, \
 from hivwholeseq.samples import samples as samples_seq
 from hivwholeseq.patients.patients import get_patient
 from hivwholeseq.patients.filenames import get_initial_index_filename, \
-        get_initial_hash_filename, get_initial_consensus_filename, \
+        get_initial_hash_filename, get_initial_reference_filename, \
         get_mapped_to_initial_filename, get_map_initial_summary_filename, \
         get_paste_mapped_chunks_initial_summary_filename
 from hivwholeseq.fork_cluster import fork_paste_mapped_chunks_to_initial_consensus as fork_self

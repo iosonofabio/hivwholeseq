@@ -3,7 +3,7 @@
 '''
 author:     Fabio Zanini
 date:       25/10/13
-content:    Map reads to the initial consensus of the patient (in order to have
+content:    Map reads to the initial reference of the patient (in order to have
             the whole patient data aligned to one reference).
 
             This script must cope with a flexible sequencing schedule, e.g.
@@ -29,10 +29,10 @@ from hivwholeseq.generic_utils import mkdirs
 from hivwholeseq.mapping_utils import stampy_bin, subsrate, \
         convert_sam_to_bam, convert_bam_to_sam, get_number_reads
 from hivwholeseq.patients.filenames import get_initial_index_filename, \
-        get_initial_hash_filename, get_initial_consensus_filename, \
+        get_initial_hash_filename, get_initial_reference_filename, \
         get_mapped_to_initial_filename, get_mapped_to_initial_foldername, \
         get_map_initial_summary_filename
-from hivwholeseq.fork_cluster import fork_map_to_initial_consensus as fork_self
+from hivwholeseq.fork_cluster import fork_map_to_initial_reference as fork_self
 from hivwholeseq.clean_temp_files import remove_mapped_init_tempfiles
 from hivwholeseq.patients.patients import load_samples_sequenced as lssp
 from hivwholeseq.samples import load_samples_sequenced as lss
@@ -48,7 +48,7 @@ stampy_sensitive = True     # Default: False
 # Functions
 def get_input_filename(data_folder, adaID, frag_spec, type='bam', only_chunk=None,
                        filtered=True):
-    '''Get filename of input for mapping to initial consensus'''
+    '''Get filename of input for mapping to initial reference'''
     # We should take reads filtered after mapping to the auto-consensus
     if filtered:
         from hivwholeseq.filenames import get_mapped_filename
@@ -76,13 +76,13 @@ def make_output_folders(pname, samplename, PCR=1, VERBOSE=0):
 
 
 def make_index_and_hash(pname, fragment, VERBOSE=0):
-    '''Make index and hash files for consensus'''
+    '''Make index and hash files for reference'''
     # 1. Make genome index file
     stdout = sp.check_output([stampy_bin,
                               '--overwrite',
                               '--species="HIV fragment '+fragment+'"',
                               '-G', get_initial_index_filename(pname, fragment, ext=False),
-                              get_initial_consensus_filename(pname, fragment),
+                              get_initial_reference_filename(pname, fragment),
                               ],
                               stderr=sp.STDOUT)
     if VERBOSE:
@@ -408,7 +408,7 @@ def get_number_chunks(pname, samplename, fragment, VERBOSE=0):
 if __name__ == '__main__':
 
     # Parse input args
-    parser = argparse.ArgumentParser(description='Map to initial consensus',
+    parser = argparse.ArgumentParser(description='Map to initial reference',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     pats_or_samples = parser.add_mutually_exclusive_group(required=True)
     pats_or_samples.add_argument('--patients', nargs='+',
@@ -522,7 +522,7 @@ if __name__ == '__main__':
                                                            samplename, fragment,
                                                            PCR=PCR, only_chunk=only_chunk)
                     with open(sfn, 'w') as f:
-                        f.write('Call: python map_to_initial_consensus.py'+\
+                        f.write('Call: python map_to_initial_reference.py'+\
                                 ' --samples '+samplename+\
                                 ' --fragments '+fragment+\
                                 ' --threads '+str(threads)+\

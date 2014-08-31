@@ -29,7 +29,7 @@ from hivwholeseq.samples import SampleSeq
 from hivwholeseq.patients.patients import load_patient
 from hivwholeseq.miseq import alpha
 from hivwholeseq.filenames import get_consensus_filename
-from hivwholeseq.patients.filenames import get_initial_consensus_filename, \
+from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_foldername
 from hivwholeseq.primer_info import primers_inner
 from hivwholeseq.primer_info import primers_coordinates_HXB2_inner as pci
@@ -151,7 +151,7 @@ if __name__ == '__main__':
                                                               samplen, VERBOSE=VERBOSE)
 
         conss = str(cons_rec.seq)
-        output_filename = get_initial_consensus_filename(pname, fragment)
+        output_filename = get_initial_reference_filename(pname, fragment)
 
         seq_in = SeqRecord(Seq(conss, unambiguous_dna),
                            id='cons_init_p'+pname+'_'+frag_spec,
@@ -189,13 +189,13 @@ if __name__ == '__main__':
             conss = str(cons_rec.seq)
 
         else:
-            consensi = [SeqIO.read(get_initial_consensus_filename(pname, 'F'+str(ifr+1)), 'fasta')
+            consensi = [SeqIO.read(get_initial_reference_filename(pname, 'F'+str(ifr+1)), 'fasta')
                            for ifr in xrange(6)]
 
             conss = merge_sequences(consensi, VERBOSE=VERBOSE)
             print len(conss)
 
-        output_filename = get_initial_consensus_filename(pname, 'genomewide')
+        output_filename = get_initial_reference_filename(pname, 'genomewide')
         seq_in = SeqRecord(Seq(conss, unambiguous_dna),
                            id='cons_init_p'+pname,
                            name='cons_init_p'+pname,

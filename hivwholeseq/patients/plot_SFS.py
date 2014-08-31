@@ -13,7 +13,7 @@ from Bio import SeqIO
 
 from hivwholeseq.miseq import alpha, alphal
 from hivwholeseq.patients.patients import load_samples_sequenced as lssp
-from hivwholeseq.patients.filenames import get_initial_consensus_filename, \
+from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_allele_counts_filename
 
 
@@ -122,7 +122,7 @@ if __name__ == '__main__':
                 print samplename_pat,
 
             pname = sample.patient
-            ref_fn = get_initial_consensus_filename(pname, fragment)
+            ref_fn = get_initial_reference_filename(pname, fragment)
             ref = SeqIO.read(ref_fn, 'fasta')
             refm = np.array(ref, 'S1')
 

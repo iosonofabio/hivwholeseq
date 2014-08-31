@@ -20,7 +20,7 @@ from hivwholeseq.patients.patients import load_patient
 from hivwholeseq.filter_mapped_reads import plot_distance_histogram, \
         plot_distance_histogram_sliding_window, get_distance_from_consensus, \
         check_overhanging_reads, trim_bad_cigar
-from hivwholeseq.patients.filenames import get_initial_consensus_filename, \
+from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_mapped_to_initial_filename, get_filter_mapped_init_summary_filename, \
         get_mapped_filtered_filename
 from hivwholeseq.mapping_utils import convert_sam_to_bam, pair_generator
@@ -47,7 +47,7 @@ def filter_mapped_reads(sample, fragment,
     if VERBOSE >= 1:
         print 'Filtering reads:', pname, samplename_pat, fragment, PCR
 
-    reffilename = get_initial_consensus_filename(pname, fragment)
+    reffilename = get_initial_reference_filename(pname, fragment)
     refseq = SeqIO.read(reffilename, 'fasta')
     ref = np.array(refseq)
 

@@ -14,7 +14,7 @@ from matplotlib import cm
 import matplotlib.pyplot as plt
 
 from hivwholeseq.patients.patients import load_patients, filter_patients_n_times, Patient
-from hivwholeseq.patients.filenames import get_initial_consensus_filename
+from hivwholeseq.patients.filenames import get_initial_reference_filename
 from hivwholeseq.patients.one_site_statistics import get_allele_count_trajectories
 
 

@@ -12,7 +12,7 @@ import numpy as np
 
 
 from hivwholeseq.patients.patients import load_patients, Patient
-from hivwholeseq.patients.filenames import get_initial_consensus_filename, \
+from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_mapped_filtered_filename, get_allele_counts_filename
 
 

@@ -17,7 +17,7 @@ from Bio import SeqIO
 from hivwholeseq.primer_info import find_fragment
 from hivwholeseq.reference import load_custom_reference
 from hivwholeseq.patients.patients import patients as patients_all
-from hivwholeseq.patients.filenames import get_initial_consensus_filename, \
+from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_foldername, get_coordinate_map_filename
 
 
@@ -37,7 +37,7 @@ def build_coordinate_map(pname, fragment, refname, VERBOSE=0):
     (fragment_start, fragment_end) = find_fragment(ref_rec, frag_spec)
     ref_rec_frag = ref_rec[fragment_start: fragment_end]
     
-    ref_init_fn = get_initial_consensus_filename(pname, fragment)
+    ref_init_fn = get_initial_reference_filename(pname, fragment)
     ref_init_rec = SeqIO.read(ref_init_fn, 'fasta')
 
     from seqanpy import align_global

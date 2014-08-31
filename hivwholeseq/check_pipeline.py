@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # vim: fdm=marker
 '''
 author:     Fabio Zanini

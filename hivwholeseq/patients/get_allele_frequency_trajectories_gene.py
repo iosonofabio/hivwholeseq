@@ -20,7 +20,7 @@ from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_fi
         get_allele_counts_insertions_from_file_unfiltered, \
         filter_nus
 from hivwholeseq.patients.patients import get_patient
-from hivwholeseq.patients.filenames import get_initial_consensus_filename, \
+from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_mapped_to_initial_filename, get_allele_frequency_trajectories_filename
 from hivwholeseq.patients.one_site_statistics import plot_allele_frequency_trajectories as plot_nus
 from hivwholeseq.patients.one_site_statistics import plot_allele_frequency_trajectories_3d as plot_nus_3d
@@ -76,7 +76,7 @@ if __name__ == '__main__':
         times = times[ind]
 
     from hivwholeseq.annotate_genomewide_consensus import annotate_sequence
-    cons_rec = SeqIO.read(get_initial_consensus_filename(pname, 'genomewide'), 'fasta')
+    cons_rec = SeqIO.read(get_initial_reference_filename(pname, 'genomewide'), 'fasta')
     conss = str(cons_rec.seq)
         
     #aft_filename = get_allele_frequency_trajectories_filename(pname, 'genomewide')

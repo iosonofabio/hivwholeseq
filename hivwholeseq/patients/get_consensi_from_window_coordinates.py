@@ -18,7 +18,7 @@ from Bio.Alphabet.IUPAC import ambiguous_dna
 
 from hivwholeseq.miseq import alpha
 from hivwholeseq.patients.patients import patients as patients_all
-from hivwholeseq.patients.filenames import get_initial_consensus_filename, \
+from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_foldername, get_coordinate_map_filename, \
         get_allele_count_trajectories_filename
 

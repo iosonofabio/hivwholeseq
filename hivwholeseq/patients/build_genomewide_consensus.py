@@ -16,7 +16,7 @@ from Bio.SeqRecord import SeqRecord
 import Bio.SeqIO as SeqIO
 
 from hivwholeseq.samples import SampleSeq, load_sequencing_run
-from hivwholeseq.patients.filenames import get_initial_consensus_filename
+from hivwholeseq.patients.filenames import get_initial_reference_filename
 from hivwholeseq.check_overlaps import get_overlapping_fragments, get_overlap, \
         check_overlap_consensus
 
@@ -67,7 +67,7 @@ def merge_consensi(pname, VERBOSE=0):
 
     consensi = {}
     for frag in ['F'+str(i+1) for i in xrange(6)]:
-        cons_fn = get_initial_consensus_filename(pname, frag)
+        cons_fn = get_initial_reference_filename(pname, frag)
         if os.path.isfile(cons_fn):
             consensi[frag] = SeqIO.read(cons_fn, 'fasta')
 
@@ -136,7 +136,7 @@ if __name__ == '__main__':
         else:
             fn = 'genomewide'
         
-        output_filename = get_initial_consensus_filename(pname, fn)
+        output_filename = get_initial_reference_filename(pname, fn)
         SeqIO.write(cons, output_filename, 'fasta')
         if VERBOSE >= 1:
             print 'Consensus written:', fn
