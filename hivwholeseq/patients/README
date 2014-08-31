@@ -1,22 +1,47 @@
--------------------------------------------------------------------------------
 PIPELINE FOR HIV MISEQ SEQUENCING DATA: PATIENTS
 -------------------------------------------------------------------------------
-LAST UPDATE: Feb 2014.
+LAST UPDATE: Aug 2014.
 
-0. We have all samples with consensus for all fragments and, if possible, genomewide.
+SINGLE-PATIENT ANALYSIS
+-------------------------------------------------------------------------------
+The second step of the analysis maps all the reads onto a patient-specific
+reference, in order to get a single frame of reference for population genetics
+observables. The analysis is made of substeps:
 
-1. Collect and align all consensi to get a rough idea. (collect_align_consensi.py)
+1. Build a reference for each patient, using the consensus of the initial time
+   point if possible, otherwise something similar. The reference must be good:
+   all genes in place and in frame, complete coverage of the sequenced regions
+   (with outer primers), agreement on overlapping stretches.
 
-2. Build the consensus at the initial time point, against which everything will
-   be mapped. Perform check on frameshifts in genes and similia. (build_initial_reference.py)
+2. A genome-wide reference has to be created by stitching. If no complete
+   agreement on overlaps can be achieved, a stitching recipe must be produced,
+   such that the same can be applied to extend any observable to genome-wide
+   coordinates.
 
 CHECKPOINT: check initial reference
 
-3. Map everything to the initial consensus. (map_to_initial_consensus.py)
+3. Map the reads onto that reference, merge various repetitions of the sequencing,
+   and filter away unmapped and similia (map_to_initial_consensus.py)
 
-(3b. Filter again)
+4. Build allele counts per patient sample (get_allele_counts.py)
 
-4. We build allele frequency trajectories (get_allele_frequency_trajectories.py)
+5. Build allele frequency trajectories using various criteria for PCR1/PCR2, low
+   coverage samples, et similia.
+
+6. Study linkage (TODO).
+
+
+CROSS-SECTIONAL ANALYSIS
 -------------------------------------------------------------------------------
+Comparisons across patient are useful as controls for contamination and sample
+swaps, but also to study genetic diversity:
 
+1. Collect and align consensi from all samples, and build a phylogenetic tree.
+   Repetitions of the same sample should agree completely, then ladder-like
+   intrapatient clustering is expected, then subtype clustering, then star-like
+   phylogeny.
 
+2. Create coordinate transformation maps between patient references in order to
+   identify loci from one patient to the other.
+
+3. Compare local haplotypes across patients and time.
