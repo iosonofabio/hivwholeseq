@@ -22,7 +22,7 @@ if __name__ == '__main__':
 
 
     # Parse input args
-    parser = argparse.ArgumentParser(description='Check patient samples')
+    parser = argparse.ArgumentParser(description='Load patient samples')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
 

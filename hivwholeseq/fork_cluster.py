@@ -27,6 +27,37 @@ def empty_log_folders():
     os.mkdir(JOBLOGERR)
 
 
+def fork_check_pipeline(seq_runs, adaIDs=None, pats=False,
+                        detail=1, VERBOSE=0):
+    '''Submit checking status of the pipeline to the cluster'''
+    if VERBOSE:
+        print 'Forking to the cluster'
+
+    JOBSCRIPT = JOBDIR+'check_pipeline.py'
+    cluster_time = '00:59:59'
+    vmem = '1G'
+    call_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'pipe',
+                 '-l', 'h_rt='+cluster_time,
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--runs', seq_runs,
+                 '--adaIDs', adaIDs,
+                 '--detail', detail,
+                ]
+    if not pats:
+        call_list.append('--nopatients')
+
+    call_list = map(str, call_list)
+    if VERBOSE:
+        print ' '.join(call_list)
+    return sp.check_output(call_list)
+
+
 def fork_quality_along_read(seq_run, VERBOSE=0, maxreads=-1, savefig=True):
     '''Submit quality check along read to the cluster'''
     if VERBOSE:
@@ -509,7 +540,8 @@ def fork_map_to_initial_consensus(samplename, fragment,
                                   VERBOSE=0, threads=1,
                                   n_pairs=-1, filter_reads=False,
                                   summary=True,
-                                  only_chunks=[None]):
+                                  only_chunks=[None],
+                                  filtered=True):
     '''Fork to the cluster for each sample and fragment'''
     if VERBOSE:
         print 'Forking to the cluster: sample '+samplename+', fragment '+fragment
@@ -540,6 +572,8 @@ def fork_map_to_initial_consensus(samplename, fragment,
         call_list.append('--no-summary')
     if only_chunks != [None]:
         call_list = call_list + ['--chunks'] + only_chunks
+    if not filtered:
+        call_list.append('--unfiltered')
     call_list = map(str, call_list)
     if VERBOSE:
         print ' '.join(call_list)

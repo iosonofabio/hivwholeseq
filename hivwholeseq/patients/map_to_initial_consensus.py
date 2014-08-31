@@ -100,7 +100,7 @@ def make_index_and_hash(pname, fragment, VERBOSE=0):
 
 
 def map_stampy_singlethread(sample, fragment, VERBOSE=0, n_pairs=-1,
-                            summary=True, only_chunk=None):
+                            summary=True, only_chunk=None, filtered=True):
     '''Map using stampy, single thread (no cluster queueing race conditions)'''
     pname = sample.patient
     samplename_pat = sample['patient sample']
@@ -128,7 +128,8 @@ def map_stampy_singlethread(sample, fragment, VERBOSE=0, n_pairs=-1,
     else:
         frag_spec = frag_spec[0]
 
-    input_filename = get_input_filename(data_folder, adaID, frag_spec, type='bam', chunk=only_chunk)
+    input_filename = get_input_filename(data_folder, adaID, frag_spec, type='bam',
+                                        chunk=only_chunk, filtered=filtered)
 
     # NOTE: we introduced fragment nomenclature late, e.g. F3a. Check for that
     if not os.path.isfile(input_filename):
@@ -210,7 +211,8 @@ def map_stampy_singlethread(sample, fragment, VERBOSE=0, n_pairs=-1,
         os.remove(input_filename_sub)
 
 
-def map_stampy_multithread(sample, fragment, VERBOSE=0, threads=2, summary=True):
+def map_stampy_multithread(sample, fragment, VERBOSE=0, threads=2, summary=True,
+                           filtered=True):
     '''Map using stampy, multithread (via cluster requests, queueing race conditions possible)'''
     import hivwholeseq
     JOBDIR = hivwholeseq.__path__[0].rstrip('/')+'/'
@@ -429,6 +431,8 @@ if __name__ == '__main__':
                         help='Do not save results in a summary file')
     parser.add_argument('--chunks', type=int, nargs='+', default=[None],
                         help='Only map some chunks (cluster optimization): 0 for automatic detection')
+    parser.add_argument('--unfiltered', action='store_false', dest='filtered',
+                        help='Map unfiltered reads (for quick checks only)')
 
     args = parser.parse_args()
     pnames = args.patients
@@ -441,6 +445,7 @@ if __name__ == '__main__':
     skip_hash = args.skiphash
     summary = args.summary
     only_chunks = args.chunks
+    filtered = args.filtered
 
     # Collect all sequenced samples from patients
     samples_pat = lssp()
@@ -508,7 +513,8 @@ if __name__ == '__main__':
                               VERBOSE=VERBOSE, threads=threads,
                               n_pairs=n_pairs,
                               summary=summary,
-                              only_chunks=[only_chunk])
+                              only_chunks=[only_chunk],
+                              filtered=filtered)
                     continue
     
                 if summary:
@@ -525,13 +531,11 @@ if __name__ == '__main__':
                             f.write(' --maxreads '+str(n_pairs))
                         if only_chunk is not None:
                             f.write('--chunks '+str(only_chunk))
+                        if not filtered:
+                            f.write(' --unfiltered')
                         f.write('\n')
     
     
                 map_stampy(sample, fragment,
                            VERBOSE=VERBOSE, threads=threads, n_pairs=n_pairs,
-                           summary=summary, only_chunk=only_chunk)
-
-
-
-
+                           summary=summary, only_chunk=only_chunk, filtered=filtered)

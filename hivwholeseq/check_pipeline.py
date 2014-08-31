@@ -7,42 +7,126 @@ content:    Check the status of the pipeline for one or more sequencing samples.
 # Modules
 import os
 import sys
+from itertools import izip
 import argparse
+from Bio import SeqIO
 
 from hivwholeseq.generic_utils import getchar
 from hivwholeseq.samples import SampleSeq, load_sequencing_run
 from hivwholeseq.patients.patients import load_samples_sequenced as lssp
 from hivwholeseq.samples import load_samples_sequenced as lss
+from hivwholeseq.mapping_utils import get_number_reads
+from hivwholeseq.fork_cluster import fork_check_pipeline as fork_self
 
 
 # Globals
 len_fr = 8
-len_msg = 5
+len_msg = 6
 spacing_fragments = 4
 
 
 
 # Functions
-def print_info(name, gfn, frs=None):
+def check_status(sample, step, detail=1):
+    '''Check for a sample a certain step of the pipeline at a certain detail'''
+    if detail == 1:
+        if step == 'premapped':
+            return [os.path.isfile(sample.get_premapped_filename())]
+        elif step == 'divided':
+            return [(fr, os.path.isfile(sample.get_divided_filename(fr)))
+                    for fr in sample.regions_complete]
+        elif step == 'consensus':
+            return [(fr, os.path.isfile(sample.get_consensus_filename(fr)))
+                    for fr in sample.regions_generic]
+        elif step == 'mapped':
+            return [(fr, os.path.isfile(sample.get_mapped_filename(fr, filtered=False)))
+                    for fr in sample.regions_generic]
+        elif step == 'filtered':
+            return [(fr, os.path.isfile(sample.get_mapped_filename(fr, filtered=True)))
+                    for fr in sample.regions_generic]
+
+    elif detail == 2:
+        if step != 'filtered':
+            return check_status(sample, step, detail=1)
+        else:
+            return check_status(sample, step, detail=3)
+
+    elif detail == 3:
+        if step == 'premapped':
+            if os.path.isfile(sample.get_premapped_filename()):
+                return [get_number_reads(sample.get_premapped_filename())]
+            else:
+                return [False]
+
+        elif step == 'divided':
+            stati = []
+            for fr in sample.regions_complete:
+                fn = sample.get_divided_filename(fr)
+                if os.path.isfile(fn):
+                    status = (fr, get_number_reads(fn))
+                else:
+                    status = (fr, False)
+                stati.append(status)
+            return stati
+
+        elif step == 'consensus':
+            stati = []
+            for fr in sample.regions_generic:
+                fn = sample.get_consensus_filename(fr)
+                if os.path.isfile(fn):
+                    status = (fr, len(SeqIO.read(fn, 'fasta')))
+                else:
+                    status = (fr, False)
+                stati.append(status)
+            return stati
+
+        elif step == 'mapped':
+            stati = []
+            for fr in sample.regions_generic:
+                fn = sample.get_mapped_filename(fr, filtered=False)
+                if os.path.isfile(fn):
+                    status = (fr, get_number_reads(fn))
+                else:
+                    status = (fr, False)
+                stati.append(status)
+            return stati
+
+        elif step == 'filtered':
+            stati = []
+            for fr in sample.regions_generic:
+                fn = sample.get_mapped_filename(fr, filtered=True)
+                if os.path.isfile(fn):
+                    status = (fr, get_number_reads(fn))
+                else:
+                    status = (fr, False)
+                stati.append(status)
+            return stati
+
+
+def print_info(name, status, detail=1):
     '''Print info on these files'''
     print '{:<20s}'.format(name+':'),
 
-    if frs is None:
-        fn = gfn()
-        if os.path.isfile(fn):
+    if len(status) == 1:
+        status = status[0]
+        if status == True:
             print 'OK'
-        else:
+        elif status == False:
             print 'MISS'
+        else:
+            print str(status)
 
     else:
+        stati = list(status)
         msg = []
-        for fr in frs:
+        for (fr, status) in stati:
             ms = ('{:<'+str(len_fr)+'s}').format(fr+':')
-            fn = gfn(fr)
-            if os.path.isfile(fn):
+            if status == True:
                 msg.append(ms+('{:>'+str(len_msg)+'}').format('OK'))
-            else:
+            elif status == False:
                 msg.append(ms+('{:>'+str(len_msg)+'}').format('MISS'))
+            else:
+                msg.append(ms+('{:>'+str(len_msg)+'}').format(str(status)))
         print (' ' * spacing_fragments).join(msg)
 
 
@@ -61,12 +145,24 @@ if __name__ == '__main__':
                         help='Include non-patient samples (e.g. reference strains)')
     parser.add_argument('--interactive', action='store_true',
                         help='Interactive mode')
+    parser.add_argument('--detail', type=int, default=1,
+                        help='Include details on number of reads, length of consensus')
+    parser.add_argument('--submit', action='store_true',
+                        help='Execute the script in parallel on the cluster')
     
     args = parser.parse_args()
     seq_runs = args.runs
     adaIDs = args.adaIDs
     use_pats = args.use_pats
     use_interactive = args.interactive
+    detail = args.detail
+    submit = args.submit
+
+    if submit:
+        fork_self(seq_runs, adaIDs=adaIDs,
+                  pats=use_pats,
+                  detail=detail)
+        sys.exit()
 
     samples_pat = lssp()
     samples = lss()
@@ -92,11 +188,10 @@ if __name__ == '__main__':
             sample_pat = samples_pat.loc[sample['patient sample']]
             print 'patient: '+sample_pat.patient
 
-        print_info('Premapped', sample.get_premapped_filename)
-        print_info('Divided', sample.get_divided_filename, sample.regions_complete)
-        print_info('Consensus', sample.get_consensus_filename, sample.regions_generic)
-        print_info('Mapped', lambda x: sample.get_mapped_filename(x, filtered=False), sample.regions_generic)
-        print_info('Filtered', lambda x: sample.get_mapped_filename(x, filtered=True), sample.regions_generic)
+        steps = ['premapped', 'divided', 'consensus', 'mapped', 'filtered']
+        for step in steps:
+            status = check_status(sample, step, detail=detail)
+            print_info(step.capitalize(), status, detail=detail)
 
         print ''
 

@@ -28,10 +28,16 @@ def get_sample_foldername(pname, samplename, PCR=None):
     return fn
 
 
-def get_initial_consensus_filename(pname, fragment, format='fasta'):
-    '''Get the filename of the initial consensus for a patient'''
-    filename = 'consensus_initial_'+fragment+'.'+format
-    filename = get_foldername(pname)+filename
+def get_initial_reference_foldername(pname):
+    '''Get the folder name of the initial references'''
+    fn = get_foldername(pname)+'reference/'
+    return fn
+
+
+def get_initial_reference_filename(pname, fragment, format='fasta'):
+    '''Get the filename of the initial reference for a patient'''
+    filename = 'reference_initial_'+fragment+'.'+format
+    filename = get_initial_reference_foldername(pname)+filename
     return filename
 
 
@@ -43,7 +49,7 @@ def get_primers_filename(pname, format='fasta'):
 
 
 def get_mapped_to_initial_foldername(pname, samplename_pat, PCR=1):
-    '''Get the folder of mapped reads to initial consensus'''
+    '''Get the folder of mapped reads to initial reference'''
     fn = get_sample_foldername(pname, samplename_pat, PCR=PCR)+'mapped_to_initial/'
     return fn
 
@@ -53,7 +59,7 @@ def get_mapped_to_initial_filename(pname, samplename_pat,
                                    PCR=1,
                                    part=None, unsorted=False,
                                    only_chunk=None):
-    '''Get the filename of the mapped reads to initial consensus'''
+    '''Get the filename of the mapped reads to initial reference'''
     filename = samplename+'_'+fragment
     if part is not None:
         filename = filename+'_part'+str(part)
@@ -67,7 +73,7 @@ def get_mapped_to_initial_filename(pname, samplename_pat,
 
 
 def get_mapped_filtered_filename(pname, samplename_pat, fragment, type='bam', PCR=1):
-    '''Get the filename of the mapped and filtered reads to initial consensus'''
+    '''Get the filename of the mapped and filtered reads to initial reference'''
     filename = fragment+'.'+type
     filename = get_mapped_to_initial_foldername(pname, samplename_pat, PCR=PCR)+filename
     return filename
@@ -75,9 +81,9 @@ def get_mapped_filtered_filename(pname, samplename_pat, fragment, type='bam', PC
 
 def get_initial_index_filename(pname, fragment, ext=True):
     '''Get the index filename, with or w/o extension'''
-    filename = 'consensus_initial_'+fragment
+    filename = 'reference_initial_'+fragment
     filename = 'hash/'+filename
-    filename = get_foldername(pname)+filename
+    filename = get_initial_reference_foldername(pname)+filename
     if ext:
         filename = filename+'.stidx'
     return filename
@@ -85,9 +91,9 @@ def get_initial_index_filename(pname, fragment, ext=True):
 
 def get_initial_hash_filename(pname, fragment, ext=True):
     '''Get the index filename, with or w/o extension'''
-    filename = 'consensus_initial_'+fragment
+    filename = 'reference_initial_'+fragment
     filename = 'hash/'+filename
-    filename = get_foldername(pname)+filename
+    filename = get_initial_reference_foldername(pname)+filename
     if ext:
         filename = filename+'.sthash'
     return filename
@@ -115,21 +121,21 @@ def get_allele_counts_filename(pname, samplename_pat, fragment, PCR=1, qual_min=
 
 
 def get_allele_count_trajectories_filename(pname, fragment):
-    '''Get the matrix with allele counts on the initial consensus'''
+    '''Get the matrix with allele counts on the initial reference'''
     filename = 'allele_counts_trajectories_'+fragment+'.npy'
     filename = get_foldername(pname)+filename
     return filename
 
 
 def get_allele_frequency_trajectories_filename(pname, fragment):
-    '''Get the matrix with allele frequencies on the initial consensus'''
+    '''Get the matrix with allele frequencies on the initial reference'''
     filename = 'allele_frequency_trajectories_'+fragment+'.npy'
     filename = get_foldername(pname)+filename
     return filename
 
 
 def get_allele_cocounts_filename(pname, samplename, fragment):
-    '''Get the matrix of allele cocounts on the initial consensus'''
+    '''Get the matrix of allele cocounts on the initial reference'''
     filename = 'allele_cocounts_'+fragment+'.npy'
     filename = get_foldername(pname)+samplename+'/'+filename
     return filename
@@ -186,7 +192,7 @@ def get_coverage_to_initial_figure_filename(pname, fragment, format='png'):
 
 # SUMMARY
 def get_map_initial_summary_filename(pname, samplename_pat, samplename, fragment, PCR=1, only_chunk=None):
-    '''Get the filename of the summary of the map to initial consensus'''
+    '''Get the filename of the summary of the map to initial reference'''
     filename = 'summary_map_initial_'+samplename+'_'+fragment
     if only_chunk is not None:
         filename = filename+'_chunk_'+str(only_chunk)
@@ -197,7 +203,7 @@ def get_map_initial_summary_filename(pname, samplename_pat, samplename, fragment
 
 
 def get_paste_mapped_chunks_initial_summary_filename(pname, samplename_pat, samplename, fragment, PCR=1):
-    '''Get the filename of the summary of the pasting of chunk after mapping to initial consensus'''
+    '''Get the filename of the summary of the pasting of chunk after mapping to initial reference'''
     filename = 'summary_paste_mapped_initial_'+samplename+'_'+fragment+'.txt'
     filename = samplename_pat+'/PCR'+str(PCR)+'/mapped_to_initial/'+filename
     filename = get_foldername(pname)+filename

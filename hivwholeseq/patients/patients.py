@@ -31,7 +31,7 @@ class Patient(pd.Series):
 
     @property
     def folder(self):
-        '''The folder with the data on this sample'''
+        '''The folder with the data on this patient'''
         from hivwholeseq.patients.filenames import get_foldername
         return str(get_foldername(self.name))
 
@@ -124,7 +124,7 @@ def load_patient(pname):
     return patient
 
 
-def load_samples_sequenced(patient=None):
+def load_samples_sequenced(patients=None):
     '''Load patient samples sequenced from general table'''
     sample_table = pd.read_excel(table_filename, 'Samples timeline sequenced',
                                  index_col=0)
@@ -137,8 +137,8 @@ def load_samples_sequenced(patient=None):
     # the two parallel RT-PCR reactions
     sample_table['n templates'] = sample_table['viral load'] * 0.4 / 12 * 2
 
-    if patient is not None:
-        sample_table = sample_table.loc[sample_table.loc[:, 'patient'] == patient]
+    if patients is not None:
+        sample_table = sample_table.loc[sample_table.loc[:, 'patient'].isin(patients)]
 
     return sample_table
 

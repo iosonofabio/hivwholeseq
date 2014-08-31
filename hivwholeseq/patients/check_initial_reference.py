@@ -1099,7 +1099,8 @@ if __name__ == '__main__':
         sample_init = patient.initial_sample
 
         for fragment in fragments:
-            print fragment
+            if VERBOSE >= 1:
+                print fragment
 
             if (patient.name in ('15241', '15319')) and (fragment in ('F4', 'F5', 'F6')):
                 sample_init_seq = SampleSeq(sample_init['samples seq'].iloc[1])
@@ -1151,7 +1152,7 @@ if __name__ == '__main__':
         # Check genomewide if present
         ref_fn = patient.get_reference_filename('genomewide')
         if not os.path.isfile(ref_fn):
-            if VERBOSE >= 2:
+            if VERBOSE >= 1:
                 print 'WARNING: genomewide reference not found'
             continue
 
