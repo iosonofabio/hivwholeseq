@@ -206,8 +206,10 @@ def load_sequencing_runs(seq_runs=None):
         _sequencing_runs = seq_runs_in
 
     if seq_runs is not None:
-        seq_runs_in = _sequencing_runs.loc[_sequencing_runs.index.isin(seq_runs)]
-    return seq_runs_in
+        seq_runs = _sequencing_runs.loc[_sequencing_runs.index.isin(seq_runs)]
+        return seq_runs
+    else:
+        return _sequencing_runs
 
 
 def load_sequencing_run(seq_run):

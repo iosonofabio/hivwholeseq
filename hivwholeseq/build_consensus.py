@@ -437,6 +437,7 @@ if __name__ == '__main__':
                 #FIXME: old nomenclature for F3a is F3
                 if not os.path.isfile(fn) and fragment[:3] == 'F3a':
                     fn = get_reference_premap_filename(data_folder, adaID, 'F3'+fragment[-1])
+                if not os.path.isfile(bamfilename) and fragment[:3] == 'F3a':
                     bamfilename = get_divided_filename(data_folder, adaID, 'F3'+fragment[-1], type='bam')
 
                 refseq = SeqIO.read(fn, 'fasta')

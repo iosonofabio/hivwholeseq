@@ -206,7 +206,8 @@ if __name__ == '__main__':
             label = [seq_run, adaID, samplename, fragment, dist_hist.sum()]
             hists.append((dist_hist, label))
 
-        print ''
+        if VERBOSE >= 1:
+            print ''
     
     if len(hists) == 1:
         label = ', '.join(hists[0][1][:-1])+' ('+str(hists[0][1][-1])+')'

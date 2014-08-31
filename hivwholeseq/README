@@ -1,33 +1,68 @@
 -------------------------------------------------------------------------------
-PIPELINE FOR HIV MISEQ SEQUENCING DATA
+		HIV WHOLE GENOME LONGITUDINAL HIV MISEQ SEQUENCING
 -------------------------------------------------------------------------------
-LAST UPDATE: May 2014.
+F. Zanini, R. Neher (+ other authors for the non-coding part)
+LAST UPDATE: Aug 2014.
 
-0a. We get three FASTQ files from Joerg/Xi (and the Miseq):
- - read1
- - read2
- - barcode/adapter
+OVERVIEW
+-------------------------------------------------------------------------------
+The analysis of HIV whole-genome longitudinal sequences consists of a set of
+scripts and modules. There are two levels of analysis:
 
-CHECKPOINT: quality score along reads. (quality_along_read.py)
+1. MAPPING: Reads from each sequenced sample must be cleaned and assigned to
+            regions. This step is performed on non-patient samples too. The
+            scripts and modules are located in the main folder (this one).
 
-1a. Demultiplex by adapter and put into separate folders with the adapter IDs and
-   sample names. (demultiplex.py)
+2. PATIENT: Cleaned reads are mapped against a patient-specific reference (the
+            majotiry sequence of the first time point), allele counts and linkage
+            data structures are precomputed, and population genetics is
+            studied. The scripts and modules are located in the subfolder "patients"
 
-OR
+In order to check the status of the analysis, generic scripts exist:
 
-0b. We get the demultiplexed files on the Short Reads Archive (SRA).
+- overview_sequencing.py: print a list of sequencing runs and some info on each
 
-1b. Take demultiplexed reads from the SRA and symlink. (symlink_SRA.py)
+- check_pipeline.py: prints the status of one or more samples, in terms of
+  what steps of the mapping have been already done (or have failed)
 
-CHECKPOINT: errors in adapter IDs, quality along read by sample.
+Scripts to check each step of the mapping are also provided, e.g.:
 
-2. Preliminary mapping to HXB2, to allow for better filtering immediately afterwards.
+- check_quality_along_read.py
+
+- check_insert_distribution.py
+
+- check_premapped_coverage.py
+
+- check_divided_coverage.py
+
+- check_consensus.py
+
+- check_mapped_coverage.py
+
+- check_distance_mapped_consensus.py
+
+Similar scripts exist for the second part, PATIENT, see README in the "patients" folder.
+
+A standard control for sequencing quality is co-sequencing of PhiX, a plasmid of known
+sequence. The analysis pipeline on those reads is located in the README, "phix" folder.
+
+MAPPING PIPELINE FOR HIV SAMPLES
+-------------------------------------------------------------------------------
+0. We start by getting the demultiplexed files on the Short Reads Archive (SRA).
+
+1. Update the master Excel table of the dataset.
+
+2. Take demultiplexed reads from the SRA and symlink. (symlink_SRA.py)
+
+CHECKPOINT: errors in adapter IDs, quality along read by sample (check_quality_along_read.py).
+
+3. Preliminary mapping to HXB2, to allow for better filtering immediately afterwards.
    (premap_to_reference.py)
 
 CHECKPOINT: insert size distribution (check_insert_distribution.py --premapped),
             coverage (check_premapped_coverage.py).
 
-3. Trim reads according to:
+4. Trim reads according to:
    - reading into adapters (short inserts only)
    - outer and inner PCR primers
    - quality
@@ -38,55 +73,33 @@ CHECKPOINT: insert size distribution (check_insert_distribution.py --premapped),
 
 CHECKPOINT: check coverage (check_divided_coverage.py)
 
-4. Build consensus using local assembly, for each fragment and the whole genome (build_consensus.py)
+5. Build consensus using local assembly, for each fragment and the whole genome (build_consensus.py)
 
-5. Map the full dataset against the final consensus. (map_to_consensus.py)
+6. Map the full dataset against the final consensus. (map_to_consensus.py)
 
-6. Filter BAM files of unmapped stuff and similia. (filter_mapped_reads.py)
+7. Filter BAM files of unmapped stuff and similia. (filter_mapped_reads.py)
 
 CHECKPOINT: mapping issues, coverage
 
 
+POST-MAPPING PIPELINE FOR HIV SAMPLES
 -------------------------------------------------------------------------------
-END OF MAPPING
+At this point, reads are mapped against the patient-specific reference. See README in
+the "patients" folder for details on that part of the analysis.
+
+Additional sample-by-sample analyses are possible:
+
+- Calculate useful observables: coverage, allele frequencies, mutations.
+
+- Various popgen measures.
+
+
+DIAGRAMS
 -------------------------------------------------------------------------------
+1. MAPPING: START -> TABLE -> SYMLINK -> PREMAP -> DIVIDE -> CONSENSUS -> MAP -> FILTER
 
-7. Calculate useful observables: coverage, allele frequencies, mutations.
+2.1 PATIENT: REFERENCE -> MAP -> FILTER -> ALLELES -> TRAJECTORIES
+                                        L> PAIRS
+                                        L> LOCAL HAPLOTYPES
 
-8. Downstream: do popgen on this.
-
-
--------------------------------------------------------------------------------
-DIAGRAM
--------------------------------------------------------------------------------
-  FULL|SUBSAMPLE
-
-    0
-    |
-    1
-    |
-    2
-    |
-    3
-    |\
-    | 4
-    |/
-    5
-    |
-    6
-    |
-    7
-
--------------------------------------------------------------------------------
-PHIX ANALYSIS PIPELINE
--------------------------------------------------------------------------------
-LAST UPDATE: Jan 2014.
-
-We often spike in some phiX to control for sequencing errors. The scripts for
-this pipeline are in the 'phix' folder.
-
-1. map unclassified reads against phiX genome (map_phix.py).
-
-2. filter mapped reads to get read of low-quality stuff (filter_mapped_reads_phix.py).
-
-3. TODO
+2.2 CROSS SECTIONAL: CONSENSUS TREE

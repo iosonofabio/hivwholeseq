@@ -7,7 +7,7 @@ content:    Load sequencing run data for manual inspection.
 # Modules
 import argparse
 
-from hivwholeseq.datasets import MiSeq_runs
+from hivwholeseq.samples import load_sequencing_run
 
 
 # Script
@@ -21,7 +21,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
     seq_run = args.run
 
-    # Specify the dataset
-    dataset = MiSeq_runs[seq_run]
-    data_folder = dataset['folder']
-
+    dataset = load_sequencing_run(seq_run)
+    data_folder = dataset.folder

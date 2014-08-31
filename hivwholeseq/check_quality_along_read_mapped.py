@@ -21,7 +21,6 @@ from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.filenames import get_demultiplex_summary_filename, get_raw_read_files, \
         get_premapped_filename, get_read_filenames
 from hivwholeseq.adapter_info import adapters_illumina, foldername_adapter
-from hivwholeseq.fork_cluster import fork_quality_along_read as fork_self
 from hivwholeseq.mapping_utils import extract_mapped_reads_subsample_open
 
 
@@ -307,8 +306,9 @@ if __name__ == '__main__':
     plotfull = args.plotfull
 
     if submit:
-        fork_self(seq_run, VERBOSE=VERBOSE, maxreads=maxreads, savefig=savefig)
-        sys.exit()
+        raise ValueError('Not implemented!')
+        #fork_self(seq_run, VERBOSE=VERBOSE, maxreads=maxreads, savefig=savefig)
+        #sys.exit()
 
     dataset = MiSeq_runs[seq_run]
     data_folder = dataset['folder']

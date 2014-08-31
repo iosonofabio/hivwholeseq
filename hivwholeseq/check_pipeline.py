@@ -2,8 +2,7 @@
 '''
 author:     Fabio Zanini
 date:       15/06/14
-content:    Basic script to obtain the data from a seq run, e.g. adapters, sample
-            names, etc.
+content:    Check the status of the pipeline for one or more sequencing samples.
 '''
 # Modules
 import os
@@ -13,6 +12,7 @@ import argparse
 from hivwholeseq.generic_utils import getchar
 from hivwholeseq.samples import SampleSeq, load_sequencing_run
 from hivwholeseq.patients.patients import load_samples_sequenced as lssp
+from hivwholeseq.samples import load_samples_sequenced as lss
 
 
 # Globals
@@ -53,23 +53,34 @@ if __name__ == '__main__':
     # Parse input args
     parser = argparse.ArgumentParser(description='Check sequencing run for missing parts of the analysis',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
-    parser.add_argument('--run', required=True,
-                        help='Seq run to analyze (e.g. Tue28, test_tiny)')
+    parser.add_argument('--runs', required=True, nargs='+',
+                        help='Seq runs to analyze (e.g. Tue28, test_tiny)')
+    parser.add_argument('--adaIDs', nargs='+',
+                        help='Adapter IDs to analyze (e.g. TS2)')
     parser.add_argument('--nopatients', action='store_false', dest='use_pats',
                         help='Include non-patient samples (e.g. reference strains)')
     parser.add_argument('--interactive', action='store_true',
                         help='Interactive mode')
     
     args = parser.parse_args()
-    seq_run = args.run
+    seq_runs = args.runs
+    adaIDs = args.adaIDs
     use_pats = args.use_pats
     use_interactive = args.interactive
 
     samples_pat = lssp()
-    dataset = load_sequencing_run(seq_run)
+    samples = lss()
 
-    for sample in dataset.itersamples():
-        print sample.name, '('+sample.adapter+')',
+    samples = samples.loc[samples['seq run'].isin(seq_runs)]
+    if adaIDs is not None:
+        samples = samples.loc[samples.adapter.isin(adaIDs)]
+
+    if len(seq_runs) >= 2:
+        samples.sort(columns=['patient sample', 'seq run'], inplace=True)
+
+    for samplename, sample in samples.iterrows():
+        sample = SampleSeq(sample)
+        print sample.name, 'seq:', sample['seq run'], sample.adapter,
         if sample['patient sample'] == 'nan':
             print 'not a patient sample',
             if use_pats:

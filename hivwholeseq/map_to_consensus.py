@@ -148,7 +148,7 @@ def make_index_and_hash(data_folder, adaID, fragment, VERBOSE=0, summary=True):
 
 def map_stampy(data_folder, adaID, fragment, VERBOSE=0, threads=1,
                cluster_time='23:59:59', maxreads=-1, summary=True,
-               rescue=False):
+               rescue=False, dry=False):
     '''Map using stampy'''
     frag_gen = fragment[:2]
 
@@ -225,15 +225,26 @@ def map_stampy(data_folder, adaID, fragment, VERBOSE=0, threads=1,
         call_list = map(str, call_list)
         if VERBOSE >=2:
             print ' '.join(call_list)
-        sp.call(call_list)
 
-        if summary:
-            with open(summary_filename, 'a') as f:
-                f.write('Stampy mapped (single thread).\n')
+        if not dry:
+            sp.call(call_list)
 
-        output_filename = get_mapped_filename(data_folder, adaID, frag_gen, type='bam',
-                                              rescue=rescue)
-        convert_sam_to_bam(output_filename)
+            if summary:
+                with open(summary_filename, 'a') as f:
+                    f.write('Stampy mapped (single thread).\n')
+
+            output_filename = get_mapped_filename(data_folder, adaID, frag_gen, type='bam',
+                                                  rescue=rescue)
+            convert_sam_to_bam(output_filename)
+        else:
+            if summary:
+                with open(summary_filename, 'a') as f:
+                    f.write('Dry run works (single thread).\n')
+
+            if VERBOSE >= 1:
+                print 'Dry run works (single thread)'
+
+            return
 
     else:
 
@@ -269,9 +280,20 @@ def map_stampy(data_folder, adaID, fragment, VERBOSE=0, threads=1,
             call_list = map(str, call_list)
             if VERBOSE >= 2:
                 print ' '.join(call_list)
-            job_ID = sp.check_output(call_list)
-            job_ID = job_ID.split()[2]
-            job_IDs[j] = job_ID
+
+            if not dry:
+                job_ID = sp.check_output(call_list)
+                job_ID = job_ID.split()[2]
+                job_IDs[j] = job_ID
+
+        if dry:
+            if summary:
+                with open(summary_filename, 'a') as f:
+                    f.write('Dry run works (multi thread).\n')
+
+            if VERBOSE >= 1:
+                print 'Dry run works (multi thread)'
+            return
 
         # Monitor output
         output_file_parts = [get_mapped_filename(data_folder, adaID, frag_gen,
@@ -365,9 +387,9 @@ if __name__ == '__main__':
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     parser.add_argument('--run', required=True,
                         help='Seq run to analyze (e.g. Tue28)')
-    parser.add_argument('--adaIDs', nargs='*',
+    parser.add_argument('--adaIDs', nargs='+',
                         help='Adapter IDs to analyze (e.g. TS2)')
-    parser.add_argument('--fragments', nargs='*',
+    parser.add_argument('--fragments', nargs='+',
                         help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
@@ -385,6 +407,8 @@ if __name__ == '__main__':
                         help='Look at to-be-rescued reads (less stringent mapping)')
     parser.add_argument('--only-patient', action='store_true', dest='use_pats',
                         help='Map only patient samples')
+    parser.add_argument('--dry', action='store_true',
+                        help='Dry run (do everything except actual mapping)')
 
     args = parser.parse_args()
     seq_run = args.run
@@ -398,6 +422,10 @@ if __name__ == '__main__':
     summary = args.summary
     use_rescue = args.rescue
     use_pats = args.use_pats
+    use_dry = args.dry
+
+    if submit and use_dry:
+        raise ValueError('Won\'t submit a dry run!')
 
     dataset = load_sequencing_run(seq_run)
     data_folder = dataset.folder
@@ -487,7 +515,8 @@ if __name__ == '__main__':
                        cluster_time=cluster_time,
                        maxreads=maxreads,
                        summary=summary,
-                       rescue=use_rescue)
+                       rescue=use_rescue,
+                       dry=use_dry)
 
             if filter_reads:
                 if not rescue:

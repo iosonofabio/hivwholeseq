@@ -32,7 +32,7 @@ def fork_quality_along_read(seq_run, VERBOSE=0, maxreads=-1, savefig=True):
     if VERBOSE:
         print 'Forking to the cluster'
 
-    JOBSCRIPT = JOBDIR+'quality_along_read.py'
+    JOBSCRIPT = JOBDIR+'check_quality_along_read.py'
     cluster_time = '00:59:59'
     vmem = '1G'
     call_list = ['qsub','-cwd',
