@@ -27,6 +27,7 @@ class SampleSeq(pd.Series):
     '''A sequenced sample (if something has been sequenced twice, they are separate)'''
 
     _sequencing_run = None
+    _sample_pat = None
 
 
     def __init__(self, *args, **kwargs):
@@ -55,6 +56,22 @@ class SampleSeq(pd.Series):
 
 
     @property
+    def sample_pat(self):
+        '''Patient sample of this sequencing sample'''
+        if self._sample_pat is None:
+            from hivwholeseq.patients.patients import load_samples_sequenced as lssp
+            from hivwholeseq.patients.patients import SamplePat
+            self._sample_pat = SamplePat(lssp().loc[self['patient sample']])
+        return self._sample_pat
+
+
+    @property
+    def patientname(self):
+        '''Name of the patient this sample belongs to'''
+        return self.sample_pat.patient
+
+
+    @property
     def regions_complete(self):
         '''Get the complete regions, e.g. F5ao'''
         if self.PCR == 1:
@@ -79,6 +96,16 @@ class SampleSeq(pd.Series):
             return ['F'+fr[0] for fr in regions]
         else:
             return []
+
+
+    def convert_region(self, fragment):
+        '''Get the complete region of a generic or vice versa'''
+        if fragment in self.regions_generic:
+            return self.regions_complete[self.regions_generic.index(fragment)]
+        elif fragment in self.regions_complete:
+            return self.regions_generic[self.regions_complete.index(fragment)]
+        else:
+            raise IndexError('Region not in complete nor in generic regions!')
 
 
     def get_read_filenames(self, **kwargs):
@@ -114,6 +141,23 @@ class SampleSeq(pd.Series):
         from hivwholeseq.filenames import get_mapped_filename as gfn
         return gfn(self.folder, adaID=None, fragment=fragment, **kwargs)
 
+
+    def get_mapped_to_initial_filename(self, fragment, **kwargs):
+        '''Get the filename of the reads mapped to patient initial reference'''
+        from hivwholeseq.patients.filenames import get_mapped_to_initial_filename as gfn
+        pname = self.patientname
+        samplename_pat = self['patient sample']
+        PCR = int(self.PCR)
+        return gfn(pname, samplename_pat, self.name, fragment, PCR=PCR, **kwargs)
+
+
+    def get_mapped_filtered_filename(self, fragment, **kwargs):
+        '''Get the filename of the reads mapped to patient initial reference'''
+        from hivwholeseq.patients.filenames import get_mapped_filtered_filename as gfn
+        pname = self.patientname
+        samplename_pat = self['patient sample']
+        PCR = int(self.PCR)
+        return gfn(pname, samplename_pat, fragment, PCR=PCR, **kwargs)
 
 
 class SamplesSeq(pd.DataFrame):

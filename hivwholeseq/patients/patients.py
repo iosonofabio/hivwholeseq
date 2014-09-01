@@ -19,7 +19,7 @@ class Patient(pd.Series):
     def __init__(self, *args, **kwargs):
         '''Initialize a patient with all his samples'''
         super(Patient, self).__init__(*args, **kwargs)
-        samples = load_samples_sequenced(patient=self.name)
+        samples = load_samples_sequenced(patients=[self.name])
         del samples['patient']
         self.samples = samples
 
@@ -105,6 +105,39 @@ class Patient(pd.Series):
         '''The most likely time of transmission'''
         return self['last negative date'] + \
                 (self['first positive date'] - self['last negative date']) / 2
+
+
+class SamplePat(pd.Series):
+    '''Patient sample'''
+
+    def __init__(self, *args, **kwargs):
+        '''Initialize a patient sample'''
+        super(SamplePat, self).__init__(*args, **kwargs)
+
+
+    @property
+    def _constructor(self):
+        return Patient
+
+
+    def get_mapped_filtered_filename(self, fragment, PCR=1):
+        '''Get filename(s) of mapped and filtered reads'''
+        from hivwholeseq.patients.filenames import get_mapped_filtered_filename
+        return get_mapped_filtered_filename(self.patient, self.name, fragment, PCR=PCR)
+
+
+    def get_mapped_filenames(self, fragment, PCR=1):
+        '''Get filename(s) of mapped and filtered reads'''
+        # TODO: optimize this call
+        from hivwholeseq.patients.filenames import get_mapped_to_initial_filename
+        from hivwholeseq.samples import load_samples_sequenced as lss
+        samples_seq = lss()
+        samples_seq = samples_seq.loc[samples_seq['patient sample'] == self.name]
+
+        fns = [get_mapped_to_initial_filename(self.patient, self.name, samplename,
+                                              PCR=PCR)
+               for samplename, sample in samples_seq.iterrows()]
+        return fns
 
 
 

@@ -129,7 +129,7 @@ def map_stampy_singlethread(sample, fragment, VERBOSE=0, n_pairs=-1,
         frag_spec = frag_spec[0]
 
     input_filename = get_input_filename(data_folder, adaID, frag_spec, type='bam',
-                                        chunk=only_chunk, filtered=filtered)
+                                        only_chunk=only_chunk, filtered=filtered)
 
     # NOTE: we introduced fragment nomenclature late, e.g. F3a. Check for that
     if not os.path.isfile(input_filename):
@@ -363,12 +363,13 @@ def map_stampy_multithread(sample, fragment, VERBOSE=0, threads=2, summary=True,
 
 
 def map_stampy(sample, fragment, VERBOSE=0, threads=1, n_pairs=-1,
-               summary=True, only_chunk=None):
+               summary=True, only_chunk=None, filtered=True):
     '''Map using stampy'''
     if threads == 1:
         map_stampy_singlethread(sample, fragment,
                                 VERBOSE=VERBOSE, n_pairs=n_pairs,
-                                summary=summary, only_chunk=only_chunk)
+                                summary=summary, only_chunk=only_chunk,
+                                filtered=filtered)
 
     else:
         if (n_pairs != -1):
@@ -377,7 +378,8 @@ def map_stampy(sample, fragment, VERBOSE=0, threads=1, n_pairs=-1,
             raise ValueError('Cannot multithread a chunk - why would you do this?')
 
         map_stampy_multithread(sample, fragment, threads=threads,
-                               VERBOSE=VERBOSE, summary=summary)
+                               VERBOSE=VERBOSE, summary=summary,
+                               filtered=filtered)
 
 
 def get_number_chunks(pname, samplename, fragment, VERBOSE=0):
@@ -508,6 +510,18 @@ if __name__ == '__main__':
 
             for only_chunk in only_chunks_sample:
     
+                # If the input file if missing, skip
+                input_filename = get_input_filename(sample.seqrun_folder,
+                                                    sample.adapter,
+                                                    sample.convert_region(fragment),
+                                                    type='bam',
+                                                    only_chunk=only_chunk,
+                                                    filtered=filtered)
+                if not os.path.isfile(input_filename):
+                    if VERBOSE:
+                        print 'WARNING: input file not found'
+                    continue
+
                 if submit:
                     fork_self(samplename, fragment,
                               VERBOSE=VERBOSE, threads=threads,
@@ -516,7 +530,7 @@ if __name__ == '__main__':
                               only_chunks=[only_chunk],
                               filtered=filtered)
                     continue
-    
+
                 if summary:
                     sfn = get_map_initial_summary_filename(pname, samplename_pat,
                                                            samplename, fragment,

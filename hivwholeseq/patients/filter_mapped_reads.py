@@ -3,7 +3,7 @@
 '''
 author:     Fabio Zanini
 date:       18/03/14
-content:    Filter reads after mapping to the initial consensus. If there are
+content:    Filter reads after mapping to the initial reference. If there are
             several sequencing runs contributing to one patient sample, merge them
             into the filtered reads.
 '''
@@ -60,10 +60,12 @@ def filter_mapped_reads(sample, fragment,
                                                  type='bam', PCR=PCR)
                    for samplename in samplenames_seq]
     infilenames = filter(os.path.isfile, infilenames)
-
     if not len(infilenames):
         raise ValueError('No mapped files found: '+', '+join([pname, samplename_pat,
                                                               fragment, str(PCR)]))
+
+    # Take reads evenly distributed across sequencing repetitions
+    maxreads /= len(infilenames)
 
     if VERBOSE >= 2:
         print 'Input mapped filenames:',
@@ -261,7 +263,7 @@ if __name__ == '__main__':
         print 'fragments', fragments
 
     for (samplename_pat, PCR), samplenames_seq in samples_groups.groups.iteritems():
-        sample_pat = samples_pat.loc[samplename_pat]
+        sample_pat = samples_pat.loc[samplename_pat].copy()
         samples_seq_group = samples_seq.loc[samples_seq.index.isin(samplenames_seq)]
         sample_pat.set_value('samples seq', samples_seq_group)
         pname = sample_pat.patient

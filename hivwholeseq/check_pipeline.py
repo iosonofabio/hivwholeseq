@@ -15,6 +15,7 @@ from Bio import SeqIO
 from hivwholeseq.generic_utils import getchar
 from hivwholeseq.samples import SampleSeq, load_sequencing_run
 from hivwholeseq.patients.patients import load_samples_sequenced as lssp
+from hivwholeseq.patients.patients import SamplePat
 from hivwholeseq.samples import load_samples_sequenced as lss
 from hivwholeseq.mapping_utils import get_number_reads
 from hivwholeseq.fork_cluster import fork_check_pipeline as fork_self
@@ -44,6 +45,13 @@ def check_status(sample, step, detail=1):
                     for fr in sample.regions_generic]
         elif step == 'filtered':
             return [(fr, os.path.isfile(sample.get_mapped_filename(fr, filtered=True)))
+                    for fr in sample.regions_generic]
+        elif step == 'mapped_initial':
+            return [(fr, os.path.isfile(sample.get_mapped_to_initial_filename(fr)))
+                    for fr in sample.regions_generic]
+        
+        elif step == 'mapped_filtered':
+            return [(fr, os.path.isfile(sample.get_mapped_filtered_filename(fr)))
                     for fr in sample.regions_generic]
 
     elif detail == 2:
@@ -102,6 +110,10 @@ def check_status(sample, step, detail=1):
                     status = (fr, False)
                 stati.append(status)
             return stati
+
+        # TODO: add mapped_to_initial and downstream
+        elif step in ('mapped_to_initial', 'mapped_filtered'):
+            return check_status(sample, step, detail=1)
 
 
 def print_info(name, status, detail=1):
@@ -175,7 +187,7 @@ if __name__ == '__main__':
     if len(seq_runs) >= 2:
         samples.sort(columns=['patient sample', 'seq run'], inplace=True)
 
-    for samplename, sample in samples.iterrows():
+    for isa, (samplename, sample) in enumerate(samples.iterrows()):
         sample = SampleSeq(sample)
         print sample.name, 'seq:', sample['seq run'], sample.adapter,
         if sample['patient sample'] == 'nan':
@@ -189,14 +201,16 @@ if __name__ == '__main__':
             sample_pat = samples_pat.loc[sample['patient sample']]
             print 'patient: '+sample_pat.patient
 
-        steps = ['premapped', 'divided', 'consensus', 'mapped', 'filtered']
+        steps = ['premapped', 'divided', 'consensus', 'mapped', 'filtered',
+                 'mapped_initial', 'mapped_filtered']
         for step in steps:
             status = check_status(sample, step, detail=detail)
             print_info(step.capitalize(), status, detail=detail)
 
-        print ''
+        if (isa != len(samples) - 1):
+            print ''
 
-        if use_interactive:
+        if use_interactive and (isa != len(samples) - 1):
             print 'Press q to exit',
             sys.stdout.flush()
             ch = getchar()
