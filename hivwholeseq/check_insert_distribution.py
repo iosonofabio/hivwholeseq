@@ -88,6 +88,7 @@ def plot_cumulative_histogram(data_folder, adaID, fragment, insert_sizes,
     ax.plot(insert_sizes, np.linspace(0, 1, len(insert_sizes)), **kwargs)
     ax.set_xlabel('Insert size')
     ax.set_ylabel('Cumulative fraction')
+    ax.set_xlim(-1, 1000)
     if title is not None:
         ax.set_title(title)
 
@@ -152,9 +153,7 @@ if __name__ == '__main__':
     parser.add_argument('--adaIDs', nargs='*',
                         help='Adapter IDs to analyze (e.g. TS2)')
     parser.add_argument('--fragments', nargs='*',
-                        help='Fragments to analyze (e.g. F1 F6)')
-    parser.add_argument('--premapped', action='store_true',
-                        help='Analyze premapped reads')
+                        help='Fragments to analyze (e.g. F1 F6 or "premapped")')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
     parser.add_argument('--maxreads', type=int, default=-1,
@@ -169,7 +168,6 @@ if __name__ == '__main__':
     VERBOSE = args.verbose
     maxreads = args.maxreads
     savefig = args.savefig
-    premapped = args.premapped
 
     # Specify the dataset
     dataset = load_sequencing_run(seq_run)
@@ -184,9 +182,7 @@ if __name__ == '__main__':
         print 'adaIDs', adaIDs
 
     # If the script is called with no fragment, iterate over all
-    if premapped:
-        fragments = ['premapped']
-    elif not fragments:
+    if not fragments:
         fragments = ['F'+str(i) for i in xrange(1, 7)]
     if VERBOSE >= 3:
         print 'fragments', fragments

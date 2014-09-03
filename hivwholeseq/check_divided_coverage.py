@@ -42,6 +42,7 @@ def plot_coverage(counts, suptitle, minor_allele=False):
     ax.set_xlabel('Position [bases]')
     ax.set_ylabel('Coverage')
     ax.grid(True)
+    ax.set_xlim(-1, len(cov_tot))
 
     if minor_allele:
         # Use pseudocounts so-so (it is only rough)
@@ -156,15 +157,20 @@ if __name__ == '__main__':
         data_folder = sample.sequencing_run.folder
         adaID = sample.adapter
         fragments_sample = sample.regions_complete
-        if VERBOSE:
-            print seq_run, adaID, samplename, fragments_sample
+        if VERBOSE >= 1:
+            print seq_run, adaID, samplename, fragments_sample,
 
         for fragment in fragments_sample:
+            if VERBOSE >= 1:
+                print fragment,
             frag_gen = fragment[:2]
             if (fragments is None) or (frag_gen in fragments):
                 check_division(data_folder, adaID, fragment, seq_run,
                                maxreads=maxreads,
                                VERBOSE=VERBOSE,
                                minor_allele=use_minor_allele)
+
+        if VERBOSE >= 1:
+            print ''
 
 

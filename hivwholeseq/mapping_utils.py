@@ -340,7 +340,8 @@ def extract_mapped_reads_subsample_open(bamfile_in, n_reads, maxreads=-1, VERBOS
     ind_store.sort()
 
     if VERBOSE >= 2:
-        print 'Random indices between '+str(ind_store[0])+' and '+str(ind_store[-1])
+        print 'Random indices between '+str(ind_store[0])+' and '+str(ind_store[-1]),
+        print '(pairs is '+str(pairs)+')'
 
     # Copy reads
     if not pairs:

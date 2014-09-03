@@ -25,12 +25,13 @@ from Bio.Alphabet.IUPAC import ambiguous_dna, unambiguous_dna
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
+from hivwholeseq.generic_utils import mkdirs
 from hivwholeseq.samples import SampleSeq
 from hivwholeseq.patients.patients import load_patient
 from hivwholeseq.miseq import alpha
 from hivwholeseq.filenames import get_consensus_filename
 from hivwholeseq.patients.filenames import get_initial_reference_filename, \
-        get_foldername
+        get_foldername, get_initial_reference_foldername
 from hivwholeseq.primer_info import primers_inner
 from hivwholeseq.primer_info import primers_coordinates_HXB2_inner as pci
 from hivwholeseq.one_site_statistics import \
@@ -114,12 +115,8 @@ if __name__ == '__main__':
     if VERBOSE >= 3:
         print 'fragments', fragments
 
-    # Make dir for the patient if absent
-    pfolder = patient.folder
-    if not os.path.isdir(pfolder):
-        os.mkdir(pfolder)
-        if VERBOSE >= 1:
-            print pname+': folder created.'
+    # Make dir for the patient and reference if absent
+    mkdirs(get_initial_reference_foldername(pname))
     
     # Get the first sequenced sample
     sample_init_pat = patient.samples.iloc[samplen]

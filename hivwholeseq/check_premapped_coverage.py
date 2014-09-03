@@ -108,10 +108,15 @@ def check_premap(data_folder, adaID, fragments, seq_run, samplename,
 
     # Open BAM and scan reads
     input_filename = get_premapped_filename(data_folder, adaID, type='bam')
+    if not os.path.isfile(input_filename):
+        if VERBOSE:
+            print 'Premapped BAM file not found'
+        return (None, None)
 
     # Count reads if requested
+    n_reads = get_number_reads(input_filename)
     if VERBOSE:
-        print 'N. of reads:', get_number_reads(input_filename)
+        print 'N. of reads:', n_reads
 
     # Get counts
     counts, inserts = get_allele_counts_insertions_from_file_unfiltered(input_filename,
@@ -123,12 +128,10 @@ def check_premap(data_folder, adaID, fragments, seq_run, samplename,
 
     # Plot results
     if title is None:
-        title=', '.join(map(lambda x: ' '.join([x[0], str(x[1])]),
-                            [['run', seq_run],
-                             ['adaID', adaID],
-                             ['sample', samplename],
-                             ['n_reads', maxreads],
-                            ]))
+        title=', '.join(['run '+seq_run+' '+adaID,
+                         'sample '+samplename,
+                         'reads '+str(min(maxreads, n_reads))+'/'+str(n_reads),
+                        ])
     plot_coverage(counts,
                   offset_x=refseq_start,
                   frags_pos=frags_pos,
@@ -147,7 +150,7 @@ def check_premap(data_folder, adaID, fragments, seq_run, samplename,
 if __name__ == '__main__':
 
     # Parse input args
-    parser = argparse.ArgumentParser(description='Check consensus',
+    parser = argparse.ArgumentParser(description='Check premapped coverage',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     runs_or_samples = parser.add_mutually_exclusive_group(required=True)
     runs_or_samples.add_argument('--runs', nargs='+',
@@ -180,7 +183,7 @@ if __name__ == '__main__':
     show = args.show
     persist = args.persist
 
-    if persist:
+    if not show:
         plt.ioff()
 
     samples = lss()
@@ -226,8 +229,9 @@ if __name__ == '__main__':
                                          VERBOSE=VERBOSE,
                                          title=title)
 
-    if show and (not submit):
-        if not persist:
+        if show and (not submit) and (counts is not None):
             plt.ion()
-        plt.show()
+            plt.show()
+            if persist:
+                plt.waitforbuttonpress(timeout=60)
 

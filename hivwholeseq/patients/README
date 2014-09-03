@@ -11,14 +11,15 @@ observables. The analysis is made of substeps:
 1. Build a reference for each patient, using the consensus of the initial time
    point if possible, otherwise something similar. The reference must be good:
    all genes in place and in frame, complete coverage of the sequenced regions
-   (with outer primers), agreement on overlapping stretches.
+   (with outer primers), agreement on overlapping stretches
+   (build_initial_reference.py).
 
 2. A genome-wide reference has to be created by stitching. If no complete
    agreement on overlaps can be achieved, a stitching recipe must be produced,
    such that the same can be applied to extend any observable to genome-wide
    coordinates.
 
-CHECKPOINT: check initial reference
+CHECKPOINT: check initial reference for genes and length (check_initial_reference.py).
 
 3. Map the reads onto that reference, merge various repetitions of the sequencing,
    and filter away unmapped and similia (map_to_initial_reference.py)

@@ -92,8 +92,25 @@ def make_reference(data_folder, adaID, fragments, refname, VERBOSE=0, summary=Tr
     else:
         # Look for the first fwd and the last rev primers to trim the reference
         # NOTE: this works even if F1 or F6 are missing (e.g. only F2-5 are seq-ed)!
-        from hivwholeseq.primer_info import primers_PCR
+        # If more than one primer is used for the first or last fragment, take the
+        # longest reference
+        from hivwholeseq.primer_info import primers_PCR, primers_coordinates_HXB2
+        if '+' in fragments[0]:
+            fragment_subs = [fragments[0][:2]+fsub+fragments[0][-1]
+                             for fsub in fragments[0][2:-1].split('+')]
+            fr_pos_subs = [primers_coordinates_HXB2[fsub][0][0]
+                           for fsub in fragment_subs]
+            fragments[0] = fragment_subs[np.argmin(fr_pos_subs)]
+
         pr_fwd = primers_PCR[fragments[0]][0]
+
+        if '+' in fragments[-1]:
+            fragment_subs = [fragments[-1][:2]+fsub+fragments[-1][-1]
+                             for fsub in fragments[-1][2:-1].split('+')]
+            fr_pos_subs = [primers_coordinates_HXB2[fsub][1][1]
+                           for fsub in fragment_subs]
+            fragments[-1] = fragment_subs[np.argmax(fr_pos_subs)]
+
         pr_rev = primers_PCR[fragments[-1]][1]
 
         smat = np.array(seq)
@@ -342,7 +359,7 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
 
 def report_insert_size(data_folder, adaID, seq_run, VERBOSE=0, summary=True):
     '''Produce figures of the insert size distribution'''
-    from hivwholeseq.insert_size_distribution import get_insert_size_distribution, \
+    from hivwholeseq.check_insert_distribution import get_insert_size_distribution, \
             plot_cumulative_histogram, plot_histogram
 
     bins = np.linspace(0, 1000, 100)
@@ -487,6 +504,7 @@ if __name__ == '__main__':
                 f.write(outstr)
 
         fragments = get_fragments(sample)
+
         make_reference(data_folder, adaID, fragments, refname, VERBOSE=VERBOSE, summary=summary)
 
         make_index_and_hash(data_folder, adaID, VERBOSE=VERBOSE, summary=summary)
@@ -494,7 +512,7 @@ if __name__ == '__main__':
         premap_stampy(data_folder, adaID, VERBOSE=VERBOSE, threads=threads, summary=summary)
 
         if summary:
+            report_coverage(data_folder, adaID, VERBOSE=VERBOSE, summary=summary)
+
             report_insert_size(data_folder, adaID, seq_run,
                                VERBOSE=VERBOSE, summary=summary)
-
-            report_coverage(data_folder, adaID, VERBOSE=VERBOSE, summary=summary)

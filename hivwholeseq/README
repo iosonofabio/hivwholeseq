@@ -54,7 +54,7 @@ MAPPING PIPELINE FOR HIV SAMPLES
 
 2. Take demultiplexed reads from the SRA and symlink. (symlink_SRA.py)
 
-CHECKPOINT: errors in adapter IDs, quality along read by sample (check_quality_along_read.py).
+CHECKPOINT: quality along read by sample (check_quality_along_read.py).
 
 3. Preliminary mapping to HXB2, to allow for better filtering immediately afterwards.
    (premap_to_reference.py)
@@ -73,7 +73,7 @@ CHECKPOINT: insert size distribution (check_insert_distribution.py --premapped),
 
 CHECKPOINT: check coverage (check_divided_coverage.py)
 
-5. Build consensus using local assembly, for each fragment and the whole genome (build_consensus.py)
+5. Build consensus using local assembly, for each fragment and the whole genome. For region F5, using --block-length 150 helps. (build_consensus.py)
 
 6. Map the full dataset against the final consensus. (map_to_consensus.py)
 

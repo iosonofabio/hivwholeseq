@@ -663,7 +663,7 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, fragments,
 
                 # Here the tests
                 if include_tests:
-                    lfr = frags_pos['trim'][n_frag, 1] - frags_pos['trim'][n_frag, 0]
+                    lfr = frags_pos['trim'][n_frag][1] - frags_pos['trim'][n_frag][0]
                     if test_sanity(reads, n_frag, lfr):
                         print 'Tests failed:', reads[0].qname
                         import ipdb; ipdb.set_trace()

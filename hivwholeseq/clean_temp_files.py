@@ -19,6 +19,7 @@ def remove_premapped_tempfiles(data_folder, adaID, VERBOSE=0):
     dirname = os.path.dirname(get_premapped_filename(data_folder, adaID, type='bam', part=1))+'/'
     fns = glob.glob(dirname+'premapped_*part*') + \
           glob.glob(dirname+'premapped_*unsorted*')  
+    fns.append(dirname+'premapped.sam')
     for fn in fns:
         os.remove(fn)
         if VERBOSE >= 3:

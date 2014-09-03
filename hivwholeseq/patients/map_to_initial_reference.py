@@ -485,6 +485,7 @@ if __name__ == '__main__':
         sample_pat = samples_pat.loc[samplename_pat] 
         sample['patient'] = pname = sample_pat.patient
         PCR = int(sample.PCR)
+        fragments_sample = sorted(set(sample.regions_generic) & set(fragments))
 
         if VERBOSE:
             print samplename, samplename_pat, pname, PCR
@@ -492,7 +493,7 @@ if __name__ == '__main__':
         if not skip_hash:
             make_output_folders(pname, samplename_pat, PCR=PCR, VERBOSE=VERBOSE)
 
-        for fragment in fragments:
+        for fragment in fragments_sample:
             if VERBOSE:
                 print fragment
 
