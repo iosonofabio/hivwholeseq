@@ -69,12 +69,13 @@ if __name__ == '__main__':
         samples = patient.samples.iloc[ind]
         times = (samples.date - patient.transmission_date) / np.timedelta64(1, 'D')
         ntemplates = samples['n templates']
+        covt = act.sum(axis=1)
 
         if plot:
             import matplotlib.pyplot as plt
-            plot_coverage_trajectories_3d(times, act.sum(axis=1),
+            plot_coverage_trajectories_3d(times, covt,
                                           title='Patient '+pname+', '+fragment,
-                                              VERBOSE=VERBOSE)
+                                          VERBOSE=VERBOSE)
 
     if plot:
         plt.tight_layout()
