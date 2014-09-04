@@ -20,7 +20,6 @@ class Patient(pd.Series):
         '''Initialize a patient with all his samples'''
         super(Patient, self).__init__(*args, **kwargs)
         samples = load_samples_sequenced(patients=[self.name])
-        del samples['patient']
         self.samples = samples
 
 
@@ -100,6 +99,12 @@ class Patient(pd.Series):
         return act
 
 
+    def get_mapped_filtered_filename(self, samplename, fragment, PCR=1):
+        '''Get filename(s) of mapped and filtered reads for a sample'''
+        from hivwholeseq.patients.filenames import get_mapped_filtered_filename
+        return get_mapped_filtered_filename(self.patient, samplename, fragment, PCR=PCR)
+
+
     @property
     def transmission_date(self):
         '''The most likely time of transmission'''
@@ -117,7 +122,7 @@ class SamplePat(pd.Series):
 
     @property
     def _constructor(self):
-        return Patient
+        return SamplePat
 
 
     def get_mapped_filtered_filename(self, fragment, PCR=1):

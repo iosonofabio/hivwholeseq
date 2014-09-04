@@ -9,7 +9,8 @@ content:    Check status of patients: initial reference, genomewide reference,
 # Modules
 import os
 import argparse
-from hivwholeseq.patients.patients import load_patients, load_patient, Patient
+from hivwholeseq.patients.patients import load_patients, load_patient, Patient, \
+        SamplePat
 
 
 # Globals
@@ -34,7 +35,14 @@ if __name__ == '__main__':
     for pname, p in patients.iterrows():
         p = Patient(p)
 
-        print p.name
+        n_samples = len(p.samples)
+        p.discard_nonsequenced_samples()
+        n_samples_seq = len(p.samples)
+        print p.name, '# samples:', str(n_samples)+ ' ('+str(n_samples_seq)+' sequenced)'
+        title = 'Samples'
+        line = ('{:<'+str(title_len)+'}').format(title+':')
+        line = line+' '.join(p.samples.index.tolist())
+        print line
 
         fn = p.folder
         title = 'Folder'
@@ -43,7 +51,7 @@ if __name__ == '__main__':
             status = 'OK'
         else:
             status = 'MISS'
-        line = line + ' ' + ('{:>'+str(cell_len)+'}').format(status)
+        line = line + ('{:<'+str(cell_len)+'}').format(status)
         print line
 
         if status != 'OK':
@@ -67,27 +75,38 @@ if __name__ == '__main__':
             print ''
             continue
 
-        title = 'Genomewide ref'
+        title = 'Genome ref'
         line = ('{:<'+str(title_len)+'}').format(title+':')
         fn = p.get_reference_filename('genomewide')
         if os.path.isfile(fn):
             status = 'OK'
         else:
             status = 'MISS'
-        line = line + ' ' + ('{:>'+str(cell_len)+'}').format(status)
+        line = line + ('{:<'+str(cell_len)+'}').format(status)
         print line
 
         if status != 'OK':
             print ''
             continue
 
+        for samplename, sample in p.samples.iterrows():
+            sample = SamplePat(sample)
+            title = sample.name
+            line = ('{:<'+str(title_len)+'}').format(title+':')
+            
+            stati = []
+            for fragment in ('F'+str(i+1) for i in xrange(6)):
+                fn = sample.get_mapped_filtered_filename(fragment, PCR=1)
+                if os.path.isfile(fn):
+                    status = 'OK'
+                else:
+                    fn = sample.get_mapped_filtered_filename(fragment, PCR=2)
+                    if os.path.isfile(fn):
+                        status = 'PCR2'
+                    else:
+                        status = 'MISS'
+                stati.append(status)
+                line = line + fragment + ': ' + ('{:>'+str(cell_len - len(fragment) - 1)+'}').format(status) + '  '
+            print line
+
         print ''
-
-
-
-
-        #n_samples = len(p.samples)
-        #p.discard_nonsequenced_samples()
-        #n_samples_seq = len(p.samples)
-        #print p.name, n_samples, n_samples_seq, p.samples.index.tolist()
-
