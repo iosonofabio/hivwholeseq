@@ -36,7 +36,7 @@ if __name__ == '__main__':
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-4]')
     parser.add_argument('--save', action='store_true',
-                        help='Save the allele frequency trajectories to file')
+                        help='Save the allele counts to file')
     parser.add_argument('--submit', action='store_true',
                         help='Execute the script in parallel on the cluster')
     parser.add_argument('--plot', nargs='?', default=None, const='2D',

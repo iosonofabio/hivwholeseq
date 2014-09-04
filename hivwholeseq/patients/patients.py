@@ -145,6 +145,14 @@ class SamplePat(pd.Series):
         return fns
 
 
+    def get_allele_counts_filename(self, fragment, PCR=1, qual_min=30):
+        '''Get the filename of the allele counts'''
+        from hivwholeseq.patients.filenames import get_allele_counts_filename
+        return get_allele_counts_filename(self.patient, self.name, fragment,
+                                          PCR=PCR, qual_min=qual_min)
+
+
+
 
 # Functions
 def load_patients():

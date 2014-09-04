@@ -336,7 +336,6 @@ def plot_allele_frequency_trajectories_from_counts_3d(times, act, title='', VERB
     ax.set_xlabel('Time [days from initial sample]')
     ax.set_ylabel('Position [bp]')
     ax.set_title(title)
-    ax.grid(True)
 
     if logit:
         ax.set_zlim(-4.1, 4.1)
@@ -354,4 +353,25 @@ def plot_allele_frequency_trajectories_from_counts_3d(times, act, title='', VERB
     else:
         ax.set_zlim(-4.1, 0.1)
         ax.set_zlabel(r'$\log_{10} \nu$', fontsize=18)
+
+
+def plot_coverage_trajectories_3d(times, covt, title='', VERBOSE=0):
+    '''Plot coverage over time'''
+    from mpl_toolkits.mplot3d import Axes3D
+    from matplotlib import cm
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    fig = plt.figure(figsize=(16, 12))
+    ax = fig.gca(projection='3d')
+    ax.view_init(5, 150)
+    (X, Y) = np.meshgrid(times, np.arange(covt.shape[1]))
+    ax.plot_surface(X, Y, np.log10(covt.T + 0.1), lw=0, cmap=cm.jet)
+
+    ax.set_xlim(times[0] -10, times[-1] + 10)
+    ax.set_xlabel('Time [days from initial sample]')
+    ax.set_ylabel('Position [bp]')
+    ax.set_title(title)
+    ax.set_zlim(-0.2, 5)
+    ax.set_zlabel(r'$\log_{10} \nu$', fontsize=18)
 

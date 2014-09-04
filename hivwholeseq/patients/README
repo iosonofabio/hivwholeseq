@@ -22,7 +22,7 @@ observables. The analysis is made of substeps:
 CHECKPOINT: check initial reference for genes and length (check_initial_reference.py).
 
 3. Map the reads onto that reference, merge various repetitions of the sequencing,
-   and filter away unmapped and similia (map_to_initial_reference.py)
+   and filter away unmapped and similia (map_to_initial_reference.py, filter_mapped_reads.py)
 
 4. Build allele counts per patient sample (get_allele_counts.py)
 

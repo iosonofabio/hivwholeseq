@@ -11,6 +11,7 @@ import argparse
 from operator import itemgetter
 import pysam
 import numpy as np
+import pandas as pd
 from Bio import SeqIO
 
 from hivwholeseq.samples import load_sequencing_run, SampleSeq
@@ -421,7 +422,7 @@ def filter_reads(data_folder,
                 histogram_dist_along[hbin, dc.sum()] += 1
                 if (dc.sum() > max_mismatches):
                     if VERBOSE >= 2:
-                        print n_mutator+1, irp, '{:2.1f}'.format(100.0 * (n_mutator + 1) / irp)+'%',\
+                        print n_mutator+1, irp, '{:2.1f}'.format(100.0 * (n_mutator + 1) / (irp + 1))+'%',\
                                 'Read pair '+read1.qname+': too many mismatches '+\
                                 '('+str(dc[0])+' + '+str(dc[1])+')'
                     n_mutator += 1
@@ -561,6 +562,14 @@ if __name__ == '__main__':
             print 'adaID '+adaID+': fragments '+' '.join(fragments_sample)
 
         for fragment in fragments_sample:
+            if VERBOSE >= 1:
+                print fragment
+
+            # There is a blacklist of samples which are probably contaminated,
+            # we want to discard those altogether
+            if pd.notnull(sample['suspected contamination']) and (fragment in sample['suspected contamination']):
+                print 'WARNING: This sample has a suspected contamination! Skipping.'
+                continue
 
             # Submit to the cluster self if requested
             if submit:

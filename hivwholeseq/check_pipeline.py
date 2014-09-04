@@ -112,7 +112,7 @@ def check_status(sample, step, detail=1):
             return stati
 
         # TODO: add mapped_to_initial and downstream
-        elif step in ('mapped_to_initial', 'mapped_filtered'):
+        elif step in ('mapped_initial', 'mapped_filtered'):
             return check_status(sample, step, detail=1)
 
 

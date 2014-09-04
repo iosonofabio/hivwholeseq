@@ -44,6 +44,8 @@ if __name__ == '__main__':
                         help='use logit scale (log(x/(1-x)) in the plots')
     parser.add_argument('--PCR1', type=int, default=1,
                         help='Take only PCR1 samples [0=off, 1=where both available, 2=always]')
+    parser.add_argument('--threshold', type=float, default=0.9,
+                        help='Minimal frequency plotted')
 
     args = parser.parse_args()
     pname = args.patient
@@ -52,6 +54,7 @@ if __name__ == '__main__':
     plot = args.plot
     use_PCR1 = args.PCR1
     use_logit = args.logit
+    threshold = args.threshold
 
     patient = load_patient(pname)
     patient.discard_nonsequenced_samples()
@@ -90,13 +93,13 @@ if __name__ == '__main__':
                                   title='Patient '+pname+', '+fragment,
                                   VERBOSE=VERBOSE, logit=use_logit,
                                   ntemplates=ntemplates,
-                                  threshold=0.9)
+                                  threshold=threshold)
 
             elif plot in ('3D', '3d'):
                 plot_nus_from_act_3d(times, act,
                                      title='Patient '+pname+', '+fragment,
                                      VERBOSE=VERBOSE, logit=use_logit,
-                                     threshold=0.9)
+                                     threshold=threshold)
 
     if plot is not None:
         plt.tight_layout()

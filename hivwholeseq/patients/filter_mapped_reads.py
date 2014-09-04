@@ -61,8 +61,9 @@ def filter_mapped_reads(sample, fragment,
                    for samplename in samplenames_seq]
     infilenames = filter(os.path.isfile, infilenames)
     if not len(infilenames):
-        raise ValueError('No mapped files found: '+', '+join([pname, samplename_pat,
+        print ('WARNING: No mapped files found: '+', '.join([pname, samplename_pat,
                                                               fragment, str(PCR)]))
+        return
 
     # Take reads evenly distributed across sequencing repetitions
     maxreads /= len(infilenames)
@@ -224,6 +225,8 @@ if __name__ == '__main__':
                         help='Verbosity level [0-3]')
     parser.add_argument('--no-summary', action='store_false', dest='summary',
                         help='Do not save results in a summary file')
+    parser.add_argument('--PCR', default='all',
+                        help='PCR to analyze (1, 2, or all)')
 
     args = parser.parse_args()
     pnames = args.patients
@@ -233,6 +236,7 @@ if __name__ == '__main__':
     VERBOSE = args.verbose
     n_pairs = args.maxreads
     summary = args.summary
+    PCR = args.PCR
 
     # Collect all sequenced samples from patients
     samples_pat = lssp()
@@ -250,6 +254,9 @@ if __name__ == '__main__':
         ind = samples_pat.index.isin(samplenames)
         samplenames_pat = samples_pat.index[ind]
         samples_seq = samples_seq.loc[samples_seq['patient sample'].isin(samplenames_pat)]
+
+    if PCR != 'all':
+        samples_seq = samples_seq.loc[np.array(samples_seq['PCR'], int) == int(PCR)]
 
     samples_groups = samples_seq.groupby(['patient sample', 'PCR'])
 
