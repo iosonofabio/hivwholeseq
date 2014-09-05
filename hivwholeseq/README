@@ -11,7 +11,7 @@ scripts and modules. There are two levels of analysis:
 
 1. MAPPING: Reads from each sequenced sample must be cleaned and assigned to
             regions. This step is performed on non-patient samples too. The
-            scripts and modules are located in the main folder (this one).
+            scripts and modules are located in the "sequencing" folder.
 
 2. PATIENT: Cleaned reads are mapped against a patient-specific reference (the
             majotiry sequence of the first time point), allele counts and linkage
