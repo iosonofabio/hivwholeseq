@@ -22,7 +22,7 @@ def get_foldername(pname):
 
 def get_sample_foldername(pname, samplename, PCR=None):
     '''Get the folder name of the data from a patient sample'''
-    fn = get_foldername(pname)+samplename+'/'
+    fn = get_foldername(pname)+'samples/'+samplename+'/'
     if PCR is not None:
         fn = fn+'PCR'+str(PCR)+'/'
     return fn
@@ -134,10 +134,10 @@ def get_allele_frequency_trajectories_filename(pname, fragment):
     return filename
 
 
-def get_allele_cocounts_filename(pname, samplename, fragment):
+def get_allele_cocounts_filename(pname, samplename, fragment, PCR=None):
     '''Get the matrix of allele cocounts on the initial reference'''
     filename = 'allele_cocounts_'+fragment+'.npy'
-    filename = get_foldername(pname)+samplename+'/'+filename
+    filename = get_sample_foldername(pname, samplename, PCR=PCR)+filename
     return filename
 
 
@@ -197,22 +197,19 @@ def get_map_initial_summary_filename(pname, samplename_pat, samplename, fragment
     if only_chunk is not None:
         filename = filename+'_chunk_'+str(only_chunk)
     filename = filename+'.txt'
-    filename = samplename_pat+'/PCR'+str(PCR)+'/mapped_to_initial/'+filename
-    filename = get_foldername(pname)+filename
+    filename = get_sample_foldername(pname, samplename_pat, PCR=PCR)+'mapped_to_initial/'+filename
     return filename
 
 
 def get_paste_mapped_chunks_initial_summary_filename(pname, samplename_pat, samplename, fragment, PCR=1):
     '''Get the filename of the summary of the pasting of chunk after mapping to initial reference'''
     filename = 'summary_paste_mapped_initial_'+samplename+'_'+fragment+'.txt'
-    filename = samplename_pat+'/PCR'+str(PCR)+'/mapped_to_initial/'+filename
-    filename = get_foldername(pname)+filename
+    filename = get_sample_foldername(pname, samplename_pat, PCR=PCR)+'mapped_to_initial/'+filename
     return filename
 
 
 def get_filter_mapped_init_summary_filename(pname, samplename_pat, fragment, PCR=1):
     '''Get the filename of the summary of the post-map filtering'''
     filename= 'summary_filter_mapped_init_'+fragment+'.txt'
-    filename = samplename_pat+'/PCR'+str(PCR)+'/mapped_to_initial/'+filename
-    filename = get_foldername(pname)+filename
+    filename = get_sample_foldername(pname, samplename_pat, PCR=PCR)+'mapped_to_initial/'+filename
     return filename
