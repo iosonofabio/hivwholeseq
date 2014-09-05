@@ -182,6 +182,18 @@ def cluster_block(block, VERBOSE=0):
     return clusters
 
 
+def most_common_fractions(ali):
+    '''Find most common haplotype and its frequency'''
+    mcf = []
+    for a in ali:
+        a = a[2]
+        (seq, count) = a.most_common(1)[0]
+        frac = 1.0 * count / sum(a.itervalues())
+        mcf.append([seq, frac])
+
+    return mcf 
+
+
 
 # Script
 if __name__ == '__main__':
@@ -252,5 +264,14 @@ if __name__ == '__main__':
                                     maxreads=maxreads)
             clusters = cluster_block(block)
             ali.append((t, PCR, clusters))
+
+    mcfs = most_common_fractions(ali)
+    print 'Most abundant haplotypes'
+    print '{:^6}'.format('time'), ('{:^'+str(end - start)+'}').format('haplotype'), 'fraction'
+    print '-' * (6 + 1 + end - start + 1 + 8)
+    for (t, mcf) in izip(patient.times, mcfs):
+        print '{:>6.1f}'.format(t),
+        print mcf[0],
+        print '{:>8.0%}'.format(mcf[1])
 
 
