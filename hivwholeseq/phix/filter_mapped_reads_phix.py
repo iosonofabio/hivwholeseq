@@ -16,11 +16,11 @@ from Bio import SeqIO
 
 # Horizontal import of modules from this folder
 from hivwholeseq.datasets import MiSeq_runs
-from hivwholeseq.adapter_info import load_adapter_table
-from hivwholeseq.filenames import get_mapped_phix_filename
+from hivwholeseq.sequencing.adapter_info import load_adapter_table
+from hivwholeseq.sequencing.filenames import get_mapped_phix_filename
 from hivwholeseq.mapping_utils import get_ind_good_cigars, convert_sam_to_bam,\
         pair_generator, get_range_good_cigars
-from hivwholeseq.primer_info import primers_inner
+from hivwholeseq.sequencing.primer_info import primers_inner
 
 
 

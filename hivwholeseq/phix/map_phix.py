@@ -13,7 +13,7 @@ import numpy as np
 import pysam
 
 from hivwholeseq.datasets import MiSeq_runs
-from hivwholeseq.filenames import get_mapped_phix_filename, get_phix_filename, \
+from hivwholeseq.sequencing.filenames import get_mapped_phix_filename, get_phix_filename, \
         get_unclassified_reads_filenames
 from hivwholeseq.mapping_utils import stampy_bin
 from hivwholeseq.mapping_utils import convert_sam_to_bam, convert_bam_to_sam

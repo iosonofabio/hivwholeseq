@@ -11,7 +11,7 @@ import pysam
 import numpy as np
 
 from hivwholeseq.datasets import MiSeq_runs
-from hivwholeseq.filenames import get_mapped_phix_filename
+from hivwholeseq.sequencing.filenames import get_mapped_phix_filename
 from hivwholeseq.mapping_utils import pair_generator, convert_sam_to_bam
 
 

@@ -10,9 +10,9 @@ import argparse
 from Bio import SeqIO
 from Bio import AlignIO
 
-from hivwholeseq.samples import samples as samples_seq
+from hivwholeseq.sequencing.samples import samples as samples_seq
 from hivwholeseq.datasets import MiSeq_runs
-from hivwholeseq.filenames import get_merged_consensus_filename, get_consensus_filename
+from hivwholeseq.sequencing.filenames import get_merged_consensus_filename, get_consensus_filename
 from hivwholeseq.patients.filenames import get_consensi_alignment_genomewide_filename, \
         get_consensi_alignment_filename
 from hivwholeseq.patients.patients import patients, get_patient

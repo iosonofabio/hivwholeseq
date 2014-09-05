@@ -12,8 +12,8 @@ import gzip
 from itertools import izip
 from Bio import SeqIO
 
-from hivwholeseq.filenames import get_unclassified_reads_filenames, get_phix_filename
-from hivwholeseq.samples import samples
+from hivwholeseq.sequencing.filenames import get_unclassified_reads_filenames, get_phix_filename
+from hivwholeseq.sequencing.samples import samples
 from hivwholeseq.datasets import MiSeq_runs
 
 

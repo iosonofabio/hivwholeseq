@@ -13,8 +13,8 @@ import matplotlib.pyplot as plt
 
 from hivwholeseq.miseq import alpha
 from hivwholeseq.datasets import MiSeq_runs
-from hivwholeseq.filenames import get_allele_frequencies_filename
-from hivwholeseq.check_overlaps import get_overlapping_fragments, \
+from hivwholeseq.sequencing.filenames import get_allele_frequencies_filename
+from hivwholeseq.sequencing.check_overlaps import get_overlapping_fragments, \
         get_overlap
 from hivwholeseq.mapping_utils import align_muscle
 

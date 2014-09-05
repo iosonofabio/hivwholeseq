@@ -14,7 +14,7 @@ import pysam
 from Bio import SeqIO
 
 from hivwholeseq.patients.patients import get_patient
-from hivwholeseq.filter_mapped_reads import plot_distance_histogram, \
+from hivwholeseq.sequencing.filter_mapped_reads import plot_distance_histogram, \
         plot_distance_histogram_sliding_window, get_distance_from_consensus, \
         check_overhanging_reads, trim_bad_cigar
 from hivwholeseq.patients.filenames import get_initial_reference_filename, \

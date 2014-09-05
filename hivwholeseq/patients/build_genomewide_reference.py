@@ -15,9 +15,9 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 import Bio.SeqIO as SeqIO
 
-from hivwholeseq.samples import SampleSeq, load_sequencing_run
+from hivwholeseq.sequencing.samples import SampleSeq, load_sequencing_run
 from hivwholeseq.patients.filenames import get_initial_reference_filename
-from hivwholeseq.check_overlaps import get_overlapping_fragments, get_overlap
+from hivwholeseq.sequencing.check_overlaps import get_overlapping_fragments, get_overlap
 
 
 

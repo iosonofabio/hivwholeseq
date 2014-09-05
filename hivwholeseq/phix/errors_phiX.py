@@ -19,7 +19,7 @@ from Bio.Seq import reverse_complement as rc
 
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.miseq import alpha, read_types, alphal
-from hivwholeseq.filenames import get_phix_filename, get_allele_counts_phix_filename, \
+from hivwholeseq.sequencing.filenames import get_phix_filename, get_allele_counts_phix_filename, \
         get_mapped_phix_filename
 from hivwholeseq.mapping_utils import get_ind_good_cigars
 

@@ -10,7 +10,7 @@ from itertools import izip
 
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.mapping_utils import get_number_mapped_reads
-from hivwholeseq.filenames import get_premapped_filename
+from hivwholeseq.sequencing.filenames import get_premapped_filename
 
 
 # Globals

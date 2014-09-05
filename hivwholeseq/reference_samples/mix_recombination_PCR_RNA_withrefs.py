@@ -17,7 +17,7 @@ from Bio import SeqIO
 
 from hivwholeseq.miseq import alpha
 from hivwholeseq.datasets import MiSeq_runs
-from hivwholeseq.filenames import get_consensus_filename, \
+from hivwholeseq.sequencing.filenames import get_consensus_filename, \
         get_allele_frequencies_filename, \
         get_mapped_filename
 from hivwholeseq.mapping_utils import align_muscle, pair_generator

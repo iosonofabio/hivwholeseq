@@ -13,10 +13,10 @@ import argparse
 import subprocess as sp
 from Bio.SeqIO.QualityIO import FastqGeneralIterator as FGI
 
-from hivwholeseq.filenames import get_read_filenames
+from hivwholeseq.sequencing.filenames import get_read_filenames
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.mapping_utils import stampy_bin, get_number_reads_fastq_open
-from hivwholeseq.adapter_info import foldername_adapter
+from hivwholeseq.sequencing.adapter_info import foldername_adapter
 
 
 

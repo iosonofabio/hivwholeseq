@@ -106,7 +106,7 @@ if __name__ == '__main__':
         with pysam.Samfile(bamfilename, 'rb') as bamfile:
             reads_V3 = []
             
-            from hivwholeseq.filter_mapped_reads import check_overhanging_reads, \
+            from hivwholeseq.sequencing.filter_mapped_reads import check_overhanging_reads, \
                     get_distance_from_consensus, trim_bad_cigar
 
             # Iterate over all pairs

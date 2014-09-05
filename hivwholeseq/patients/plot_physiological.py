@@ -30,7 +30,7 @@ if __name__ == '__main__':
     VERBOSE = args.verbose
 
     # FIXME: write a function for this
-    from hivwholeseq.filenames import table_filename
+    from hivwholeseq.sequencing.filenames import table_filename
     samples_table = pd.read_excel(table_filename, 'Samples timeline')
     patient_table = pd.read_excel(table_filename, 'Patients', index_col=0)
     if pnames is not None:

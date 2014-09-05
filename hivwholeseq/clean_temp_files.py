@@ -14,7 +14,7 @@ import argparse
 # Functions
 def remove_premapped_tempfiles(data_folder, adaID, VERBOSE=0):
     '''Remove the part files of multi-threaded premapping'''
-    from hivwholeseq.filenames import get_premapped_filename
+    from hivwholeseq.sequencing.filenames import get_premapped_filename
 
     dirname = os.path.dirname(get_premapped_filename(data_folder, adaID, type='bam', part=1))+'/'
     fns = glob.glob(dirname+'premapped_*part*') + \
@@ -28,7 +28,7 @@ def remove_premapped_tempfiles(data_folder, adaID, VERBOSE=0):
 
 def remove_mapped_tempfiles(data_folder, adaID, fragment='F', VERBOSE=0, rescue=False):
     '''Remove the part files of multi-threaded mapping'''
-    from hivwholeseq.filenames import get_mapped_filename
+    from hivwholeseq.sequencing.filenames import get_mapped_filename
 
     dirname = os.path.dirname(get_mapped_filename(data_folder, adaID, 'F1'))+'/'
     fns = glob.glob(dirname+fragment+'*_part*') + \
@@ -83,7 +83,7 @@ def remove_mapped_init_tempfiles(pname, samplename_pat,
 
 def gzip_demultiplexed_reads(data_folder, adaID, VERBOSE=0):
     '''Gzip FastQ demultiplexed files'''
-    from hivwholeseq.filenames import get_read_filenames
+    from hivwholeseq.sequencing.filenames import get_read_filenames
 
     fns = get_read_filenames(data_folder, adaID)
     for fn in fns:
@@ -96,7 +96,7 @@ def gzip_demultiplexed_reads(data_folder, adaID, VERBOSE=0):
 
 def gunzip_demultiplexed_reads(data_folder, adaID, VERBOSE=0):
     '''Gunzip FastQ.gz demultiplexed files'''
-    from hivwholeseq.filenames import get_read_filenames
+    from hivwholeseq.sequencing.filenames import get_read_filenames
 
     fns = get_read_filenames(data_folder, adaID, gzip=True)
     for fn in fns:

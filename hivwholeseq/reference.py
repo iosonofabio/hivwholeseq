@@ -7,7 +7,7 @@ content:    Manage reference sequences.
 # Modules
 from Bio import SeqIO
 
-from hivwholeseq.filenames import get_HXB2_entire, get_NL43_entire, get_F10_entire, \
+from hivwholeseq.sequencing.filenames import get_HXB2_entire, get_NL43_entire, get_F10_entire, \
         get_HXB2_fragmented, get_NL43_fragmented, get_F10_fragmented, \
         get_custom_reference_filename
 from hivwholeseq.sequence_utils import correct_genbank_features_load, \

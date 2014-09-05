@@ -15,11 +15,11 @@ import pysam
 import warnings
 
 from hivwholeseq.generic_utils import mkdirs
-from hivwholeseq.filenames import get_divided_filename
+from hivwholeseq.sequencing.filenames import get_divided_filename
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.mapping_utils import stampy_bin, subsrate, \
         convert_sam_to_bam, convert_bam_to_sam, get_number_reads
-from hivwholeseq.samples import samples as samples_seq
+from hivwholeseq.sequencing.samples import samples as samples_seq
 from hivwholeseq.patients.patients import get_patient
 from hivwholeseq.patients.filenames import get_initial_index_filename, \
         get_initial_hash_filename, get_initial_reference_filename, \

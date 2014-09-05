@@ -5,7 +5,7 @@ date:       22/08/13
 content:    Settings of stampy used by our mapping scripts.
 '''
 # Globals
-from hivwholeseq.filenames import stampy_bin, bwa_bin, spades_bin
+from hivwholeseq.sequencing.filenames import stampy_bin, bwa_bin, spades_bin
 subsrate = '0.05'
 
 

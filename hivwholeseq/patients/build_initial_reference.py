@@ -26,25 +26,25 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
 from hivwholeseq.generic_utils import mkdirs
-from hivwholeseq.samples import SampleSeq
+from hivwholeseq.sequencing.samples import SampleSeq
 from hivwholeseq.patients.patients import load_patient
 from hivwholeseq.miseq import alpha
-from hivwholeseq.filenames import get_consensus_filename
+from hivwholeseq.sequencing.filenames import get_consensus_filename
 from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_foldername, get_initial_reference_foldername
-from hivwholeseq.primer_info import primers_inner
-from hivwholeseq.primer_info import primers_coordinates_HXB2_inner as pci
+from hivwholeseq.sequencing.primer_info import primers_inner
+from hivwholeseq.sequencing.primer_info import primers_coordinates_HXB2_inner as pci
 from hivwholeseq.one_site_statistics import \
         build_consensus_from_allele_counts_insertions as build_consensus
 from hivwholeseq.reference import load_custom_reference
 from hivwholeseq.annotate_genomewide_consensus import extract_feature
 from hivwholeseq.mapping_utils import align_muscle
 from hivwholeseq.sequence_utils import pretty_print_pairwise_ali
-from hivwholeseq.filenames import get_mapped_filename
+from hivwholeseq.sequencing.filenames import get_mapped_filename
 from hivwholeseq.one_site_statistics import build_consensus_from_mapped_reads
 from hivwholeseq.genome_info import locate_gene, gene_edges
 from hivwholeseq.genome_info import genes as genes_all
-from hivwholeseq.primer_info import fragments_genes
+from hivwholeseq.sequencing.primer_info import fragments_genes
 from hivwholeseq.sequence_utils import merge_sequences
 
 
@@ -171,7 +171,7 @@ if __name__ == '__main__':
     # Copy genomewide consensus too if explicitely requested
     if ('genomewide' in fragments) or ('genomewide_new' in fragments):
         if 'genomewide' in fragments:
-            from hivwholeseq.filenames import get_merged_consensus_filename
+            from hivwholeseq.sequencing.filenames import get_merged_consensus_filename
 
             sample_init = SampleSeq(sample_init_pat['samples seq'].iloc[repn])
 

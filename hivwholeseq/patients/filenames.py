@@ -5,7 +5,7 @@ date:       25/10/13
 content:    Module containing all filenames for the patient analysis in one place.
 '''
 # Modules
-from hivwholeseq.filenames import root_data_folder
+from hivwholeseq.sequencing.filenames import root_data_folder
 
 
 # Globals

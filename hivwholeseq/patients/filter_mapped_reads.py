@@ -17,7 +17,7 @@ import pysam
 from Bio import SeqIO
 
 from hivwholeseq.patients.patients import load_patient
-from hivwholeseq.filter_mapped_reads import plot_distance_histogram, \
+from hivwholeseq.sequencing.filter_mapped_reads import plot_distance_histogram, \
         plot_distance_histogram_sliding_window, get_distance_from_consensus, \
         check_overhanging_reads, trim_bad_cigar
 from hivwholeseq.patients.filenames import get_initial_reference_filename, \
@@ -26,7 +26,7 @@ from hivwholeseq.patients.filenames import get_initial_reference_filename, \
 from hivwholeseq.mapping_utils import convert_sam_to_bam, pair_generator
 from hivwholeseq.fork_cluster import fork_filter_mapped_init as fork_self
 from hivwholeseq.patients.patients import load_samples_sequenced as lssp
-from hivwholeseq.samples import load_samples_sequenced as lss
+from hivwholeseq.sequencing.samples import load_samples_sequenced as lss
 
 
 # Functions

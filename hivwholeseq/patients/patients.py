@@ -8,7 +8,7 @@ content:    Description module for HIV patients.
 import numpy as np
 import pandas as pd
 
-from hivwholeseq.filenames import table_filename
+from hivwholeseq.sequencing.filenames import table_filename
 
 
 
@@ -37,7 +37,7 @@ class Patient(pd.Series):
 
     def discard_nonsequenced_samples(self):
         '''Discard all samples that have not been sequenced yet'''
-        from hivwholeseq.samples import load_samples_sequenced as lss
+        from hivwholeseq.sequencing.samples import load_samples_sequenced as lss
         samples_sequenced = lss()
         samples_sequenced_set = set(samples_sequenced.loc[:, 'patient sample']) - set(['nan'])
         samples = self.samples.loc[self.samples.index.isin(samples_sequenced_set)]
@@ -135,7 +135,7 @@ class SamplePat(pd.Series):
         '''Get filename(s) of mapped and filtered reads'''
         # TODO: optimize this call
         from hivwholeseq.patients.filenames import get_mapped_to_initial_filename
-        from hivwholeseq.samples import load_samples_sequenced as lss
+        from hivwholeseq.sequencing.samples import load_samples_sequenced as lss
         samples_seq = lss()
         samples_seq = samples_seq.loc[samples_seq['patient sample'] == self.name]
 

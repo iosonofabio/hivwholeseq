@@ -107,7 +107,7 @@ def convert_date_to_samplesheet(date):
 
 def convert_adapter(adaID, libtype):
     if libtype == 'NexteraXT':
-        from hivwholeseq.adapter_info import Nextera_XT_i7, Nextera_XT_i5
+        from hivwholeseq.sequencing.adapter_info import Nextera_XT_i7, Nextera_XT_i5
         (ada7, ada5) = tuple([int(x[1:]) for x in adaID.split('-')])
         adaI7 = 'N7'+'{:02d}'.format(ada7)
         adaI5 = 'S5'+'{:02d}'.format(ada5)
@@ -116,7 +116,7 @@ def convert_adapter(adaID, libtype):
         return (adaI7, seqI7, adaI5, seqI5)
 
     elif libtype == 'TruSeq':
-        from hivwholeseq.adapter_info import TrueSeq_LT
+        from hivwholeseq.sequencing.adapter_info import TrueSeq_LT
         ada = int(adaID[2:])
         adaI7 = 'A'+'{:03d}'.format(ada)
         seqI7 = TrueSeq_LT[ada]

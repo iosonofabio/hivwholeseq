@@ -20,7 +20,7 @@ from scipy.stats import pearsonr, spearmanr
 
 from hivwholeseq.miseq import alpha, alphal
 from hivwholeseq.patients.filenames import root_patient_folder
-from hivwholeseq.filenames import reference_folder
+from hivwholeseq.sequencing.filenames import reference_folder
 from hivwholeseq.patients.patients import load_patients, Patient
 
 # Globals

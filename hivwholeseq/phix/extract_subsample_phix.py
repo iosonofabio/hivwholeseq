@@ -15,7 +15,7 @@ from itertools import izip
 from Bio.SeqIO.QualityIO import FastqGeneralIterator as FGI
 
 from hivwholeseq.datasets import MiSeq_runs
-from hivwholeseq.filenames import get_phix_filename, \
+from hivwholeseq.sequencing.filenames import get_phix_filename, \
         get_unclassified_reads_filenames
 
 

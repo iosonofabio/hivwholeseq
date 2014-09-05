@@ -20,9 +20,9 @@ from Bio import Phylo
 
 from hivwholeseq.patients.patients import load_patient
 from hivwholeseq.patients.patients import load_samples_sequenced as lssp
-from hivwholeseq.samples import load_samples_sequenced as lss
-from hivwholeseq.samples import SampleSeq
-from hivwholeseq.filenames import get_consensus_filename
+from hivwholeseq.sequencing.samples import load_samples_sequenced as lss
+from hivwholeseq.sequencing.samples import SampleSeq
+from hivwholeseq.sequencing.filenames import get_consensus_filename
 from hivwholeseq.mapping_utils import align_muscle
 from hivwholeseq.patients.filenames import get_multiple_sequence_alignment_sampleseq_filename, \
         get_tree_sampleseq_filename

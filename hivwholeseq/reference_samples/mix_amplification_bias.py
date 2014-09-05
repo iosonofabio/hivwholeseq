@@ -20,11 +20,11 @@ import matplotlib.pyplot as plt
 
 from hivwholeseq.miseq import alphal
 from hivwholeseq.datasets import MiSeq_runs
-from hivwholeseq.filenames import get_consensus_filename, get_mapped_filename, \
+from hivwholeseq.sequencing.filenames import get_consensus_filename, get_mapped_filename, \
         get_allele_counts_filename, get_coverage_filename
 from hivwholeseq.mapping_utils import align_muscle, pair_generator
 from hivwholeseq.one_site_statistics import filter_nus
-from hivwholeseq.coverage_tuples import get_coverage_tuples
+from hivwholeseq.sequencing.coverage_tuples import get_coverage_tuples
 from hivwholeseq.reference_samples.mix_recombination_PCR import align_consensi_mix1, \
         check_consensus_mix1, align_consensi_mix2, check_consensus_mix2
 

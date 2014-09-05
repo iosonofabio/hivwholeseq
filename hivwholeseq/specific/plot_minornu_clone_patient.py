@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.miseq import alpha, read_types
-from hivwholeseq.filenames import get_allele_frequencies_filename
+from hivwholeseq.sequencing.filenames import get_allele_frequencies_filename
 
 
 

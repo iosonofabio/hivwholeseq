@@ -33,7 +33,7 @@ def fork_check_pipeline(seq_runs, adaIDs=None, pats=False,
     if VERBOSE:
         print 'Forking to the cluster'
 
-    JOBSCRIPT = JOBDIR+'check_pipeline.py'
+    JOBSCRIPT = JOBDIR+'sequencing/check_pipeline.py'
     cluster_time = '00:59:59'
     vmem = '1G'
     call_list = ['qsub','-cwd',
@@ -63,7 +63,7 @@ def fork_quality_along_read(seq_run, VERBOSE=0, maxreads=-1, savefig=True):
     if VERBOSE:
         print 'Forking to the cluster'
 
-    JOBSCRIPT = JOBDIR+'check_quality_along_read.py'
+    JOBSCRIPT = JOBDIR+'sequencing/check_quality_along_read.py'
     cluster_time = '00:59:59'
     vmem = '1G'
     call_list = ['qsub','-cwd',
@@ -117,11 +117,11 @@ def fork_demultiplex(seq_run, VERBOSE=0, maxreads=-1, summary=True):
 
 
 def fork_trim(seq_run, adaID, VERBOSE=0, summary=True):
-    '''Submit premap script to the cluster for each adapter ID'''
+    '''Submit trim and divide script to the cluster for each adapter ID'''
     if VERBOSE:
         print 'Forking to the cluster: adaID '+adaID
 
-    JOBSCRIPT = JOBDIR+'trim_reads_lowq.py'
+    JOBSCRIPT = JOBDIR+'sequencing/trim_reads_lowq.py'
     cluster_time = '3:59:59'
     vmem = '1G'
     call_list = ['qsub','-cwd',
@@ -151,7 +151,7 @@ def fork_premap(seq_run, adaID, VERBOSE=0, threads=1,
     if VERBOSE:
         print 'Forking to the cluster: adaID '+adaID
 
-    JOBSCRIPT = JOBDIR+'premap_to_reference.py'
+    JOBSCRIPT = JOBDIR+'sequencing/premap_to_reference.py'
     # It is hard to tell whether 1h is sufficient, because the final sorting takes
     # quite some time. So for now give up and require 2h.
     cluster_time = ['71:59:59', '3:59:59']
@@ -187,7 +187,7 @@ def fork_premapped_coverage(samplename, VERBOSE=0, maxreads=-1):
     if VERBOSE:
         print 'Forking to the cluster'
 
-    JOBSCRIPT = JOBDIR+'check_premapped_coverage.py'
+    JOBSCRIPT = JOBDIR+'sequencing/check_premapped_coverage.py'
     cluster_time = '00:59:59'
     vmem = '1G'
     call_list = ['qsub','-cwd',
@@ -216,7 +216,7 @@ def fork_trim_and_divide(seq_run, adaID, VERBOSE=0, maxreads=-1, minisize=100,
     if VERBOSE:
         print 'Forking to the cluster: adaID '+adaID
 
-    JOBSCRIPT = JOBDIR+'trim_and_divide.py'
+    JOBSCRIPT = JOBDIR+'sequencing/trim_and_divide.py'
     cluster_time = '2:59:59'
     vmem = '1G'
     call_list = ['qsub','-cwd',
@@ -283,7 +283,7 @@ def fork_build_consensus(seq_run, adaID, fragment,
     if VERBOSE:
         print 'Forking to the cluster: adaID '+adaID+', fragment '+fragment
 
-    JOBSCRIPT = JOBDIR+'build_consensus.py'
+    JOBSCRIPT = JOBDIR+'sequencing/build_consensus.py'
     if fragment == 'genomewide':
         cluster_time = '23:59:59'
     else:
@@ -328,7 +328,7 @@ def fork_map_to_consensus(seq_run, adaID, fragment, VERBOSE=3,
     if VERBOSE:
         print 'Forking to the cluster: adaID '+adaID+', fragment '+fragment
 
-    JOBSCRIPT = JOBDIR+'map_to_consensus.py'
+    JOBSCRIPT = JOBDIR+'sequencing/map_to_consensus.py'
     cluster_time = ['23:59:59', '0:59:59']
     vmem = '8G'
     call_list = ['qsub','-cwd',
@@ -394,7 +394,7 @@ def fork_get_allele_counts(seq_run, adaID, fragment, VERBOSE=3):
     if VERBOSE:
         print 'Forking to the cluster: adaID '+adaID+', fragment '+fragment
 
-    JOBSCRIPT = JOBDIR+'get_allele_counts.py'
+    JOBSCRIPT = JOBDIR+'sequencing/get_allele_counts.py'
     cluster_time = '0:59:59'
     vmem = '4G'
     call_list = ['qsub','-cwd',
@@ -422,7 +422,7 @@ def fork_filter_allele_frequencies(seq_run, adaID, fragment, VERBOSE=3, summary=
     if VERBOSE:
         print 'Forking to the cluster: adaID '+adaID+', fragment '+fragment
 
-    JOBSCRIPT = JOBDIR+'filter_allele_frequencies.py'
+    JOBSCRIPT = JOBDIR+'sequencing/filter_allele_frequencies.py'
     cluster_time = '0:59:59'
     vmem = '2G'
     call_list = ['qsub','-cwd',
@@ -452,7 +452,7 @@ def fork_extract_mutations(seq_run, adaID, VERBOSE=0, summary=True):
     if VERBOSE:
         print 'Forking to the cluster: adaID '+adaID
 
-    JOBSCRIPT = JOBDIR+'extract_mutations.py'
+    JOBSCRIPT = JOBDIR+'sequencing/extract_mutations.py'
     cluster_time = '0:59:59'
     vmem = '8G'
     call_list = ['qsub','-cwd',
@@ -509,7 +509,7 @@ def fork_split_for_mapping(seq_run, adaID, fragment, VERBOSE=0, maxreads=-1, chu
     if VERBOSE:
         print 'Forking to the cluster: adaID '+adaID+', fragment '+fragment
 
-    JOBSCRIPT = JOBDIR+'split_reads_for_mapping.py'
+    JOBSCRIPT = JOBDIR+'sequencing/split_reads_for_mapping.py'
     cluster_time = '0:59:59'
     vmem = '8G'
     call_list = ['qsub','-cwd',

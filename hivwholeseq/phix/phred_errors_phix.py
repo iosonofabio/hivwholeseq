@@ -13,7 +13,7 @@ from Bio import SeqIO
 import pysam
 
 from hivwholeseq.datasets import MiSeq_runs
-from hivwholeseq.filenames import get_mapped_phix_filename, get_phix_filename, \
+from hivwholeseq.sequencing.filenames import get_mapped_phix_filename, get_phix_filename, \
         get_consensus_phix_filename
 from hivwholeseq.mapping_utils import pair_generator, convert_sam_to_bam
 

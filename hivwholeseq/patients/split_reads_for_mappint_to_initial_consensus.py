@@ -15,18 +15,18 @@ import pysam
 import warnings
 
 from hivwholeseq.generic_utils import mkdirs
-from hivwholeseq.filenames import get_divided_filename
+from hivwholeseq.sequencing.filenames import get_divided_filename
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.mapping_utils import stampy_bin, subsrate, \
         convert_sam_to_bam, convert_bam_to_sam, get_number_reads
-from hivwholeseq.samples import samples as samples_seq
+from hivwholeseq.sequencing.samples import samples as samples_seq
 from hivwholeseq.patients.patients import get_patient
 from hivwholeseq.patients.filenames import get_initial_index_filename, \
         get_initial_hash_filename, get_initial_reference_filename, \
         get_mapped_to_initial_filename, get_map_initial_summary_filename
 from hivwholeseq.fork_cluster import fork_split_for_mapping as fork_split
 from hivwholeseq.clean_temp_files import remove_mapped_init_tempfiles
-from hivwholeseq.split_reads_for_mapping import split_reads
+from hivwholeseq.sequencing.split_reads_for_mapping import split_reads
 
 
 # Script

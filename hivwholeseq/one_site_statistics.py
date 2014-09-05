@@ -631,7 +631,7 @@ def build_consensus_from_mapped_reads(bamfilename, maxreads=2000, block_len=100,
 # PLOT
 def plot_coverage(data_folder, adaID, fragment, counts, VERBOSE=0, savefig=False):
     '''Plot figure with the coverage'''
-    from hivwholeseq.filenames import get_coverage_figure_filename as gff
+    from hivwholeseq.sequencing.filenames import get_coverage_figure_filename as gff
 
     if VERBOSE >= 1:
         print 'Plotting coverage: '+adaID+' '+fragment
@@ -662,7 +662,7 @@ def plot_SFS_folded(data_folder, adaID, fragment, nu_filtered, VERBOSE=0, savefi
     if VERBOSE >= 1:
         print 'Plotting folded SFS'
 
-    from hivwholeseq.filenames import get_SFS_figure_filename as gff
+    from hivwholeseq.sequencing.filenames import get_SFS_figure_filename as gff
     import matplotlib.pyplot as plt
     import numpy as np
 

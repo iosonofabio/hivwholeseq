@@ -23,7 +23,7 @@ import pandas as pd
 import pysam
 import warnings
 
-from hivwholeseq.samples import SampleSeq
+from hivwholeseq.sequencing.samples import SampleSeq
 from hivwholeseq.patients.patients import load_patients, load_patient, Patient
 from hivwholeseq.generic_utils import mkdirs
 from hivwholeseq.mapping_utils import stampy_bin, subsrate, \
@@ -35,7 +35,7 @@ from hivwholeseq.patients.filenames import get_initial_index_filename, \
 from hivwholeseq.fork_cluster import fork_map_to_initial_reference as fork_self
 from hivwholeseq.clean_temp_files import remove_mapped_init_tempfiles
 from hivwholeseq.patients.patients import load_samples_sequenced as lssp
-from hivwholeseq.samples import load_samples_sequenced as lss
+from hivwholeseq.sequencing.samples import load_samples_sequenced as lss
 
 
 
@@ -51,11 +51,11 @@ def get_input_filename(data_folder, adaID, frag_spec, type='bam', only_chunk=Non
     '''Get filename of input for mapping to initial reference'''
     # We should take reads filtered after mapping to the auto-consensus
     if filtered:
-        from hivwholeseq.filenames import get_mapped_filename
+        from hivwholeseq.sequencing.filenames import get_mapped_filename
         frag_gen = frag_spec[:2]
         fn = get_mapped_filename(data_folder, adaID, frag_gen, type='bam', filtered=True)
     else:
-        from hivwholeseq.filenames import get_divided_filename
+        from hivwholeseq.sequencing.filenames import get_divided_filename
         fn = get_divided_filename(data_folder, adaID, frag_spec, type='bam', chunk=only_chunk)
     return fn
 

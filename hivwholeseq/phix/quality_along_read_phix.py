@@ -17,8 +17,8 @@ from Bio.SeqIO.QualityIO import FastqGeneralIterator as FGI
 import pysam
 
 from hivwholeseq.datasets import MiSeq_runs
-from hivwholeseq.filenames import get_mapped_phix_filename
-from hivwholeseq.adapter_info import adapters_illumina, foldername_adapter
+from hivwholeseq.sequencing.filenames import get_mapped_phix_filename
+from hivwholeseq.sequencing.adapter_info import adapters_illumina, foldername_adapter
 
 
 

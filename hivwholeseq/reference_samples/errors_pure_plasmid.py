@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.miseq import alpha
-from hivwholeseq.filenames import get_NL43_entire, get_NL43_fragmented, \
+from hivwholeseq.sequencing.filenames import get_NL43_entire, get_NL43_fragmented, \
         get_F10_entire, get_F10_fragmented, \
         get_consensus_filename, get_allele_counts_filename, get_coverage_filename
 from hivwholeseq.mapping_utils import align_muscle
