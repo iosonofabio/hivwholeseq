@@ -14,7 +14,7 @@ import numpy as np
 from Bio import SeqIO
 
 from hivwholeseq.miseq import alpha
-from hivwholeseq.patients.patients import load_patient
+from hivwholeseq.patients.patients import load_patient, convert_date_deltas_to_float
 from hivwholeseq.patients.filenames import get_allele_frequency_trajectories_filename, \
         get_allele_count_trajectories_filename
 from hivwholeseq.patients.one_site_statistics import plot_coverage_trajectories_3d
@@ -67,7 +67,7 @@ if __name__ == '__main__':
         ind = [i for i, (_, sample) in enumerate(patient.samples.iterrows())
                if sample.name in map(itemgetter(0), sns)]
         samples = patient.samples.iloc[ind]
-        times = (samples.date - patient.transmission_date) / np.timedelta64(1, 'D')
+        times = convert_date_deltas_to_float(samples.date - patient.transmission_date, unit='day')
         ntemplates = samples['n templates']
         covt = act.sum(axis=1)
 

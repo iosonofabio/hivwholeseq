@@ -59,10 +59,9 @@ class Patient(pd.Series):
 
     
     @property
-    def times(self):
-        '''Get the times as days from transmission'''
-        times = (self.dates - self.transmission_date) / np.timedelta64(1, 'D')
-        return times        
+    def times(self, unit='day'):
+        '''Get the times from transmission'''
+        return convert_date_deltas_to_float(self.dates - self.transmission_date, unit=unit)
 
 
     @property
@@ -199,3 +198,12 @@ def filter_patients_n_times(patients, n_times=3):
             ind[i] = True
 
     return ind
+
+
+def convert_date_deltas_to_float(deltas, unit='day'):
+    '''Convert pandas date deltas into float'''
+    nanoseconds_per_unit = {'day': 3600e9 * 24,
+                            'month': 3600e9 * 24 * 365.25 / 12,
+                            'year': 3600e9 * 24 * 365.25,
+                           }
+    return np.array(deltas, float) / nanoseconds_per_unit[unit]
