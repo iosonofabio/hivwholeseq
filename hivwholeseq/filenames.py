@@ -23,6 +23,8 @@ else:
     stampy_bin = '/ebio/ag-neher/share/programs/bundles/stampy-1.0.22/stampy.py'
     bwa_bin = '/ebio/ag-neher/share/programs/bin/bwa'
     spades_bin = '/ebio/ag-neher/share/programs/bundles/SPAdes-2.5.0-Linux/bin/spades.py'
+
+sequencing_folder = root_data_folder+'sequencing/'
 reference_folder = root_data_folder+'reference/'
 table_filename = hivwholeseq.__path__[0] + '/tables/HIV_reservoir_all.xlsx'
 
@@ -31,7 +33,7 @@ table_filename = hivwholeseq.__path__[0] + '/tables/HIV_reservoir_all.xlsx'
 # Functions
 def get_seqrun_foldername(seq_run):
     '''Get the path of the folder for a sequencing run'''
-    fn = root_data_folder+seq_run+'/'
+    fn = sequencing_folder+seq_run+'/'
     return fn
 
 
