@@ -70,6 +70,12 @@ class Patient(pd.Series):
         return self.samples.iloc[0]
 
 
+    def itersamples(self):
+        '''Generator for samples in this patient, each with extended attributes'''
+        for samplename, sample in self.samples.iterrows():
+            yield SamplePat(sample)
+
+
     def get_reference_filename(self, fragment, format='fasta'):
         '''Get filename of the reference for mapping'''
         from hivwholeseq.patients.filenames import get_initial_reference_filename
