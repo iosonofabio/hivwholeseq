@@ -1,6 +1,6 @@
-# log files
-hivwholeseq/logout
-hivwholeseq/logerr
+# log files: they have a separate .gitignore file
+# because we want to keep the folder but not the content
+# (git does not track empty folders)
 
 # figure output
 *pdf
