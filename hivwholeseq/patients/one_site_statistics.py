@@ -300,7 +300,7 @@ def plot_allele_frequency_trajectories_3d(times, nus, title='', VERBOSE=0,
 
 
 def plot_allele_frequency_trajectories_from_counts_3d(times, act, title='', VERBOSE=0,
-                                          threshold=0.1, logit=False):
+                                          threshold=0.1, options=[], logit=False):
     '''Plot the allele freq traj in 3D'''
     from mpl_toolkits.mplot3d import Axes3D
     from matplotlib import cm
@@ -323,13 +323,28 @@ def plot_allele_frequency_trajectories_from_counts_3d(times, act, title='', VERB
             nu = 1.0 * act[ind, j, i] / cov[ind]
 
             if (nu[0] < 0.5) and (nu > threshold).any():
+
+                # Use dashed lines for synonymous if requested
+                if 'syn-nonsyn' in options:
+                    cod_initial = alpha[act[0, :, i - i%3: i - i%3 + 3].argmax(axis=0)]
+                    cod_mut = cod_initial.copy()
+                    cod_mut[i%3] = alpha[j]
+                    if ('-' in cod_mut) or \
+                       (str(Seq(''.join(cod_initial), ambiguous_dna).translate()) != \
+                        str(Seq(''.join(cod_mut), ambiguous_dna).translate())):
+                        ls = '-'
+                    else:
+                        ls= '--'
+                else:
+                    ls = '-'
+
                 if logit:
                     ax.plot(t, [i] * len(t), np.log10((nu + 1e-4)/(1-1e-4-nu)),
-                            lw=2,
+                            lw=2, ls=ls,
                             color=cm.jet(int(255.0 * i / act.shape[2])))
                 else:
                     ax.plot(t, [i] * len(t), np.log10(nu + 1e-4),
-                            lw=2,
+                            lw=2, ls=ls,
                             color=cm.jet(int(255.0 * i / act.shape[2])))
 
     ax.set_xlim(times[0] -10, times[-1] + 10)

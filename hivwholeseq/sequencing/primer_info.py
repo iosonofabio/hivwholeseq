@@ -29,6 +29,13 @@ fragments_exons['tat2'] = fragments_genes['tat'][1]
 fragments_exons['rev1'] = fragments_genes['rev'][0]
 fragments_exons['rev2'] = fragments_genes['rev'][1]
 
+fragments_RNA_structures = {'RRE': ['F5', 'F6'],
+                            "LTR5'": ['F1'],
+                            "LTR3'": ['F6']}
+
+fragments_other = {'env peptide': ['F4', 'F5'],
+                   'psi': ['F1']}
+
 # Note: the reverse primers get reverse complemented (so everything is positive sense)
 primers_inner = {'F1': ['AAGTAGTGTGTGCCCGTCTGT', rc('TGCCAAAGAGTGATYTGAGGG')],
                  'F2': ['GGGCTGTTGGARATGTGG', rc('ACAAACTCCCAYTCAGGAATCCA')],

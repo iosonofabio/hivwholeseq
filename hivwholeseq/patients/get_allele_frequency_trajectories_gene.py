@@ -9,7 +9,7 @@ content:    Collect the allele frequencies of all samples to the initial
 # Modules
 import os
 import argparse
-from operator import attrgetter
+from operator import attrgetter, itemgetter
 import numpy as np
 from Bio.Seq import Seq
 from Bio.Alphabet.IUPAC import ambiguous_dna
@@ -19,20 +19,17 @@ from hivwholeseq.miseq import alpha
 from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file, \
         get_allele_counts_insertions_from_file_unfiltered, \
         filter_nus
-from hivwholeseq.patients.patients import get_patient
-from hivwholeseq.patients.filenames import get_initial_reference_filename, \
-        get_mapped_to_initial_filename, get_allele_frequency_trajectories_filename
-from hivwholeseq.patients.one_site_statistics import plot_allele_frequency_trajectories as plot_nus
-from hivwholeseq.patients.one_site_statistics import plot_allele_frequency_trajectories_3d as plot_nus_3d
+from hivwholeseq.patients.patients import load_patient, convert_date_deltas_to_float
+from hivwholeseq.patients.filenames import get_initial_reference_filename
+from hivwholeseq.patients.one_site_statistics import plot_allele_frequency_trajectories_from_counts as plot_nus_from_act
+from hivwholeseq.patients.one_site_statistics import plot_allele_frequency_trajectories_from_counts_3d as plot_nus_from_act_3d
+from hivwholeseq.patients.one_site_statistics import get_allele_count_trajectories
 from hivwholeseq.genome_info import genes, locate_gene, gene_edges
 from hivwholeseq.generic_utils import mkdirs
+from hivwholeseq.sequencing.primer_info import fragments_genes, \
+        fragments_RNA_structures, fragments_other
+from hivwholeseq.sequence_utils import correct_genbank_features_load
 
-
-# Globals
-
-
-
-# Functions
 
 
 # Script
@@ -42,93 +39,111 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Update initial consensus')
     parser.add_argument('--patient', required=True,
                         help='Patient to analyze')
-    parser.add_argument('--gene', required=True,
-                        help='Gene to analyze (e.g. gag)')
+    parser.add_argument('--features', required=True, nargs='+',
+                        help='Feature to analyze (e.g. gag, RRE)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
-    parser.add_argument('--save', action='store_true',
-                        help='Save the allele frequency trajectories to file')
-    parser.add_argument('--saveplot', action='store_true',
-                        help='Save the plot to file')
     parser.add_argument('--plot', nargs='?', default=None, const='2D',
                         help='Plot the allele frequency trajectories')
     parser.add_argument('--logit', action='store_true',
                         help='use logit scale (log(x/(1-x)) in the plots')
-    parser.add_argument('--PCR1', action='store_true',
-                        help='Show only PCR1 samples where possible (still computes all)')
+    parser.add_argument('--PCR1', type=int, default=1,
+                        help='Take only PCR1 samples [0=off, 1=where both available, 2=always]')
+    parser.add_argument('--threshold', type=float, default=0.9,
+                        help='Minimal frequency plotted')
     
     args = parser.parse_args()
     pname = args.patient
-    gene = args.gene
+    featnames = args.features
     VERBOSE = args.verbose
-    save_to_file = args.save
     plot = args.plot
-    saveplot = args.saveplot
     use_logit = args.logit
     use_PCR1 = args.PCR1
+    threshold = args.threshold
 
-    patient = get_patient(pname)
-    times = patient.times()
-    samplenames = patient.samples
-    if use_PCR1:
-        # Keep PCR2 only if PCR1 is absent
-        ind = np.nonzero(map(lambda x: ('PCR1' in x[1]) or ((times == times[x[0]]).sum() == 1), enumerate(samplenames)))[0]
-        times = times[ind]
+    patient = load_patient(pname)
+    patient.discard_nonsequenced_samples()
+    refseq = SeqIO.read(patient.get_reference_filename('genomewide', 'gb'), 'gb')
+    correct_genbank_features_load(refseq)
+    samplenames = patient.samples.index
 
-    from hivwholeseq.annotate_genomewide_consensus import annotate_sequence
-    cons_rec = SeqIO.read(get_initial_reference_filename(pname, 'genomewide'), 'fasta')
-    conss = str(cons_rec.seq)
-        
-    #aft_filename = get_allele_frequency_trajectories_filename(pname, 'genomewide')
-    #aft = np.load(aft_filename)
-    aft = patient.get_allele_frequency_trajectories('genomewide')
-    act = patient.get_allele_count_trajectories('genomewide')
+    fragments_features = {}
+    fragments_features.update(fragments_genes)
+    fragments_features.update(fragments_RNA_structures)
+    fragments_features.update(fragments_other)
+    fragments_features = {featname: frags
+                          for (featname, frags) in fragments_features.iteritems()
+                          if featname in featnames}
 
-    # Extract gene from reference and allele freq trajectories
-    from hivwholeseq.patients.build_initial_reference import check_genes_consensus
-    gene_seqs, _, gene_poss = check_genes_consensus(conss, 'genomewide', genes=[gene],
-                                                    VERBOSE=VERBOSE)
-    conss_gene = gene_seqs[gene]
-    gene_pos = gene_poss[gene]
-    aft_gene = np.concatenate([aft[:, :, exon_pos[0]: exon_pos[1]]
-                               for exon_pos in gene_pos], axis=2)
-    act_gene = np.concatenate([act[:, :, exon_pos[0]: exon_pos[1]]
-                               for exon_pos in gene_pos], axis=2)
+    for featname, fragments in fragments_features.iteritems():
+        # FIX tat/rev they do not belong to a single fragment continuously
+        if featname in ('tat', 'rev'):
+            continue
 
-    # Exclude stuff with little counts from any time point (e.g. between inner and outer primers)
-    ind_cov = (act_gene.sum(axis=1) >= 100).all(axis=0)
-    aft[:, :, -ind_cov] = 0
+        for fragment in fragments:
+            if VERBOSE >= 1:
+                print featname, fragment,
 
-    if save_to_file:
-        aft_gene.dump(get_allele_frequency_trajectories_filename(pname, gene))
+            # Collect allele counts from patient samples, and return only positive hits
+            # sns contains sample names and PCR types
+            (sns, act) = get_allele_count_trajectories(pname, samplenames, fragment,
+                                                       use_PCR1=use_PCR1, VERBOSE=VERBOSE)
+            ind = [i for i, (_, sample) in enumerate(patient.samples.iterrows())
+                   if sample.name in map(itemgetter(0), sns)]
+            samples = patient.samples.iloc[ind]
+            times = convert_date_deltas_to_float(samples.date - patient.transmission_date,
+                                                 unit='day')
+            ntemplates = samples['n templates']
 
-    if use_PCR1:
-        aft = aft[ind]
-        aft_gene = aft_gene[ind]
+            # Restrict to feature
+            coord_frag = None
+            coord_feature = None
+            for feature in refseq.features:
+                if feature.id == featname:
+                    coord_feature = feature.location
+                if feature.id == fragment:
+                    coord_frag = feature.location
+                if None not in (coord_frag, coord_feature):
+                    break
+            else:
+                continue
 
-    # Plot
-    if (plot is not None):
-        import matplotlib.pyplot as plt
-        if plot in ('2D', '2d', ''):
-            # FIXME: the number of molecules to PCR depends on the number of
-            # fragments for that particular experiment... integrate Lina's table!
-            # Note: this refers to the TOTAL # of templates, i.e. the factor 2x for
-            # the two parallel RT-PCR reactions
-            ntemplates = patient.viral_load * 0.4 / 12 * 2
-            if use_PCR1:
-                ntemplates = ntemplates[ind]
-            plot_nus(times, aft_gene, title='Patient '+pname+', '+gene, VERBOSE=VERBOSE,
-                     options=['syn-nonsyn'], ntemplates=ntemplates, logit=use_logit)
-        elif plot in ('3D', '3d'):
-            plot_nus_3d(times, aft_gene, title='Patient '+pname+', '+gene, VERBOSE=VERBOSE, logit=use_logit)
+            frag_start = coord_frag.nofuzzy_start
+            feat_start = max(0, coord_feature.nofuzzy_start - frag_start)
+            feat_end = min(act.shape[2], coord_feature.nofuzzy_end - frag_start)
+            act = act[:, :, feat_start: feat_end]
+            if VERBOSE >= 1:
+                print feat_start, feat_end
 
-        plt.tight_layout()
+            # FIXME: use masked arrays?
+            aft = (1.0 * act.swapaxes(0, 1) / act.sum(axis=1)).swapaxes(0, 1)
+            aft[np.isnan(aft)] = 0
+            aft[(aft < 1e-4)] = 0
 
-    if (plot is not None) and (not saveplot):
-        plt.ion()
-        plt.show()
+            if plot is not None:
+                import matplotlib.pyplot as plt
 
-    if saveplot:
-        fn = get_allele_frequency_trajectories_filename(pname, gene)
-        mkdirs(os.path.dirname(fn))
-        plt.savefig(fn)
+                title='Patient '+pname+', '+featname+' ('+fragment+')'
+                options = []
+                if featname in genes:
+                    options.append('syn-nonsyn')
+                if plot in ('2D', '2d', ''):
+
+                    plot_nus_from_act(times, act,
+                                      title=title,
+                                      VERBOSE=VERBOSE, logit=use_logit,
+                                      ntemplates=ntemplates,
+                                      threshold=threshold,
+                                      options=options)
+
+                elif plot in ('3D', '3d'):
+                    plot_nus_from_act_3d(times, act,
+                                         title=title,
+                                         VERBOSE=VERBOSE, logit=use_logit,
+                                         threshold=threshold,
+                                         options=options)
+
+        if plot is not None:
+            plt.tight_layout()
+            plt.ion()
+            plt.show()
