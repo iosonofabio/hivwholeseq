@@ -5,7 +5,7 @@ date:       17/12/13
 content:    Information module on the HIV genome.
 '''
 # Globals
-genes = ('gag', 'pol', 'env', 'vif', 'vpr', 'vpu', 'tat', 'rev')
+genes = ('gag', 'pol', 'env', 'vif', 'vpr', 'vpu', 'tat', 'rev', 'nef')
 
 # Edges of genes (fuzzy)
 gag_edges = ['ATGGGTGCGAGAGCGTCAGTA', 'GACCCCTCGTCACAATAA']
@@ -17,10 +17,12 @@ vpr_edges = ['ATGGAACAAGCCCCAGAAGACCAG', 'AATGGATCCAGTAGATCCTAA']
 vpu_edges = ['ATGCAACCTATACCAATAGTAGCAATAGTAGCATTAGTAGTAGCAATAATAATAGCAATAGTTGTGTGGTCC',             
              'GGGATGTTGATGATCTGTAG']
 tat_edges = ['ATGGAGCCAGTAGATCCTAACC', 'TCATCAANNTNCTNTANCAAAGCA',
-             'ACCCNNNNCCNNNNCCNAGAGG', 'CAGAGACAGATCCATTCGATTAG']
+             'ACCCNNNNCCNNNNNCNNNAGGNACNNGACAGNCNCG', 'CAGAGACAGATCCATTCGATTAG']
 
 rev_edges = ['ATGGCAGGAAGAAGC', 'TCATCAANNTNCTNTANCAAAGCA',
-             'ACCCNNNNCCNNNNCCNAGAGG', 'ACAGTATTGGAGTCAGGAACTAAAGAATAG']
+             'ACCCNNNNCCNNNNNCNNNAGGNACNNGACAGNCNCG', 'ACAGTATTGGAGTCAGGAACTAAAGAATAG']
+
+nef_edges = ['ATGGGNNGCAANTGGTCAAAANGNA','GAGTNNTACAANNACTGCTGA']
 
 gene_edges = {'gag': gag_edges,
               'pol': pol_edges,
@@ -29,14 +31,17 @@ gene_edges = {'gag': gag_edges,
               'vpr': vpr_edges,
               'vpu': vpu_edges,
               'tat': tat_edges,
-              'rev': rev_edges}
+              'rev': rev_edges,
+              'nef': nef_edges}
 
 # Edges of RNA structures
 RRE_edges = ['AGGAGCTATGTTCCTTGGGT', 'ACCTAAGGGATACACAGCTCCT']
-LTR5 = ['', 'CTCTAGCA']
+LTR5 = [None, 'CTCTAGCA']
+LTR3 = ['TGGANGGGNTANTTNNNTC', None]
 
 RNA_structure_edges = {'RRE': RRE_edges,
-                       "LTR5'": LTR5}
+                       "LTR5'": LTR5,
+                       "LTR3'": LTR3}
 
 
 # Edges of other regions
@@ -49,30 +54,58 @@ other_edges = {'env peptide': env_peptide_edges,
 
 
 # Functions
-def find_region_edges(smat, edges):
+def find_region_edges(refm, edges, minimal_fraction_match=0.60):
     '''Find a region's edges in a sequence'''
     import numpy as np
 
     pos_edge = []
 
-    # Gene start
-    emat = np.fromstring(edges[0], 'S1')
-    n_matches = [(emat == smat[pos: pos+len(emat)]).sum()
-                 for pos in xrange(len(smat) - len(emat))]
-    pos = np.argmax(n_matches)
-    pos_edge.append(pos)
+    # Start
+    if edges[0] is None:
+        start = -50
+        pos_edge.append(None)
+    else:
+        seed = np.ma.array(np.fromstring(edges[0], 'S1'))
+        seed[seed == 'N'] = np.ma.masked
+        seed[seed == 'R'] = np.ma.masked
+        seed[seed == 'W'] = np.ma.masked
+        seed[seed == 'Y'] = np.ma.masked
+        sl = len(seed)
+        n_match = np.array([(refm[i: i + sl] == seed).sum()
+                            for i in xrange(len(refm) - sl)], int)
+        pos_seed = np.argmax(n_match)
+        # Check whether a high fraction of the comparable (i.e. not masked)
+        # sites match the seed
+        if n_match[pos_seed] > minimal_fraction_match * (-seed.mask).sum():
+            start = pos_seed
+            pos_edge.append(start)
+        else:
+            start = -50
+            pos_edge.append(None)
 
-    # Gene end
-    emat = np.fromstring(edges[1], 'S1')
-    n_matches = [(emat == smat[pos: pos+len(emat)]).sum()
-                 for pos in xrange(pos_edge[0], len(smat) - len(emat))]
-    pos = np.argmax(n_matches) + pos_edge[0] + len(emat)
-    pos_edge.append(pos)
+    # End
+    if edges[1] is None:
+        end = None
+    else:
+        seed = np.ma.array(np.fromstring(edges[1], 'S1'))
+        seed[seed == 'N'] = np.ma.masked
+        seed[seed == 'R'] = np.ma.masked
+        seed[seed == 'W'] = np.ma.masked
+        seed[seed == 'Y'] = np.ma.masked
+        sl = len(seed)
+        n_match = np.array([(refm[i: i + sl] == seed).sum()
+                            for i in xrange(start + 50, len(refm) - sl)], int)
+        pos_seed = np.argmax(n_match)
+        if n_match[pos_seed] > minimal_fraction_match * (-seed.mask).sum():
+            end = pos_seed + start + 50 + sl
+        else:
+            end = None
+    pos_edge.append(end)
 
     return pos_edge
 
 
-def find_region_edges_multiple(smat, edges):
+def find_region_edges_multiple(smat, edges, min_distance=2000):
     '''Find a multiple region (e.g. split gene)'''
     import numpy as np
 
@@ -84,14 +117,14 @@ def find_region_edges_multiple(smat, edges):
         pos_edge = find_region_edges(smat[pos:], edges_i)
         pos_edge = [p + pos for p in pos_edge]
         pos_edges.append(pos_edge)
-        pos = pos_edge[-1]
+        pos = pos_edge[-1] + min_distance
 
     return pos_edges
 
 
 # NOTE: duplicate of above, but more specific to genes
 def locate_gene(refseq, gene, minimal_fraction_match='auto', VERBOSE=0,
-                pairwise_alignment=False):
+                pairwise_alignment=False, output_compact=False):
     '''Locate a gene in a sequence
     
     Parameters:
@@ -204,4 +237,11 @@ def locate_gene(refseq, gene, minimal_fraction_match='auto', VERBOSE=0,
     if (not start_found) and (not end_found):
         start = end = -1
 
-    return (start, end, start_found, end_found)
+    if not output_compact:
+        return (start, end, start_found, end_found)
+    else:
+        if not start_found:
+            start = None
+        if not end_found:
+            end = None
+        return (start, end)

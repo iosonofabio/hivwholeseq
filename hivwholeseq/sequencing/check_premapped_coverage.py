@@ -70,9 +70,13 @@ def check_premap(data_folder, adaID, fragments, seq_run, samplename,
                  title=None):
     '''Check premap to reference: coverage, etc.'''
     refseq = SeqIO.read(get_reference_premap_filename(data_folder, adaID), 'fasta')
+
     # FIXME: do this possibly better than parsing the description!
-    fields = refseq.description.split()
-    refseq_start = int(fields[fields.index('(indices') - 3])
+    try:
+        fields = refseq.description.split()
+        refseq_start = int(fields[fields.index('(indices') - 3])
+    except ValueError:
+        refseq_start = 550
 
     fragpos_filename = get_fragment_positions_filename(data_folder, adaID)
     if os.path.isfile(fragpos_filename):
