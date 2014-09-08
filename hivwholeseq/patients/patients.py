@@ -65,6 +65,12 @@ class Patient(pd.Series):
 
 
     @property
+    def viral_load(self):
+        '''Get the time course of the viral load'''
+        return self.samples['viral load']
+
+
+    @property
     def initial_sample(self):
         '''The initial sample used as a mapping reference'''
         return self.samples.iloc[0]
@@ -88,20 +94,26 @@ class Patient(pd.Series):
         return SeqIO.read(self.get_reference_filename(fragment), 'fasta')
 
 
-    def get_allele_frequency_trajectories(self, fragment_or_gene):
+    def get_allele_frequency_trajectories(self, fragment, use_PCR1=1):
         '''Get the allele frequency trajectories from files'''
-        from hivwholeseq.patients.filenames import get_allele_frequency_trajectories_filename
-        aft_filename = get_allele_frequency_trajectories_filename(self.name, fragment_or_gene)
-        aft = np.load(aft_filename)
-        return aft
+        (act, ind) = self.get_allele_count_trajectories(fragment, use_PCR1=use_PCR1)
+        # FIXME: use masked arrays?
+        aft = (1.0 * act.swapaxes(0, 1) / act.sum(axis=1)).swapaxes(0, 1)
+        aft[np.isnan(aft)] = 0
+        aft[(aft < 1e-4)] = 0
+        return (aft, ind)
 
 
-    def get_allele_count_trajectories(self, fragment_or_gene):
+    def get_allele_count_trajectories(self, fragment, use_PCR1=1):
         '''Get the allele count trajectories from files'''
-        from hivwholeseq.patients.filenames import get_allele_count_trajectories_filename
-        act_filename = get_allele_count_trajectories_filename(self.name, fragment_or_gene)
-        act = np.load(act_filename)
-        return act
+        from hivwholeseq.patients.one_site_statistics import get_allele_count_trajectories
+        from operator import itemgetter
+        (sns, act) = get_allele_count_trajectories(self.name, self.samples.index,
+                                                   fragment,
+                                                   use_PCR1=use_PCR1, VERBOSE=0)
+        ind = [i for i, (_, sample) in enumerate(self.samples.iterrows())
+               if sample.name in map(itemgetter(0), sns)]
+        return (act, ind)
 
 
     def get_mapped_filtered_filename(self, samplename, fragment, PCR=1):

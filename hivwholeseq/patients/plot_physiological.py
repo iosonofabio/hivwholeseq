@@ -11,6 +11,7 @@ import pandas as pd
 import matplotlib.dates
 import matplotlib.pyplot as plt
 
+from hivwholeseq.patients.patients import load_patients, Patient
 
 
 
@@ -30,22 +31,20 @@ if __name__ == '__main__':
     VERBOSE = args.verbose
 
     # FIXME: write a function for this
-    from hivwholeseq.sequencing.filenames import table_filename
-    samples_table = pd.read_excel(table_filename, 'Samples timeline')
-    patient_table = pd.read_excel(table_filename, 'Patients', index_col=0)
+    patients = load_patients()
     if pnames is not None:
-        patients = patient_table.loc[pnames]
-    else:
-        patients = patient_table
+        patients = patients.loc[patients.index.isin(pnames)]
 
     # Get patient and the sequenced samples
-    for p, patient in patients.iterrows():
-        if VERBOSE:
-            print p
+    for pname, patient in patients.iterrows():
+        patient = Patient(patient)
 
-        samples_p = samples_table[samples_table['patient'] == int(p)]
-        dates = samples_p['date']
-        viral_load = samples_p['viral load']
+        if VERBOSE:
+            print pname
+
+        samplenames = patient.samples.index
+        dates = patient.dates
+        viral_load = patient.viral_load
 
         datesplot = matplotlib.dates.date2num(dates)
         fig, ax = plt.subplots(1, 1)
@@ -53,7 +52,7 @@ if __name__ == '__main__':
         ax.set_yscale('log')
         ax.set_ylabel('Viral load [virions / ml plasma]')
         ax.set_xlabel('Time [yrs from 1st sample]')
-        ax.set_title(p)
+        ax.set_title(pname)
 
         plt.ion()
         plt.show()
