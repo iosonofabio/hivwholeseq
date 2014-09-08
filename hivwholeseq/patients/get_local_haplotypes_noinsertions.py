@@ -22,7 +22,7 @@ from hivwholeseq.patients.patients import load_patient
 
 
 # Functions
-def get_local_block(bamfilename, start, end, VERBOSE=0, maxreads=-1):
+def get_local_block(bamfilename, start, end, VERBOSE=0, maxreads=-1, refroi=None):
     '''Extract reads fully covering the region, discarding insertions'''
     import sys
     import pysam
@@ -149,30 +149,39 @@ def cluster_block(block, VERBOSE=0):
     clusters = Counter(block)
     
     # Cluster ambiguous nucleotides
+    # TODO: this is buggy at present, and reads with Ns are a small minority
+    # (typically < 2%), without any bias towards sequence, so do we want to do this?
     clusters_new = Counter()
+    n_reads_clu = {'no N': 0, 'with N': 0}
     for (seq, count) in clusters.iteritems():
         if 'N' not in seq:
             clusters_new[seq] = count
+            n_reads_clu['no N'] += count
+        else:
+            n_reads_clu['with N'] += count
 
         # Skip if too many Ns (exponentially many neighbouring seqs)
-        nN = seq.count('N')
-        if nN > 3:
-            continue
+        #nN = seq.count('N')
+        #if nN > 3:
+        #    continue
 
-        alpha = ['A', 'C', 'G', 'T']
-        best_neighbour = None
-        count_neighbour = 0
-        for comb in product(*([alpha] * nN)):
-            seqtmp = seq
-            for nuc_new in comb:
-                seqtmp = seqtmp.replace('N', nuc_new, 1)
-            count_neighbour_tmp = clusters[seqtmp]
-            if count_neighbour_tmp > count_neighbour:
-                best_neighbour = seqtmp
-                count_neighbour = count_neighbour_tmp
+        #alpha = ['A', 'C', 'G', 'T']
+        #best_neighbour = None
+        #count_neighbour = 0
+        #for comb in product(*([alpha] * nN)):
+        #    seqtmp = seq
+        #    for nuc_new in comb:
+        #        seqtmp = seqtmp.replace('N', nuc_new, 1)
+        #    count_neighbour_tmp = clusters[seqtmp]
+        #    if count_neighbour_tmp > count_neighbour:
+        #        best_neighbour = seqtmp
+        #        count_neighbour = count_neighbour_tmp
 
-        if best_neighbour is not None:
-            clusters_new[best_neighbour] = count
+        #if best_neighbour is not None:
+        #    clusters_new[best_neighbour] += count
+    
+    if VERBOSE >= 3:
+        print '# clusters: no N', n_reads_clu['no N'], 'with N', n_reads_clu['with N']
 
     clusters = clusters_new
     
@@ -211,6 +220,8 @@ if __name__ == '__main__':
                         help='Take only PCR1 samples [0=off, 1=where both available, 2=always]')
     parser.add_argument('--maxreads', type=int, default=-1,
                         help='Number of reads analyzed per sample')
+    parser.add_argument('--plot', action='store_true',
+                        help='Plot local haplotype trajectories')
 
     args = parser.parse_args()
     pname = args.patient
@@ -218,6 +229,7 @@ if __name__ == '__main__':
     VERBOSE = args.verbose
     use_PCR1 = args.PCR1
     maxreads = args.maxreads
+    use_plot = args.plot
 
     if len(roi) % 3:
         raise ValueError('roi syntax: --roi FRAGMENT START END')
@@ -227,6 +239,8 @@ if __name__ == '__main__':
 
     patient = load_patient(pname)
     patient.discard_nonsequenced_samples()
+    refseq = patient.get_reference('F4')
+    refroi = ''.join(refseq[start: end])
 
     if VERBOSE >= 1:
         print patient.name, fragment, start, end
@@ -261,7 +275,7 @@ if __name__ == '__main__':
 
         for (PCR, bamfilename) in bamfilenames:
             block = get_local_block(bamfilename, start, end, VERBOSE=VERBOSE,
-                                    maxreads=maxreads)
+                                    maxreads=maxreads, refroi=refroi)
             clusters = cluster_block(block)
             ali.append((t, PCR, clusters))
 
@@ -273,5 +287,58 @@ if __name__ == '__main__':
         print '{:>6.1f}'.format(t),
         print mcf[0],
         print '{:>8.0%}'.format(mcf[1])
+
+
+    if use_plot:
+        haplos = set()
+        for (t, PCR, clusters) in ali:
+            haplos |= set(clusters)
+        haplos = list(haplos)
+        haplos = np.array(haplos, 'S'+str(len(haplos[0])))
+
+        ts = []
+        hct = np.zeros((len(ali), len(haplos)), int)
+        for it, (t, PCR, clusters) in enumerate(ali):
+            ts.append(t)
+            for ih, haplo in enumerate(haplos):
+                hct[it, ih] = clusters[haplo]
+
+        hft = np.zeros_like(hct, float)
+        for it, hc in enumerate(hct):
+            hft[it] = 1.0 * hc / hc.sum()
+
+        # Sort by size
+        ind = hft.sum(axis=0).argsort()[::-1]
+        haplos = haplos[ind]
+        hct = hct[:, ind]
+        hft = hft[:, ind]
+
+        # Take only major ones and compress the rest
+        n_haplos = 10
+        haplos_comp = haplos[:n_haplos].tolist() + ['other']
+        hft_comp = np.zeros((len(ali), n_haplos + 1), float)
+        for ihf in xrange(n_haplos):
+            hft_comp[:, ihf] = hft[:, ihf]
+        
+        hft_comp[:, -1] = hft[:, n_haplos:].sum(axis=1)
+
+        from matplotlib import cm
+        import matplotlib.pyplot as plt
+        fig, ax = plt.subplots()
+        colors = [cm.jet(1.0 * ihf / (n_haplos + 1)) for ihf in xrange(n_haplos + 1)]
+        ax.stackplot(ts, *(hft_comp.T), baseline='zero',
+                     label=haplos_comp,
+                     colors=colors)
+
+        ax.set_xlabel('Time from transmission [days]')
+        ax.set_ylabel('Haplotype frequency')
+        ax.set_title(pname+', roi = '+' '.join(roi))
+        ax.legend(loc=1)
+
+        plt.ion()
+        plt.show()
+
+
+
 
 

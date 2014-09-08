@@ -89,7 +89,7 @@ if __name__ == '__main__':
 
             if plot in ('2D', '2d', ''):
 
-                plot_nus_from_act(times, act,
+                plot_nus_from_act(times, act2,
                                   title='Patient '+pname+', '+fragment,
                                   VERBOSE=VERBOSE, logit=use_logit,
                                   ntemplates=ntemplates,
