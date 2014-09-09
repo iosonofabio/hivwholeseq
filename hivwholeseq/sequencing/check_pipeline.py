@@ -55,10 +55,10 @@ def check_status(sample, step, detail=1):
                     for fr in sample.regions_generic]
 
     elif detail == 2:
-        if step != 'filtered':
-            return check_status(sample, step, detail=1)
-        else:
+        if step in ('filtered', 'consensus'):
             return check_status(sample, step, detail=3)
+        else:
+            return check_status(sample, step, detail=1)
 
     elif detail == 3:
         if step == 'premapped':
