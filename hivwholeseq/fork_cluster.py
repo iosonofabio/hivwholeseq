@@ -364,7 +364,7 @@ def fork_filter_mapped(seq_run, adaID, fragment, VERBOSE=0, summary=True):
     if VERBOSE:
         print 'Forking to the cluster: adaID '+adaID+', fragment '+fragment
 
-    JOBSCRIPT = JOBDIR+'filter_mapped_reads.py'
+    JOBSCRIPT = JOBDIR+'sequencing/filter_mapped_reads.py'
     cluster_time = '0:59:59'
     vmem = '2G'
     call_list = ['qsub','-cwd',
@@ -480,7 +480,7 @@ def fork_get_coallele_counts(data_folder, adaID, fragment, VERBOSE=3, summary=Tr
     if VERBOSE:
         print 'Forking to the cluster: adaID '+adaID+', fragment '+fragment
 
-    JOBSCRIPT = JOBDIR+'get_coallele_counts.py'
+    JOBSCRIPT = JOBDIR+'sequencing/get_coallele_counts.py'
     cluster_time = '0:59:59'
     vmem = '8G'
     call_list = ['qsub','-cwd',
