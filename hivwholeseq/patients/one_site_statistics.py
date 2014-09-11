@@ -370,6 +370,36 @@ def plot_allele_frequency_trajectories_from_counts_3d(times, act, title='', VERB
         ax.set_zlabel(r'$\log_{10} \nu$', fontsize=18)
 
 
+def plot_coverage_trajectories(times, covt, title='', labels=None, legendtitle='',
+                               VERBOSE=0):
+    '''Plot coverage over time'''
+    from matplotlib import cm
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    if labels is None:
+        labels = map(str, times)
+        if not legendtitle:
+            legendtitle = 'Time from transmission [days]:'
+
+    fig, ax = plt.subplots(figsize=(16, 8))
+    for it, t in enumerate(times):
+        ax.plot(np.arange(covt.shape[1]), covt[it] + 0.1,
+                lw=2,
+                c=cm.jet(1.0 * it / len(times)),
+                label=labels[it])
+
+    ax.set_xlabel('Position [bp]')
+    ax.set_xlim(0, covt.shape[1])
+    ax.set_ylabel('Coverage', fontsize=18)
+    ax.set_ylim(1, 5e5)
+    ax.set_yscale('log')
+    ax.legend(loc=3, title=legendtitle, fontsize=14,
+              ncol=(1 + (len(times) - 1) // 4))
+    ax.set_title(title)
+    ax.grid(True)
+
+
 def plot_coverage_trajectories_3d(times, covt, title='', VERBOSE=0):
     '''Plot coverage over time'''
     from mpl_toolkits.mplot3d import Axes3D
@@ -389,4 +419,27 @@ def plot_coverage_trajectories_3d(times, covt, title='', VERBOSE=0):
     ax.set_title(title)
     ax.set_zlim(-0.2, 5)
     ax.set_zlabel(r'$\log_{10} \nu$', fontsize=18)
+
+
+def plot_coverage_trajectories_heatmap(times, covt, title='', VERBOSE=0):
+    '''Plot coverage over time'''
+    from matplotlib import cm
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    fig, ax = plt.subplots(figsize=(16, 4 + 0.5 * len(times)))
+    h = ax.imshow(np.log10(covt + 0.1),
+                  interpolation='nearest',
+                  aspect='auto',
+                  vmin=0, vmax=6,
+                  cmap=cm.jet)
+    cbar = fig.colorbar(h, ticks=np.arange(6))
+    cbar.set_label(r'$\log_{10} \nu$', fontsize=18)
+
+    ax.set_ylabel('Time [days from initial sample]')
+    ax.set_xlabel('Position [bp]')
+    ax.set_ylim(-0.5, len(times) - 0.5)
+    ax.set_yticks(np.arange(len(times)))
+    ax.set_yticklabels(map(str, times), fontsize=16)
+    ax.set_title(title)
 

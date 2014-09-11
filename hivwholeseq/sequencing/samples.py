@@ -160,6 +160,12 @@ class SampleSeq(pd.Series):
         return gfn(pname, samplename_pat, fragment, PCR=PCR, **kwargs)
 
 
+    def get_consensus(self, fragment):
+        '''Get consensus sequence for mapping'''
+        from Bio import SeqIO
+        return SeqIO.read(self.get_consensus_filename(fragment), 'fasta')
+
+
 class SamplesSeq(pd.DataFrame):
     '''Table of sequenced samples'''
 

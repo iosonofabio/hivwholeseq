@@ -94,13 +94,46 @@ class Patient(pd.Series):
         return SeqIO.read(self.get_reference_filename(fragment), 'fasta')
 
 
-    def get_allele_frequency_trajectories(self, fragment, use_PCR1=1):
-        '''Get the allele frequency trajectories from files'''
+    def get_consensi_alignment_filename(self, fragment):
+        '''Get the multiple sequence alignment of all consensi'''
+        from hivwholeseq.patients.filenames import get_consensi_alignment_filename
+        return get_consensi_alignment_filename(self.name, fragment)
+
+
+    def get_consensi_tree_filename(self, fragment):
+        '''Get the filename of the consensi of the patient'''
+        from hivwholeseq.patients.filenames import get_consensi_tree_filename
+        return get_consensi_tree_filename(self.name, fragment)
+
+
+    def get_coverage_trajectories(self, fragment, use_PCR1=1):
+        '''Get coverage as a function of time'''
         (act, ind) = self.get_allele_count_trajectories(fragment, use_PCR1=use_PCR1)
-        # FIXME: use masked arrays?
-        aft = (1.0 * act.swapaxes(0, 1) / act.sum(axis=1)).swapaxes(0, 1)
-        aft[np.isnan(aft)] = 0
+        return (act.sum(axis=1), ind)
+
+
+    def get_allele_frequency_trajectories(self, fragment, use_PCR1=1, cov_min=1):
+        '''Get the allele frequency trajectories from files
+        
+        Args:
+          cov_min (int): minimal coverage accepted, anything lower will be masked.
+        '''
+        (act, ind) = self.get_allele_count_trajectories(fragment, use_PCR1=use_PCR1)
+
+        covt = act.sum(axis=1)
+        mask = np.zeros_like(act, bool)
+        mask.swapaxes(0, 1)[:] = covt < cov_min
+
+        # NOTE: the hard mask is necessary to avoid unmasking part of the alphabet
+        # at a certain site: the mask is site-wise, not allele-wise
+        aft = np.ma.array((1.0 * act.swapaxes(0, 1) / covt).swapaxes(0, 1),
+                          mask=mask,
+                          hard_mask=True,
+                          fill_value=0)
+
         aft[(aft < 1e-4)] = 0
+        # NOTE: we'd need to renormalize, but it's a small effect
+
         return (aft, ind)
 
 

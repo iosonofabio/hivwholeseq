@@ -10,5 +10,6 @@ __all__ = ['generic_utils',
            'reference',
            'reference_samples',
            'sequence_utils',
+           'tree_utils',
            'two_site_statistics',
           ]
