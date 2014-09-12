@@ -127,6 +127,13 @@ def get_allele_counts_filename(pname, samplename_pat, fragment, PCR=1, qual_min=
     return filename
 
 
+def get_consensus_filename(pname, samplename_pat, fragment, PCR=1, format='fasta'):
+    '''Get the filename of the consensus of a patient sample'''
+    filename = 'consensus_'+fragment+'.'+format
+    filename = get_sample_foldername(pname, samplename_pat, PCR=PCR)+filename
+    return filename
+
+
 def get_allele_count_trajectories_filename(pname, fragment):
     '''Get the matrix with allele counts on the initial reference'''
     filename = 'allele_counts_trajectories_'+fragment+'.npy'
@@ -193,6 +200,13 @@ def get_coverage_to_initial_figure_filename(pname, fragment, format='png'):
     '''Get the filename of the figure of coverage along the infection'''
     folder = get_figure_folder(pname)
     fn = folder+'coverage_'+fragment+'.png'
+    return fn
+
+
+def get_tree_consensi_figure_filename(pname, fragment, format='png'):
+    '''Get the filename of the figure of the tree of consensi'''
+    folder = get_figure_folder(pname)
+    fn = folder+'tree_consensi_'+fragment+'.png'
     return fn
 
 

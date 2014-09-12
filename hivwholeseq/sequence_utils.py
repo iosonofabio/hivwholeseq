@@ -197,3 +197,61 @@ def merge_sequences(seqs, minimal_fraction_match=0.75, skip_initial=30, VERBOSE=
             seqs_all.append(('N' * 10) + seq)
 
     return ''.join(seqs_all)
+
+
+def build_local_consensus(seqs, VERBOSE=0, store_allele_counts=False, full_cover=True):
+    '''Build a local consensus from an MSA
+    
+    There is only ONE tricky point: what to do if some reads do not cover the whole
+    block, e.g. at the end of a fragment because of low coverage?
+    If full_cover == False, convert MSA gaps at the end of too short reads into N
+
+    Args:
+      seqs (list of SeqRecords): seqs to build consensus from
+      store_allele_counts (bool): return also allele counts from the alignment
+      full_cover (bool): if True, assume the reads fully cover the region (no gaps at edges)
+    '''
+
+    import numpy as np
+    from hivwholeseq.miseq import alpha
+    from hivwholeseq.mapping_utils import align_muscle
+
+    ali = np.array(align_muscle(*seqs, sort=True), 'S1', ndmin=2)
+    if full_cover:
+        allele_counts = np.array([(ali == a).sum(axis=0) for a in alpha], int, ndmin=2)
+    else:
+        allele_counts = np.zeros((len(alpha), len(ali[0])),int)
+        for i in xrange(len(seqs)):
+            if ali[i, -1] == '-':
+                first_finalgap = len(ali[i].tostring().rstrip('-'))
+                ali[i, first_finalgap:] = 'X'
+            for ai, a in enumerate(alpha):
+                allele_counts[ai] += ali[i] == a
+
+        cov = allele_counts.sum(axis=0)
+        allele_counts = allele_counts[:, cov > 0]
+
+    cons_local = []
+    for counts in allele_counts.T:
+        # Pick max count nucleotide, ignoring N
+        maxinds = (counts[:-1] == counts.max()).nonzero()[0]
+        if len(maxinds) < 1:
+            cons_local.append('-')
+            continue
+        # Pick a random nucleotide in case of a tie
+        elif len(maxinds) > 1:
+            np.random.shuffle(maxinds)
+        maxind = maxinds[0]
+        cons_local.append(alpha[maxind])
+    cons_local = np.array(cons_local, 'S1')
+
+    ind_nongap = cons_local != '-'
+    cons_local = ''.join(cons_local[ind_nongap])
+    
+    if store_allele_counts:
+        allele_counts = allele_counts[:, ind_nongap]
+        return (cons_local, allele_counts)
+
+    return cons_local
+
+

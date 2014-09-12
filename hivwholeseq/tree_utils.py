@@ -9,7 +9,7 @@ def build_tree_fasttree(filename, VERBOSE=0, rootname=None):
     '''Build phylogenetic tree using FastTree'''
     import subprocess as sp
 
-    if VERBOSE >= 2:
+    if VERBOSE >= 3:
         output = sp.check_output(['fasttree', '-nt', filename])
     else:
         output = sp.check_output(['fasttree', '-nt', filename], stderr=sp.STDOUT)

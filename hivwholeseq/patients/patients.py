@@ -202,6 +202,17 @@ class SamplePat(pd.Series):
                                           PCR=PCR, qual_min=qual_min)
 
 
+    def get_consensus_filename(self, fragment, PCR=1):
+        '''Get the filename of the consensus of this sample'''
+        from hivwholeseq.patients.filenames import get_consensus_filename
+        return get_consensus_filename(self.patient, self.name, fragment, PCR=PCR)
+
+
+    def get_consensus(self, fragment, PCR=1):
+        '''Get consensu for this sample'''
+        from Bio import SeqIO
+        return SeqIO.read(self.get_consensus_filename(fragment, PCR=PCR), 'fasta')
+
 
 
 # Functions
