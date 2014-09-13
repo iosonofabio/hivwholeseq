@@ -293,7 +293,7 @@ def get_divided_filename(data_folder, adaID=None, fragment=None, type='bam', chu
 
 def get_mapped_filename(data_folder, adaID=None, fragment=None, type='bam', 
                         bwa=False, filtered=False, sort=False, part=None, unsorted=False,
-                        rescue=False):
+                        rescue=False, trashed=False):
     '''Get the filename of the mapped reads onto consensus'''
     if fragment is None:
         raise ValueError('Select a fragment')
@@ -304,6 +304,8 @@ def get_mapped_filename(data_folder, adaID=None, fragment=None, type='bam',
         filename = filename + '_bwa'
     if filtered:
         filename = filename + '_filtered'
+    if trashed:
+        filename = filename + '_trashed'
     if sort:
         filename = filename + '_sorted'
     elif part is not None:

@@ -64,7 +64,7 @@ if __name__ == '__main__':
             ax.set_title(pname+', '+fragment)
 
             x_max = max(tree.depths().itervalues())
-            ax.set_xlim(0.995, 0.995 + (x_max - 0.995) * 1.4)
+            ax.set_xlim(0.998, 0.998 + (x_max - 0.998) * 1.5)
             ax.grid(True)
 
             if use_save:

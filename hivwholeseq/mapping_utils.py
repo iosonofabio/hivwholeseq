@@ -261,6 +261,7 @@ def align_muscle(*seqs, **kwargs):
 
     return align
 
+
 def get_number_reads_fastq_open(handle):
     '''Get the number of reads from a fastq file'''
     from Bio.SeqIO.QualityIO import FastqGeneralIterator as FGI
