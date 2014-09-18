@@ -213,7 +213,7 @@ if __name__ == '__main__':
     parser.add_argument('--patient', required=True,
                         help='Patient to analyze')
     parser.add_argument('--roi', required=True, nargs='+',
-                        help='Region of interest (e.g. F1 F6)')
+                        help='Region of interest (e.g. F1 300 350)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-4]')
     parser.add_argument('--PCR1', type=int, default=1,
@@ -314,7 +314,7 @@ if __name__ == '__main__':
         hft = hft[:, ind]
 
         # Take only major ones and compress the rest
-        n_haplos = 10
+        n_haplos = 50
         haplos_comp = haplos[:n_haplos].tolist() + ['other']
         hft_comp = np.zeros((len(ali), n_haplos + 1), float)
         for ihf in xrange(n_haplos):
@@ -334,6 +334,8 @@ if __name__ == '__main__':
         ax.set_ylabel('Haplotype frequency')
         ax.set_title(pname+', roi = '+' '.join(roi))
         ax.legend(loc=1)
+        ax.set_ylim(-0.01, 1.01)
+        ax.set_xlim(ts[0] - 20, ts[-1] + 20)
 
         plt.ion()
         plt.show()

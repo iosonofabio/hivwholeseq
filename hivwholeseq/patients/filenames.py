@@ -72,9 +72,13 @@ def get_mapped_to_initial_filename(pname, samplename_pat,
     return filename
 
 
-def get_mapped_filtered_filename(pname, samplename_pat, fragment, type='bam', PCR=1):
+def get_mapped_filtered_filename(pname, samplename_pat, fragment, type='bam', PCR=1,
+                                 decontaminated=False):
     '''Get the filename of the mapped and filtered reads to initial reference'''
-    filename = fragment+'.'+type
+    filename = fragment
+    if decontaminated:
+        filename = filename+'_decontaminated'
+    filename = filename+'.'+type
     filename = get_mapped_to_initial_foldername(pname, samplename_pat, PCR=PCR)+filename
     return filename
 
@@ -220,5 +224,12 @@ def get_paste_mapped_chunks_initial_summary_filename(pname, samplename_pat, samp
 def get_filter_mapped_init_summary_filename(pname, samplename_pat, fragment, PCR=1):
     '''Get the filename of the summary of the post-map filtering'''
     filename= 'summary_filter_mapped_init_'+fragment+'.txt'
+    filename = get_sample_foldername(pname, samplename_pat, PCR=PCR)+'mapped_to_initial/'+filename
+    return filename
+
+
+def get_decontaminate_summary_filename(pname, samplename_pat, fragment, PCR=1):
+    '''Get the filename of the summary of the decontamination'''
+    filename = 'summary_decontaminate_'+fragment+'.txt'
     filename = get_sample_foldername(pname, samplename_pat, PCR=PCR)+'mapped_to_initial/'+filename
     return filename

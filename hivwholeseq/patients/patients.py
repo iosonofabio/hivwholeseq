@@ -175,10 +175,10 @@ class SamplePat(pd.Series):
         return SamplePat
 
 
-    def get_mapped_filtered_filename(self, fragment, PCR=1):
+    def get_mapped_filtered_filename(self, fragment, PCR=1, **kwargs):
         '''Get filename(s) of mapped and filtered reads'''
         from hivwholeseq.patients.filenames import get_mapped_filtered_filename
-        return get_mapped_filtered_filename(self.patient, self.name, fragment, PCR=PCR)
+        return get_mapped_filtered_filename(self.patient, self.name, fragment, PCR=PCR, **kwargs)
 
 
     def get_mapped_filenames(self, fragment, PCR=1):
