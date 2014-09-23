@@ -25,6 +25,11 @@ sample_list = [\
   'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i')},
  {'name': 'S3', 'run': 'Upp23', 'description': 'pat', 'filename': 'pb_023_3',
   'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i')},
+
+ {'name': 'convPCR', 'run': 'Upp91', 'description': 'conventional PCR', 'filename': 'pb_091_1',
+  'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i')},
+ {'name': 'emPCR', 'run': 'Upp91', 'description': 'emulsion PCR', 'filename': 'pb_091_2',
+  'fragments': ('F1i', 'F2i', 'F3i', 'F4i', 'F5ai', 'F6i')},
 ]
 sample_table = SampleTable(sample_list)
 

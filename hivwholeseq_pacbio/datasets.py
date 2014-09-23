@@ -17,6 +17,11 @@ PacBio_runs_list = [\
   'date': '2014-01-21',
   'folder': '/ebio/ag-neher/share/data/PacBio_HIV_Karolinska/run23/'},
 
+ {'name': 'Upp91',
+  'description': 'Second test run (emPCR)',
+  'date': '2014-09-22',
+  'folder': '/ebio/ag-neher/share/data/PacBio_HIV_Karolinska/run91/'},
+
 ]
 
 # Add samples to the runs

@@ -7,6 +7,7 @@ content:    Map PacBio reads to NL4-3 using stampy or custom pipeline.
 '''
 # Modules
 import os
+import gzip
 import argparse
 from itertools import izip
 from Bio import SeqIO
@@ -23,6 +24,7 @@ from hivwholeseq_pacbio.samples import sample_table
 from hivwholeseq_pacbio.datasets import PacBio_runs
 from hivwholeseq_pacbio.filenames import get_premapped_file, \
         get_reference_premap_filename
+from hivwholeseq.reference import load_custom_reference
 
 # Globals
 
@@ -65,6 +67,13 @@ def fork_self(seq_run, sample, maxreads=-1, reference='NL4-3', VERBOSE=0):
     return sp.check_output(call_list)
 
 
+def hash_set_sequence(seq, block_size):
+    '''Hash the reference on the fly (note: __hash__ includes random stuff!)'''
+    refs = ''.join(seq)
+    h = {refs[i: i + block_size].__hash__(): i for i in xrange(len(refs) - block_size)}
+    return h
+
+
 def make_output_folders(data_folder, samplename, VERBOSE=0):
     '''Make output folders'''
     from hivwholeseq.generic_utils import mkdirs
@@ -76,118 +85,102 @@ def make_output_folders(data_folder, samplename, VERBOSE=0):
             print 'Folder created:', dirname
 
 
-def trim_reference(refm, readm, band=100, VERBOSE=0):
-    '''Trim the reference around a seed of the read'''
-
-    seed_len = 30
-    matches_min = 25
-    rl = len(readm)
-
-    # Try out a few seeds: middle of the read, a bit earlier, a bit later
-    seed_starts = [max(0, rl / 2 - seed_len / 2),
-                   max(0, rl / 2 - 5 * seed_len),
-                   min(rl - seed_len, rl / 2 + 5 * seed_len)]
-
-    for seed_start in seed_starts:
-        seed = readm[seed_start: seed_start + seed_len]
-        mismatches = 0
-
-        # Scan the reference for incomplete matches of the seed
-        ####################################################################
-        ## NOTE: this is the algorithm that takes long - might be optimized
-        #pos_seed = -1
-        #score_old = -1
-        #for i in xrange(len(refm) - (rl - seed_start) + band / 2):
-        #    score = (seed == refm[i: i + seed_len]).sum()
-        #    if score == seed_len:
-        #        pos_seed = i
-        #        break
-        #    elif score > score_old:
-        #        score_old = score
-        #        pos_seed = i
-        ####################################################################
-        (pos_seed, score) = sap2.find_seed(refm.tostring(), seed.tostring())
-
-        if score >= matches_min:
-            if VERBOSE >= 3:
-                print 'Position:', pos_seed, 'seed start:', seed_start, 'score:', score
-        
-            pos_trim_start = pos_seed - seed_start - band
-            pos_trim_end = pos_seed + (rl - seed_start) + band
-            ref_trim = refm[max(0, pos_trim_start): min(len(refm), pos_trim_end)]
-
-            if (pos_trim_end > len(ref_trim)) or (pos_trim_start < 0):
-                raise ValueError('Seed overhangs from reference')
-
-            return (pos_trim_start, ref_trim)
-    
-    raise ValueError('Seed not found in reference')
-
-
-def map_read(refm, readm, qual, qname, band=100, VERBOSE=0):
+def map_read(refm, ref_hash, readm, qual, qname, VERBOSE=0,
+             trim_edges=True, band=100, hash_block_size=20, n_hash_matches=5,
+             score_match=3, score_mismatch=-3, score_gapext=-1, score_gapopen=-7):
     '''Make a mapped read out of an oerlap alignment with the reference'''
 
-    if len(refm) > len(readm) + 2 * band:
+    # Hash the read
+    is_reverse = False
+    read_hash = hash_set_sequence(readm, hash_block_size).items()
+    np.random.shuffle(read_hash)
+    n_matches = 0
+    for h, pos_read in read_hash:
+        if h in ref_hash:
+            pos_ref = ref_hash[h]
+            n_matches += 1
+            if n_matches == n_hash_matches:
+                break
 
-        # Guess the strand by the A bias, or else try the other one
-        if (readm == 'A').mean() > (readm == 'T').mean():
-            is_reverse = False
+    # if no hashes found, look in the opposite direction
+    else:
+        is_reverse = True
+        readm = np.fromstring(revcom(readm.tostring()), 'S1')
+        qual = qual[::-1]
+        read_hash = hash_set_sequence(readm, hash_block_size).items()
+        np.random.shuffle(read_hash)
+        n_matches = 0
+        for h, pos_read in read_hash:
+            if h in ref_hash:
+                pos_ref = ref_hash[h]
+                n_matches += 1
+                if n_matches == n_hash_matches:
+                    break
+
+        # If no hashes found, unmapped
         else:
-            readm = np.fromstring(revcom(readm.tostring()), 'S1')
-            qual = qual[::-1]
-            is_reverse = True
-
-        try:
-            (pos_ref, refm) = trim_reference(refm, readm, band=band, VERBOSE=VERBOSE)
-
-        except ValueError:
-            try:
+            if is_reverse:
                 readm = np.fromstring(revcom(readm.tostring()), 'S1')
                 qual = qual[::-1]
-                is_reverse = not is_reverse
-                (pos_ref, refm) = trim_reference(refm, readm, band=band, VERBOSE=VERBOSE)
 
-            except ValueError:
+            readout = pysam.AlignedRead()
+            readout.qname = qname
+            readout.seq = readm.tostring()
+            readout.flag = 0x0004
+            readout.rname = 0
+            readout.pos = 0
+            readout.mapq = 0
+            readout.cigar = []
+            readout.mrnm = 0
+            readout.mpos = 0
+            readout.isize = 0
+            readout.qual = qual
+            readout.tags = ()
 
-                # Unmapped: bring it back to its original strand
-                if is_reverse:
-                    readm = np.fromstring(revcom(readm.tostring()), 'S1')
-                    qual = qual[::-1]
+            return readout
 
-                readout = pysam.AlignedRead()
-                readout.qname = qname
-                readout.seq = readm.tostring()
-                readout.flag = 0x0004
-                readout.rname = 0
-                readout.pos = 0
-                readout.mapq = 0
-                readout.cigar = []
-                readout.mrnm = 0
-                readout.mpos = 0
-                readout.isize = 0
-                readout.qual = qual
-                readout.tags = ()
 
-                return readout
-
+    ref_start = max(0, pos_ref - pos_read - band)
+    ref_end = min(len(refm), pos_ref + len(readm) - pos_read + band)
+    ref_trimmed = refm[ref_start: ref_end]
 
     # Align pairwise ref and read
-    (score, ref, read) = sap.align_overlap(refm.tostring(),
+    (score, ref, read) = sap.align_overlap(ref_trimmed.tostring(),
                                            readm.tostring(),
-                                           band=band)
+                                           band=-1,
+                                           score_match=score_match,
+                                           score_mismatch=score_mismatch,
+                                           score_gapext=score_gapext,
+                                           score_gapopen=score_gapopen)
 
     # Trim alignment of side gaps (readm and qual are untouched)
     read = read.lstrip('-')
     offset = len(ref) - len(read)
     read = read.rstrip('-')
     ref = ref[offset: offset + len(read)]
-
-    pos_ref += offset
+    pos_ref = ref_start + offset
 
     if VERBOSE >= 3:
-        print ref[:50]
-        print read[:50]
+        print 'Alignment score:', score, 'of', score_match * len(ref),
+        print 'pos: ['+str(pos_ref)+', '+str(pos_ref + len(ref.replace('-', '')))+']'
+        print 'ref: ', ref[:40], '   ', ref[-40:]
+        print 'read:', read[:40], '   ', read[-40:]
         print
+
+    if trim_edges:
+        if (pos_ref == 0) and (ref[0] == '-'):
+            ref = ref.lstrip('-')
+            offset = len(read) - len(ref)
+            read = read[offset:]
+
+        if (pos_ref + len(ref.replace('-', '')) == len(refm)) and (ref[-1] == '-'):
+            ref = ref.rstrip('-')
+            read = read[:len(ref)]
+
+        if VERBOSE >= 3:
+            print 'After edge trimming:'
+            print 'ref: ', ref[:40], '   ', ref[-40:]
+            print 'read:', read[:40], '   ', read[-40:]
 
     # Build cigar
     pos_ali = 0
@@ -290,28 +283,26 @@ if __name__ == '__main__':
     data_folder = dataset['folder']
     sample = sample_table.set_index('name').loc[samplename]
 
-    # Parse raw circular consensus reads
-    reads_iter = SeqIO.parse(data_folder+'ccs_reads/'+sample['filename']+\
-                             '_ccs_reads.fastq.txt', 'fastq')
-    
-    # Get reference
-    from hivwholeseq.reference import load_custom_reference
     refseq = load_custom_reference(refname)
     refm = np.array(refseq)
 
-    # Make output folders
+    ref_hash = hash_set_sequence(refseq, block_size=20)
+
     make_output_folders(data_folder, samplename, VERBOSE=VERBOSE)
 
-    # Copy mapping reference into folder
-    SeqIO.write(refseq, get_reference_premap_filename(data_folder, samplename),
-                'fasta')
+    fn_ref_out = get_reference_premap_filename(data_folder, samplename)
+    SeqIO.write(refseq, fn_ref_out, 'fasta')
 
-    # Map reads
-    reads_mapped = []
+    fn_in = data_folder+'ccs_reads/'+sample['filename']+'_reads.fastq.gz'
     bamfilename = get_premapped_file(data_folder, samplename)
-    with pysam.Samfile(bamfilename, "wb",
+    with gzip.open(fn_in, 'rb') as f, \
+         pysam.Samfile(bamfilename, "wb",
                        referencenames=['HIV'],
                        referencelengths=[len(refm)]) as bamfile:
+
+        reads_iter = SeqIO.parse(f, 'fastq')
+        reads_mapped = []
+
         for i, read in enumerate(reads_iter):
             if i == maxreads:
                 break
@@ -324,7 +315,7 @@ if __name__ == '__main__':
             qual = (np.array(read.letter_annotations['phred_quality'],
                              np.int8) + ord('!')).tostring()
             
-            read_mapped = map_read(refm, readm, qual, "read_"+str(i),
+            read_mapped = map_read(refm, ref_hash, readm, qual, "read_"+str(i),
                                    VERBOSE=VERBOSE)
             
             bamfile.write(read_mapped)
