@@ -20,7 +20,7 @@ from Bio.Seq import reverse_complement as rc
 from hivwholeseq.miseq import alpha
 from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_allele_count_trajectories_filename, get_primers_filename
-from hivwholeseq.patients.patients import load_patient
+from hivwholeseq.patients.patients import load_patient, SamplePat
 from hivwholeseq.sequencing.primer_info import primers_outer, find_primer_seq
 from hivwholeseq.sequence_utils import expand_ambiguous_seq
 
@@ -110,12 +110,13 @@ if __name__ == '__main__':
             primers_pat[fragment]['fwd'] = primer_fwd_pat
 
             if status == 'FAIL':
-                act_filename = get_allele_count_trajectories_filename(pname, frag_left)
-                if not os.path.isfile(act_filename):
+                sample = SamplePat(patient.samples.iloc[0])
+                ac_filename = sample.get_allele_counts_filename(frag_left)
+                if not os.path.isfile(ac_filename):
                     print 'Allele count filename not found.'
                 else:
-                    act = np.load(act_filename)
-                    ac_pr = act[0, :, pos: pos + len(primer_fwd)]
+                    ac = np.load(ac_filename).sum(axis=0)
+                    ac_pr = ac[:, pos: pos + len(primer_fwd)]
                     ind = (np.fromstring(primer_fwd_closest, 'S1') != np.fromstring(primer_fwd_pat, 'S1')).nonzero()[0]
                     for i in ind:
                         print i, primer_fwd_closest[i], primer_fwd_pat[i], ac_pr[:, i]
@@ -168,12 +169,13 @@ if __name__ == '__main__':
             primers_pat[fragment]['rev'] = primer_rev_pat
 
             if status == 'FAIL':
-                act_filename = get_allele_count_trajectories_filename(pname, frag_right)
-                if not os.path.isfile(act_filename):
+                sample = SamplePat(patient.samples.iloc[0])
+                ac_filename = sample.get_allele_counts_filename(frag_right)
+                if not os.path.isfile(ac_filename):
                     print 'Allele count filename not found.'
                 else:
-                    act = np.load(act_filename)
-                    ac_pr = act[0, :, pos: pos + len(primer_rev)]
+                    ac = np.load(ac_filename).sum(axis=0)
+                    ac_pr = ac[:, pos: pos + len(primer_rev)]
                     tmp = ac_pr[0].copy()
                     ac_pr[0] = ac_pr[3]
                     ac_pr[3] = tmp

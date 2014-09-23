@@ -178,7 +178,8 @@ class SamplePat(pd.Series):
     def get_mapped_filtered_filename(self, fragment, PCR=1, **kwargs):
         '''Get filename(s) of mapped and filtered reads'''
         from hivwholeseq.patients.filenames import get_mapped_filtered_filename
-        return get_mapped_filtered_filename(self.patient, self.name, fragment, PCR=PCR, **kwargs)
+        return get_mapped_filtered_filename(self.patient, self.name, fragment,
+                                            PCR=PCR, **kwargs)
 
 
     def get_mapped_filenames(self, fragment, PCR=1):
@@ -219,7 +220,7 @@ class SamplePat(pd.Series):
 def load_patients():
     '''Load patients from general table'''
     patients = pd.read_excel(table_filename, 'Patients',
-                             index_col=0)
+                             index_col=1)
     patients.index = pd.Index(map(str, patients.index))
     return patients
 

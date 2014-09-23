@@ -16,6 +16,7 @@ from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_mapped_filtered_filename, get_allele_counts_filename
 from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file as gac
 from hivwholeseq.patients.patients import load_samples_sequenced as lssp
+from hivwholeseq.patients.patients import SamplePat
 from hivwholeseq.fork_cluster import fork_get_allele_counts_patient as fork_self 
 
 
@@ -77,6 +78,7 @@ if __name__ == '__main__':
                 fork_self(samplename_pat, fragment, VERBOSE=VERBOSE, qual_min=qual_min)
                 continue
 
+            sample_pat = SamplePat(sample_pat)
             pname = sample_pat.patient
             refseq = SeqIO.read(get_initial_reference_filename(pname, fragment), 'fasta')
             counts_sample = [None, None]
@@ -85,8 +87,7 @@ if __name__ == '__main__':
             for PCR in (1, 2):
                 fn_out = get_allele_counts_filename(pname, samplename_pat,
                                                     fragment, PCR=PCR, qual_min=qual_min)
-                fn = get_mapped_filtered_filename(pname, samplename_pat,
-                                                  fragment, PCR=PCR)
+                fn = sample_pat.get_mapped_filtered_filename(fragment, PCR=PCR, decontaminated=True) #FIXME
                 
                 if save_to_file:
                     if os.path.isfile(fn):

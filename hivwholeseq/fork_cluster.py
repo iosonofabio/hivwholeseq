@@ -711,7 +711,7 @@ def fork_get_cocounts_patient(pname, samplename, fragment, VERBOSE=0,
                               maxreads=-1, use_tests=False):
     '''Fork to the cluster for each patient, sample, and fragment'''
     if VERBOSE:
-        print 'Forking to the cluster: patient '+pname+', sample'+samplename+', fragment '+fragment
+        print 'Forking to the cluster: patient '+pname+', sample '+samplename+', fragment '+fragment
 
     JOBSCRIPT = JOBDIR+'patients/get_allele_cocounts.py'
     cluster_time = '23:59:59'
@@ -734,6 +734,41 @@ def fork_get_cocounts_patient(pname, samplename, fragment, VERBOSE=0,
                 ]
     if use_tests:
         qsub_list.append('--tests')
+    qsub_list = map(str, qsub_list)
+    if VERBOSE:
+        print ' '.join(qsub_list)
+    return sp.check_output(qsub_list)
+
+
+def fork_decontaminate_reads_patient(samplename, fragment, VERBOSE=0, PCR=None,
+                                     maxreads=-1, summary=True):
+    '''Fork to the cluster the decontamination of reads'''
+    if VERBOSE:
+        print 'Fork to cluster: sample', samplename, fragment
+
+    JOBSCRIPT = JOBDIR+'patients/decontaminate_reads.py'
+    cluster_time = '71:59:59'
+    vmem = '2G'
+
+    qsub_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'dec'+fragment+samplename,
+                 '-l', 'h_rt='+cluster_time,
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--samples', samplename,
+                 '--fragments', fragment,
+                 '--verbose', VERBOSE,
+                ]
+    if PCR is not None:
+        qsub_list.extend(['--PCR', PCR])
+    if maxreads != -1:
+        qsub_list.extend(['--maxreads', maxreads])
+    if not summary:
+        qsub_list.append('--no-summary')
     qsub_list = map(str, qsub_list)
     if VERBOSE:
         print ' '.join(qsub_list)

@@ -296,6 +296,8 @@ if __name__ == '__main__':
     parser.add_argument('--reads-per-alignment', type=int, default=31,
                         dest='reads_per_alignment',
                         help='Number of (random) reads used for the local consensi')
+    parser.add_argument('--decontaminated', action='store_true',
+                        help='Use the decontaminated reads')
 
     args = parser.parse_args()
     pnames = args.patients
@@ -305,6 +307,7 @@ if __name__ == '__main__':
     save_to_file = args.save
     n_reads_per_ali = args.reads_per_alignment
     block_len = args.block_len
+    use_decontaminated = args.decontaminated
 
     samples = load_samples_sequenced()
     if pnames is not None:
@@ -336,7 +339,8 @@ if __name__ == '__main__':
             len_reference = len(refseq)
 
             for PCR in (1, 2):
-                bamfilename = sample.get_mapped_filtered_filename(fragment, PCR=PCR)
+                bamfilename = sample.get_mapped_filtered_filename(fragment, PCR=PCR, \
+                                                decontaminated=use_decontaminated)
                 if not os.path.isfile(bamfilename):
                     continue
                 

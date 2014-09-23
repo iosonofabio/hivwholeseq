@@ -11,6 +11,7 @@ import os
 import argparse
 from hivwholeseq.patients.patients import load_patients, load_patient, Patient, \
         SamplePat
+from hivwholeseq.patients.filenames import get_decontaminate_summary_filename
 
 
 # Globals
@@ -104,6 +105,31 @@ if __name__ == '__main__':
                     status = 'OK'
                 else:
                     fn = sample.get_mapped_filtered_filename(fragment, PCR=2)
+                    if os.path.isfile(fn):
+                        status = 'PCR2'
+                    else:
+                        status = 'MISS'
+                stati.append(status)
+                line = line + fragment + ': ' + ('{:>'+str(cell_len - len(fragment) - 1)+'}').format(status) + '  '
+            print line
+
+        title = 'Decontaminate'
+        line = ('{:<'+str(title_len)+'}').format(title+':')
+        print line
+        for samplename, sample in p.samples.iterrows():
+            sample = SamplePat(sample)
+            title = sample.name
+            line = ('{:<'+str(title_len)+'}').format(title+':')
+            
+            stati = []
+            for fragment in ('F'+str(i+1) for i in xrange(6)):
+                fn = get_decontaminate_summary_filename(sample.patient, samplename,
+                                                        fragment, PCR=1)
+                if os.path.isfile(fn):
+                    status = 'OK'
+                else:
+                    fn = get_decontaminate_summary_filename(sample.patient, samplename,
+                                                            fragment, PCR=1)
                     if os.path.isfile(fn):
                         status = 'PCR2'
                     else:
