@@ -5,6 +5,15 @@ date:       30/01/14
 content:    Functions for getting standard filenames.
 '''
 # Functions
+root_data_folder = '/ebio/ag-neher/share/data/PacBio_HIV_Karolinska/'
+
+
+def get_raw_sequence_filename(data_folder, filename):
+    '''Get the raw PacBio sequence filename'''
+    fn = filename+'_reads.fastq.gz'
+    return data_folder+'ccs_reads/'+fn
+
+
 def get_reference_premap_filename(data_folder, samplename, fragment=None):
     '''Get the filename of the reference used from premapping'''
     fn = 'reference'

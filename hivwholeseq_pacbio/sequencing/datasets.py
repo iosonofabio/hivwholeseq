@@ -5,7 +5,7 @@ date:       30/01/14
 content:    Datasets (sequencing runs)
 '''
 # Modules
-from hivwholeseq_pacbio.samples import sample_table
+from hivwholeseq_pacbio.sequencing.samples import sample_table
 
 
 

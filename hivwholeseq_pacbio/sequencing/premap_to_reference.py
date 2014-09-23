@@ -20,10 +20,10 @@ import matplotlib.pyplot as plt
 #from hivwholeseq_pacbio.test_align import trim_reference, align_overlap_seqan
 import seqanpy as sap
 import hivwholeseq_pacbio.seqan_module.seqanpy as sap2
-from hivwholeseq_pacbio.samples import sample_table
-from hivwholeseq_pacbio.datasets import PacBio_runs
-from hivwholeseq_pacbio.filenames import get_premapped_file, \
-        get_reference_premap_filename
+from hivwholeseq_pacbio.sequencing.samples import sample_table
+from hivwholeseq_pacbio.sequencing.datasets import PacBio_runs
+from hivwholeseq_pacbio.sequencing.filenames import get_premapped_file, \
+        get_reference_premap_filename, get_raw_sequence_filename
 from hivwholeseq.reference import load_custom_reference
 
 # Globals
@@ -43,7 +43,7 @@ def fork_self(seq_run, sample, maxreads=-1, reference='NL4-3', VERBOSE=0):
     if VERBOSE:
         print 'Forking to the cluster'
 
-    JOBSCRIPT = JOBDIR+'premap_to_reference.py'
+    JOBSCRIPT = JOBDIR+'sequencing/premap_to_reference.py'
     cluster_time = '23:59:59'
     vmem = '8G'
     call_list = ['qsub','-cwd',
@@ -293,7 +293,7 @@ if __name__ == '__main__':
     fn_ref_out = get_reference_premap_filename(data_folder, samplename)
     SeqIO.write(refseq, fn_ref_out, 'fasta')
 
-    fn_in = data_folder+'ccs_reads/'+sample['filename']+'_reads.fastq.gz'
+    fn_in = get_raw_sequence_filename(data_folder, sample['filename'])
     bamfilename = get_premapped_file(data_folder, samplename)
     with gzip.open(fn_in, 'rb') as f, \
          pysam.Samfile(bamfilename, "wb",
