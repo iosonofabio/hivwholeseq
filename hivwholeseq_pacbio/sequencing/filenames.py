@@ -4,8 +4,23 @@ author:     Fabio Zanini
 date:       30/01/14
 content:    Functions for getting standard filenames.
 '''
-# Functions
+# Globals
 root_data_folder = '/ebio/ag-neher/share/data/PacBio_HIV_Karolinska/'
+reference_folder = root_data_folder+'reference/'
+
+
+
+# Functions
+def get_seqrun_foldername(seq_run):
+    '''Get the folder name of a sequencing run'''
+    return root_data_folder+seq_run+'/'
+
+
+def get_custom_reference_filename(reference, format='fasta'):
+    '''Get the filename of a custom reference sequence, in one piece'''
+    filename = reference
+    filename = filename+'.'+format
+    return reference_folder+filename
 
 
 def get_raw_sequence_filename(data_folder, filename):
@@ -24,7 +39,7 @@ def get_reference_premap_filename(data_folder, samplename, fragment=None):
     return fn
 
 
-def get_premapped_file(data_folder, samplename, type='bam'):
+def get_premapped_filename(data_folder, samplename, type='bam'):
     '''Get the filename of the readed mapped to reference to split into fragments'''
     filename = 'premapped'
     filename = data_folder+samplename+'/premapped/'+filename+'.'+type

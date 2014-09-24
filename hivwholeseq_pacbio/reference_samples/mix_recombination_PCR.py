@@ -3,12 +3,6 @@
 author:     Fabio Zanini
 date:       26/10/13
 content:    Study PCR-mediated recombination from the plasmid mixes.
-
-            This script is used both for:
-                - MIX1 PCR2 probes (Tue28, adaID TS18)
-                - MIX1 PCR1 probes (Tue42, adaID N1-S1)
-                - MIX2 PCR2 probes (Tue28, adaID TS19)
-                - MIX2 PCR1 probes (Tue42, adaID N3-S3)
 '''
 # Modules
 import argparse
@@ -22,10 +16,8 @@ import pysam
 from matplotlib import cm
 import matplotlib.pyplot as plt
 
-from hivwholeseq.miseq import alphal
-from hivwholeseq.datasets import MiSeq_runs
-from hivwholeseq.filenames import get_consensus_filename, get_mapped_filename, \
-        get_allele_counts_filename, get_coverage_filename
+from hivwholeseq_pacbio.sequencing.pacbio_rs_II import alphal
+from hivwholeseq_pacbio.sequencing.datasets import PacBio_runs
 from hivwholeseq.mapping_utils import align_muscle, pair_generator
 from hivwholeseq.minor_allele_frequency import filter_nus
 from hivwholeseq.coverage_tuples import get_coverage_tuples
@@ -361,8 +353,7 @@ if __name__ == '__main__':
     n_reads = args.n
     VERBOSE = args.verbose
 
-    # Specify the dataset
-    dataset = MiSeq_runs[seq_run]
+    dataset = PacBio_runs[seq_run]
     data_folder = dataset['folder']
 
     # If the script is called with no fragment, iterate over all
