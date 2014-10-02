@@ -29,15 +29,35 @@ maj_contnames = ['12879', '18798', '6154']
 
 
 # Functions
-def get_number_reads_summary(fn):
+def get_number_reads_summary(fn, details=False):
     '''Get the number of reads from the summary file'''
+    start_dict = False
+    n_cont_dict = {}
     with open(fn, 'r') as f:
         for line in f:
             if line[:4] == 'Good':
                 n_reads_good = 2 * int(line.rstrip('\n').split()[1])
+                continue
             elif line[:12] == 'Contaminated':
                 n_reads_cont = 2 * int(line.rstrip('\n').split()[1])
-    return (n_reads_good, n_reads_cont)
+                if not details:
+                    break
+                continue
+
+            elif line[:21] == 'Contamination sources':
+                start_dict = True
+                continue
+
+            if start_dict:
+                fields = line.rstrip('\n').split()
+                cont_name = fields[0]
+                cont_n_reads = int(fields[1])
+                n_cont_dict[cont_name] = cont_n_reads
+
+    if not details:
+        return (n_reads_good, n_reads_cont)
+    else:
+        return (n_reads_good, n_reads_cont, n_cont_dict)
 
 
 def check_already_decontaminated(sample, fragment, PCR):
@@ -82,7 +102,7 @@ def trim_align_overlap(ali):
 
 
 def filter_contamination(bamfilename, bamfilename_out, contseqs, samplename, VERBOSE=0,
-                         deltascore_max_pure=24, deltascore_max_cont=60,
+                         deltascore_max_self=60, deltascore_max_other=24,
                          maxreads=-1,
                          **kwargs):
     '''Fish contaminated reads from mapped reads
@@ -91,10 +111,10 @@ def filter_contamination(bamfilename, bamfilename_out, contseqs, samplename, VER
     if it's more than that it checks all other samples.
     
     Args:
-      deltascore_max_pure (int): the maximal delta in alignment score to the 
+      deltascore_max_self (int): the maximal delta in alignment score to the 
                                  consensus to be considered pure
-      deltascore_max_cont (int): the maximal delta in alignment score to any other
-                                 sample to be considered a contamination
+      deltascore_max_other (int): the maximal delta in alignment score to any other
+                                  sample to be considered a contamination
       **kwargs: passed down to the pairwise alignment function
     '''
     import pysam
@@ -109,11 +129,14 @@ def filter_contamination(bamfilename, bamfilename_out, contseqs, samplename, VER
     else:
         score_match = 3
 
+    bamfilename_trash = bamfilename_out[:-4]+'_trashed.bam'
+
     contseqs = contseqs.copy()
     consseq = contseqs.pop(samplename)
 
     with pysam.Samfile(bamfilename, 'rb') as bamfile:
-        with pysam.Samfile(bamfilename_out, 'wb', template=bamfile) as bamfileout:
+        with pysam.Samfile(bamfilename_out, 'wb', template=bamfile) as bamfileout, \
+             pysam.Samfile(bamfilename_trash, 'wb', template=bamfile) as bamfiletrash:
             n_good = 0
             n_cont = defaultdict(int)
 
@@ -129,24 +152,23 @@ def filter_contamination(bamfilename, bamfilename_out, contseqs, samplename, VER
 
                 for read in reads:
 
-                    # Look for distance to the own consensus, it that's zero move on
+                    # Look for distance to the own consensus, it that's small move on
                     alignments_read = {}
                     deltas_read = {}
-                    (score, ali1, ali2) = align_overlap(consseq, read.seq, **kwargs)
-                    (ali1, ali2) = trim_align_overlap((ali1, ali2))
-                    scoremax = len(ali1) * score_match
+                    (score, alis1, alis2) = align_overlap(consseq, read.seq, **kwargs)
+                    (alis1, alis2) = trim_align_overlap((alis1, alis2))
+                    scoremax = len(alis1) * score_match
                     delta_read = scoremax - score
                     deltas_read[samplename] = delta_read
-                    alignments_read[samplename] = (ali1, ali2)
-                    # NOTE: here we might want to soften up a bit, e.g. less
-                    # than 3 changes or so
-                    if delta_read <= deltascore_max_pure:
+                    alignments_read[samplename] = (alis1, alis2)
+                    if delta_read <= deltascore_max_self:
                         if VERBOSE >= 4:
                             print 'Read is very close to its own consensus', scoremax, score, delta_read
-                            pretty_print_pairwise_ali([ali1, ali2], width=90, name1='ref', name2='read')
+                            pretty_print_pairwise_ali([alis1, alis2], width=90,
+                                                      name1='ref', name2='read')
                         continue
 
-                    # Otherwise, move on to all other sequences
+                    # Otherwise, move on to all other sequences and find the neighbour
                     for contname, contseq in contseqs.iteritems():
                         (score, ali1, ali2) = align_overlap(contseq, read.seq, **kwargs)
                         (ali1, ali2) = trim_align_overlap((ali1, ali2))
@@ -172,24 +194,31 @@ def filter_contamination(bamfilename, bamfilename_out, contseqs, samplename, VER
                     if contname == samplename:
                         if VERBOSE >= 4:
                             print 'Read is closest to its consensus', scoremax, score, delta_read
-                            pretty_print_pairwise_ali([ali1, ali2], width=90, name1='ref', name2='read')
+                            pretty_print_pairwise_ali([ali1, ali2], width=90,
+                                                      name1='ref', name2='read')
 
-                    # The read may come from another consensus, but it may be a bit
-                    # distant from its own consensus
-                    elif (delta_read <= deltascore_max_cont):
+                    # The read may come from another consensus (contamination)
+                    elif (delta_read <= deltascore_max_other):
                         n_cont[contname] += 1
+                        bamfiletrash.write(reads[0])
+                        bamfiletrash.write(reads[1])
 
                         if VERBOSE >= 2:
-                            print 'Good:', n_good, 'cont:', n_cont
+                            print 'Contaminated read found! Good:', n_good, 'cont:', sum(n_cont.itervalues()), 'sources:', n_cont
 
                         if VERBOSE >= 3:
                             print 'Read is contaminated by', contname, scoremax, score, delta_read
-                            pretty_print_pairwise_ali([ali1, ali2], width=90, name1='ref', name2='read')
+                            pretty_print_pairwise_ali([alis1, alis2], width=90,
+                                                      name1='self', name2='read')
+                            print ''
+                            pretty_print_pairwise_ali([ali1, ali2], width=90,
+                                                      name1='ref', name2='read')
+
+                            import ipdb; ipdb.set_trace()
 
                         break
 
-                    # Finally, the read might be closest to somebody else, but not really
-                    # close to anything... FIXME: for now accept those
+                    # Finally, the read is not really close to anything: accept
                     else:
                         if VERBOSE >= 4:
                             print 'Read is close to nothing really', scoremax, score, delta_read
@@ -274,8 +303,8 @@ if __name__ == '__main__':
                     if not os.path.isfile(bamfilename):
                         continue
                 
-                    if check_already_decontaminated(sample, fragment, PCR_sample):
-                        continue
+                    #if check_already_decontaminated(sample, fragment, PCR_sample):
+                    #    continue
 
                     fork_self(samplename, fragment, VERBOSE=VERBOSE, maxreads=maxreads,
                               summary=summary, PCR=PCR_sample)
@@ -341,7 +370,6 @@ if __name__ == '__main__':
                 (n_good, n_cont) = filter_contamination(bamfilename, bamfilename_out,
                                                         consensi_sample, samplename,
                                                         VERBOSE=VERBOSE,
-                                                        deltascore_max_cont=60,
                                                         maxreads=maxreads)
 
                 if VERBOSE:

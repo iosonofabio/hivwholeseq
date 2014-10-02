@@ -196,7 +196,7 @@ def make_index_and_hash(data_folder, adaID, VERBOSE=0, summary=True):
             f.write('\n')
 
 
-def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
+def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True, maxreads=-1):
     '''Call stampy for actual mapping'''
     if VERBOSE:
         print 'Premapping: adaID ', adaID
@@ -219,7 +219,10 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True):
                      '-h', get_reference_premap_hash_filename(data_folder, adaID, ext=False), 
                      '-o', get_premapped_filename(data_folder, adaID, type='sam'),
                      '--substitutionrate='+subsrate,
-                     '-M'] + input_filenames
+                    ]
+        if maxreads > 0:
+            call_list.append('--numrecords='+str(maxreads))
+        call_list.extend(['-M'] + input_filenames)
         call_list = map(str, call_list)
         if VERBOSE >= 2:
             print ' '.join(call_list)
@@ -452,6 +455,8 @@ if __name__ == '__main__':
                         help='Execute the script in parallel on the cluster')
     parser.add_argument('--threads', type=int, default=1,
                         help='Number of threads to use for mapping')
+    parser.add_argument('--maxreads', type=int, default=-1,
+                        help='Number of read pairs to map (for testing)')
     parser.add_argument('--reference', default='HXB2',
                         help='Use alternative reference (the file must exist)')
     parser.add_argument('--no-summary', action='store_false', dest='summary',
@@ -468,6 +473,7 @@ if __name__ == '__main__':
     refname = args.reference
     summary = args.summary
     use_trimmed = args.trimmed
+    maxreads = args.maxreads
 
     # Specify the dataset
     dataset = load_sequencing_run(seq_run)
@@ -487,7 +493,8 @@ if __name__ == '__main__':
         # Submit to the cluster self if requested
         if submit:
             fork_self(seq_run, adaID, VERBOSE=VERBOSE, threads=threads,
-                      reference=refname, summary=summary, trimmed=use_trimmed)
+                      reference=refname, summary=summary, trimmed=use_trimmed,
+                      maxreads=maxreads)
             continue
 
         make_output_folders(data_folder, adaID, VERBOSE=VERBOSE, summary=summary)
@@ -498,9 +505,12 @@ if __name__ == '__main__':
                         ' --adaIDs '+adaID+\
                         ' --threads '+str(threads)+\
                         ' --reference '+refname+\
-                        ' --verbose '+str(VERBOSE)+'\n'
+                        ' --verbose '+str(VERBOSE)
+                if maxreads != -1:
+                    outstr = outstr + ' --maxreads '+str(maxreads)
                 if use_trimmed:
-                    outstr = outstr+' --trimmed\n'
+                    outstr = outstr+' --trimmed'
+                outstr = outstr+'\n'
                 f.write(outstr)
 
         fragments = get_fragments(sample)
@@ -509,7 +519,8 @@ if __name__ == '__main__':
 
         make_index_and_hash(data_folder, adaID, VERBOSE=VERBOSE, summary=summary)
 
-        premap_stampy(data_folder, adaID, VERBOSE=VERBOSE, threads=threads, summary=summary)
+        premap_stampy(data_folder, adaID, VERBOSE=VERBOSE, threads=threads, summary=summary,
+                      maxreads=maxreads)
 
         if summary:
             report_coverage(data_folder, adaID, VERBOSE=VERBOSE, summary=summary)

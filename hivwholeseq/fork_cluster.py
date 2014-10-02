@@ -145,7 +145,7 @@ def fork_trim(seq_run, adaID, VERBOSE=0, summary=True):
     return sp.check_output(call_list)
 
 
-def fork_premap(seq_run, adaID, VERBOSE=0, threads=1,
+def fork_premap(seq_run, adaID, VERBOSE=0, threads=1, maxreads=-1,
                 reference='HXB2', summary=True, trimmed=False):
     '''Submit premap script to the cluster for each adapter ID'''
     if VERBOSE:
@@ -173,6 +173,8 @@ def fork_premap(seq_run, adaID, VERBOSE=0, threads=1,
                 ]
     if not summary:
         call_list.append('--no-summary')
+    if maxreads != -1:
+        call_list.extend(['--maxreads', maxreads])
     if trimmed:
         call_list.append('--trimmed')
         

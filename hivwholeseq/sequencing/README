@@ -1,0 +1,69 @@
+-------------------------------------------------------------------------------
+		HIV WHOLE GENOME LONGITUDINAL HIV MISEQ SEQUENCING
+-------------------------------------------------------------------------------
+F. Zanini, R. Neher (+ other authors for the non-coding part)
+LAST UPDATE: Aug 2014.
+
+
+CHECK SCRIPTS
+-------------------------------------------------------------------------------
+In order to check the status of the analysis, generic scripts exist:
+
+- overview_sequencing.py: print a list of sequencing runs and some info on each
+
+- check_pipeline.py: prints the status of one or more samples, in terms of
+  what steps of the mapping have been already done (or have failed)
+
+Scripts to check each step of the mapping are also provided, e.g.:
+
+- check_quality_along_read.py
+
+- check_insert_distribution.py
+
+- check_premapped_coverage.py
+
+- check_divided_coverage.py
+
+- check_consensus.py
+
+- check_mapped_coverage.py
+
+- check_distance_mapped_consensus.py
+
+
+MAPPING PIPELINE FOR HIV SAMPLES
+-------------------------------------------------------------------------------
+0. We start by getting the demultiplexed files on the Short Reads Archive (SRA).
+
+1. Update the master Excel table of the dataset.
+
+2. Take demultiplexed reads from the SRA and symlink. (symlink_SRA.py)
+
+CHECKPOINT: quality along read by sample (check_quality_along_read.py).
+
+3. Preliminary mapping to HXB2, to allow for better filtering immediately afterwards.
+   (premap_to_reference.py)
+
+CHECKPOINT: insert size distribution (check_insert_distribution.py --premapped),
+            coverage (check_premapped_coverage.py).
+
+4. Trim reads according to:
+   - reading into adapters (short inserts only)
+   - outer and inner PCR primers
+   - quality
+   Do not trim yet for good CIGARs, i.e. indels at read edges. They could be simply
+   due to distance from the reference (we are going to remap anyway).
+
+   In addition, divide into fragments, keeping BAM format. (trim_and_divide.py)
+
+CHECKPOINT: check coverage (check_divided_coverage.py)
+
+5. Build consensus using local assembly, for each fragment and the whole genome. For region F5, using --block-length 150 helps. (build_consensus.py)
+
+6. Map the full dataset against the final consensus. (map_to_consensus.py)
+
+7. Filter BAM files of unmapped stuff and similia. (filter_mapped_reads.py)
+
+CHECKPOINT: mapping issues, coverage
+
+

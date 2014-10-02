@@ -111,7 +111,5 @@ if __name__ == '__main__':
                                                 VERBOSE=VERBOSE)
                         counts_sample[PCR - 1] = count
 
-                
-
             counts.append(counts_sample)
 

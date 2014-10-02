@@ -44,7 +44,8 @@ Nextera_XT_i7 = {1: 'TAAGGCGA',
 Nextera_XT_i5 = {1: 'TAGATCGC',
                  2: 'CTCTCTAT',
                  3: 'TATCCTCT',
-                 4: 'AGAGTAGA'}
+                 4: 'AGAGTAGA',
+                 17: 'GCGTAAGA'}
 
 
 adapters_illumina = dict([('TS'+str(adaID), s) for (adaID, s) in TrueSeq_LT.iteritems()])

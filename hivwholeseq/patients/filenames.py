@@ -191,16 +191,21 @@ def get_correlation_PCR1_PCR2_aft_figure_filename(pname, fragment, samplename, f
 def get_coverage_to_initial_figure_filename(pname, fragment, format='png'):
     '''Get the filename of the figure of coverage along the infection'''
     folder = get_figure_folder(pname)
-    fn = folder+'coverage_'+fragment+'.png'
+    fn = folder+'coverage_'+fragment+'.'+format
     return fn
 
 
 def get_tree_consensi_figure_filename(pname, fragment, format='png'):
     '''Get the filename of the figure of the tree of consensi'''
     folder = get_figure_folder(pname)
-    fn = folder+'tree_consensi_'+fragment+'.png'
+    fn = folder+'tree_consensi_'+fragment+'.'+format
     return fn
 
+
+def get_crosscontamination_figure_filename(fragment, format='pdf'):
+    folder = get_figure_folder('all')
+    fn = folder+'crosscontamination_'+fragment+'.'+format
+    return fn
 
 
 # SUMMARY

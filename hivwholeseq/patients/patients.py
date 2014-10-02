@@ -215,6 +215,23 @@ class SamplePat(pd.Series):
         return SeqIO.read(self.get_consensus_filename(fragment, PCR=PCR), 'fasta')
 
 
+    def get_allele_counts(self, fragment, PCR=1, qual_min=30, merge_read_types=True):
+        '''Get the allele counts'''
+        import numpy as np
+        ac = np.load(self.get_allele_counts_filename(fragment, PCR=PCR, qual_min=qual_min))
+        if merge_read_types:
+            ac = ac.sum(axis=0)
+        return ac
+
+
+    def get_coverage(self, fragment, PCR=1, qual_min=30, merge_read_types=True):
+        '''Get the coverage'''
+        ac = self.get_allele_counts(fragment, PCR=PCR, qual_min=qual_min,
+                                    merge_read_types=merge_read_types)
+        cov = ac.sum(axis=-2)
+        return cov
+
+
 
 # Functions
 def load_patients():
@@ -249,6 +266,11 @@ def load_samples_sequenced(patients=None):
         sample_table = sample_table.loc[sample_table.loc[:, 'patient'].isin(patients)]
 
     return sample_table
+
+
+def load_sample_sequenced(samplename):
+    '''Load one patient sample'''
+    return SamplePat(load_samples_sequenced().loc[samplename])
 
 
 def filter_patients_n_times(patients, n_times=3):
