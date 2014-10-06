@@ -317,8 +317,9 @@ if __name__ == '__main__':
         for samplename, sample in samples.iterrows():
             sample = SamplePat(sample)
             try:
-                consensi[samplename] = sample.get_consensus(fragment)
+                consensi[samplename] = sample.get_consensus(fragment, PCR=1)
             except IOError:
+                print samplename, 'file not found'
                 continue
 
         # Some consensi are bogus and must be deleted

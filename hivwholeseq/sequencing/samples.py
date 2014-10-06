@@ -114,6 +114,12 @@ class SampleSeq(pd.Series):
         return gfn(self.folder, **kwargs)
 
 
+    def get_reference_premap_filename(self, **kwargs):
+        '''Get the filename of the premapping refernce'''
+        from hivwholeseq.sequencing.filenames import get_reference_premap_filename as gfn
+        return gfn(self.seqrun_folder, self.adapter, **kwargs)
+
+
     def get_premapped_filename(self, **kwargs):
         '''Get the filename of the readed premapped to reference'''
         from hivwholeseq.sequencing.filenames import get_premapped_filename as gfn
@@ -245,6 +251,11 @@ def load_samples_sequenced(seq_runs=None):
         sample_table = sample_table.loc[sample_table.loc[:, 'seq run'].isin(seq_runs)]
 
     return SamplesSeq(sample_table)
+
+
+def load_sample_sequenced(samplename):
+    '''Load a sequenced sample from the general table'''
+    return SampleSeq(load_samples_sequenced().loc[samplename])
 
 
 def load_sequencing_runs(seq_runs=None):

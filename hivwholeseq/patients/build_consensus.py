@@ -290,7 +290,7 @@ if __name__ == '__main__':
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-4]')
     parser.add_argument('--save', action='store_true',
-                        help='Save the allele counts to file')
+                        help='Save the consensus to file')
     parser.add_argument('--block-length', type=int, default=200, dest='block_len',
                         help='Length of each local consensus block')
     parser.add_argument('--reads-per-alignment', type=int, default=31,
@@ -298,6 +298,8 @@ if __name__ == '__main__':
                         help='Number of (random) reads used for the local consensi')
     parser.add_argument('--decontaminated', action='store_true',
                         help='Use the decontaminated reads')
+    parser.add_argument('--PCR', default=(1, 2), type=int, nargs='+',
+                        help='PCR to analyze (1 and/or 2)')
 
     args = parser.parse_args()
     pnames = args.patients
@@ -308,6 +310,7 @@ if __name__ == '__main__':
     n_reads_per_ali = args.reads_per_alignment
     block_len = args.block_len
     use_decontaminated = args.decontaminated
+    PCR = args.PCR
 
     samples = load_samples_sequenced()
     if pnames is not None:
@@ -338,14 +341,15 @@ if __name__ == '__main__':
             refm = np.array(refseq)
             len_reference = len(refseq)
 
-            for PCR in (1, 2):
-                bamfilename = sample.get_mapped_filtered_filename(fragment, PCR=PCR, \
+            for PCR_sample in PCR:
+                bamfilename = sample.get_mapped_filtered_filename(fragment,
+                                                PCR=PCR_sample,
                                                 decontaminated=use_decontaminated)
                 if not os.path.isfile(bamfilename):
                     continue
                 
                 if VERBOSE >= 1:
-                    print 'PCR', PCR,
+                    print 'PCR', PCR_sample,
                     if VERBOSE >= 2:
                         print ''
 
@@ -371,7 +375,7 @@ if __name__ == '__main__':
                     if VERBOSE >= 2:
                         print 'Save to file'
 
-                    fn_out = sample.get_consensus_filename(fragment, PCR=PCR)
+                    fn_out = sample.get_consensus_filename(fragment, PCR=PCR_sample)
                     consrec = SeqRecord(Seq(cons, ambiguous_dna),
                                         id=samplename+'_consensus',
                                         name=samplename+'_consensus',

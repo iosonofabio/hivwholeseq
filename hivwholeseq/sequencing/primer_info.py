@@ -86,7 +86,7 @@ primers_coordinates_HXB2 = dict([(fi+'i', si) for (fi, si) in primers_coordinate
                                 [(fo+'o', so) for (fo, so) in primers_coordinates_HXB2_outer.iteritems()])
 
 # Functions
-def find_fragment(refseq, fragment):
+def find_fragment(refseq, fragment, threshold=0.7):
     '''Find the coordinate of one fragment in the refseq'''
     import numpy as np
 
@@ -104,7 +104,7 @@ def find_fragment(refseq, fragment):
     sl = len(seed)
     n_matches = np.array([(seed == refm[i: i + sl]).sum() for i in xrange(len(refm) - sl)], int)
     poss_start = np.argsort(n_matches)[::-1][:5]
-    if n_matches[poss_start[0]] < 0.7 * (-seed.mask).sum():
+    if n_matches[poss_start[0]] < threshold * (-seed.mask).sum():
         raise ValueError('Start of fragment not found')
 
     seed = np.ma.array(np.fromstring(prrev, 'S1'))
@@ -115,7 +115,7 @@ def find_fragment(refseq, fragment):
     sl = len(seed)
     n_matches = np.array([(seed == refm[i: i + sl]).sum() for i in xrange(len(refm) - sl)], int)
     poss_end = np.argsort(n_matches)[::-1][:5]
-    if n_matches[poss_end[0]] < 0.7 * (-seed.mask).sum():
+    if n_matches[poss_end[0]] < threshold * (-seed.mask).sum():
         raise ValueError('End of fragment not found')
 
     found = False

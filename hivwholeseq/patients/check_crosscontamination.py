@@ -36,7 +36,7 @@ if __name__ == '__main__':
     parser.add_argument('--saveplot', action='store_true',
                         help='Save the plot')
     parser.add_argument('--compress', action='store_true',
-                        help='Delete samples without a summary file')
+                        help='Don\'t show samples without a summary file')
 
     args = parser.parse_args()
     fragments = args.fragments
@@ -49,18 +49,33 @@ if __name__ == '__main__':
     samplenames = refnames + samples.index.tolist()
 
     for fragment in fragments:
+        if VERBOSE >= 1:
+            print fragment
 
         mat = np.ma.masked_all((len(samplenames), len(samplenames)))
 
         for (samplename, sample) in samples.iterrows():
+            if VERBOSE >= 2:
+                print samplename,
+
             isp = samplenames.index(samplename)
             sample = SamplePat(sample)
             fn = get_decontaminate_summary_filename(sample.patient, samplename, fragment,
                                                     PCR=1)
+            
+            #FIXME: still finishing this one
+            if samplename == '29184':
+                continue
+
             if not os.path.isfile(fn):
+                if VERBOSE >= 2:
+                    print 'summary file not found'
                 continue
 
             n_good, n_cont, n_cont_dict = get_number_reads_summary(fn, details=True)
+
+            if VERBOSE >= 2:
+                print n_good, n_cont
             
             mat[isp] = 0
             mat[isp, isp] = n_good
@@ -75,7 +90,25 @@ if __name__ == '__main__':
         else:
             samplenames_to = list(samplenames)
 
-        if plot:
+        mat_norm = (mat.T / (mat.sum(axis=1))).T
+
+        if VERBOSE >= 1:
+            print ''
+            print 'Contaminations:'
+            print 'to   from  frac total cont'
+            for i, row in enumerate(mat_norm):
+                if row.mask.all():
+                    continue
+
+                ind = (row > 1e-3)
+                ind[samplenames_from.index(samplenames_to[i])] = False
+
+                for indc in ind.nonzero()[0]:
+                    print samplenames_to[i], samplenames_from[indc], \
+                            '{:2.1%}'.format(row[indc]), \
+                            int(mat[i].sum()), int(mat[i, indc])
+
+        if plot or use_saveplot:
             fig, ax = plt.subplots(figsize=(21, 14))
             ax.set_title('Contamination matrix, '+fragment)
             ax.set_xlabel('From:')
@@ -85,7 +118,7 @@ if __name__ == '__main__':
             ax.set_yticks(np.arange(len(samplenames_to)))
             ax.set_yticklabels(samplenames_to, fontsize=6)
 
-            z = (mat.T / (mat.sum(axis=1))).T
+            z = mat_norm
             z_bg = 0.1 * z[z > 0].min()
             z = np.log10(z + z_bg)
             h = ax.imshow(z, cmap=cm.jet, interpolation='nearest')
@@ -96,6 +129,9 @@ if __name__ == '__main__':
             if use_saveplot:
                 fn_fig = get_crosscontamination_figure_filename(fragment)
                 fig.savefig(fn_fig)
+
+            if not plot:
+                plt.close(fig)
 
     if plot:
         plt.ion()

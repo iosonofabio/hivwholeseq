@@ -203,9 +203,18 @@ def get_tree_consensi_figure_filename(pname, fragment, format='png'):
 
 
 def get_crosscontamination_figure_filename(fragment, format='pdf'):
+    '''Get the filename of the figure with the cross-contamination matrix'''
     folder = get_figure_folder('all')
     fn = folder+'crosscontamination_'+fragment+'.'+format
     return fn
+
+
+def get_physiological_figure_filename(pname, format='png'):
+    '''Get the filename of the figure with the viral load and CD4+ counts'''
+    folder = get_figure_folder(pname)
+    fn = folder+'physiological.'+format
+    return fn
+
 
 
 # SUMMARY
