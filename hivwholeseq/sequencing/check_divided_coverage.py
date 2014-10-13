@@ -113,9 +113,9 @@ if __name__ == '__main__':
                                  help='Seq run to analyze (e.g. Tue28)')
     runs_or_samples.add_argument('--samples', nargs='+',
                                  help='Samples to analyze (e.g. 31440_PCR1')
-    parser.add_argument('--adaIDs', nargs='*',
+    parser.add_argument('--adaIDs', nargs='+',
                         help='Adapter IDs to analyze (e.g. TS2)')
-    parser.add_argument('--fragments', nargs='*',
+    parser.add_argument('--fragments', nargs='+',
                         help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('--maxreads', type=int, default=1000,
                         help='Number of reads analyzed')

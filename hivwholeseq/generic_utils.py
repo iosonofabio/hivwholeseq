@@ -50,3 +50,11 @@ def getchar():
         ch = os.read(fd,7)
     
     return(ch)
+
+
+def modification_date(filename):
+    '''Get the modification date of a file in datetime format'''
+    import os
+    import datetime
+    t = os.path.getmtime(filename)
+    return datetime.datetime.fromtimestamp(t)

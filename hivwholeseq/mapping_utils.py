@@ -167,9 +167,7 @@ def get_fragment_list(data_folder, adaID):
 def get_read_start_end(read):
     '''Get the start and end position of a read in its reference'''
     start = read.pos
-    len_ref = sum(block_len for (block_type, block_len) in read.cigar
-                  if block_type in [0, 2])
-    end = start + len_ref
+    end = start + sum(bl for (bt, bl) in read.cigar if bt in (0, 2))
     return (start, end)
 
 
@@ -184,7 +182,7 @@ def reads_to_seqrecord(reads):
     # Precompute conversion table
     SANGER_SCORE_OFFSET = ord("!")
     q_mapping = dict()
-    for letter in range(0, 255):
+    for letter in xrange(0, 255):
         q_mapping[chr(letter)] = letter - SANGER_SCORE_OFFSET
     
     seqs = []
@@ -320,20 +318,20 @@ def get_number_mapped_reads(bamfilename, format='bam'):
     return n_reads
 
 
-def extract_mapped_reads_subsample_open(bamfile_in, n_reads, maxreads=-1, VERBOSE=0,
-                                        pairs=True):
-    '''Extract random reads or read pairs (pointers) from an open BAM file'''
-    import numpy as np
+def extract_mapped_pairs_subsample_open(bamfile_in, n_reads, maxreads=-1, VERBOSE=0):
+    '''Extract random read pairs (pointers) from an open BAM file'''
+    n_pairs_tot = get_number_reads_open(bamfile_in) // 2
 
-    n_reads_tot = get_number_reads_open(bamfile_in) / 2
+    if n_pairs_tot <= n_reads:
+        bamfile_in.reset()
+        return pair_generator(bamfile_in)
 
     # Limit to the first part of the file
     if maxreads == -1:
-        maxreads = n_reads_tot
+        maxreads = n_pairs_tot
     else:
-        maxreads = min(n_reads_tot, maxreads)
+        maxreads = min(n_pairs_tot, maxreads)
 
-    # Pick random numbers among those
     # Get the random indices of the reads to store
     ind_store = np.arange(maxreads)
     np.random.shuffle(ind_store)
@@ -342,34 +340,71 @@ def extract_mapped_reads_subsample_open(bamfile_in, n_reads, maxreads=-1, VERBOS
 
     if VERBOSE >= 2:
         print 'Random indices between '+str(ind_store[0])+' and '+str(ind_store[-1]),
-        print '(pairs is '+str(pairs)+')'
+        print '(pairs is True)'
 
-    # Copy reads
-    if not pairs:
-        ind_readrand = np.random.rand(maxreads) > 0.5
     output_reads = []
     n_written = 0
     for i, (read1, read2) in enumerate(pair_generator(bamfile_in)):
-
         if VERBOSE >= 2:
             if not ((i+1) % 10000):
                 print i+1, n_written, ind_store[n_written]
     
-        # If you hit a read pair, add it
         if i == ind_store[n_written]:
-
-            if pairs:
-                output_reads.append((read1, read2))
-            else:
-                output_reads.append((read1, read2)[ind_readrand[n_written]])
+            output_reads.append((read1, read2))
             n_written += 1
     
-        # Break after the last one
         if n_written >= n_reads:
             break
 
     bamfile_in.reset()
+    return output_reads
 
+
+def extract_mapped_reads_subsample_open(bamfile_in, n_reads, maxreads=-1, VERBOSE=0,
+                                        pairs=True):
+    '''Extract random reads or read pairs (pointers) from an open BAM file'''
+    import numpy as np
+
+    if pairs:
+        return extract_mapped_pairs_subsample_open(bamfile_in, n_reads,
+                                                   maxreads=maxreads,
+                                                   VERBOSE=VERBOSE)
+
+    n_reads_tot = get_number_reads_open(bamfile_in)
+    if n_reads_tot <= n_reads:
+        bamfile_in.reset()
+        return bamfile_in
+
+    # Limit to the first part of the file
+    if maxreads == -1:
+        maxreads = n_reads_tot
+    else:
+        maxreads = min(n_reads_tot, maxreads)
+
+    ind_store = np.arange(maxreads)
+    np.random.shuffle(ind_store)
+    ind_store = ind_store[:n_reads]
+    ind_store.sort()
+
+    if VERBOSE >= 2:
+        print 'Random indices between '+str(ind_store[0])+' and '+str(ind_store[-1]),
+        print '(pairs is False)'
+
+    output_reads = []
+    n_written = 0
+    for i, read in enumerate(bamfile_in):
+        if VERBOSE >= 2:
+            if not ((i+1) % 10000):
+                print i+1, n_written, ind_store[n_written]
+    
+        if i == ind_store[n_written]:
+            output_reads.append(read)
+            n_written += 1
+    
+        if n_written >= n_reads:
+            break
+
+    bamfile_in.reset()
     return output_reads
 
 
@@ -523,6 +558,28 @@ def test_read_pair_integrity(read_pair, VERBOSE=True):
     return False
 
 
+def test_read_pair_exotic_cigars(read_pair):
+    '''Test a read pair for exotic cigar codes'''
+    from operator import itemgetter
+
+    for read in read_pair:
+        bts = frozenset(map(itemgetter(0), read.cigar))
+        if bts - frozenset([0, 1, 2]):
+            return True
+
+    return False
+
+
+def test_read_pair_exceed_reference(read_pair, length):
+    '''Check whether a read pair exceed the length of the reference'''
+    for read in read_pair:
+        (start, end) = get_read_start_end(read)
+        if (end > length) or (start >= length):
+            return True
+
+    return False
+
+
 def test_read_pair_crossoverhang(read_pair, VERBOSE=True):
     '''Test read_pair overhanging beyond the insert size'''
     i_fwd = read_pair[0].is_reverse
@@ -537,8 +594,9 @@ def test_read_pair_crossoverhang(read_pair, VERBOSE=True):
         return False
 
 
-def main_block_read_pair_low_quality(read_pair, phred_min=20, read_len_min=50, include_tests=False,
-                     VERBOSE=0):
+def main_block_read_pair_low_quality(read_pair, phred_min=20, read_len_min=50,
+                                     include_tests=False,
+                                     VERBOSE=0):
     '''Keep only the largest high-phred block of each read in an insert'''
     import numpy as np
 

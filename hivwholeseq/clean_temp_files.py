@@ -55,7 +55,6 @@ def remove_mapped_init_tempfiles(pname, samplename_pat,
 
     dirname = get_mapped_to_initial_foldername(pname, samplename_pat, PCR=PCR)
     prefix = samplename+'_'+fragment
-    print dirname+prefix, os.listdir(dirname)
     if only_chunk is None:
         fns = glob.glob(dirname+prefix+'*_part*') + \
               glob.glob(dirname+prefix+'*_unsorted*') + \

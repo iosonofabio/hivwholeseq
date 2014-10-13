@@ -73,7 +73,11 @@ if __name__ == '__main__':
                 if VERBOSE == 1:
                     print ''
 
-            seqs = [patient.get_reference(fragment)]
+            refseq = patient.get_reference(fragment)
+            refseq.id = 'reference_'+refseq.id
+            refseq.name = 'reference_'+refseq.name
+            refseq.description = 'reference '+refseq.description
+            seqs = [refseq]
 
             for i, (samplename, sample) in enumerate(patient.samples.iterrows()):
                 if VERBOSE >= 2:

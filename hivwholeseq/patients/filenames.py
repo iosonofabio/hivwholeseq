@@ -5,7 +5,7 @@ date:       25/10/13
 content:    Module containing all filenames for the patient analysis in one place.
 '''
 # Modules
-from hivwholeseq.sequencing.filenames import root_data_folder
+from hivwholeseq.filenames import root_data_folder
 
 
 # Globals
@@ -76,8 +76,8 @@ def get_mapped_filtered_filename(pname, samplename_pat, fragment, type='bam', PC
                                  decontaminated=False):
     '''Get the filename of the mapped and filtered reads to initial reference'''
     filename = fragment
-    if decontaminated:
-        filename = filename+'_decontaminated'
+    if not decontaminated:
+        filename = filename+'_to_decontaminate'
     filename = filename+'.'+type
     filename = get_mapped_to_initial_foldername(pname, samplename_pat, PCR=PCR)+filename
     return filename
@@ -131,6 +131,13 @@ def get_allele_counts_filename(pname, samplename_pat, fragment, PCR=1, qual_min=
     return filename
 
 
+def get_allele_cocounts_filename(pname, samplename_pat, fragment, PCR=1, qual_min=30):
+    '''Get the matrix of allele cocounts on the initial reference'''
+    filename = 'allele_cocounts_'+fragment+'_qual'+str(qual_min)+'+'+'.npy'
+    filename = get_sample_foldername(pname, samplename_pat, PCR=PCR)+filename
+    return filename
+
+
 def get_consensus_filename(pname, samplename_pat, fragment, PCR=1, format='fasta'):
     '''Get the filename of the consensus of a patient sample'''
     filename = 'consensus_'+fragment+'.'+format
@@ -149,13 +156,6 @@ def get_allele_frequency_trajectories_filename(pname, fragment):
     '''Get the matrix with allele frequencies on the initial reference'''
     filename = 'allele_frequency_trajectories_'+fragment+'.npy'
     filename = get_foldername(pname)+filename
-    return filename
-
-
-def get_allele_cocounts_filename(pname, samplename, fragment, PCR=None):
-    '''Get the matrix of allele cocounts on the initial reference'''
-    filename = 'allele_cocounts_'+fragment+'.npy'
-    filename = get_sample_foldername(pname, samplename, PCR=PCR)+filename
     return filename
 
 

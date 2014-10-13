@@ -123,9 +123,6 @@ def plot_distance_histogram(h, cumulative=True, title='', ax=None,
     if len(title):
         ax.set_title(title)
 
-    plt.ion()
-    plt.show()
-
 
 
 # Script
@@ -134,11 +131,14 @@ if __name__ == '__main__':
     # Input arguments
     parser = argparse.ArgumentParser(description='Check distance histogram from consensus',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
-    parser.add_argument('--runs', required=True, nargs='+',
-                        help='Seq run to analyze (e.g. 28, 37)')
-    parser.add_argument('--adaIDs', nargs='*',
+    runs_or_samples = parser.add_mutually_exclusive_group(required=True)
+    runs_or_samples.add_argument('--runs', nargs='+',
+                                 help='Seq run to analyze (e.g. Tue28)')
+    runs_or_samples.add_argument('--samples', nargs='+',
+                                 help='Samples to analyze (e.g. 31440_PCR1')
+    parser.add_argument('--adaIDs', nargs='+',
                         help='Adapter IDs to analyze (e.g. 2 16)')
-    parser.add_argument('--fragments', nargs='*',
+    parser.add_argument('--fragments', nargs='+',
                         help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('--verbose', type=int, default=0,
                         help=('Verbosity level [0-3]'))
@@ -148,6 +148,7 @@ if __name__ == '__main__':
                         help='Analyze filtered reads')
 
     args = parser.parse_args()
+    samplenames = args.samples
     seq_runs = args.runs
     adaIDs = args.adaIDs
     fragments = args.fragments
@@ -156,16 +157,20 @@ if __name__ == '__main__':
     use_filtered = args.filtered
 
     # If the script is called with no adaID, iterate over all
-    samples = load_samples_sequenced(seq_runs=seq_runs)
-    if adaIDs is not None:
-        samples = samples.loc[samples.adapter.isin(adaIDs)]
-    if VERBOSE >= 3:
-        print 'adaIDs', samples.adapter
+    if seq_runs is not None:
+        samples = load_samples_sequenced(seq_runs=seq_runs)
+        if adaIDs is not None:
+            samples = samples.loc[samples.adapter.isin(adaIDs)]
+        if VERBOSE >= 3:
+            print 'adaIDs', samples.adapter
+    else:
+        samples = load_samples_sequenced().loc[samplenames]
 
     if len(samples) == 0:
         print 'WARNING: no samples found.'
         sys.exit()
 
+    
     hists = []
     for (samplename, sample) in samples.iterrows():
         if VERBOSE == 1:
@@ -201,7 +206,8 @@ if __name__ == '__main__':
                     print 'missing mapped file, skipping'
                 continue
 
-            dist_hist = get_distance_histogram(data_folder, adaID, fragment, VERBOSE=VERBOSE, maxreads=maxreads,
+            dist_hist = get_distance_histogram(data_folder, adaID, fragment,
+                                               VERBOSE=VERBOSE, maxreads=maxreads,
                                                filtered=use_filtered)
             label = [seq_run, adaID, samplename, fragment, dist_hist.sum()]
             hists.append((dist_hist, label))
@@ -222,16 +228,22 @@ if __name__ == '__main__':
             elif len(samples) == 1:
                 del label[2]
                 del label[1]
-            if len(seq_runs) == 1:
+            if (seq_runs is not None) and (len(seq_runs) == 1):
                 del label[0]
             label = ', '.join(label[:-1])+' ('+str(label[-1])+')'
             plot_distance_histogram(h[0], label=label, ax=ax, color=color)
 
         ax.legend(loc=1, fontsize=10)
-        if len(seq_runs) == 1:
+        if (seq_runs is not None) and (len(seq_runs) == 1):
             title = seq_run
             if len(fragments_sample) == 1:
                 title = title+', '+fragment
             elif len(samples) == 1:
                 title = title+', '+adaID+', '+samplename
             ax.set_title(title)
+        elif (samplenames is not None) and (len(samplenames) == 1):
+            title = samplename
+            ax.set_title(title)
+
+    plt.ion()
+    plt.show()

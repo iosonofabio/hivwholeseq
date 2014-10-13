@@ -361,13 +361,14 @@ def fork_map_to_consensus(seq_run, adaID, fragment, VERBOSE=3,
     return sp.check_output(call_list)
 
 
-def fork_filter_mapped(seq_run, adaID, fragment, VERBOSE=0, summary=True):
+def fork_filter_mapped(seq_run, adaID, fragment, VERBOSE=0, maxreads=-1,
+                       max_mismatches=30, susp_mismatches=25, summary=True):
     '''Submit filter script for each adapter ID and fragment'''
     if VERBOSE:
         print 'Forking to the cluster: adaID '+adaID+', fragment '+fragment
 
     JOBSCRIPT = JOBDIR+'sequencing/filter_mapped_reads.py'
-    cluster_time = '0:59:59'
+    cluster_time = '71:59:59'
     vmem = '2G'
     call_list = ['qsub','-cwd',
                  '-b', 'y',
@@ -382,9 +383,13 @@ def fork_filter_mapped(seq_run, adaID, fragment, VERBOSE=0, summary=True):
                  '--adaIDs', adaID,
                  '--fragments', fragment,
                  '--verbose', VERBOSE,
+                 '--max-mismatches', max_mismatches,
+                 '--suspicious-mismatches', susp_mismatches,
                 ]
     if not summary:
         call_list.append('--no-summary')
+    if maxreads > 0:
+        call_list.extend(['--maxreads', maxreads])
     call_list = map(str, call_list)
     if VERBOSE:
         print ' '.join(call_list)
@@ -618,6 +623,7 @@ def fork_paste_mapped_chunks_to_initial_reference(pname, samplename, fragment,
 
 def fork_filter_mapped_init(samplename, fragment,
                             VERBOSE=0, n_pairs=-1,
+                            PCR=1,
                             summary=True):
     '''Fork to the cluster for each sample and fragment'''
     if VERBOSE:
@@ -640,6 +646,7 @@ def fork_filter_mapped_init(samplename, fragment,
                  '--fragments', fragment,
                  '--verbose', VERBOSE,
                  '--maxreads', n_pairs,
+                 '--PCR', PCR,
                 ]
     if not summary:
         call_list.append('--no-summary')

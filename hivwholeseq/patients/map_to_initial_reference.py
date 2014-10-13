@@ -497,6 +497,12 @@ if __name__ == '__main__':
             if VERBOSE:
                 print fragment
 
+            # Check for contamination
+            contstr = sample['suspected contamination']
+            if pd.notnull(contstr) and (fragment in contstr):
+                print 'WARNING: This sample has a suspected contamination! Skipping.'
+                continue
+
             if not skip_hash:
                 make_index_and_hash(pname, fragment, VERBOSE=VERBOSE)
     

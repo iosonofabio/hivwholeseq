@@ -18,26 +18,38 @@ from hivwholeseq.mapping_utils import pair_generator
 
 
 # Functions
-def get_coallele_counts_from_file(bamfilename, length, qual_min=35,
+def get_coallele_counts_from_file(bamfilename, length, qual_min=30,
                                   maxreads=-1, VERBOSE=0,
                                   use_tests=False):
     '''Get counts of join occurence of two alleles'''
     # TODO: add quality thresholds (easy-peasy)
 
+    from mapping_utils import test_read_pair_exotic_cigars, \
+            test_read_pair_exceed_reference
+
     if VERBOSE >= 1:
         print 'Getting coallele counts'
+
+
+    # Precompute conversion tables
+    alpha_mapping = {a: alphal.index(a) for a in alphal}
+    SANGER_SCORE_OFFSET = ord("!")
+    q_mapping = dict()
+    for letter in xrange(0, 255):
+        q_mapping[chr(letter)] = letter - SANGER_SCORE_OFFSET
     
     if VERBOSE >= 2:
         print 'Initializing matrix of cocounts'
-    # NOTE: ignore fwd/rev and read1/2 for now
+
+    # NOTE: we are ignoring fwd/rev and read1/2
     counts = np.zeros((len(alpha), len(alpha), length, length), int)
     posall = np.zeros(1000, dtype=[('pos', int), ('aind', int)])
 
     if VERBOSE >= 2:
         print 'Scanning reads'
+
     # NOTE: the reads should already be filtered of unmapped stuff at this point
     with pysam.Samfile(bamfilename, 'rb') as bamfile:
-
         for ir, reads in enumerate(pair_generator(bamfile)):
             if ir == maxreads:
                 if VERBOSE:
@@ -49,29 +61,13 @@ def get_coallele_counts_from_file(bamfilename, length, qual_min=35,
                     sys.stdout.write("\x1b[1A")
                 print (ir+1) 
 
-            # Check positions and CIGAR (this should REALLY not be necessary)
             if use_tests:
-                for read in reads:
-                    pos_ref = read.pos
-                    pos_read = 0
-                    if VERBOSE >= 3:
-                        print read.pos, read.cigar, read.seq[:20]
-                    for (bt, bl) in read.cigar:
-                        if (bt in [0, 1, 2]) and (pos_ref > length):
-                            raise ValueError('Pos exceeded the length of the fragment')
-                    # Insertions
-                    if bt == 1:
-                        pos_read += bl
-                    # Deletions
-                    elif bt == 2:
-                        pos_ref += bl
-                    # Matches
-                    elif bt == 0:
-                        pos_read += bl
-                        pos_ref += bl
-                    # Other types of cigar?
-                    else:
-                        raise ValueError('CIGAR type '+str(bt)+' not recognized')
+                if test_read_pair_exotic_cigars(reads):
+                    raise ValueError('CIGAR type '+str(bt)+' not recognized')
+
+                if test_read_pair_exceed_reference(reads, length):
+                    raise ValueError('Read pair exceeds reference length of '+str(length))
+
 
             # Temp structures
             posall[:] = (-1, -1)
@@ -79,21 +75,31 @@ def get_coallele_counts_from_file(bamfilename, length, qual_min=35,
 
             # Collect alleles
             for read in reads:
-                alleles_ind = np.fromiter((alphal.index(x) for x in read.seq), int, len(read.seq))
+                alleles_ind = np.fromiter((alpha_mapping[x] for x in read.seq),
+                                          np.uint8, len(read.seq))
+                allqual_ind = np.fromiter((q_mapping[x] for x in read.qual),
+                                          np.uint8, len(read.qual))
+
                 pos_ref = read.pos
                 pos_read = 0
                 for (bt, bl) in read.cigar:
                     if bt == 1:
                         pos_read += bl
                     elif bt == 2:
-                        posall['pos'][iall: iall + bl] = np.arange(pos_ref, pos_ref + bl)
-                        posall['aind'][iall: iall + bl] = 4
-                        iall += bl
+                        # NOTE: no CIGAR can start NOR end with a deletion
+                        qual_deletion = allqual_ind[pos_read: pos_read + 2].min()
+                        if qual_deletion >= qual_min:
+                            posall['pos'][iall: iall + bl] = np.arange(pos_ref,
+                                                                       pos_ref + bl)
+                            posall['aind'][iall: iall + bl] = 4
+                            iall += bl
                         pos_ref += bl
                     else:
                         alleles_indb = alleles_ind[pos_read: pos_read + bl]
+                        allqual_indb = allqual_ind[pos_read: pos_read + bl]
                         for i in xrange(len(alpha)):
-                            aitmp = (alleles_indb == i).nonzero()[0] + pos_ref
+                            aitmp = (alleles_indb == i) & (allqual_indb >= qual_min)
+                            aitmp = aitmp.nonzero()[0] + pos_ref
                             aitmplen = len(aitmp)
                             posall['pos'][iall: iall + aitmplen] = aitmp
                             posall['aind'][iall: iall + aitmplen] = i
@@ -107,7 +113,8 @@ def get_coallele_counts_from_file(bamfilename, length, qual_min=35,
             iall = (posall['pos'] != -1).nonzero()[0][0]
             while iall < len(posall) - 1:
                 if posall['pos'][iall + 1] == posall['pos'][iall]:
-                    # If the dups agree, skip one
+
+                    # If both reads agree @ an overlap allele, take a single call
                     if posall['aind'][iall + 1] == posall['aind'][iall]:
                         posall[iall + 1] = (-1, -1)
 
@@ -131,7 +138,7 @@ def get_coallele_counts_from_file(bamfilename, length, qual_min=35,
                     if not len(poss2):
                         continue
 
-                    # Raveling vodoo for efficiency - what python cannot, cobra can do!
+                    # Raveling vodoo for efficiency - what python cannot, cobra can!
                     cobra = counts[i1, i2].ravel()
                     ind = poss1.repeat(len(poss2)) * length + np.tile(poss2, len(poss1))
                     cobra[ind] += 1

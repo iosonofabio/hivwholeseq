@@ -21,11 +21,14 @@ from hivwholeseq.sequencing.filenames import get_filter_mapped_summary_filename,
 from hivwholeseq.sequencing.samples import SampleSeq, load_samples_sequenced
 from hivwholeseq.patients.filenames import get_consensi_alignment_filename
 from hivwholeseq.generic_utils import getchar
+from hivwholeseq.sequence_utils import pretty_print_pairwise_ali
 
 
 
 # Functions
-def fish_distant_reads(bamfilename, ref, max_mismatches=30, VERBOSE=0, maxseqs=-1):
+def fish_distant_reads(bamfilename, ref,
+                       min_mismatches=20, max_mismatches=30,
+                       VERBOSE=0, maxseqs=-1):
     '''Fish distant reads from the trash'''
     import numpy as np
 
@@ -63,9 +66,9 @@ def fish_distant_reads(bamfilename, ref, max_mismatches=30, VERBOSE=0, maxseqs=-
             if skip:
                 continue
 
-            # Fish our babies
+            # Fish out our reads
             dc = get_distance_from_consensus(ref, reads, VERBOSE=VERBOSE)
-            if (dc.sum() > max_mismatches):
+            if (min_mismatches <= dc.sum() <= max_mismatches):
                 if VERBOSE >= 3:
                     print 'Gotcha!', reads[0].qname
                 seqs.append(reads[0])
@@ -92,8 +95,11 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Examine distant reads',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
-    parser.add_argument('--runs', nargs='+',
-                        help='Seq runs to analyze (e.g. Tue28, test_tiny)')
+    runs_or_samples = parser.add_mutually_exclusive_group(required=True)
+    runs_or_samples.add_argument('--runs', nargs='+',
+                                 help='Seq runs to analyze (e.g. Tue28, test_tiny)')
+    runs_or_samples.add_argument('--samples', nargs='+',
+                                 help='Samples to map (e.g. VL98-1253 VK03-4298)')
     parser.add_argument('--adaIDs', nargs='+',
                         help='Adapter IDs to analyze (e.g. TS2)')
     parser.add_argument('--fragments', nargs='+',
@@ -104,24 +110,35 @@ if __name__ == '__main__':
                         help='Verbosity level [0-3]')
     parser.add_argument('--maxseqs', type=int, default=-1,
                         help='Stop when collected so many seqs')
+    parser.add_argument('--min-mismatches', type=int, default=20,
+                        dest='min_mismatches',
+                        help='Minimal number of mismatches to select')
+    parser.add_argument('--max-mismatches', type=int, default=20,
+                        dest='max_mismatches',
+                        help='Maximal number of mismatches to select')
 
     args = parser.parse_args()
     seq_runs = args.runs
+    samplenames = args.samples
     adaIDs = args.adaIDs
     fragments = args.fragments
     use_pats = args.use_pats
     VERBOSE = args.verbose
     maxseqs = args.maxseqs
+    min_mismatches = args.min_mismatches
+    max_mismatches = args.max_mismatches
 
     samples = load_samples_sequenced()
     if seq_runs is not None:
         samples = samples.loc[samples['seq run'].isin(seq_runs)]
     
-    if adaIDs is not None:
-        samples = samples.loc[samples.adapter.isin(adaIDs)]
+        if adaIDs is not None:
+            samples = samples.loc[samples.adapter.isin(adaIDs)]
     
-    if use_pats:
-        samples = samples.loc[samples['patient sample'] != 'nan']
+        if use_pats:
+            samples = samples.loc[samples['patient sample'] != 'nan']
+    else:
+        samples = samples.loc[samplenames]
 
     if fragments is None:
         fragments = ['F'+str(i+1) for i in xrange(6)]
@@ -142,38 +159,40 @@ if __name__ == '__main__':
             # Read the summary filename of the filter_mapped, and find out whether
             # there are many distant reads (a few are normal)
             fn = get_filter_mapped_summary_filename(data_folder, adaID, fragment)
-            found = False
-            with open(fn, 'r') as f:
-                for line in f:
-                    line = line.rstrip('\n')
-                    if line[:4] == 'Good':
-                        n_good = int(line.split()[-1])
+            if os.path.isfile(fn):
+                found = False
+                with open(fn, 'r') as f:
+                    for line in f:
+                        line = line.rstrip('\n')
+                        if line[:4] == 'Good':
+                            n_good = int(line.split()[-1])
 
-                    elif line[:14] == 'Many-mutations':
-                        n_distant = int(line.split()[-1])
-                        found = True
-                        break
+                        elif line[:14] == 'Many-mutations':
+                            n_distant = int(line.split()[-1])
+                            found = True
+                            break
 
-            if not found:
-                if VERBOSE >= 1:
-                    print 'not filtered (probably no HIV reads)'
-                continue
+                if not found:
+                    if VERBOSE >= 1:
+                        print 'not filtered (probably no HIV reads)'
+                    continue
 
-            frac_dist = 1.0 * n_distant / n_good
-            if frac_dist < 0.01:
-                if VERBOSE >= 1:
-                    print 'OK'
-                continue
+                frac_dist = 1.0 * n_distant / n_good
+                if frac_dist < 0.01:
+                    if VERBOSE >= 1:
+                        print '< 1% of reads are distant'
             
-            if VERBOSE >= 1:
-                print '{:3.0%}'.format(frac_dist), 'of reads are distant'
+                else:
+                    if VERBOSE >= 1:
+                        print '{:3.0%}'.format(frac_dist), 'of reads are distant'
 
-            # Distant reads end up in the trash (oh, no!)
             consrec = sample.get_consensus(fragment)
             bamfilename = get_mapped_filename(data_folder, adaID, fragment,
-                                              filtered=True, trashed=True)
+                                              filtered=False)
 
             (ds, edges, seqs) = fish_distant_reads(bamfilename, consrec, VERBOSE=VERBOSE,
+                                                   min_mismatches=min_mismatches,
+                                                   max_mismatches=max_mismatches,
                                                    maxseqs=maxseqs)
             indrandom = np.arange(len(ds))
             np.random.shuffle(indrandom)
@@ -182,16 +201,20 @@ if __name__ == '__main__':
             seqs = [seqs[i] for i in indrandom]
 
             for irp, (dpair, edgepair, seqpair) in enumerate(izip(ds, edges, seqs)):
-                # Take only the most distant read of a pair
+                # NOTE: Take only the most distant read of a pair
+                print irp, dpair
+
                 i = dpair.argmax()
                 d = dpair[i]
                 edge = edgepair[i]
                 seq = seqpair[i]
 
-                ali = align_global(seq, consrec[edge[0]: edge[1]])
-                ali = ali[1:][::-1]
-                from hivwholeseq.sequence_utils import pretty_print_pairwise_ali
-                print 'Alignment to its own consensus'
+                (score, ali1, ali2) = align_global(seq, consrec[edge[0]: edge[1]])
+                scoremax = 3 * len(ali1)
+                delta = scoremax - score
+                ali = [ali2, ali1]
+
+                print 'Alignment to its own consensus (delta = '+str(delta)+')'
                 pretty_print_pairwise_ali(ali,
                                           'cons',
                                           'read'+str(i+1)+' '+str(edge),
@@ -210,10 +233,13 @@ if __name__ == '__main__':
                 start = len(alimax[1]) - len(alimax[1].lstrip('-'))
                 end = len(alimax[1].rstrip('-'))
                 alimax = [s[start: end] for s in alimax]
+                score = scores[indmax]
+                scoremax = 3 * len(alimax[0])
+                delta = scoremax - score
 
                 name1 = ' '.join(['cons '] + alifr[indmax].name.split('_')[::2])
                 name2 = ' '.join(['read'+str(i+1), pname, sample['patient sample']])
-                print 'Alignment to best consensus'
+                print 'Alignment to best consensus (delta = '+str(delta)+')'
                 pretty_print_pairwise_ali(alimax, name1, name2, len_name=25, width=90)
                 print ''
 

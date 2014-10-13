@@ -24,6 +24,11 @@ from hivwholeseq.mapping_utils import align_muscle
 from hivwholeseq.patients.filenames import get_consensi_alignment_filename, \
         get_consensi_tree_filename
 from hivwholeseq.tree_utils import build_tree_fasttree
+from hivwholeseq.reference import load_custom_reference
+
+
+# Globals
+refnames = ['38304', '38540', 'LAI-III']
 
 
 
@@ -74,7 +79,7 @@ if __name__ == '__main__':
         print 'fragments', fragments
 
     for fragment in fragments:
-        consensi = []
+        consensi = [load_custom_reference(refname+'_'+fragment) for refname in refnames]
         for samplename, sample in samples.iterrows():
             if VERBOSE >= 1:
                 print samplename, fragment,

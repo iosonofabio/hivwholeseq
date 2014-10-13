@@ -37,6 +37,8 @@ if __name__ == '__main__':
                         help='Verbosity level [0-4]')
     parser.add_argument('--plot', nargs='?', default=None, const='2D',
                         help='Plot the allele frequency trajectories')
+    parser.add_argument('--saveplot', action='store_true',
+                        help='Save the plot to file')
     parser.add_argument('--PCR1', type=int, default=1,
                         help='Take only PCR1 samples [0=off, 1=where both available, 2=always]')
 
@@ -45,6 +47,7 @@ if __name__ == '__main__':
     fragments = args.fragments
     VERBOSE = args.verbose
     plot = args.plot
+    saveplot = args.saveplot
     use_PCR1 = args.PCR1
 
     patients = load_patients()
@@ -97,9 +100,13 @@ if __name__ == '__main__':
             ax.legend(loc=4, fontsize=12)
             ax.grid(True)
             plt.tight_layout()
-            plt.savefig('/ebio/ag-neher/home/fzanini/phd/sequencing/figures/'+\
-                        'divergence_diversity_'+pname+'.png')
 
-    plt.ion()
-    plt.show()
+            if saveplot:
+                plt.savefig('/ebio/ag-neher/home/fzanini/phd/sequencing/figures/'+\
+                            'divergence_diversity_'+pname+'.png')
+                plt.close(fig)
+
+    if not saveplot:
+        plt.ion()
+        plt.show()
 

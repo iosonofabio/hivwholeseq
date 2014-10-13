@@ -210,7 +210,7 @@ if __name__ == '__main__':
     # Parse input args
     parser = argparse.ArgumentParser(description='Filter mapped reads',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
-    pats_or_samples = parser.add_mutually_exclusive_group(required=True)
+    pats_or_samples = parser.add_mutually_exclusive_group(required=False)
     pats_or_samples.add_argument('--patients', nargs='+',
                                  help='Patient to analyze')
     pats_or_samples.add_argument('--samples', nargs='+',
@@ -249,11 +249,16 @@ if __name__ == '__main__':
                 samples_seq.append(sample_pat['samples seq'])
         samples_seq = pd.concat(samples_seq)
 
-    else:
+    elif samplenames is not None:
         samples_seq = lss()
         ind = samples_pat.index.isin(samplenames)
         samplenames_pat = samples_pat.index[ind]
         samples_seq = samples_seq.loc[samples_seq['patient sample'].isin(samplenames_pat)]
+
+    else:
+        samples_seq = lss()
+        samples_seq = samples_seq.loc[samples_seq['patient sample'].isin(samples_pat.index)]
+
 
     if PCR != 'all':
         samples_seq = samples_seq.loc[np.array(samples_seq['PCR'], int) == int(PCR)]
@@ -281,6 +286,7 @@ if __name__ == '__main__':
                 fork_self(samplename_pat, fragment,
                           VERBOSE=VERBOSE,
                           n_pairs=n_pairs,
+                          PCR=PCR,
                           summary=summary)
                 continue
 

@@ -7,26 +7,14 @@ content:    Module containing all filenames of the analysis in one place.
 # Modules
 import os
 
-import hivwholeseq
 from hivwholeseq.sequencing.adapter_info import foldername_adapter
+from hivwholeseq.filenames import root_data_folder, stampy_bin, spades_bin, \
+        bwa_bin, reference_folder, table_filename
 
 
 
 # Globals
-if os.path.isdir('/media/FZ_MPI/HIV_Sweden/'):
-    root_data_folder = '/media/FZ_MPI/HIV_Sweden/'
-    stampy_bin = '/usr/bin/stampy'
-    spades_bin = None
-    bwa_bin = None
-else:
-    root_data_folder = '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/'
-    stampy_bin = '/ebio/ag-neher/share/programs/bundles/stampy-1.0.22/stampy.py'
-    bwa_bin = '/ebio/ag-neher/share/programs/bin/bwa'
-    spades_bin = '/ebio/ag-neher/share/programs/bundles/SPAdes-2.5.0-Linux/bin/spades.py'
-
 sequencing_folder = root_data_folder+'sequencing/'
-reference_folder = root_data_folder+'reference/'
-table_filename = hivwholeseq.__path__[0] + '/tables/HIV_reservoir_all.xlsx'
 
 
 

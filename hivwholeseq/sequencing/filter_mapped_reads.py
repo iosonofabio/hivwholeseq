@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 from Bio import SeqIO
 
-from hivwholeseq.sequencing.samples import load_sequencing_run, SampleSeq
+from hivwholeseq.sequencing.samples import load_samples_sequenced, SampleSeq
 from hivwholeseq.sequencing.filenames import get_consensus_filename, get_mapped_filename, \
         get_filter_mapped_summary_filename, get_mapped_suspicious_filename
 from hivwholeseq.mapping_utils import get_ind_good_cigars, convert_sam_to_bam,\
@@ -25,13 +25,44 @@ from seqanpy import align_overlap
 
 
 # Globals
-maxreads = 1e10
 match_len_min = 30
 trim_bad_cigars = 3
 
 
 
 # Functions
+def get_other_consensi_seqrun(dataset, samplename, fragment, VERBOSE=0):
+    '''Get consensi of other samples except the focal one'''
+    consensi = []
+    for (samplename_other, sample) in dataset.samples.iterrows():
+        if samplename_other == samplename:
+            continue
+
+        sample = SampleSeq(sample)
+        ref_fn = sample.get_consensus_filename(fragment)
+        if not os.path.isfile(ref_fn):
+            if VERBOSE >= 3:
+                print samplename_other+': consensus for fragment '+fragment+' not found, skipping'
+            continue
+        consensi.append(SeqIO.read(ref_fn, 'fasta'))
+    return consensi
+
+
+def get_other_consensi_all(pname, fragment, VERBOSE=0):
+    '''Get all other consensi except the ones from this patient'''
+    from Bio import SeqIO
+    from hivwholeseq.patients.filenames import get_consensi_alignment_filename
+    fn = get_consensi_alignment_filename('all', fragment)
+    consensi = []
+    for seq in SeqIO.parse(fn, 'fasta'):
+        # NOTE: the first of seq.name.split('_') is the patient name
+        if seq.name.split('_')[0] != pname:
+            seq.seq = seq.seq.ungap('-')
+            consensi.append(seq)
+
+    return consensi
+
+
 def plot_distance_histogram(data_folder, adaID, fragment, counts, savefig=False):
     '''Plot the histogram of distance from consensus'''
     from hivwholeseq.sequencing.filenames import get_distance_from_consensus_figure_filename as gff
@@ -247,56 +278,26 @@ def trim_bad_cigar(reads, match_len_min=match_len_min,
     return False
 
 
-def check_suspect(reads, dist, consensi, VERBOSE=0):
+def check_suspect(reads, consensi_foreign, deltamax=30, VERBOSE=0):
     '''Check suspicious reads for closer distance to potential contaminants'''
-    # TODO: align read pair against all other consensi (do we need to map??)
-
     if VERBOSE >= 2:
         print 'Checking suspect read pair:', reads[0].qname,
-    for consensus in consensi:
+
+    for consensus in consensi_foreign:
         conss = ''.join(consensus)
-        poss = []
-        ds = []
+        delta_foreign = 0
         for read in reads:
-            seq = read.seq
-            ali = align_overlap(conss, seq)
-
-            # NOTE: it is possible that we start before conss' start or end after
-            # its end, but that IS evidence that it's not contamination from there.
-
-            pos = conss.find(ali[1].replace('-', ''))
-            alim0 = np.fromstring(ali[1], 'S1')
-            alim1 = np.fromstring(ali[2], 'S1')
-
-            # Score subst
-            d = ((alim0 != alim1) & (alim0 != '-') & (alim1 != '-')).sum()
-
-            # Score insertions
-            gaps = alim0 == '-'
-            if gaps.sum():
-                n_gaps_borders = np.diff(gaps).sum()
-                n_gaps_borders += alim0[0] == '-'
-                n_gaps_borders += alim0[-1] == '-'
-                n_insertions = n_gaps_borders // 2
-                d += n_insertions
-
-            # Score deletions
-            gaps = alim1 == '-'
-            if gaps.sum():
-                n_gaps_borders = np.diff(gaps).sum()
-                n_gaps_borders -= alim1[0] == '-'
-                n_gaps_borders -= alim1[-1] == '-'
-                n_deletions = n_gaps_borders // 2
-                d += n_deletions
-
-            ds.append(d)
-
-        dpair = sum(ds)
-        if dpair < dist:
+            (score, ali1, ali2) = align_overlap(conss, read.seq)
+            scoremax = 3 * len(ali2.strip('-'))
+            delta_foreign += scoremax - score
+        
+        # We classify as trash all reads that are within a basin of another seq
+        if delta_foreign < deltamax:
             if VERBOSE >= 2:
                 print ''
-                print consensus.name, dpair, dist
+                print consensus.name, delta_foreign
             return True
+
         else:
             if VERBOSE >= 2:
                 print 'OK',
@@ -307,32 +308,16 @@ def check_suspect(reads, dist, consensi, VERBOSE=0):
     return False
 
 
-def get_other_consensi_seqrun(dataset, samplename, fragment, VERBOSE=0):
-    '''Get consensi of other samples except the focal one'''
-    consensi = []
-    for (samplename_other, sample) in dataset.samples.iterrows():
-        if samplename_other == samplename:
-            continue
-
-        sample = SampleSeq(sample)
-        ref_fn = sample.get_consensus_filename(fragment)
-        if not os.path.isfile(ref_fn):
-            if VERBOSE >= 3:
-                print samplename_other+': consensus for fragment '+fragment+' not found, skipping'
-            continue
-        consensi.append(SeqIO.read(ref_fn, 'fasta'))
-    return consensi
-
-
 def filter_reads(data_folder,
                  adaID,
                  fragment,
                  VERBOSE=0,
-                 potential_contaminants=None,
+                 maxreads=-1,
+                 contaminants=None,
                  n_cycles=600,
                  max_mismatches=30,
                  susp_mismatches=20,
-                 summary=True):
+                 summary=True, plot=False):
     '''Filter the reads to good chunks'''
     frag_gen = fragment[:2]
 
@@ -378,7 +363,8 @@ def filter_reads(data_folder,
             for irp, reads in enumerate(pair_generator(bamfile)):
 
                 # Limit to the first reads
-                if 2 * irp >= maxreads: break
+                if irp == maxreads:
+                    break
             
                 # Assign names
                 (read1, read2) = reads
@@ -435,8 +421,8 @@ def filter_reads(data_folder,
                 # cross-contamination, the rest will be done in a script downstream
                 # (here we could TAG suspicious reads for contamination)
                 elif (dc.sum() > susp_mismatches):
-                    if potential_contaminants is not None:
-                        skip = check_suspect(reads, dc.sum(), potential_contaminants, VERBOSE=VERBOSE)
+                    if contaminants is not None:
+                        skip = check_suspect(reads, contaminants, VERBOSE=VERBOSE)
                     else:
                         skip = True
                     if skip:
@@ -483,6 +469,8 @@ def filter_reads(data_folder,
             f.write('Suspect contaminations:\t'+str(n_suspect)+'\n')
             f.write('Bad CIGARs:\t\t'+str(n_badcigar)+'\n')
 
+
+    if plot:
         plot_distance_histogram(data_folder, adaID, frag_gen,
                                 histogram_distance_from_consensus,
                                 savefig=True)
@@ -501,14 +489,19 @@ if __name__ == '__main__':
     # Input arguments
     parser = argparse.ArgumentParser(description='Filter mapped reads',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
-    parser.add_argument('--run', required=True,
-                        help='Seq run to analyze (e.g. 28, 37)')
+    run_or_samples = parser.add_mutually_exclusive_group(required=True)
+    run_or_samples.add_argument('--run',
+                                help='Seq run to analyze (e.g. 28, 37)')
+    run_or_samples.add_argument('--samples', nargs='+',
+                                help='Samples to map (e.g. VL98-1253 VK03-4298)')
     parser.add_argument('--adaIDs', nargs='*',
                         help='Adapter IDs to analyze (e.g. 2 16)')
     parser.add_argument('--fragments', nargs='*',
                         help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('--verbose', type=int, default=0,
                         help=('Verbosity level [0-3]'))
+    parser.add_argument('--maxreads', type=int, default=-1,
+                        help='Number of read pairs to map (for testing)')
     parser.add_argument('--submit', action='store_true', default=False,
                         help='Submit the job to the cluster')
     parser.add_argument('--no-summary', action='store_false', dest='summary',
@@ -523,24 +516,25 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     seq_run = args.run
+    samplenames = args.samples
     adaIDs = args.adaIDs
     fragments = args.fragments
     VERBOSE = args.verbose
+    maxreads = args.maxreads
     submit = args.submit
     summary=args.summary
     max_mismatches = args.max_mismatches
     susp_mismatches = args.susp_mismatches
 
-    # Specify the dataset
-    dataset = load_sequencing_run(seq_run)
-    data_folder = dataset.folder
 
-    # If the script is called with no adaID, iterate over all
-    samples = dataset.samples
-    if adaIDs is not None:
-        samples = samples.loc[samples.adapter.isin(adaIDs)]
-    if VERBOSE >= 3:
-        print 'adaIDs', samples.adapter
+    if seq_run is not None:
+        samples = load_samples_sequenced(seq_runs=[seq_run])
+        if adaIDs is not None:
+            samples = samples.loc[samples.adapter.isin(adaIDs)]
+        if VERBOSE >= 3:
+            print 'adaIDs', samples.adapter
+    else:
+        samples = load_samples_sequenced().loc[samplenames]
 
     for (samplename, sample) in samples.iterrows():
         sample = SampleSeq(sample)
@@ -552,7 +546,11 @@ if __name__ == '__main__':
                 print 'PCR type not found, skipping'
             continue
 
+        seq_run = sample['seq run']
+        dataset = sample.sequencing_run
+        data_folder = dataset.folder
         adaID = sample.adapter
+        pname = sample.patientname
 
         if not fragments:
             fragments_sample = sample.regions_generic
@@ -567,13 +565,16 @@ if __name__ == '__main__':
 
             # There is a blacklist of samples which are probably contaminated,
             # we want to discard those altogether
-            if pd.notnull(sample['suspected contamination']) and (fragment in sample['suspected contamination']):
+            contstr = sample['suspected contamination']
+            if pd.notnull(contstr) and (fragment in contstr):
                 print 'WARNING: This sample has a suspected contamination! Skipping.'
                 continue
 
             # Submit to the cluster self if requested
             if submit:
-                fork_self(seq_run, adaID, fragment, VERBOSE=VERBOSE, summary=summary)
+                fork_self(seq_run, adaID, fragment, VERBOSE=VERBOSE, summary=summary,
+                          maxreads=maxreads,
+                          max_mismatches=max_mismatches, susp_mismatches=susp_mismatches)
                 continue
 
             if summary:
@@ -584,17 +585,24 @@ if __name__ == '__main__':
                             ' --adaIDs '+adaID+\
                             ' --fragments '+fragment+\
                             ' --max-mismatches '+str(max_mismatches)+\
+                            ' --suspicious-mismatches '+str(susp_mismatches)+\
                             ' --verbose '+str(VERBOSE))
+                    if maxreads > 0:
+                        f.write(' --maxreads '+str(maxreads))
                     f.write('\n')
 
-            # Get potential contaminants: consensi from the same sequencing run
-            # (TODO: same RNA extraction, etc.)
-            potential_contaminants = get_other_consensi_seqrun(dataset, samplename, fragment, VERBOSE=VERBOSE)
+            # Get potential contaminants
+            try:
+                contaminants = get_other_consensi_all(pname, fragment, VERBOSE=VERBOSE)
 
-            # Filter reads
+            except IOError:
+                contaminants = get_other_consensi_seqrun(dataset, samplename,
+                                                         fragment, VERBOSE=VERBOSE)
+
             filter_reads(data_folder, adaID, fragment, VERBOSE=VERBOSE,
-                         potential_contaminants=potential_contaminants,
+                         contaminants=contaminants,
                          n_cycles=dataset['cycles'],
+                         maxreads=maxreads,
                          max_mismatches=max_mismatches,
                          susp_mismatches=susp_mismatches,
                          summary=summary)

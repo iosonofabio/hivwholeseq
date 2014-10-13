@@ -18,6 +18,7 @@ import numpy as np
 from Bio import SeqIO
 
 from hivwholeseq.patients.patients import load_patient
+from hivwholeseq.argparse_utils import RoiAction
 
 
 
@@ -208,11 +209,11 @@ def most_common_fractions(ali):
 if __name__ == '__main__':
 
     # Parse input args
-    parser = argparse.ArgumentParser(description='Get coverage trajectories',
+    parser = argparse.ArgumentParser(description='Get local haplotypes',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     parser.add_argument('--patient', required=True,
                         help='Patient to analyze')
-    parser.add_argument('--roi', required=True, nargs='+',
+    parser.add_argument('--roi', required=True, action=RoiAction,
                         help='Region of interest (e.g. F1 300 350)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-4]')
@@ -231,11 +232,7 @@ if __name__ == '__main__':
     maxreads = args.maxreads
     use_plot = args.plot
 
-    if len(roi) % 3:
-        raise ValueError('roi syntax: --roi FRAGMENT START END')
-    fragment = roi[0]
-    start = int(roi[1])
-    end = int(roi[2])
+    (fragment, start, end) = roi
 
     patient = load_patient(pname)
     patient.discard_nonsequenced_samples()

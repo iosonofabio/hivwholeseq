@@ -12,11 +12,11 @@ import argparse
 import numpy as np
 from Bio import SeqIO
 
+from hivwholeseq.patients.samples import load_samples_sequenced as lssp
+from hivwholeseq.patients.samples import SamplePat
 from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_mapped_filtered_filename, get_allele_counts_filename
 from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file as gac
-from hivwholeseq.patients.patients import load_samples_sequenced as lssp
-from hivwholeseq.patients.patients import SamplePat
 from hivwholeseq.fork_cluster import fork_get_allele_counts_patient as fork_self 
 
 
@@ -46,6 +46,8 @@ if __name__ == '__main__':
                         help='use logit scale (log(x/(1-x)) in the plots')
     parser.add_argument('--qualmin', type=int, default=30,
                         help='Minimal quality of base to call')
+    parser.add_argument('--PCR', type=int, default=1,
+                        help='Analyze only reads from this PCR (e.g. 1)')
 
     args = parser.parse_args()
     pnames = args.patients
@@ -55,15 +57,16 @@ if __name__ == '__main__':
     VERBOSE = args.verbose
     save_to_file = args.save
     qual_min = args.qualmin
+    PCR = args.PCR
 
-    samples_pat = lssp()
+    samples = lssp()
     if pnames is not None:
-        samples_pat = samples_pat.loc[samples_pat.patient.isin(pnames)]
+        samples = samples.loc[samples.patient.isin(pnames)]
     elif samplenames is not None:
-        samples_pat = samples_pat.loc[samples_pat.index.isin(samplenames)]
+        samples = samples.loc[samples.index.isin(samplenames)]
 
     if VERBOSE >= 2:
-        print 'samples', samples_pat.index.tolist()
+        print 'samples', samples.index.tolist()
 
     if not fragments:
         fragments = ['F'+str(i) for i in xrange(1, 7)]
@@ -73,43 +76,37 @@ if __name__ == '__main__':
     counts_all = []
     for fragment in fragments:
         counts = []
-        for samplename_pat, sample_pat in samples_pat.iterrows():
+        for samplename, sample in samples.iterrows():
             if submit:
-                fork_self(samplename_pat, fragment, VERBOSE=VERBOSE, qual_min=qual_min)
+                fork_self(samplename, fragment, VERBOSE=VERBOSE, qual_min=qual_min)
                 continue
 
-            sample_pat = SamplePat(sample_pat)
-            pname = sample_pat.patient
+            sample = SamplePat(sample)
+            pname = sample.patient
             refseq = SeqIO.read(get_initial_reference_filename(pname, fragment), 'fasta')
-            counts_sample = [None, None]
 
-            # Look for both PCR1 and PCR2, and see what you find
-            for PCR in (1, 2):
-                fn_out = get_allele_counts_filename(pname, samplename_pat,
-                                                    fragment, PCR=PCR, qual_min=qual_min)
-                fn = sample_pat.get_mapped_filtered_filename(fragment, PCR=PCR, decontaminated=True) #FIXME
-                
-                if save_to_file:
-                    if os.path.isfile(fn):
-                        (count, inserts) = gac(fn, len(refseq),
-                                                qual_min=qual_min,
-                                                VERBOSE=VERBOSE)
+            fn_out = sample.get_allele_counts_filename(fragment, PCR=PCR, qual_min=qual_min)
+            fn = sample.get_mapped_filtered_filename(fragment, PCR=PCR, decontaminated=True) #FIXME
+            
+            if save_to_file:
+                if os.path.isfile(fn):
+                    (count, inserts) = gac(fn, len(refseq),
+                                            qual_min=qual_min,
+                                            VERBOSE=VERBOSE)
 
-                        counts_sample[PCR - 1] = count
-                        count.dump(fn_out)
+                    count.dump(fn_out)
 
-                        if VERBOSE >= 2:
-                            print 'Allele counts saved:', samplename_pat, fragment
+                    if VERBOSE >= 2:
+                        print 'Allele counts saved:', samplename, fragment
 
-                else:
-                    if os.path.isfile(fn_out):
-                        count = np.load(fn_out)
-                        counts_sample[PCR - 1] = count
-                    elif os.path.isfile(fn):
-                        (count, inserts) = gac(fn, len(refseq),
-                                                qual_min=qual_min,
-                                                VERBOSE=VERBOSE)
-                        counts_sample[PCR - 1] = count
+                    counts.append(count)
 
-            counts.append(counts_sample)
+            elif os.path.isfile(fn_out):
+                count = np.load(fn_out)
+                counts.append(count)
 
+            elif os.path.isfile(fn):
+                (count, inserts) = gac(fn, len(refseq),
+                                        qual_min=qual_min,
+                                        VERBOSE=VERBOSE)
+                counts.append(count)
