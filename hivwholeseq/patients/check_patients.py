@@ -22,14 +22,14 @@ cell_len = 7
 
 
 # Functions
-def pretty_print_info(p, title, name, method, name_requisite=None, mod_dates={},
-                      fragments=['F'+str(i+1) for i in xrange(6)]):
+def pretty_print_info(p, title, name, method, name_requisite=None, mod_dates={}):
     '''Pretty printer for patient pipeline info'''
     import os, sys
     from hivwholeseq.patients.samples import SamplePat
 
+    fragments=['F'+str(i+1) for i in xrange(6)]
+
     stati = set()
-    
     line = ('{:<'+str(title_len)+'}').format(title+':')
     print line
     for samplename, sample in p.samples.iterrows():
@@ -60,6 +60,9 @@ def pretty_print_info(p, title, name, method, name_requisite=None, mod_dates={},
                     status = 'OK'
                     mod_dates[(name, fragment, samplename)] = md
 
+                elif 'contaminated' in sample[fragment]:
+                    status = 'CONT'
+                
                 else:
                     status = 'OLD'
 
@@ -72,7 +75,71 @@ def pretty_print_info(p, title, name, method, name_requisite=None, mod_dates={},
 
 
     if 'OLD' in stati:
-        sys.exit()
+        raise ValueError('OLD status found') 
+
+
+def pretty_print_info_genomewide(p, title, name, method, mod_dates={}):
+    '''Pretty printer for patient pipeline info'''
+    def check_requisite_genomewide(md, name_requisite, samplename, mod_dates):
+        '''Check requisites for genomewide observables'''
+        fragments=['F'+str(i+1) for i in xrange(6)]
+        for fragment in fragments:
+            if ((name_requisite, fragment, samplename) not in mod_dates) or \
+                (md < mod_dates[(name_requisite, fragment, samplename)]):
+                return False
+        return True
+
+    def check_contamination_genomewide(sample):
+        '''Check whether any of the fragment samples is contaminated'''
+        fragments=['F'+str(i+1) for i in xrange(6)]
+        for fragment in fragments:
+            if 'contaminated' in sample[fragment]:
+                return True
+        return False
+
+
+    import os, sys
+    from hivwholeseq.patients.samples import SamplePat
+
+    stati = set()
+    
+    line = ('{:<'+str(title_len)+'}').format(title+':')
+    print line
+    for samplename, sample in p.samples.iterrows():
+        sample = SamplePat(sample)
+        title = sample.name
+        line = ('{:<'+str(title_len)+'}').format(title+':')
+        
+        if isinstance(method, basestring) and hasattr(sample, method):
+            fun = getattr(sample, method)
+            fn = fun('genomewide')
+        else:
+            fn = method(sample.patient, samplename, 'genomewide')
+        if os.path.isfile(fn):
+            md = modification_date(fn)
+
+            if name is None:
+                status = 'OK'
+                mod_dates[(name, 'genomewide', samplename)] = md
+
+            elif check_requisite_genomewide(md, name, samplename, mod_dates): 
+                status = 'OK'
+                mod_dates[(name, 'genomewide', samplename)] = md
+
+            elif check_contamination_genomewide(sample):
+                status = 'CONT'
+            
+            else:
+                status = 'OLD'
+
+        else:
+            status = 'MISS'
+        stati.add(status)
+        line = line + ('{:<'+str(cell_len)+'}').format(status)
+        print line
+
+    if 'OLD' in stati:
+        raise ValueError('OLD status found') 
 
 
 
@@ -167,6 +234,10 @@ if __name__ == '__main__':
         pretty_print_info(p, 'Consensus', 'consensus',
                           'get_consensus_filename',
                           'decontaminate', mod_dates)
+
+        pretty_print_info_genomewide(p, 'Cons genomewide', 'consensus',
+                                     'get_consensus_filename',
+                                     mod_dates)
 
         pretty_print_info(p, 'Allele counts', 'allele counts',
                           'get_allele_counts_filename',

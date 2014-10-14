@@ -218,7 +218,11 @@ def build_consensus(bamfilename, len_reference, VERBOSE=0,
             #    print pos_ref, pos_ref + block_len
             #    import ipdb; ipdb.set_trace()
 
-            # Make local consensus
+            # Make local consensus using a multiple sequence alignment
+            # --------------
+            # -----   ------
+            # --------   ---
+            #---------------
             cons_local = build_local_consensus(seqs, VERBOSE=VERBOSE,
                                                store_allele_counts=store_allele_counts,
                                                full_cover=full_cover)
@@ -229,7 +233,9 @@ def build_consensus(bamfilename, len_reference, VERBOSE=0,
 
             pos_ref += block_len_initial // 2
 
-            # Join block <-- to the stack
+            # Join block <-- to the stack, like this:
+            # ---------------------------
+            #                        --------------------
             if consensus is None:
                 consensus = [consensi_local[0]]
                 if store_allele_counts:

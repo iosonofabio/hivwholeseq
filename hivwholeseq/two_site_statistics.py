@@ -22,8 +22,6 @@ def get_coallele_counts_from_file(bamfilename, length, qual_min=30,
                                   maxreads=-1, VERBOSE=0,
                                   use_tests=False):
     '''Get counts of join occurence of two alleles'''
-    # TODO: add quality thresholds (easy-peasy)
-
     from mapping_utils import test_read_pair_exotic_cigars, \
             test_read_pair_exceed_reference
 
@@ -46,7 +44,8 @@ def get_coallele_counts_from_file(bamfilename, length, qual_min=30,
     posall = np.zeros(1000, dtype=[('pos', int), ('aind', int)])
 
     if VERBOSE >= 2:
-        print 'Scanning reads'
+        from hivwholeseq.mapping_utils import get_number_reads
+        print 'Scanning read pairs ('+str(get_number_reads(bamfilename) // 2)+')'
 
     # NOTE: the reads should already be filtered of unmapped stuff at this point
     with pysam.Samfile(bamfilename, 'rb') as bamfile:
@@ -138,7 +137,7 @@ def get_coallele_counts_from_file(bamfilename, length, qual_min=30,
                     if not len(poss2):
                         continue
 
-                    # Raveling vodoo for efficiency - what python cannot, cobra can!
+                    # Raveling vodoo for efficiency
                     cobra = counts[i1, i2].ravel()
                     ind = poss1.repeat(len(poss2)) * length + np.tile(poss2, len(poss1))
                     cobra[ind] += 1

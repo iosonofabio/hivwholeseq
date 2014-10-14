@@ -122,7 +122,7 @@ def filter_contamination(bamfilename, bamfilename_out, contseqs, samplename, VER
     from operator import itemgetter
     from seqanpy import align_overlap
 
-    from hivwholeseq.mapping_utils import pair_generator
+    from hivwholeseq.mapping_utils import pair_generator, get_number_reads
 
     if 'score_match' in kwargs:
         score_match = kwargs['score_match']
@@ -133,6 +133,9 @@ def filter_contamination(bamfilename, bamfilename_out, contseqs, samplename, VER
 
     contseqs = contseqs.copy()
     consseq = contseqs.pop(samplename)
+
+    if VERBOSE >= 2:
+        print 'Scanning reads ('+str(get_number_reads(bamfilename) // 2)+')'
 
     with pysam.Samfile(bamfilename, 'rb') as bamfile:
         with pysam.Samfile(bamfilename_out, 'wb', template=bamfile) as bamfileout, \
@@ -214,7 +217,9 @@ def filter_contamination(bamfilename, bamfilename_out, contseqs, samplename, VER
                             pretty_print_pairwise_ali([ali1, ali2], width=90,
                                                       name1='ref', name2='read')
 
-                            import ipdb; ipdb.set_trace()
+                        if VERBOSE >= 2:
+                            print ''
+
 
                         break
 
@@ -252,7 +257,7 @@ if __name__ == '__main__':
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-4]')
     parser.add_argument('--maxreads', type=int, default=-1,
-                        help='Number of read pairs to map (for testing)')
+                        help='Number of read pairs to decontaminate')
     parser.add_argument('--no-summary', action='store_false', dest='summary',
                         help='Do not save results in a summary file')
     parser.add_argument('--submit', action='store_true',

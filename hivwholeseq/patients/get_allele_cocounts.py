@@ -31,7 +31,7 @@ from hivwholeseq.fork_cluster import fork_get_cocounts_patient as fork_self
 if __name__ == '__main__':
 
     # Parse input args
-    parser = argparse.ArgumentParser(description='Get allele counts',
+    parser = argparse.ArgumentParser(description='Get allele cocounts',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     pats_or_samples = parser.add_mutually_exclusive_group(required=True)
     pats_or_samples.add_argument('--patients', nargs='+',
@@ -45,7 +45,7 @@ if __name__ == '__main__':
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
     parser.add_argument('--save', action='store_true',
-                        help='Save the allele counts to file')
+                        help='Save the allele cocounts to file')
     parser.add_argument('--tests', action='store_true',
                         help='Include consistency tests')
     parser.add_argument('--submit', action='store_true',
@@ -53,7 +53,7 @@ if __name__ == '__main__':
     parser.add_argument('--qualmin', type=int, default=30,
                         help='Minimal quality of base to call')
     parser.add_argument('--PCR', type=int, default=1,
-                        help='Analyze only reads from this PCR (e.g. 1)')
+                        help='Analyze only reads from this PCR (1 or 2)')
 
     args = parser.parse_args()
     pnames = args.patients
@@ -85,6 +85,7 @@ if __name__ == '__main__':
         for fragment in fragments:
             for samplename, sample in samples.iterrows():
                 fork_self(samplename, fragment, VERBOSE=VERBOSE,
+                          qual_min=qual_min, PCR=PCR,
                           maxreads=maxreads, use_tests=use_tests)
         sys.exit()
 

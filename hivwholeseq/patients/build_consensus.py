@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # vim: fdm=marker
 '''
 author:     Fabio Zanini
@@ -15,6 +16,7 @@ from Bio.Alphabet.IUPAC import ambiguous_dna
 
 from hivwholeseq.patients.patients import load_samples_sequenced, SamplePat
 from hivwholeseq.patients.filenames import get_initial_reference_filename
+from hivwholeseq.fork_cluster import fork_build_consensus_patient as fork_self
 
 
 
@@ -120,46 +122,24 @@ def pileup_trim_reads_coverstart(bamfile, start, VERBOSE=0):
     return seqs
 
 
-def join_block_to_consensus(consensus, cons_block, seed_length=40, VERBOSE=0):
+def join_block_to_consensus(consensus, cons_block, VERBOSE=0):
     '''Join a new block to an extant consensus'''
     import numpy as np
+    from seqanpy import align_ladder
 
-    start = consensus.rfind(cons_block[:seed_length])
-    if start == -1:
-        # Rescue for single polymorphisms
-        start_tail = max(0, len(consensus) - 300)
-        cons_tail = np.fromstring(consensus[start_tail:], 'S1')
-        seed = np.fromstring(cons_block[:seed_length], 'S1')
-        sl = len(seed)
-        n_matches = [(seed == cons_tail[i: i + sl]).sum() for i in xrange(len(cons_tail) - sl)]
-        pos = np.argmax(n_matches)
-        if n_matches[pos] < 0.80 * sl:
+    (score, ali1, ali2) = align_ladder(consensus, cons_block, score_gapopen=-10)
 
-            # Try a local pairwise alignment
-            seed = ''.join(seed)
-            cons_tail = ''.join(cons_tail)
-            from seqanpy import align_local
-            scores = []
-            seeds1 = []
-            seeds2 = []
-            for i in xrange(len(cons_tail) - sl):
-                score, seed1, seed2 = align_local(cons_tail[i: i + sl], seed)
-                scores.append(score)
-                seeds1.append(seed1)
-                seeds2.append(seed2)
+    if VERBOSE >= 3:
+        from hivwholeseq.sequence_utils import pretty_print_pairwise_ali
+        pretty_print_pairwise_ali([ali1, ali2], name1='consensus', name2='new block')
 
-            ind = np.argmax(scores)
-            scoremax = scores[ind]
-            if scoremax < 20:
-                raise ValueError('Hole in consensus')
-            
-            pos = cons_tail.rfind(seeds1[ind].replace('-', ''))
-            cons_block = cons_block[cons_block.find(seeds2[ind].replace('-', '')):]
-
-        start = start_tail + pos
-
-    consensus = consensus[:start] + cons_block
-
+    end1 = len(ali1.rstrip('-'))
+    start2 = len(ali2) - len(ali2.lstrip('-'))
+    scoremax = 3 * (end1 - start2)
+    delta = scoremax - score
+    if delta > 6 * 10:
+        raise ValueError('Too many mismatches in neighbouring local consensi!')
+    consensus = (ali1[:start2] + ali2[start2:]).replace('-', '')
     return consensus
 
 
@@ -225,7 +205,7 @@ def build_consensus(bamfilename, len_reference, VERBOSE=0,
                 np.random.shuffle(seqs)
                 seqs = seqs[:reads_per_alignment]
 
-            # Local alignment
+            # Make local consensus using a multiple sequence alignment
             # --------------
             # -----   ------
             # --------   ---
@@ -236,9 +216,8 @@ def build_consensus(bamfilename, len_reference, VERBOSE=0,
 
             # Join to the rest of the consensus, like this:
             # ---------------------------
-            #                          ---------
+            #                        --------------------
             consensus = join_block_to_consensus(consensus, cons_block,
-                                                seed_length=block_len // 4,
                                                 VERBOSE=VERBOSE)
 
             start_block += 2 * block_len // 3
@@ -289,27 +268,27 @@ if __name__ == '__main__':
                         help='Fragments to analyze (e.g. F1 F6)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-4]')
+    parser.add_argument('--submit', action='store_true',
+                        help='Execute the script in parallel on the cluster')
     parser.add_argument('--save', action='store_true',
                         help='Save the consensus to file')
-    parser.add_argument('--block-length', type=int, default=200, dest='block_len',
+    parser.add_argument('--block-length', type=int, default=150, dest='block_len',
                         help='Length of each local consensus block')
     parser.add_argument('--reads-per-alignment', type=int, default=31,
                         dest='reads_per_alignment',
                         help='Number of (random) reads used for the local consensi')
-    parser.add_argument('--decontaminated', action='store_true',
-                        help='Use the decontaminated reads')
-    parser.add_argument('--PCR', default=(1, 2), type=int, nargs='+',
-                        help='PCR to analyze (1 and/or 2)')
+    parser.add_argument('--PCR', default=1, type=int,
+                        help='PCR to analyze (1 or 2)')
 
     args = parser.parse_args()
     pnames = args.patients
     samplenames = args.samples
     fragments = args.fragments
     VERBOSE = args.verbose
+    submit = args.submit
     save_to_file = args.save
     n_reads_per_ali = args.reads_per_alignment
     block_len = args.block_len
-    use_decontaminated = args.decontaminated
     PCR = args.PCR
 
     samples = load_samples_sequenced()
@@ -335,53 +314,57 @@ if __name__ == '__main__':
                 if VERBOSE >= 2:
                     print ''
 
+            if submit:
+                fork_self(samplename, fragment, VERBOSE=VERBOSE, PCR=PCR,
+                          block_len=block_len, n_reads_per_ali=n_reads_per_ali)
+                continue
+
             sample = SamplePat(sample)
             pname = sample.patient
             refseq = SeqIO.read(get_initial_reference_filename(pname, fragment), 'fasta')
             refm = np.array(refseq)
             len_reference = len(refseq)
 
-            for PCR_sample in PCR:
-                bamfilename = sample.get_mapped_filtered_filename(fragment,
-                                                PCR=PCR_sample,
-                                                decontaminated=use_decontaminated)
-                if not os.path.isfile(bamfilename):
-                    continue
-                
-                if VERBOSE >= 1:
-                    print 'PCR', PCR_sample,
-                    if VERBOSE >= 2:
-                        print ''
-
-                cons = build_consensus(bamfilename, len_reference, VERBOSE=VERBOSE,
-                                       block_len=block_len,
-                                       reads_per_alignment=n_reads_per_ali)
-                consm = np.fromstring(cons, 'S1')
-
+            bamfilename = sample.get_mapped_filtered_filename(fragment,
+                                            PCR=PCR,
+                                            decontaminated=True) #FIXME
+            if not os.path.isfile(bamfilename):
+                continue
+            
+            if VERBOSE >= 1:
+                print 'PCR', PCR,
                 if VERBOSE >= 2:
-                    print 'Reference length:', len_reference, 'consensus:', len(cons),
-                    if len_reference != len(cons):
-                        from seqanpy import align_local
-                        (score, ali1, ali2) = align_local(''.join(refseq), cons)
-                        alim1 = np.fromstring(ali1, 'S1')
-                        alim2 = np.fromstring(ali2, 'S1')
-                        n_diff = (alim1 != alim2).sum()
-                        print 'overlap', len(alim1), 'n diffs.', n_diff
-                    else:
-                        n_diff = (refm != consm).sum()
-                        print 'n diffs.', n_diff
+                    print ''
 
-                if save_to_file:
-                    if VERBOSE >= 2:
-                        print 'Save to file'
+            cons = build_consensus(bamfilename, len_reference, VERBOSE=VERBOSE,
+                                   block_len=block_len,
+                                   reads_per_alignment=n_reads_per_ali)
+            consm = np.fromstring(cons, 'S1')
 
-                    fn_out = sample.get_consensus_filename(fragment, PCR=PCR_sample)
-                    consrec = SeqRecord(Seq(cons, ambiguous_dna),
-                                        id=samplename+'_consensus',
-                                        name=samplename+'_consensus',
-                                        description=samplename+', consensus',
-                                       )
-                    SeqIO.write(consrec, fn_out, 'fasta')
+            if VERBOSE >= 2:
+                print 'Reference length:', len_reference, 'consensus:', len(cons),
+                if len_reference != len(cons):
+                    from seqanpy import align_local
+                    (score, ali1, ali2) = align_local(''.join(refseq), cons)
+                    alim1 = np.fromstring(ali1, 'S1')
+                    alim2 = np.fromstring(ali2, 'S1')
+                    n_diff = (alim1 != alim2).sum()
+                    print 'overlap', len(alim1), 'n diffs.', n_diff
+                else:
+                    n_diff = (refm != consm).sum()
+                    print 'n diffs.', n_diff
+
+            if save_to_file:
+                if VERBOSE >= 2:
+                    print 'Save to file'
+
+                fn_out = sample.get_consensus_filename(fragment, PCR=PCR)
+                consrec = SeqRecord(Seq(cons, ambiguous_dna),
+                                    id=samplename+'_consensus',
+                                    name=samplename+'_consensus',
+                                    description=samplename+', consensus',
+                                   )
+                SeqIO.write(consrec, fn_out, 'fasta')
 
             if VERBOSE == 1:
                 print ''

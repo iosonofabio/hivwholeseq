@@ -81,6 +81,9 @@ if __name__ == '__main__':
                 fork_self(samplename, fragment, VERBOSE=VERBOSE, qual_min=qual_min)
                 continue
 
+            if VERBOSE >= 1:
+                print fragment, samplename
+
             sample = SamplePat(sample)
             pname = sample.patient
             refseq = SeqIO.read(get_initial_reference_filename(pname, fragment), 'fasta')
