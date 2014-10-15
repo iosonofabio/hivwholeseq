@@ -16,40 +16,32 @@ from Bio import SeqIO
 
 from hivwholeseq.sequencing.primer_info import find_fragment
 from hivwholeseq.reference import load_custom_reference
-from hivwholeseq.patients.patients import patients as patients_all
+from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_foldername, get_coordinate_map_filename
 
 
 # Function
-def build_coordinate_map(pname, fragment, refname, VERBOSE=0):
+def build_coordinate_map(refseq, patseq, VERBOSE=0):
     '''Build the coordinate map'''
-    ref_rec = load_custom_reference(refname)
-    if 'F5' not in fragment:
-        frag_spec = fragment+'o'
-    else:
-        # Take outermost, F5ao
-        frag_spec = 'F5ao'
+    from seqanpy import align_overlap
+    (score, ali1, ali2) = align_overlap(refseq, patseq)
+    patseq_start = len(ali2) - len(ali2.lstrip('-'))
+    patseq_end = len(ali2.rstrip('-'))
 
-    if VERBOSE >= 2:
-        print frag_spec
-
-    (fragment_start, fragment_end) = find_fragment(ref_rec, frag_spec)
-    ref_rec_frag = ref_rec[fragment_start: fragment_end]
-    
-    ref_init_fn = get_initial_reference_filename(pname, fragment)
-    ref_init_rec = SeqIO.read(ref_init_fn, 'fasta')
-
-    from seqanpy import align_global
-    ali = align_global(str(ref_rec_frag.seq), str(ref_init_rec.seq))
+    if VERBOSE >= 3:
+        from hivwholeseq.sequence_utils import pretty_print_pairwise_ali
+        pretty_print_pairwise_ali([ali1[patseq_start: patseq_end],
+                                   ali2[patseq_start: patseq_end]],
+                                  name1=refseq.name, name2=patseq.name)
 
     # Only identify bijective map
     mapco = []
-    pos_ref = fragment_start
+    pos_ref = patseq_start
     pos_ini = 0
-    for col in xrange(len(ali[1])):
-        nuc_ref = ali[1][col]
-        nuc_ini = ali[2][col]
+    for col in xrange(patseq_start, patseq_end):
+        nuc_ref = ali1[col]
+        nuc_ini = ali2[col]
         if (nuc_ref != '-') and (nuc_ini != '-'):
             mapco.append((pos_ref, pos_ini))
             pos_ref += 1
@@ -67,7 +59,8 @@ def build_coordinate_map(pname, fragment, refname, VERBOSE=0):
 if __name__ == '__main__':
 
     # Parse input args
-    parser = argparse.ArgumentParser(description='Update initial consensus')
+    parser = argparse.ArgumentParser(description='Map patient coordinates to reference',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     parser.add_argument('--reference', default='HXB2',
                         help='Select reference strain to align against')
     parser.add_argument('--patients', nargs='+',
@@ -77,7 +70,7 @@ if __name__ == '__main__':
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
     parser.add_argument('--save', action='store_true',
-                        help='Save the allele frequency trajectories to file')
+                        help='Save the map to file')
 
     args = parser.parse_args()
     refname = args.reference
@@ -86,12 +79,11 @@ if __name__ == '__main__':
     VERBOSE = args.verbose
     save_to_file = args.save
 
-    if pnames is None:
-        patients = [p for p in patients_all]
-    else:
-        patients = [p for p in patients_all if p.id in pnames]    
+    patients = load_patients()
+    if pnames is not None:
+        patients = patients.loc[pnames]
     if VERBOSE >= 3:
-        print 'patients', map(attrgetter('id'), patients)
+        print 'patients', patients.index
     if not len(patients):
         raise ValueError('No patients found!')
 
@@ -102,10 +94,14 @@ if __name__ == '__main__':
 
     maps_coord = defaultdict(dict)
     for fragment in fragments:
-        for patient in patients:
-            pname = patient.id
+        refseq = load_custom_reference(refname)
+        for pname, patient in patients.iterrows():
+            if VERBOSE >= 1:
+                print fragment, pname
+            patient = Patient(patient)
+            patseq = patient.get_reference(fragment)
 
-            mapco = build_coordinate_map(pname, fragment, refname, VERBOSE=VERBOSE)
+            mapco = build_coordinate_map(refseq, patseq, VERBOSE=VERBOSE)
 
             maps_coord[fragment][pname] = mapco 
 

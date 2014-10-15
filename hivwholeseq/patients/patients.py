@@ -163,6 +163,14 @@ class Patient(pd.Series):
                 (self['first positive date'] - self['last negative date']) / 2
 
 
+    def get_map_coordinates_reference(self, fragment, refname='HXB2'):
+        '''Get the map of coordinate to some external reference'''
+        from hivwholeseq.patients.filenames import get_coordinate_map_filename
+        fn = get_coordinate_map_filename(self.name, fragment, refname=refname)
+        mapco = np.loadtxt(fn, dtype=int)
+        return mapco
+
+
 
 # Functions
 def load_patients():

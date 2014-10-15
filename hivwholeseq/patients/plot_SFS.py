@@ -67,7 +67,7 @@ def load_BSC_SFS():
 if __name__ == '__main__':
 
     # Parse input args
-    parser = argparse.ArgumentParser(description='Get allele frequency trajectories',
+    parser = argparse.ArgumentParser(description='Get site frequency spectra',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     parser.add_argument('--patients', nargs='+',
                         help='Patients to analyze')
@@ -110,7 +110,6 @@ if __name__ == '__main__':
     if add_bsc:
         sfs_bsc = load_BSC_SFS()
 
-    # If the script is called with no fragment, iterate over all
     if not fragments:
         fragments = ['F'+str(i) for i in xrange(1, 7)]
     if VERBOSE >= 2:
