@@ -216,6 +216,13 @@ def get_physiological_figure_filename(pname, format='png'):
     return fn
 
 
+def get_SFS_figure_filename(pname, fragments, format='png'):
+    '''Get the filename of the figure of the site frequency spectrum'''
+    folder = get_figure_folder(pname)
+    fn = folder+'SFS_'+'-'.join(fragments)+'.'+format
+    return fn
+
+
 
 # SUMMARY
 def get_map_initial_summary_filename(pname, samplename_pat, samplename, fragment, PCR=1, only_chunk=None):

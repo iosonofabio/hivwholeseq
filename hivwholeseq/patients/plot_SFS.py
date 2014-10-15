@@ -7,52 +7,59 @@ content:    Plot site frequency spectra for derived alleles.
 # Modules
 import os
 import argparse
-from operator import itemgetter
 import numpy as np
 from Bio import SeqIO
 
-from hivwholeseq.miseq import alpha, alphal
-from hivwholeseq.patients.patients import load_samples_sequenced as lssp
-from hivwholeseq.patients.filenames import get_initial_reference_filename, \
-        get_allele_counts_filename
+from hivwholeseq.miseq import alpha
+from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file, \
+        get_allele_counts_insertions_from_file_unfiltered, \
+        filter_nus
+from hivwholeseq.patients.patients import load_patients, Patient
+from hivwholeseq.patients.one_site_statistics import plot_allele_frequency_trajectories as plot_nus
+from hivwholeseq.patients.one_site_statistics import plot_allele_frequency_trajectories_3d as plot_nus_3d
+from hivwholeseq.patients.one_site_statistics import get_allele_frequency_trajectories
+
 
 
 # Functions
-def get_allele_count(pname, samplename_pat, fragment, VERBOSE=0, use_PCR1=1):
-    '''Get counts from a single patient sample'''
+def load_BSC_SFS():
+    '''Load sfs of direct bsc simulations'''
+    import glob
+    import cPickle as pickle
 
-    fns = []
-    samplenames_out = []
-    fn1 = get_allele_counts_filename(pname, samplename_pat, fragment, PCR=1)
-    fn2 = get_allele_counts_filename(pname, samplename_pat, fragment, PCR=2)
-    if use_PCR1 == 0:
-        for PCR, fn in enumerate((fn1, fn2), 1):
-            if os.path.isfile(fn):
-                fns.append(fn)
-                samplenames_out.append((samplename_pat, PCR))
-    elif use_PCR1 == 1:
-        if os.path.isfile(fn1):
-            fns.append(fn1)
-            samplenames_out.append((samplename_pat, 1))
-        elif os.path.isfile(fn2):
-            fns.append(fn2)
-            samplenames_out.append((samplename_pat, 2))
-    elif use_PCR1 == 2:
-        if os.path.isfile(fn1):
-            fns.append(fn1)
-            samplenames_out.append((samplename_pat, 1))
+    filelist = glob.glob('/ebio/ag-neher/share/users/rneher/WeakSelectionCoalescent/BS_SFS/SFS*.pickle')
+    sfs_bsc = {}
+    sfs_bc = {}
+    sfs_bw={}
+    sfs_bsc_filecount ={}
+    for fname in filelist:                                                          
+        entries=fname.split('_')                                                    
+        N=int(entries[-2])                                                          
+        file=open(fname, 'r')                                                       
+        temp, temp_bc=pickle.load(file)                                           
+        if (N in sfs_bsc):                                                            
+            sfs_bsc[N]+=temp/sfs_bw[N]
+            sfs_bsc_filecount[N]+=1                                                     
+        else:                                                                       
+            sfs_bc[N]=temp_bc                                                 
+            sfs_bw[N] = sfs_bc[N][1:]-sfs_bc[N][:-1]
+            sfs_bsc_filecount[N]=1                                                      
+            sfs_bsc[N]=temp/sfs_bw[N]
 
-    acs = []
-    for i, fn in enumerate(fns):
-        ac = np.load(fn)
-        if i == 0:
-            ls = ac.shape[2]
-            acs = np.zeros((len(fns), len(alpha), ls), int)
+    #Produce centered bins                                                          
+    for N in sfs_bc:
+        sfs_bc[N]=np.sqrt(sfs_bc[N][1:]*sfs_bc[N][:-1])
+    #divide the spectra by the file count to normalize                              
+    for N in sfs_bsc:                                                                 
+        sfs_bsc[N]/=sfs_bsc_filecount[N]                                                  
 
-        # Average directly over read types?
-        acs[i] = np.load(fn).sum(axis=0)
+    #calculate pi for the spectra and normalize to equal pi (== equal T_2)
+    for N in sfs_bsc:
+        print np.sum(sfs_bc[N]*(1-sfs_bc[N])*sfs_bw[N]*sfs_bsc[N])
+        # normalize bsc SFS to unit pairwise difference
+        sfs_bsc[N]/=np.sum(sfs_bc[N]*(1-sfs_bc[N])*sfs_bw[N]*sfs_bsc[N])
 
-    return (samplenames_out, acs)
+    return sfs_bsc
 
 
 
@@ -62,49 +69,46 @@ if __name__ == '__main__':
     # Parse input args
     parser = argparse.ArgumentParser(description='Get allele frequency trajectories',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
-    pats_or_samples = parser.add_mutually_exclusive_group(required=False)
-    pats_or_samples.add_argument('--patients', nargs='+',
-                                 help='Patient to analyze')
-    pats_or_samples.add_argument('--samples', nargs='+',
-                                 help='Samples to map (e.g. VL98-1253 VK03-4298)')
+    parser.add_argument('--patients', nargs='+',
+                        help='Patients to analyze')
     parser.add_argument('--fragments', nargs='*',
                         help='Fragments to analyze (e.g. F1 F6)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-4]')
-    parser.add_argument('--save', action='store_true',
-                        help='Save the allele frequency trajectories to file')
-    parser.add_argument('--submit', action='store_true',
-                        help='Execute the script in parallel on the cluster')
-    parser.add_argument('--plot', nargs='?', default=None, const='2D',
+    parser.add_argument('--plot', action='store_true',
                         help='Plot the allele frequency trajectories')
-    parser.add_argument('--PCR1', type=int, default=1,
-                        help='Take only PCR1 samples [0=off, 1=where both available, 2=always]')
-    parser.add_argument('--logit', action='store_true',
-                        help='use logit scale (log(x/(1-x)) in the plots')
+    parser.add_argument('--BSC', action='store_true',
+                        help='compare to BSC site frequency spectra')
+    parser.add_argument('--min-depth', type=int, default=100, dest='min_depth',
+                        help='Minimal depth to consider the site')
+    parser.add_argument('--saveplot', action='store_true',
+                        help='Save the plot')
 
     args = parser.parse_args()
     pnames = args.patients
-    samplenames = args.samples
     fragments = args.fragments
     VERBOSE = args.verbose
-    save_to_file = args.save
-    plot = args.plot
-    submit = args.submit
-    use_PCR1 = args.PCR1
-    use_logit = args.logit
+    use_plot = args.plot
+    add_bsc = args.BSC
+    depth_min = args.min_depth
+    use_saveplot = args.saveplot
 
-    # Bins for histogram
-    itouch = 0
-    bins = np.logspace(-2.8, -0.0001, 30)
+    # Prepare histogram data structures
+    # Bin either logarithmically or logit
+    #bins = np.logspace(-3, 0, 11)
+    tbins = np.linspace(-7,7,21) 
+    bins = np.exp(tbins)/(1+np.exp(tbins))
     binsc = np.sqrt(bins[1:] * bins[:-1])
-    binsw = bins[1:] - bins[:-1]
-    hist = None
+    binw = np.diff(bins)
+    hist = np.zeros_like(binsc)
 
-    samples = lssp()
-    if pnames is not None:
-        samples = samples.loc[samples.patient.isin(pnames)]
-    elif samplenames is not None:
-        samples = samples.loc[samples.index.isin(samplenames)]
+    delta_af_bins = np.concatenate([-np.logspace(-2,0,11)[::-1], np.logspace(-2,0,11)])
+    delta_af_binsc = 0.5*(delta_af_bins[1:] + delta_af_bins[:-1])
+    delta_af_binw = np.diff(delta_af_bins)
+    delta_af_hist = np.zeros_like(delta_af_binsc)
+
+    if add_bsc:
+        sfs_bsc = load_BSC_SFS()
 
     # If the script is called with no fragment, iterate over all
     if not fragments:
@@ -112,111 +116,103 @@ if __name__ == '__main__':
     if VERBOSE >= 2:
         print 'fragments', fragments
 
-    # Iterate over samples and fragments
-    for fragment in fragments:
-        if VERBOSE >= 1:
-            print fragment
+    patients = load_patients()
+    if pnames is not None:
+        patients = patients.loc[pnames]
 
-        for samplename_pat, sample in samples.iterrows():
+    for pname, patient in patients.iterrows():
+        patient = Patient(patient)
+
+        for fragment in fragments:
             if VERBOSE >= 1:
-                print samplename_pat,
-
-            pname = sample.patient
-            ref_fn = get_initial_reference_filename(pname, fragment)
-            ref = SeqIO.read(ref_fn, 'fasta')
-            refm = np.array(ref, 'S1')
-
-            # FIXME: determine better PCR errors?
-            ntemplate = sample['n templates']
-            if ntemplate > 0.1:
-                depthmax = np.maximum(1e-3, 1.0 / ntemplate)
-            else:
-                depthmax = 1e-3
-
-            (sns, acs) = get_allele_count(pname, samplename_pat, fragment, VERBOSE=VERBOSE, use_PCR1=use_PCR1)
-
-            # We might be getting back one count table, or two in case of both PCR types
-            for ac in acs:
-                cov = ac.sum(axis=0)
-
-                if cov.mean() < 1000:
-                    continue
-
-                af = 1.0 * ac / cov
-                af[np.isnan(af)] = np.ma.masked
-                af[af < depthmax] = 0
-                af[af > 1.0 - depthmax] = 1
-
-                # Get rid of gaps and low-coverage regions
-                is_gap = (af.argmax(axis=0) == 6) | (ac.sum(axis=0) < 100)
-                if VERBOSE >= 2:
-                    print 'Fraction of gap sites (excluded):', is_gap.mean()
-
-                # Get rid of ancestral alleles
-                af_der = af.copy()
-                af_der[:, is_gap] = 0
-                for i, nuc in enumerate(refm):
-                    ai = alphal.index(nuc)
-                    af_der[ai, i] = np.ma.masked
-
-                histtmp = np.histogram(af_der, bins=bins, density=False)[0]
-                if hist is None:
-                    hist = histtmp
-                else:
-                    hist += histtmp
-
+                print patient.name, fragment,
+    
+            try:
+                # TODO: include low depth due to low viral load
+                aft, ind = patient.get_allele_frequency_trajectories(fragment,
+                                                                     cov_min=depth_min)
+            except IOError:
                 if VERBOSE >= 1:
-                    print 'ok',
+                    print 'WARNING: failed!'
+                continue
 
-            print ''
+            if VERBOSE >= 1:
+                print 'ok'
 
-    # Get density from histogram counts
-    histd = 1.0 * hist / hist.sum() / binsw
+            if VERBOSE >= 2:
+                print 'Filter out masked positions'
+            ind_nonmasked = -aft.mask.any(axis=0).any(axis=0)
+            aft = aft[:, :, ind_nonmasked].data
 
-    if plot:
+            if VERBOSE >= 2:
+                print 'Remove first time sample'
+            aft_der = aft[1:].copy()
+
+            if VERBOSE >= 2:
+                print 'Filter out ancestral alleles'
+            for i, ai in enumerate(aft[0].argmax(axis=0)):
+                aft_der[:, ai, i] = 0
+                # take out everything at high frequency in first sample to
+                # improve polarization
+                aft_der[:, aft[0, :, i] > 0.1, i] = 0
+
+            # Add to the histogram
+            hist += np.histogram(aft_der, bins=bins, density=False)[0]/binw
+            delta_af = np.diff(aft_der, axis=0)
+            h = np.histogram(\
+                delta_af[np.where((aft_der[:-1,:,:] > 0.1)*(aft_der[:-1,:,:] < 0.2))], 
+                bins=delta_af_bins, density=False)
+            delta_af_hist += h[0] / delta_af_binw
+
+    
+    if use_plot:
+        N=10000
         import matplotlib.pyplot as plt
+        trfun = lambda x: np.log10(x / (1 - x))
 
         fig, ax = plt.subplots()
-        x = binsc
-        if use_logit:
-            trfun = lambda xx: np.log10(xx / (1 - xx))
-            trfuni = lambda y: 10**y / (1 + 10**y)
-            x = trfun(x)
-        ax.plot(x, histd, lw=2, c='k')
-        alpha = histd[itouch]
-        if use_logit:
-            xext = trfun(np.array([binsc[0], binsc[-1]]))
-            xmod = np.linspace(xext[0], xext[1], 100)
-            xmodi = trfuni(xmod)
-            ymod1 = alpha * ((binsc[itouch] / xmodi))
-            ymod2 = alpha * ((binsc[itouch] / xmodi)**2)
+        ax.plot(trfun(binsc), hist, lw=2, c='k',marker='o', label = 'HIV polymorphisms')
+        alpha = hist[0]
+        if add_bsc:
+            ax.plot(trfun(sfs_bc[N]), alpha*sfs_bsc[N]/sfs_bsc[N][np.argmax(sfs_bc[N]>1.3e-3)], 
+                    lw=2, c='r', ls = '-', label = 'Strong selection')
         else:
-            xmod = np.array([binsc[0], binsc[-1]])
-            ymod1 = alpha * ((binsc[itouch] / xmod))
-            ymod2 = alpha * ((binsc[itouch] / xmod)**2)
-        ax.plot(xmod, ymod1, lw=2, c='g')
-        ax.plot(xmod, ymod2, lw=2, c='r')
+            ax.plot(trfun(binsc[:8]), alpha*binsc[0]**2/binsc[:8]**2, lw=2, c='r')
+        ax.plot(trfun(binsc), alpha*binsc[0]/binsc, lw=2, c='g', label = 'Neutral')
 
-        ax.set_xlabel('Freq')
+        ax.set_xlabel('derived allele frequency')
         ax.set_ylabel('SFS [density = counts / sum / binsize]')
-        if use_logit:
-            tickloc = np.array([0.0001, 0.01, 0.5, 0.99, 0.9999])
-            ax.set_xticks(trfun(tickloc))
-            ax.set_xticklabels(map(str, tickloc))
-            from matplotlib.ticker import FixedLocator
-            ticklocminor = np.concatenate([[10**po * x for x in xrange(2 , 10)] for po in xrange(-4, -1)] + \
-                                          [[0.1 * x for x in xrange(2 , 9)]] + \
-                                          [[1 - 10**po * (10 - x) for x in xrange(2, 10)] for po in xrange(-2, -5, -1)])
-            ax.xaxis.set_minor_locator(FixedLocator(trfun(ticklocminor)))
-            ax.set_xlim(-2.8, 1.1)
-
-        else:
-            ax.set_xscale('log')
+        ax.set_xlim(-3.1, 3.1)
+        ax.set_ylim([3e1,3e7])
+        tickloc = np.array([0.001, 0.01, 0.1, 0.5, 0.9, 0.99, 0.999])
+        ax.set_xticks(trfun(tickloc))
+        ax.set_xticklabels(map(str, tickloc))
+        from matplotlib.ticker import FixedLocator
+        ticklocminor = np.concatenate([[10**po * x for x in xrange(2 , 10)]
+                                       for po in xrange(-4, -1)] + \
+                                      [[0.1 * x for x in xrange(2 , 9)]] + \
+                                      [[1 - 10**po * (10 - x) for x in xrange(2, 10)]
+                                       for po in xrange(-2, -5, -1)])
+        ax.xaxis.set_minor_locator(FixedLocator(trfun(ticklocminor)))
+        #ax.set_xscale('log')
         ax.set_yscale('log')
-        ax.set_title('SFS, '+str(fragments))
+        if len(fragments) == 6:
+            ax.set_title('All patients, all fragments')
+        else:
+            ax.set_title('All patients, fragments '+str(fragments))
         ax.grid(True)
+        plt.legend()
 
         plt.tight_layout()
+
+
+        if use_saveplot:
+            from hivwholeseq.patients.filenames import get_SFS_figure_filename
+            if len(fragments) == 6:
+                fn_out = get_SFS_figure_filename('all', 'all-fragments')
+            else:
+                fn_out = get_SFS_figure_filename('all', fragments)
+
         plt.ion()
         plt.show()
 
