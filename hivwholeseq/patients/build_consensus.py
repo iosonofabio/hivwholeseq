@@ -133,6 +133,13 @@ def join_block_to_consensus(consensus, cons_block, VERBOSE=0):
         from hivwholeseq.sequence_utils import pretty_print_pairwise_ali
         pretty_print_pairwise_ali([ali1, ali2], name1='consensus', name2='new block')
 
+    # In very rare occasions (coverage holes), the second sequence is actually
+    # shorter than the first, then we do not need to glue it in
+    if ali2[-1] == '-':
+        if VERBOSE >= 2:
+            print 'WARNING: the old block is longer than the new one (maybe low coverage)'
+        return consensus
+
     end1 = len(ali1.rstrip('-'))
     start2 = len(ali2) - len(ali2.lstrip('-'))
     scoremax = 3 * (end1 - start2)
@@ -163,7 +170,14 @@ def build_consensus(bamfilename, len_reference, VERBOSE=0,
     
     with pysam.Samfile(bamfilename, 'rb') as bamfile:
 
+        if VERBOSE >= 3:
+            from hivwholeseq.mapping_utils import get_number_reads_open
+            print 'The bamfile has', get_number_reads_open(bamfile), 'reads.'
+
         # Get first block covered, even if partially, and record where each read started
+        if VERBOSE >= 2:
+            print 'First block'
+
         block_len = block_len
         seqs = []
         n_block = 0

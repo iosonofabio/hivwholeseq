@@ -58,6 +58,10 @@ if __name__ == '__main__':
     save_to_file = args.save
     qual_min = args.qualmin
     PCR = args.PCR
+    use_plot = args.plot
+
+    if use_plot:
+        import matplotlib.pyplot as plt
 
     samples = lssp()
     if pnames is not None:
@@ -113,3 +117,16 @@ if __name__ == '__main__':
                                         qual_min=qual_min,
                                         VERBOSE=VERBOSE)
                 counts.append(count)
+
+
+            if use_plot:
+                # FIXME: actually plot allele counts!
+                cov = count.sum(axis=0).sum(axis=0)
+                fig, ax = plt.subplots(figsize=(12, 6))
+                ax.plot(cov, lw=2)
+                ax.set_xlabel('Position [bp]')
+                ax.set_ylabel('Coverage')
+
+    if use_plot:
+        plt.ion()
+        plt.show()
