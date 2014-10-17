@@ -124,19 +124,11 @@ if __name__ == '__main__':
 
         for fragment in fragments:
             if VERBOSE >= 1:
-                print patient.name, fragment,
+                print patient.name, fragment
     
-            try:
-                # TODO: include low depth due to low viral load
-                aft, ind = patient.get_allele_frequency_trajectories(fragment,
-                                                                     cov_min=depth_min)
-            except IOError:
-                if VERBOSE >= 1:
-                    print 'WARNING: failed!'
-                continue
-
-            if VERBOSE >= 1:
-                print 'ok'
+            # TODO: include low depth due to low viral load
+            aft, ind = patient.get_allele_frequency_trajectories(fragment,
+                                                                 cov_min=depth_min)
 
             if VERBOSE >= 2:
                 print 'Filter out masked positions'

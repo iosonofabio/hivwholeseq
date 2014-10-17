@@ -67,8 +67,26 @@ class Patient(pd.Series):
 
     @property
     def viral_load(self):
-        '''Get the time course of the viral load'''
+        '''Get the time course of the viral load [molecules/ml of serum]'''
         return self.samples['viral load']
+
+
+    @property
+    def cell_count(self):
+        '''Get the time course of the CD4+ cell count'''
+        return self.samples['CD4+ count']
+
+
+    @property
+    def n_templates(self, n_reactions=6):
+        '''Get the time course of the number of templates to PCR, limiting depth'''
+        n = self.viral_load
+        # We take 400 ul of serum
+        n *= 0.4
+        # We typically have 6 reactions with that total volume (plus the F4 dilution
+        # series, but each of those uses only 0.1x template which is very little)
+        n /= (n_reactions + 0.2)
+        return n
 
 
     @property
@@ -145,8 +163,8 @@ class Patient(pd.Series):
         (sns, act) = get_allele_count_trajectories(self.name, self.samples.index,
                                                    fragment,
                                                    use_PCR1=use_PCR1, VERBOSE=0)
-        ind = [i for i, (_, sample) in enumerate(self.samples.iterrows())
-               if sample.name in map(itemgetter(0), sns)]
+        ind = np.array([i for i, (_, sample) in enumerate(self.samples.iterrows())
+                        if sample.name in map(itemgetter(0), sns)], int)
         return (act, ind)
 
 
