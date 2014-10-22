@@ -227,7 +227,7 @@ if __name__ == '__main__':
     title = seq_run+', '+adaID
 
     quality = quality_score_along_reads(read_len, reads_filenames,
-                                        randomreads=True,
+                                        randomreads=(maxreads >= 1),
                                         maxreads=maxreads, VERBOSE=VERBOSE)
 
     plot_cuts_quality_along_reads(data_folder, adaID, title,

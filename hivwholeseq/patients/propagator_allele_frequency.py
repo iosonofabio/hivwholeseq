@@ -177,21 +177,31 @@ class Propagator(object):
         plt.tight_layout(rect=(0, 0, 1, 0.94))
 
 
-def plot_propagator_BSC(xis, t, xlim=[0.03, 0.93], ax=None, logit=False):
+def plot_propagator_theory(xis, t, model='BSC', xlim=[0.03, 0.93], ax=None, logit=False,
+                           VERBOSE=0):
     '''Make and plot BSC propagators for some initial frequencies'''
     from itertools import izip
-    from hivwholeseq.theory.propagators import propagator_BSC
+    from hivwholeseq.theory.propagators import propagator_BSC, propagator_neutral
 
-    # Make the propagators
+    if model == 'BSC':
+        propagator_fun =  propagator_BSC
+    elif model in ('neutral', 'Kingman', 'Kimura'):
+        propagator_fun =  propagator_neutral
+
+
+
+    if VERBOSE >= 1:
+        print 'Make the propagators'
     xis = pp.binsxc
     xfs = []
     rhos = []
     for i, xi in enumerate(xis): 
-        (xf, rho) = propagator_BSC(xi, t)
+        (xf, rho) = propagator_fun(xi, t)
         xfs.append(xf)
         rhos.append(rho)
 
-    # Plot
+    if VERBOSE >= 1:
+        print 'Plot'
     if ax is None:
         ax_was_none = True
         fig, ax = plt.subplots(figsize=(12, 8))
@@ -239,7 +249,7 @@ def plot_propagator_BSC(xis, t, xlim=[0.03, 0.93], ax=None, logit=False):
 
         ax.set_yscale('log')
         ax.set_ylabel('P(x1 | x0)')
-        ax.set_title('BSC propagator, t = '+'{:1.1e}'.format(t))
+        ax.set_title(model+' propagator, t = '+'{:1.1e}'.format(t))
         ax.grid(True)
 
 
@@ -350,10 +360,13 @@ if __name__ == '__main__':
                 '$\Delta t = '+str(dt)+'$ days, '+str(fragments)
         pp.plot(title=title, heatmap=False)
 
-        # BSC propagators
+        # BSC and neutral propagators
         t = 1.0 * np.mean(dt) / 500
         xis = pp.binsxc
-        plot_propagator_BSC(xis, t, logit=use_logit, xlim=[pp.binsyc[0], pp.binsyc[-1]])
+        plot_propagator_theory(xis, t, model='BSC',
+                               logit=use_logit, xlim=[pp.binsyc[0], pp.binsyc[-1]])
+        plot_propagator_theory(xis, t, model='neutral',
+                               logit=use_logit, xlim=[pp.binsyc[0], pp.binsyc[-1]])
         
         plt.ion()
         plt.show()
