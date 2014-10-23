@@ -21,6 +21,7 @@ from hivwholeseq.miseq import alpha
 from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_allele_count_trajectories_filename, get_primers_filename
 from hivwholeseq.patients.patients import load_patient, SamplePat
+from hivwholeseq.patients.samples import load_sample_sequenced
 from hivwholeseq.sequencing.primer_info import primers_outer, find_primer_seq
 from hivwholeseq.sequence_utils import expand_ambiguous_seq
 
@@ -31,8 +32,11 @@ if __name__ == '__main__':
 
     # Parse input args
     parser = argparse.ArgumentParser(description='Update initial consensus')
-    parser.add_argument('--patient', required=True,
-                        help='Patient to analyze')
+    pat_or_sample = parser.add_mutually_exclusive_group(required=True)
+    pat_or_sample.add_argument('--patient',
+                               help='Patient to analyze')
+    pat_or_sample.add_argument('--sample',
+                               help='Sample to analyze')
     parser.add_argument('--fragments', nargs='+',
                         help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('--verbose', type=int, default=0,
@@ -42,11 +46,17 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     pname = args.patient
+    samplename = args.sample
     fragments = args.fragments
     VERBOSE = args.verbose
     use_save = args.save
 
-    patient = load_patient(pname)
+    if pname is not None:
+        patient = load_patient(pname)
+        seq_fun = patient.get_reference
+    elif samplename is not None:
+        sample = load_sample_sequenced(samplename)
+        seq_fun = sample.get_consensus
 
      # If the script is called with no fragment, iterate over all
     # NOTE: This assumes that the fragment has been sequenced. If not, we should
@@ -60,12 +70,15 @@ if __name__ == '__main__':
     primers_clo = defaultdict(dict)
     primers_pat = defaultdict(dict)
     for fragment in fragments:
-        print fragment
+        if pname is not None:
+            print pname, fragment
+        elif samplename is not None:
+            print samplename, fragment
+
         # Check the overlap from the left for fwd primer, unless F1
         if fragment != 'F1':
             frag_left = 'F'+str(int(fragment[1]) - 1)
-            cons_fn_left = get_initial_reference_filename(pname, frag_left)
-            cons_left = SeqIO.read(cons_fn_left, 'fasta')
+            cons_left = seq_fun(frag_left)
 
             # Only use the best-performing primers...
             if fragment == 'F5':
@@ -109,7 +122,7 @@ if __name__ == '__main__':
             primers_clo[fragment]['fwd'] = primer_fwd_closest
             primers_pat[fragment]['fwd'] = primer_fwd_pat
 
-            if status == 'FAIL':
+            if (pname is not None) and (status == 'FAIL'):
                 sample = SamplePat(patient.samples.iloc[0])
                 ac_filename = sample.get_allele_counts_filename(frag_left)
                 if not os.path.isfile(ac_filename):
@@ -124,8 +137,7 @@ if __name__ == '__main__':
         # Check overlap from the right for rev primer
         if fragment != 'F6':
             frag_right = 'F'+str(int(fragment[1]) + 1)
-            cons_fn_right = get_initial_reference_filename(pname, frag_right)
-            cons_right = SeqIO.read(cons_fn_right, 'fasta')
+            cons_right = seq_fun(frag_right)
 
             if fragment == 'F5':
                 frag_spec = 'F5a'
@@ -168,7 +180,7 @@ if __name__ == '__main__':
             primers_clo[fragment]['rev'] = primer_rev_closest
             primers_pat[fragment]['rev'] = primer_rev_pat
 
-            if status == 'FAIL':
+            if (pname is not None) and (status == 'FAIL'):
                 sample = SamplePat(patient.samples.iloc[0])
                 ac_filename = sample.get_allele_counts_filename(frag_right)
                 if not os.path.isfile(ac_filename):
@@ -190,7 +202,7 @@ if __name__ == '__main__':
 
         print ''
 
-    if use_save:
+    if use_save and (pname is not None):
         fn = get_primers_filename(pname, format='fasta')
         
         seqs = []

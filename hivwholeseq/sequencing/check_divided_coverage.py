@@ -159,6 +159,8 @@ if __name__ == '__main__':
         fragments_sample = sample.regions_complete
         if VERBOSE >= 1:
             print seq_run, adaID, samplename, fragments_sample,
+            if VERBOSE >= 2:
+                print ''
 
         for fragment in fragments_sample:
             if VERBOSE >= 1:

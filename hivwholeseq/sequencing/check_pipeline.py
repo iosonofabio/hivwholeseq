@@ -120,7 +120,7 @@ def print_info(name, status, detail=1):
     '''Print info on these files'''
     print '{:<20s}'.format(name+':'),
 
-    if len(status) == 1:
+    if name.lower() in ['premapped']:
         status = status[0]
         if status == True:
             print 'OK'

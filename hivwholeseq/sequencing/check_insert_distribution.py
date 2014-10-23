@@ -89,6 +89,7 @@ def plot_cumulative_histogram(data_folder, adaID, fragment, insert_sizes,
     ax.set_xlabel('Insert size')
     ax.set_ylabel('Cumulative fraction')
     ax.set_xlim(-1, 1000)
+    ax.set_ylim(-0.02, 1.02)
     if title is not None:
         ax.set_title(title)
 
