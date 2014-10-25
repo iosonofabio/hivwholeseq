@@ -70,12 +70,15 @@ class Propagator(object):
         self.binsyw = binsyw
 
         self.use_logit = use_logit
-
         self.histogram = np.zeros((len(binsx) - 1, len(binsy) - 1), float)
 
 
-    def plot(self, figaxs=None, title='', heatmap=True):
-        '''Plot the propagator'''
+    def plot(self, figaxs=None, title='', heatmap=True, marker='o', **kwargs):
+        '''Plot the propagator.
+        
+        Parameters
+          **kwargs: passed down to plot function        
+        '''
         import matplotlib.pyplot as plt
 
         plt.ioff()
@@ -109,20 +112,23 @@ class Propagator(object):
             xf0 = 1.2e-3
             xf1 = 1.0 - 1.2e-3
 
-            if use_logit:
+            if self.use_logit:
                 (xf, xf0, xf1) = map(self.trfun, (xf, xf0, xf1))
                 xi = self.trfun(xi)
 
             ax.plot(xf, y, lw=2, c=cm.jet(1.0 * iz / z.shape[0]),
-                    label='$x_i = '+'{:1.1e}'.format(xi)+'$')
+                    label='$x_i = '+'{:1.1e}'.format(xi)+'$',
+                    **kwargs)
             ax.scatter(xf0, zi[0], s=80, facecolor='none', lw=2,
-                       edgecolor=cm.jet(1.0 * iz / z.shape[0]))
+                       edgecolor=cm.jet(1.0 * iz / z.shape[0]),
+                       marker=marker)
             ax.scatter(xf1, zi[-1], s=80, facecolor='none', lw=2,
-                       edgecolor=cm.jet(1.0 * iz / z.shape[0]))
+                       edgecolor=cm.jet(1.0 * iz / z.shape[0]),
+                       marker=marker)
             ax.axvline(xi, color=cm.jet(1.0 * iz / z.shape[0]), lw=0.5,
                        alpha=0.5, ls='-')
 
-        if use_logit:
+        if self.use_logit:
             ax.set_xlim(*map(self.trfun, (1e-3, 1 - 1e-3)))
             tickloc = np.array([0.001, 0.01, 0.1, 0.5, 0.9, 0.99, 0.999])
             ax.set_xticks(self.trfun(tickloc))
@@ -142,6 +148,7 @@ class Propagator(object):
         ax.grid(True)
         ax.set_ylabel('P(x1 | x0)')
         ax.set_xlabel('Final frequency')
+        ax.set_ylim(1e-3, 1e3)
         ax.set_yscale('log')
         #ax.legend(loc=3, fontsize=10, title='Initial frequency:', ncol=2)
 
@@ -153,7 +160,7 @@ class Propagator(object):
             # extremes (loss and fixation) and behave specially
             z1 = np.log10(z[:, 1:-1])
 
-            im = ax.imshow(z1.T, interpolation='nearest')
+            im = ax.imshow(z1.T, interpolation='nearest', aspect='auto')
             ax.set_xlabel('Initial freq')
             ax.set_ylabel('Final freq')
             ax.set_xticks(np.arange(len(self.binsx)) - 0.5)
@@ -178,7 +185,7 @@ class Propagator(object):
 
 
 def plot_propagator_theory(xis, t, model='BSC', xlim=[0.03, 0.93], ax=None, logit=False,
-                           VERBOSE=0):
+                           VERBOSE=0, n=100):
     '''Make and plot BSC propagators for some initial frequencies'''
     from itertools import izip
     from hivwholeseq.theory.propagators import propagator_BSC, propagator_neutral
@@ -186,9 +193,7 @@ def plot_propagator_theory(xis, t, model='BSC', xlim=[0.03, 0.93], ax=None, logi
     if model == 'BSC':
         propagator_fun =  propagator_BSC
     elif model in ('neutral', 'Kingman', 'Kimura'):
-        propagator_fun =  propagator_neutral
-
-
+        propagator_fun =  lambda x, y: propagator_neutral(x, y, n=n)
 
     if VERBOSE >= 1:
         print 'Make the propagators'
@@ -247,6 +252,7 @@ def plot_propagator_theory(xis, t, model='BSC', xlim=[0.03, 0.93], ax=None, logi
         else:
             ax.set_xscale('log')
 
+        ax.set_ylim(1e-3, 1e3)
         ax.set_yscale('log')
         ax.set_ylabel('P(x1 | x0)')
         ax.set_title(model+' propagator, t = '+'{:1.1e}'.format(t))
@@ -257,7 +263,6 @@ def plot_propagator_theory(xis, t, model='BSC', xlim=[0.03, 0.93], ax=None, logi
 # Script
 if __name__ == '__main__': 
 
-    # Parse input args
     parser = argparse.ArgumentParser(description='Propagator for allele frequencies',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     parser.add_argument('--patients', nargs='+',
@@ -277,7 +282,6 @@ if __name__ == '__main__':
     parser.add_argument('--min-depth', type=int, default=100, dest='min_depth',
                         help='Minimal depth to consider the site')
 
-
     args = parser.parse_args()
     pnames = args.patients
     fragments = args.fragments
@@ -293,7 +297,7 @@ if __name__ == '__main__':
         patients = patients.loc[pnames]
 
     # Prepare output structures
-    n_bins = 14
+    n_binsx = 8
     binsy = [0.,
              0.002,
              0.005, 0.009, 0.013, 0.025,
@@ -304,7 +308,7 @@ if __name__ == '__main__':
              0.95, 0.975, 0.987, 0.991, 0.994,
              0.998,
              1.]
-    pp = Propagator(n_bins, binsy=binsy, use_logit=use_logit)
+    pp = Propagator(n_binsx, binsy=binsy, use_logit=use_logit)
 
     binsd = np.array([-0.5, -0.4, -0.3, -0.2, -0.1, -0.05, -0.02, -0.01, -0.003,
                       0.003, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5])
@@ -318,7 +322,6 @@ if __name__ == '__main__':
         patient = Patient(patient)
         samplenames = patient.samples.index
 
-        # If the script is called with no fragment, iterate over all
         if not fragments:
             fragments = ['F'+str(i) for i in xrange(1, 7)]
         if VERBOSE >= 2:
@@ -360,7 +363,8 @@ if __name__ == '__main__':
                 '$\Delta t = '+str(dt)+'$ days, '+str(fragments)
         pp.plot(title=title, heatmap=False)
 
-        # BSC and neutral propagators
+        if VERBOSE >= 1:
+            print 'Calculate and plot theory'
         t = 1.0 * np.mean(dt) / 500
         xis = pp.binsxc
         plot_propagator_theory(xis, t, model='BSC',
@@ -370,84 +374,3 @@ if __name__ == '__main__':
         
         plt.ion()
         plt.show()
-
-        sys.exit()
-
-        ## Plot difference
-        #fig, axs = plt.subplots(1, 2, figsize=(16, 8))
-        #z = histd
-        #z = 1.0 * (z.T / z.sum(axis=1)).T
-        #z /= binsdw
-
-        #ax = axs[0]
-        #for iz, zi in enumerate(z):
-        #    xi = binsxc[iz]
-        #    dx = binsdc[1:-1]
-        #    y = zi[1:-1]
-
-        #    ax.plot(dx, y, lw=2, c=cm.jet(1.0 * iz / z.shape[0]),
-        #            label='$x_i = '+'{:1.1e}'.format(xi)+'$')
-
-        #ax.set_ylabel('P(x1 - x0 | x0)')
-        #ax.set_xlabel('x1 - x0')
-        #ax.set_yscale('log')
-        #ax.legend(loc=1, fontsize=10, title='Initial\nfrequency:', ncol=2)
-
-        #ax = axs[1]
-        #z1 = np.log10(z)
-        #z1 = np.maximum(z1, z1[z1 != (-np.inf)].min() - 1)
-        #im = ax.imshow(z1.T, interpolation='nearest', aspect='auto')
-        #ax.set_xlabel('Initial freq')
-        #ax.set_ylabel('Freq diff')
-        #ax.set_xticks(np.arange(len(binsx)) - 0.5)
-        #ax.set_xticklabels(map('{:1.1e}'.format, binsx),
-        #                   rotation=45, fontsize=10)
-        #ax.set_yticks(np.arange(len(binsd)) - 0.5)
-        #ax.set_yticklabels(map('{:1.2e}'.format, binsd),
-        #                   rotation=45, fontsize=10)
-        #ax.set_ylim(*(ax.get_ylim()[::-1]))
-        #cb = plt.colorbar(im)
-        #cb.set_label('log10 P(x1 - x0 | x0)', labelpad=30, rotation=270, fontsize=12)
-
-        #fig.suptitle('Propagator for allele frequencies\n'+\
-        #             '$\Delta t = '+str(dt)+'$, '+str(fragments),
-        #             fontsize=16)
-        #plt.tight_layout(rect=(0, 0, 1, 0.94))
-
-        ## Plot normalized (Kosheleva et Desai 2013)
-        ## rho(x_k | x_k-1) = x_k-1 (1 - x_k-1) / (q * dx^2) -- q = 8 in HIV
-        #fig, ax = plt.subplots(1)
-        #z = histr
-        #z = (1.0 * z.T / z.sum(axis=1)).T
-        #z /=  binsyw
-
-        #for iz, zi in enumerate(z):
-        #    xi = binsxc[iz]
-        #    xf = binsyc[1:-1]
-        #    y = zi[1:-1] / (xi * (1 - xi)) * ((xf - xi)**2)
-
-        #    if use_logit:
-        #        (xf, xf0, xf1) = map(trfun, (xf, xf0, xf1))
-
-        #    ax.plot(xf, y, lw=2, c=cm.jet(1.0 * iz / z.shape[0]),
-        #            label='$x_i = '+'{:1.1e}'.format(xi)+'$')
-
-        #if use_logit:
-        #    ax.set_xlim(*map(trfun, (2e-3, 1 - 2e-3)))
-        #else:
-        #    ax.set_xscale('log')
-        #    ax.set_xlim(1e-3, 1.5)
-
-        #ax.set_ylabel('P(x1 | x0) / (x0 * (1 - x0)) * dx^2')
-        #ax.set_xlabel('Final frequency')
-        #ax.set_yscale('log')
-        #ax.legend(loc=3, fontsize=10, title='Initial\nfrequency:', ncol=2)
-
-        #ax.set_title('Propagator (normalized )for allele frequencies\n'+\
-        #             '$\Delta t = '+str(dt)+'$, '+str(fragments),
-        #             fontsize=16)
-        #plt.tight_layout()
-
-
-        #plt.ion()
-        #plt.show()

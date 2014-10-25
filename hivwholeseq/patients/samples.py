@@ -89,6 +89,13 @@ class SamplePat(pd.Series):
         return ac
 
 
+    def get_allele_cocounts(self, fragment, PCR=1, qual_min=30):
+        '''Get the allele cocounts'''
+        import numpy as np
+        acc = np.load(self.get_allele_cocounts_filename(fragment, PCR=PCR, qual_min=qual_min))
+        return acc
+
+
     def get_coverage(self, fragment, PCR=1, qual_min=30, merge_read_types=True):
         '''Get the coverage'''
         ac = self.get_allele_counts(fragment, PCR=PCR, qual_min=qual_min,

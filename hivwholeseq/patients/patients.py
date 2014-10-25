@@ -107,10 +107,14 @@ class Patient(pd.Series):
         return get_initial_reference_filename(self.name, fragment, format)
 
 
-    def get_reference(self, fragment):
+    def get_reference(self, fragment, format='fasta'):
         '''Get the reference for a fragment'''
         from Bio import SeqIO
-        return SeqIO.read(self.get_reference_filename(fragment), 'fasta')
+        refseq = SeqIO.read(self.get_reference_filename(fragment, format=format), format)
+        if format in ('gb', 'genbank'):
+            from hivwholeseq.sequence_utils import correct_genbank_features_load
+            correct_genbank_features_load(refseq)
+        return refseq
 
 
     def get_consensi_alignment_filename(self, fragment):
@@ -181,12 +185,21 @@ class Patient(pd.Series):
                 (self['first positive date'] - self['last negative date']) / 2
 
 
-    def get_map_coordinates_reference(self, fragment, refname='HXB2'):
-        '''Get the map of coordinate to some external reference'''
+    def get_map_coordinates_reference(self, fragment, refname='HXB2', roi=None):
+        '''Get the map of coordinate to some external reference
+        
+        Returns:
+          mapco (2D int array): the first column are the positions in the reference,
+            the second column the position in the patient initial reference. 
+        '''
         from hivwholeseq.patients.filenames import get_coordinate_map_filename
         fn = get_coordinate_map_filename(self.name, fragment, refname=refname)
         mapco = np.loadtxt(fn, dtype=int)
-        return mapco
+        if roi is None:
+            return mapco
+        else:
+            ind = (mapco[:, 1] >= roi[0]) & (mapco[:, 1] < roi[1])
+            return mapco[ind]
 
 
 

@@ -9,7 +9,7 @@ import os
 
 from hivwholeseq.sequencing.adapter_info import foldername_adapter
 from hivwholeseq.filenames import root_data_folder, stampy_bin, spades_bin, \
-        bwa_bin, reference_folder, table_filename
+        bwa_bin, reference_folder, table_filename, get_custom_reference_filename
 
 
 
@@ -408,13 +408,6 @@ def get_merged_allele_frequencies_filename(data_folder, adaID,
     filename = 'allele_frequencies_'+'-'.join(fragments)+'.fasta'
     filename = data_folder+foldername_adapter(adaID)+filename
     return filename
-
-
-def get_custom_reference_filename(reference, format='fasta'):
-    '''Get the filename of a custom reference sequence, in one piece'''
-    filename = reference
-    filename = filename+'.'+format
-    return reference_folder+filename
 
 
 def get_custom_index_filename_fun(reference):

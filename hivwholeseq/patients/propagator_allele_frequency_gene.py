@@ -7,212 +7,233 @@ content:    Calculate and plot the propagator of allele frequencies.
 # Modules
 import sys
 import argparse
+from operator import attrgetter
 import numpy as np
 from Bio import SeqIO
-from Bio.Seq import MutableSeq
+from Bio.Seq import MutableSeq, translate
 from Bio.Alphabet.IUPAC import unambiguous_dna
 import matplotlib.pyplot as plt
+from seqanpy import align_overlap
 
 from hivwholeseq.miseq import alpha
-from hivwholeseq.patients.patients import patients as patients_all
-from hivwholeseq.patients.filenames import get_initial_reference_filename, \
-        get_allele_frequency_trajectories_filename, \
-        get_allele_count_trajectories_filename
+from hivwholeseq.reference import load_custom_reference
+from hivwholeseq.patients.patients import load_patients, Patient
+from hivwholeseq.patients.propagator_allele_frequency import Propagator
+
+
+
+# Functions
+def get_gene_positions_in_fragment(gene, fragment, gwseq, fragseq, VERBOSE=0):
+    '''Get the coordinates of a gene within a fragment'''
+    # Find coordinates of gene in reference
+    feagene = gwseq.features[map(attrgetter('id'), gwseq.features).index(gene)]
+    gene_start = feagene.location.nofuzzy_start
+    gene_end = feagene.location.nofuzzy_end
+
+    # Sanity check on coordinates
+    feafrag = refseq.features[map(attrgetter('id'), gwseq.features).index(fragment)]
+    fragrefgw = feafrag.extract(gwseq)
+    if len(fragseq) != len(fragrefgw):
+        raise ValueError('Problem with coordinates between fragment and genomewide.')
+
+    # Find coordinates of gene in fragment
+    frag_start = feafrag.location.nofuzzy_start
+    frag_end = feafrag.location.nofuzzy_end
+
+    # complete gene
+    if (frag_start <= gene_start) and (frag_end >= gene_end):
+        if VERBOSE >= 2:
+            print 'Complete gene found'
+        positions = np.arange(gene_start, gene_end) - frag_start
+
+    # start of gene
+    elif (frag_start <= gene_start):
+        if VERBOSE >= 2:
+            print 'WARNING: only gene start found'
+        positions = np.arange(gene_start, frag_end) - frag_start
+        if len(positions) % 3:
+            positions = positions[:-(len(positions) % 3)]
+
+    # end of gene
+    elif (frag_end >= gene_end):
+        if VERBOSE >= 2:
+            print 'WARNING: only gene end found'
+        positions = np.arange(frag_start, gene_end) - frag_start
+        if len(positions) % 3:
+            positions = positions[len(positions) % 3:]
+
+    # middle of gene: guess reading frame
+    else:
+        if VERBOSE >= 2:
+            print 'WARNING: only gene middle found'
+        prot = feagene.extract(gwseq).seq.translate()
+        ali_score = []
+        for rf_start in xrange(3):
+            tmpseq = fragseq[rf_start:].seq
+            if len(tmpseq) % 3:
+                tmpseq = tmpseq[:-(len(tmpseq) % 3)]
+            tmpprot = tmpseq.translate()
+            (score, ali1, ali2) = align_overlap(tmpprot, prot)
+            ali_score.append(score)
+        rf_start = np.argmax(ali_score)
+        positions = np.arange(frag_start + rf_start, frag_end) - frag_start
+        if len(positions) % 3:
+            positions = positions[:-(len(positions) % 3)]
+
+    return positions
 
 
 
 # Script
 if __name__ == '__main__': 
 
-
-    # Parse input args
-    parser = argparse.ArgumentParser(description='Get allele frequency trajectories')
+    parser = argparse.ArgumentParser(description='Propagator for allele frequencies',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     parser.add_argument('--patients', nargs='+',
                         help='Patients to analyze')
-    parser.add_argument('--genes', default=('gag', 'pol'), nargs='+',
-                        help='Gene to analyze (e.g. pol)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-4]')
     parser.add_argument('--save', action='store_true',
                         help='Save the propagator to file')
-    parser.add_argument('--submit', action='store_true',
-                        help='Execute the script in parallel on the cluster')
     parser.add_argument('--plot', nargs='?', default=None, const='2D',
                         help='Plot the propagator')
+    parser.add_argument('--deltat', type=int, nargs=2, default=[100, 300],
+                        help='Time in days between final and initial (range)')
+    parser.add_argument('--logit', action='store_true',
+                        help='use logit scale (log(x/(1-x)) in the plots')
+    parser.add_argument('--min-depth', type=int, default=100, dest='min_depth',
+                        help='Minimal depth to consider the site')
+    parser.add_argument('--genes', default=('gag', 'pol'), nargs='+',
+                        help='Gene to analyze (e.g. pol)')
 
     args = parser.parse_args()
-    pnames = args.patients
     genes = map(lambda x: x.lower(), args.genes)
+    pnames = args.patients
     VERBOSE = args.verbose
     save_to_file = args.save
     plot = args.plot
-    submit = args.submit
+    dt = args.deltat
+    use_logit = args.logit
+    depth_min = args.min_depth
 
-    if pnames is None:
-        patients = [p for p in patients_all if (len(set(p.times())) >= 3) and (p.id != '15241')]
+    patients = load_patients()
+    if pnames is not None:
+        patients = patients.loc[pnames]
+        # FIXME: the initial ref of 15107 is mislabelled and a mess
     else:
-        patients = [p for p in patients_all if p.id in pnames]
+        patients = patients.loc[patients.index != '15107']
 
-    # Submit to the cluster self if requested (--save is assumed)
-    if submit:
-        fork_self(pnames, gene, VERBOSE=VERBOSE)
-        sys.exit()
+    # Prepare output structures
+    n_binsx = 5
+    binsy = [0.,
+             0.002,
+             0.01,
+             0.025,
+             0.12,
+             0.33,
+             0.67,
+             0.88,
+             0.975,
+             0.99,
+             0.998,
+             1.]
+    props = {(gene, synkey): Propagator(n_binsx, binsy=binsy, use_logit=use_logit)
+             for gene in genes for synkey in ('syn', 'nonsyn')}
 
-    fragments = ['F'+str(i) for i in xrange(1, 7)]
+    for pname, patient in patients.iterrows():
+        patient = Patient(patient)
+        samplenames = patient.samples.index
 
-    # Prepare output data structures
-    bins_to = np.insert(np.logspace(-2.5, 0, 10), 0, 0)
-    bins_from = bins_to[(bins_to > 1e-3) & (bins_to < 0.5)]
-    hist = np.zeros((len(bins_from) - 1, len(bins_to) - 1), float)
-    hist_syn = np.zeros((len(bins_from) - 1, len(bins_to) - 1), float)
-    hist_nonsyn = np.zeros((len(bins_from) - 1, len(bins_to) - 1), float)
+        refseq = patient.get_reference('genomewide', format='gb')
 
-    for patient in patients:
-        pname = patient.id
-        times = patient.times()
-        samplenames = patient.samples
-
-        # Keep PCR2 only if PCR1 is absent
-        ind = np.nonzero(map(lambda x: ('PCR1' in x[1]) or ((times == times[x[0]]).sum() == 1),
-                             enumerate(samplenames)))[0]
-        times = times[ind]
-        samplenames = [s for (i, s) in enumerate(samplenames) if i in ind] 
-    
         for gene in genes:
-            for fragment in fragments:
-        
-                # FIXME
-                if gene == 'pol':
-                    if fragment != 'F2':
-                        continue
-                
-                elif gene == 'gag':
-                    if fragment != 'F1':
-                        continue
-    
-                else:
-                    raise ValueError('Only pol/F2 and gag/F1 implemented!')
 
-                if VERBOSE >= 1:
-                    print pname, fragment
-        
-                act_filename = get_allele_count_trajectories_filename(pname, fragment)
-                aft_filename = get_allele_frequency_trajectories_filename(pname, fragment)
-        
-                aft = np.load(aft_filename)
-                act = np.load(act_filename)
-        
-                aft[np.isnan(aft)] = 0
-                aft[(aft < 1e-5) | (aft > 1)] = 0
-    
-                # Extract gene from reference and allele freq trajectories
-                from hivwholeseq.patients.build_initial_reference import check_genes_consensus
-                cons_rec = SeqIO.read(get_initial_reference_filename(pname, fragment), 'fasta')
-                conss = str(cons_rec.seq)
-                gene_seqs, genes_good, gene_poss = check_genes_consensus(conss, fragment, genes=[gene],
-                                                                         VERBOSE=VERBOSE)
-                if not genes_good[gene]:
-                    if VERBOSE >= 1:
-                        print pname+':', gene, 'not found or with problems: skipping.'
+            if VERBOSE >= 1:
+                print pname, gene,
+
+            # Get the right fragment(s)
+            # FIXME: do better than this ;-)
+            frags = {'pol': ['F2', 'F3'], 'gag': ['F1'], 'env': ['F5', 'F6']}
+            fragments = frags[gene]
+
+            if VERBOSE >= 1:
+                print fragments
+
+            for fragment in fragments:
+                fragseq = patient.get_reference(fragment)
+                # FIXME: there are sometimes coordinate shifts in the genomewide ref.
+                try:
+                    positions = get_gene_positions_in_fragment(gene, fragment, refseq, fragseq,
+                                                               VERBOSE=VERBOSE)
+                except ValueError:
                     continue
-    
-                gene_pos = gene_poss[gene]
-                aft_gene = np.concatenate([aft[:, :, exon_pos[0]: exon_pos[1]]
-                                   for exon_pos in gene_pos], axis=2)
-                conss_gene = gene_seqs[gene]
-                gene_len = len(conss_gene)
-    
+
+                # Get allele freqs
+                aft, ind = patient.get_allele_frequency_trajectories(fragment,
+                                                                     cov_min=depth_min)
+                aft = aft[:, :, positions]
+
+                n_templates = np.array(patient.n_templates[ind])
+                indd = n_templates >= depth_min
+                aft = aft[indd]
+                ind = ind[indd]
+                n_templates = n_templates[indd]
+
+                ts = patient.times[ind]
+
+                # Make initial consensus to declare syn/nonsyn
+                # NOTE: the initial consensus is NOT the mapping reference, so there
+                # might be gaps in the sequence. That's ok.
+                genem = alpha[aft[0].argmax(axis=0)]
+
                 # Collect counts
-                for i in xrange(aft_gene.shape[0] - 1):
-                    hist_frag = np.histogram2d(aft_gene[i].ravel(), aft_gene[i + 1].ravel(),
-                                               bins=[bins_from, bins_to])
-                    hist += hist_frag[0]
-    
-                    nu_syn = [[], []]
-                    nu_nonsyn = [[], []]
-                    cod_anc = MutableSeq('AAA', unambiguous_dna)
-                    cod_new = MutableSeq('AAA', unambiguous_dna)
-                    for j in xrange(gene_len // 3):
-                        for jcod in xrange(3):
-                            for ai in xrange(4):
-                                cod_anc[:] = conss_gene[3 * j: 3 * (j+1)]
-                                # Ancestral allele, skip (we only look at propagation of MINOR alleles)
-                                if alpha[ai] == cod_anc[jcod]:
+                for i in xrange(aft.shape[0] - 1):
+                    for j in xrange(i + 1, aft.shape[0]):
+                        dij = j - i
+                        if ((ts[j] - ts[i]) > dt[1]) or ((ts[j] - ts[i]) < dt[0]):
+                            continue
+
+                        afaf = {'syn': [], 'nonsyn': []}
+
+                        for pos in xrange(aft.shape[2]):
+                            pos_cod = pos // 3
+                            pos_wn = pos % 3
+
+                            # Because the initial consensus is NOT the mapping reference,
+                            # genem might have gaps... that's ok, they come in groups of three.
+                            # FIXME: this is slightly more messed up than that, for now skip the
+                            # whole codon
+                            if '-' in genem[pos_cod * 3: (pos_cod + 1) * 3]:
+                                continue
+
+                            # TODO: Check this algorithm!!
+                            for ia, a in enumerate(alpha[:4]):
+
+                                # exclude ancestral alleles
+                                if a == genem[pos]:
                                     continue
-    
-                                cod_new[:] = conss_gene[3 * j: 3 * (j+1)]
-                                cod_new[jcod] = alpha[ai]
-    
-                                if str(cod_new.toseq().translate()) != str(cod_anc.toseq().translate()):
-                                    nu_syn[0].append(aft_gene[i, ai, j + jcod])
-                                    nu_syn[1].append(aft_gene[i + 1, ai, j + jcod])
+
+                                cod_anc = genem[pos_cod * 3: (pos_cod + 1) * 3]
+                                cod_new = cod_anc.copy()
+                                cod_new[pos_wn] = a
+
+                                if translate(''.join(cod_anc)) == translate(''.join(cod_new)):
+                                    afaf['syn'].append((aft[i, ia, pos], aft[j, ia, pos]))
                                 else:
-                                    nu_nonsyn[0].append(aft_gene[i, ai, j + jcod])
-                                    nu_nonsyn[1].append(aft_gene[i + 1, ai, j + jcod])
-    
-                    if len(nu_syn[0]):
-                        hist_syn += np.histogram2d(nu_syn[0], nu_syn[1], bins=[bins_from, bins_to])[0]
-                    if len(nu_nonsyn[0]):
-                        hist_nonsyn += np.histogram2d(nu_nonsyn[0], nu_nonsyn[1], bins=[bins_from, bins_to])[0]
+                                    afaf['nonsyn'].append((aft[i, ia, pos], aft[j, ia, pos]))
+
+                        for key in ('syn', 'nonsyn'):
+                            pp = props[(gene, key)]
+                            pp.histogram += np.histogram2d(*np.transpose(afaf[key]),
+                                                           bins=[pp.binsx, pp.binsy])[0]
+
 
     if plot:
-        fig, ax = plt.subplots()
-        z = hist[:, 1:-1]
-        z  = (z.T / z.sum(axis=1)).T
-        z = np.log10(z)
-        im = ax.imshow(z.T, interpolation='nearest')
-        ax.set_xlabel('Initial freq')
-        ax.set_ylabel('Final freq')
-        ax.set_xticks(np.arange(len(bins_from) - 1))
-        ax.set_yticks(np.arange(len(bins_to) - 1))
-        ax.set_xticklabels(map('{:1.1e}'.format, np.sqrt(bins_from[:-1] * bins_from[1:])), rotation=45, fontsize=10)
-        ax.set_yticklabels(map('{:1.1e}'.format, np.sqrt(bins_to[1:-2] * bins_to[2:-1])), rotation=45, fontsize=10)
-        ax.set_xlim(0.5, len(bins_from) - 1.5)
-        ax.set_ylim(len(bins_to) - 3.5, -0.5)
-        plt.colorbar(im)
-        ax.set_title('Propagator for allele frequencies\nbetween consecutive time points, '+\
-                     gene+'\n[log10 P(x1 | x0)]', fontsize=16)
-        plt.tight_layout()
-
-        fig_syn, ax = plt.subplots()
-        z = hist_syn[:, 1:-1]
-        z  = (z.T / z.sum(axis=1)).T
-        z = np.log10(z)
-        im = ax.imshow(z.T, interpolation='nearest')
-        ax.set_xlabel('Initial freq')
-        ax.set_ylabel('Final freq')
-        ax.set_xticks(np.arange(len(bins_from) - 1))
-        ax.set_yticks(np.arange(len(bins_to) - 1))
-        ax.set_xticklabels(map('{:1.1e}'.format, np.sqrt(bins_from[:-1] * bins_from[1:])), rotation=45, fontsize=10)
-        ax.set_yticklabels(map('{:1.1e}'.format, np.sqrt(bins_to[1:-2] * bins_to[2:-1])), rotation=45, fontsize=10)
-        ax.set_xlim(0.5, len(bins_from) - 1.5)
-        ax.set_ylim(len(bins_to) - 3.5, -0.5)
-        plt.colorbar(im)
-        ax.set_title('Propagator for allele frequencies\nbetween consecutive time points, '+\
-                     '-'.join(genes)+'\n[log10 P(x1 | x0)], syn muts', fontsize=16)
-        plt.tight_layout()
-
-        fig_nonsyn, ax = plt.subplots()
-        z = hist_nonsyn[:, 1:-1]
-        z  = (z.T / z.sum(axis=1)).T
-        z = np.log10(z)
-        im = ax.imshow(z.T, interpolation='nearest')
-        ax.set_xlabel('Initial freq')
-        ax.set_ylabel('Final freq')
-        ax.set_xticks(np.arange(len(bins_from) - 1))
-        ax.set_yticks(np.arange(len(bins_to) - 1))
-        ax.set_xticklabels(map('{:1.1e}'.format, np.sqrt(bins_from[:-1] * bins_from[1:])), rotation=45, fontsize=10)
-        ax.set_yticklabels(map('{:1.1e}'.format, np.sqrt(bins_to[1:-2] * bins_to[2:-1])), rotation=45, fontsize=10)
-        ax.set_xlim(0.5, len(bins_from) - 1.5)
-        ax.set_ylim(len(bins_to) - 3.5, -0.5)
-        plt.colorbar(im)
-        ax.set_title('Propagator for allele frequencies\nbetween consecutive time points, '+\
-                     '-'.join(genes)+'\n[log10 P(x1 | x0)], nonsyn muts', fontsize=16)
-        plt.tight_layout()
+        fig, ax = plt.subplots(figsize=(9, 6))
+        ax.set_title(gene+', $\Delta t \in ['+str(dt[0])+', '+str(dt[1])+']$ days')
+        props[(gene, 'syn')].plot(heatmap=False, figaxs=(fig, ax), ls='--', marker='s')
+        props[(gene, 'nonsyn')].plot(heatmap=False, figaxs=(fig, ax))
 
         plt.ion()
         plt.show()
 
-        # Save figs to tmp folder
-        fig_syn.savefig('/ebio/ag-neher/home/fzanini/tmp/propagator_'+'-'.join(genes)+'_syn.png')
-        fig_nonsyn.savefig('/ebio/ag-neher/home/fzanini/tmp/propagator_'+'-'.join(genes)+'_nonsyn.png')

@@ -81,13 +81,12 @@ def onpick_callback(event):
 # Script
 if __name__ == '__main__':
 
-    # Parse input args
     parser = argparse.ArgumentParser(description='Get interpatient diversity',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     parser.add_argument('--patients', nargs='+',
                         help='Patients to analyze')
     parser.add_argument('--roi', action=RoiAction, required=True,
-                        help='Fragments to analyze (e.g. F1 F6)')
+                        help='Region of Interest (e.g. F1 100 200)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-4]')
     parser.add_argument('--plot', default='both',

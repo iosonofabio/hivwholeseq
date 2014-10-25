@@ -10,21 +10,25 @@ content:    Test script to measure decorrelation (recombination): pick pairs of
 import sys
 import os
 import argparse
+from itertools import izip
 import numpy as np
-import pysam
-from Bio import SeqIO
+from matplotlib import cm
+import matplotlib.pyplot as plt
 
 from hivwholeseq.miseq import alpha
-from hivwholeseq.patients.patients import get_patient
-from hivwholeseq.sequencing.filter_mapped_reads import plot_distance_histogram, \
-        plot_distance_histogram_sliding_window, get_distance_from_consensus, \
-        check_overhanging_reads, trim_bad_cigar
-from hivwholeseq.patients.filenames import get_initial_reference_filename, \
-        get_mapped_to_initial_filename, get_filter_mapped_init_summary_filename, \
-        get_allele_cocounts_filename, get_allele_frequency_trajectories_filename
-from hivwholeseq.mapping_utils import convert_sam_to_bam, pair_generator
-from hivwholeseq.two_site_statistics import get_coallele_counts_from_file
+from hivwholeseq.patients.patients import load_patients, Patient
+from hivwholeseq.patients.samples import SamplePat
 
+
+
+# Functions
+def broadcast_one_site_to_two_sites(array):
+    '''Broadcast a one-site statistics for two-sites'''
+    array_bc = np.tile(array, np.prod(array.shape))
+    array_bc = array_bc.reshape((array.shape[0], array.shape[1],
+                                 array.shape[0], array.shape[1]))
+    array_bc = array_bc.swapaxes(1, 2)
+    return array_bc
 
 
 
@@ -33,32 +37,125 @@ if __name__ == '__main__':
 
     # Parse input args
     parser = argparse.ArgumentParser(description='Filter mapped reads')
-    parser.add_argument('--patient', required=True,
+    parser.add_argument('--patients',
                         help='Patient to analyze')
     parser.add_argument('--fragments', nargs='*',
                         help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
+    parser.add_argument('--plot', action='store_true',
+                        help='Plot results')
 
     args = parser.parse_args()
-    pname = args.patient
+    pnames = args.patients
     fragments = args.fragments
     VERBOSE = args.verbose
+    use_plot = args.plot
 
-    patient = get_patient(pname)
-    samplenames = patient.samples[:2] #FIXME # They are time sorted already
-    times = patient.times()
 
-    # If the script is called with no fragment, iterate over all
-    # NOTE: This assumes that the fragment has been sequenced. If not, we should
-    # take a later time point or similia, but let's not worry about it yet.
+    patients = load_patients()
+    if pnames is not None:
+        patients = patients.loc[pnames]
+
     if not fragments:
         fragments = ['F'+str(i) for i in xrange(1, 7)]
-    if VERBOSE >= 3:
-        print 'fragments', fragments
 
     for fragment in fragments:
-        #refseq = SeqIO.read(get_initial_reference_filename(pname, fragment), 'fasta')
+        for pname, patient in patients.iterrows():
+            if VERBOSE >= 1:
+                print pname, fragment
+
+            patient = Patient(patient)
+
+            refseq = patient.get_reference(fragment)
+
+            if VERBOSE >= 2:
+                print 'Get allele frequency trajectories'
+            aft, indt = patient.get_allele_frequency_trajectories(fragment)
+            times = patient.times[indt]
+
+            if VERBOSE >= 2:
+                print 'Get initial cocounts'
+            sample0 = SamplePat(patient.samples.iloc[0])
+            acc = sample0.get_allele_cocounts(fragment)
+            acf = 1.0 * acc / acc.sum(axis=0).sum(axis=0)
+
+            if VERBOSE >= 2:
+                print 'Restrict to polymorphic sites'
+            # FIXME: deal better with low viral load
+            ind_poly = (aft > 0.01).any(axis=0) & (aft < 1 - 0.01).any(axis=0)
+
+            ind_poly_cc = broadcast_one_site_to_two_sites(ind_poly)
+            ind_poly_cc = ind_poly_cc & ind_poly_cc.swapaxes(0, 1).swapaxes(2, 3)
+
+            if VERBOSE >= 2:
+                print 'Take a subset of pairs'
+            indi_poly_cc = np.transpose(ind_poly_cc.nonzero())
+            indi_ss = indi_poly_cc[np.random.randint(len(indi_poly_cc), size=1000)]
+            indi_ts = np.random.randint(len(times), size=(len(indi_ss), 2))
+
+            if VERBOSE >= 2:
+                print 'Computing statistics'
+
+            ds = np.zeros(len(indi_ss))
+            ys = np.zeros_like(ds)
+            for i, (indi, it) in enumerate(izip(indi_ss, indi_ts)):
+                it1 = np.min(it)
+                it2 = np.max(it)
+
+                if it1 == it2:
+                    continue
+
+                # FIXME: we take zero-count pairs?
+                import ipdb; ipdb.set_trace()
+
+                # NOTE: tuples are special for indexing (!)
+                sgn = np.sign(acf[tuple(indi)] - \
+                              aft[0, indi[0], indi[2]] * aft[0, indi[1], indi[3]])
+                daf1 = aft[it2, indi[0], indi[2]] - aft[it1, indi[0], indi[2]]
+                daf2 = aft[it2, indi[1], indi[3]] - aft[it1, indi[1], indi[3]]
+                y = sgn * daf1 * daf2
+
+                dt = times[it2] - times[it1]
+                dpos = np.abs(indi[3] - indi[2])
+                d = dpos * dt
+
+                import ipdb; ipdb.set_trace()
+
+                ds[i] = d
+                ys[i] = y
+
+            if use_plot:
+
+                if VERBOSE >= 2:
+                    print 'Plotting'
+
+                bins = np.linspace(0.001, ds.max() + 0.001, 30)
+                x = 0.5 * (bins[1:] + bins[:-1])
+                y = np.array([ys[(ds >= bins[i]) & (ds < bins[i+1])].mean()
+                              for i in xrange(len(bins) - 1)])
+                dy = np.array([ys[(ds >= bins[i]) & (ds < bins[i+1])].std()
+                               for i in xrange(len(bins) - 1)])
+
+                fig, ax = plt.subplots()
+                ax.set_xlabel('Distance [days * bp]')
+                ax.set_ylabel('sgn$C_0 \cdot d\\nu_1 \cdot d\\nu_2$')
+
+                ax.errorbar(x, y, dy, lw=2)
+                
+                plt.tight_layout()
+                plt.ion()
+                plt.show()
+
+
+
+
+
+
+
+            break
+        break
+
 
         #if VERBOSE >= 1:
         #    print 'Initializing matrix of coallele frequencies'
@@ -92,13 +189,13 @@ if __name__ == '__main__':
         ## Take the correlation coefficient, i.e. divide by sqrt(pi qi pj qj)
         #corr = LD / np.sqrt(aftbroad * (1 - aftbroad) * aftbroadT * (1 - aftbroadT))
 
-        if VERBOSE >= 1:
-            print 'Finding initial highly correlated pairs'
+        #if VERBOSE >= 1:
+        #    print 'Finding initial highly correlated pairs'
 
-        # FIXME: only use this criterion because we have t0 twice
-        ind_highLD0 = (corr[0] > 1).nonzero()
-        #ind_highLD0 = ((LD[0] > 0.1) & (LD[1] > 0.1) & (aftbroad[0] > 1e-3) & (aftbroad[0] < 0.5)).nonzero()
-        pairs_high_LD0 = zip(*ind_highLD0)
-        LD_pairs = np.array([LD[:, pair[0], pair[1], pair[2], pair[3]] for pair in pairs_high_LD0]).T
-        corr_pairs = np.array([corr[:, pair[0], pair[1], pair[2], pair[3]] for pair in pairs_high_LD0]).T
-        print corr_pairs.T
+        ## FIXME: only use this criterion because we have t0 twice
+        #ind_highLD0 = (corr[0] > 1).nonzero()
+        ##ind_highLD0 = ((LD[0] > 0.1) & (LD[1] > 0.1) & (aftbroad[0] > 1e-3) & (aftbroad[0] < 0.5)).nonzero()
+        #pairs_high_LD0 = zip(*ind_highLD0)
+        #LD_pairs = np.array([LD[:, pair[0], pair[1], pair[2], pair[3]] for pair in pairs_high_LD0]).T
+        #corr_pairs = np.array([corr[:, pair[0], pair[1], pair[2], pair[3]] for pair in pairs_high_LD0]).T
+        #print corr_pairs.T

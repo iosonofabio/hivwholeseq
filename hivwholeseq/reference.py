@@ -5,13 +5,14 @@ date:       26/09/13
 content:    Manage reference sequences.
 '''
 # Modules
-from Bio import SeqIO
+from Bio import SeqIO, AlignIO
 
 from hivwholeseq.sequencing.filenames import get_HXB2_entire, get_NL43_entire, get_F10_entire, \
-        get_HXB2_fragmented, get_NL43_fragmented, get_F10_fragmented, \
-        get_custom_reference_filename
+        get_HXB2_fragmented, get_NL43_fragmented, get_F10_fragmented
 from hivwholeseq.sequence_utils import correct_genbank_features_load, \
         correct_genbank_features_save
+from hivwholeseq.filenames import get_custom_reference_filename, \
+        get_custom_alignment_filename
 
 
 
@@ -65,3 +66,9 @@ def save_custom_reference(record, reference, format='fasta', molecule='DNA'):
                        get_custom_reference_filename(reference, format=format),
                        format)
 
+
+def load_custom_alignment(aliname, format='fasta', molecule='DNA'):
+    '''Load a custom alignment'''
+    fn = get_custom_alignment_filename(aliname, format=format)
+    ali = AlignIO.read(fn, format)
+    return ali
