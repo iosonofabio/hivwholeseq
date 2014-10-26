@@ -2,9 +2,7 @@
 '''
 author:     Fabio Zanini
 date:       20/03/14
-content:    Test script to measure decorrelation (recombination): pick pairs of
-            alleles that are strongly correlated at the first time point, and see
-            how fast the correlation disappears - if at all.
+content:    Measure recombination in various ways.
 '''
 # Modules
 import sys
@@ -37,7 +35,7 @@ if __name__ == '__main__':
 
     # Parse input args
     parser = argparse.ArgumentParser(description='Filter mapped reads')
-    parser.add_argument('--patients',
+    parser.add_argument('--patients', nargs='+',
                         help='Patient to analyze')
     parser.add_argument('--fragments', nargs='*',
                         help='Fragment to map (e.g. F1 F6)')
@@ -60,6 +58,8 @@ if __name__ == '__main__':
     if not fragments:
         fragments = ['F'+str(i) for i in xrange(1, 7)]
 
+    ds_all = []
+    ys_all = []
     for fragment in fragments:
         for pname, patient in patients.iterrows():
             if VERBOSE >= 1:
@@ -77,26 +77,50 @@ if __name__ == '__main__':
             if VERBOSE >= 2:
                 print 'Get initial cocounts'
             sample0 = SamplePat(patient.samples.iloc[0])
-            acc = sample0.get_allele_cocounts(fragment)
-            acf = 1.0 * acc / acc.sum(axis=0).sum(axis=0)
+            # FIXME: complete those matrices
+            try:
+                acc = sample0.get_allele_cocounts(fragment)
+            except IOError:
+                ds_all.append([])
+                ys_all.append([])
+                continue
+
+            # FIXME: Einstein's style sums should be equivalent to tile + swapaxes
+            # EXCEPT that einsum ignores the mask I should DOUBLE CHECK that. Btw,
+            # if speed is an issue and einsum is faster, we can just do it twice,
+            # with data and mask, and then reglue those togetherfaster, we can just do it twice,
+            # with data and mask, and then reglue those together..
 
             if VERBOSE >= 2:
                 print 'Restrict to polymorphic sites'
             # FIXME: deal better with low viral load
             ind_poly = (aft > 0.01).any(axis=0) & (aft < 1 - 0.01).any(axis=0)
-
             ind_poly_cc = broadcast_one_site_to_two_sites(ind_poly)
             ind_poly_cc = ind_poly_cc & ind_poly_cc.swapaxes(0, 1).swapaxes(2, 3)
 
             if VERBOSE >= 2:
+                print 'Restrict to pairs with enough cocoverage'
+            # FIXME: make a variable threshold
+            ind_cocoverage = (acc.sum(axis=0).sum(axis=0) > 100)
+            ind_cocoverage_cc = np.einsum('ij,kl->klij',
+                                          ind_cocoverage,
+                                          np.ones(acc.shape[:2], bool))
+
+            if VERBOSE >= 2:
+                print 'Calculate coallele frequencies from cocounts, excluding low-coverage and low-frequency'
+            acf = 1.0 * acc / acc.sum(axis=0).sum(axis=0)
+            acf[ind_cocoverage_cc & (acf < 1e-2)] = 0
+            # Renormalize (small effect)
+            acf /= acf.sum(axis=0).sum(axis=0)
+
+            if VERBOSE >= 2:
                 print 'Take a subset of pairs'
-            indi_poly_cc = np.transpose(ind_poly_cc.nonzero())
-            indi_ss = indi_poly_cc[np.random.randint(len(indi_poly_cc), size=1000)]
+            indi_good_cc = np.transpose((ind_poly_cc & ind_cocoverage_cc).nonzero())
+            indi_ss = indi_good_cc[np.random.randint(len(indi_good_cc), size=1000)]
             indi_ts = np.random.randint(len(times), size=(len(indi_ss), 2))
 
             if VERBOSE >= 2:
                 print 'Computing statistics'
-
             ds = np.zeros(len(indi_ss))
             ys = np.zeros_like(ds)
             for i, (indi, it) in enumerate(izip(indi_ss, indi_ts)):
@@ -105,9 +129,6 @@ if __name__ == '__main__':
 
                 if it1 == it2:
                     continue
-
-                # FIXME: we take zero-count pairs?
-                import ipdb; ipdb.set_trace()
 
                 # NOTE: tuples are special for indexing (!)
                 sgn = np.sign(acf[tuple(indi)] - \
@@ -120,41 +141,47 @@ if __name__ == '__main__':
                 dpos = np.abs(indi[3] - indi[2])
                 d = dpos * dt
 
-                import ipdb; ipdb.set_trace()
+                if VERBOSE >= 4:
+                    print acc[:, :, indi[2], indi[3]]
+                    print acf[:, :, indi[2], indi[3]]
+                    import ipdb; ipdb.set_trace()
 
                 ds[i] = d
                 ys[i] = y
 
-            if use_plot:
+            ds_all.append(ds)
+            ys_all.append(ys)
 
-                if VERBOSE >= 2:
-                    print 'Plotting'
+    if use_plot:
 
-                bins = np.linspace(0.001, ds.max() + 0.001, 30)
-                x = 0.5 * (bins[1:] + bins[:-1])
-                y = np.array([ys[(ds >= bins[i]) & (ds < bins[i+1])].mean()
-                              for i in xrange(len(bins) - 1)])
-                dy = np.array([ys[(ds >= bins[i]) & (ds < bins[i+1])].std()
-                               for i in xrange(len(bins) - 1)])
+        if VERBOSE >= 2:
+            print 'Plotting'
 
-                fig, ax = plt.subplots()
-                ax.set_xlabel('Distance [days * bp]')
-                ax.set_ylabel('sgn$C_0 \cdot d\\nu_1 \cdot d\\nu_2$')
+        dsa = np.concatenate(ds_all)
+        ysa = np.concatenate(ys_all)
 
-                ax.errorbar(x, y, dy, lw=2)
-                
-                plt.tight_layout()
-                plt.ion()
-                plt.show()
+        bins = np.linspace(0.001, dsa.max() + 0.001, 30)
+        x = 0.5 * (bins[1:] + bins[:-1])
+        y = np.array([ysa[(dsa >= bins[i]) & (dsa < bins[i+1])].mean()
+                      for i in xrange(len(bins) - 1)])
+        dy = np.array([ysa[(dsa >= bins[i]) & (dsa < bins[i+1])].std()
+                       for i in xrange(len(bins) - 1)])
+
+        fig, ax = plt.subplots()
+        ax.set_xlabel('Distance [days * bp]')
+        ax.set_ylabel('sgn$C_0 \cdot d\\nu_1 \cdot d\\nu_2$')
+        ax.grid(True)
+
+        ax.errorbar(x, y, dy, lw=2)
+        
+        plt.tight_layout()
+        plt.ion()
+        plt.show()
 
 
 
 
 
-
-
-            break
-        break
 
 
         #if VERBOSE >= 1:

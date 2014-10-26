@@ -218,6 +218,8 @@ if __name__ == '__main__':
                                 cod_new[pos_wn] = a
 
                                 if translate(''.join(cod_anc)) == translate(''.join(cod_new)):
+                                # FIXME: random control
+                                #if np.random.rand() > 0.5:
                                     afaf['syn'].append((aft[i, ia, pos], aft[j, ia, pos]))
                                 else:
                                     afaf['nonsyn'].append((aft[i, ia, pos], aft[j, ia, pos]))
