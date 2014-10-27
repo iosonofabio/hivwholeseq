@@ -225,7 +225,7 @@ if __name__ == '__main__':
                         help='Verbosity level [0-3]')
     parser.add_argument('--no-summary', action='store_false', dest='summary',
                         help='Do not save results in a summary file')
-    parser.add_argument('--PCR', default='all',
+    parser.add_argument('--PCR', default='1',
                         help='PCR to analyze (1, 2, or all)')
 
     args = parser.parse_args()

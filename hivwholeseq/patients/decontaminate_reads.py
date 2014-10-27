@@ -262,7 +262,7 @@ if __name__ == '__main__':
                         help='Do not save results in a summary file')
     parser.add_argument('--submit', action='store_true',
                         help='Execute the script in parallel on the cluster')
-    parser.add_argument('--PCR', type=int, default=None,
+    parser.add_argument('--PCR', type=int, default=1,
                         help='Analyze only reads from this PCR (e.g. 1)')
 
     args = parser.parse_args()

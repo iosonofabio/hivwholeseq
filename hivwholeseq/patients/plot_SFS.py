@@ -22,7 +22,7 @@ from hivwholeseq.patients.one_site_statistics import get_allele_frequency_trajec
 
 
 # Functions
-def load_BSC_SFS():
+def load_BSC_SFS(VERBOSE=0):
     '''Load sfs of direct bsc simulations'''
     import glob
     import cPickle as pickle
@@ -55,11 +55,12 @@ def load_BSC_SFS():
 
     #calculate pi for the spectra and normalize to equal pi (== equal T_2)
     for N in sfs_bsc:
-        print np.sum(sfs_bc[N]*(1-sfs_bc[N])*sfs_bw[N]*sfs_bsc[N])
+        if VERBOSE >= 3:
+            print np.sum(sfs_bc[N]*(1-sfs_bc[N])*sfs_bw[N]*sfs_bsc[N])
         # normalize bsc SFS to unit pairwise difference
         sfs_bsc[N]/=np.sum(sfs_bc[N]*(1-sfs_bc[N])*sfs_bw[N]*sfs_bsc[N])
 
-    return sfs_bsc
+    return (sfs_bc, sfs_bsc)
 
 
 
@@ -79,7 +80,7 @@ if __name__ == '__main__':
                         help='Plot the allele frequency trajectories')
     parser.add_argument('--BSC', action='store_true',
                         help='compare to BSC site frequency spectra')
-    parser.add_argument('--min-depth', type=int, default=100, dest='min_depth',
+    parser.add_argument('--min-depth', type=int, default=500, dest='min_depth',
                         help='Minimal depth to consider the site')
     parser.add_argument('--saveplot', action='store_true',
                         help='Save the plot')
@@ -108,7 +109,7 @@ if __name__ == '__main__':
     delta_af_hist = np.zeros_like(delta_af_binsc)
 
     if add_bsc:
-        sfs_bsc = load_BSC_SFS()
+        (sfs_bc, sfs_bsc) = load_BSC_SFS()
 
     if not fragments:
         fragments = ['F'+str(i) for i in xrange(1, 7)]
