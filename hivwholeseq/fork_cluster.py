@@ -819,3 +819,33 @@ def fork_get_allele_frequency_trajectory(pname, fragment, VERBOSE=0):
         print ' '.join(qsub_list)
     return sp.check_output(qsub_list)
 
+
+
+# THEORY
+def fork_calculate_beta_SFS(alpha, N, VERBOSE=0):
+    '''Fork to the cluster in parallel for each alpha and N'''
+    if VERBOSE:
+        print 'Forking to the cluster: alpha '+str(alpha)+', N '+str(N)
+
+    JOBSCRIPT = JOBDIR+'theory/build_betatree_sfs.py'
+    cluster_time = '23:59:59'
+    vmem = '4G'
+
+    qsub_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'SFS '+str(alpha)+' '+str(N),
+                 '-l', 'h_rt='+cluster_time,
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--alphas', alpha,
+                 '--Ns', N,
+                 '--verbose', VERBOSE,
+                ]
+    qsub_list = map(str, qsub_list)
+    if VERBOSE:
+        print ' '.join(qsub_list)
+    return sp.check_output(qsub_list)
+

@@ -22,43 +22,33 @@ from hivwholeseq.patients.one_site_statistics import get_allele_frequency_trajec
 
 
 # Functions
-def load_BSC_SFS(VERBOSE=0):
+def load_beta_SFS(VERBOSE=0, alpha=1, bins=20):
     '''Load sfs of direct bsc simulations'''
-    import glob
-    import cPickle as pickle
+    sample_size = 3000
 
-    filelist = glob.glob('/ebio/ag-neher/share/users/rneher/WeakSelectionCoalescent/BS_SFS/SFS*.pickle')
-    sfs_bsc = {}
-    sfs_bc = {}
-    sfs_bw={}
-    sfs_bsc_filecount ={}
-    for fname in filelist:                                                          
-        entries=fname.split('_')                                                    
-        N=int(entries[-2])                                                          
-        file=open(fname, 'r')                                                       
-        temp, temp_bc=pickle.load(file)                                           
-        if (N in sfs_bsc):                                                            
-            sfs_bsc[N]+=temp/sfs_bw[N]
-            sfs_bsc_filecount[N]+=1                                                     
-        else:                                                                       
-            sfs_bc[N]=temp_bc                                                 
-            sfs_bw[N] = sfs_bc[N][1:]-sfs_bc[N][:-1]
-            sfs_bsc_filecount[N]=1                                                      
-            sfs_bsc[N]=temp/sfs_bw[N]
+    import os
+    from hivwholeseq.theory.filenames import get_sfs_betatree_filename
+    fn = get_sfs_betatree_filename(sample_size, alpha)
+    if os.path.isfile(fn):
+        if VERBOSE >= 2:
+            print 'Recycling beta coalescent SFS with N = '+str(sample_size)+\
+                    ' and alpha = '+str(alpha)
+        data = np.loadtxt(fn, unpack=True)
+        sfs_bc = {(sample_size, alpha): data[0]}
+        sfs_bsc = {(sample_size, alpha): data[1]}
 
-    #Produce centered bins                                                          
-    for N in sfs_bc:
-        sfs_bc[N]=np.sqrt(sfs_bc[N][1:]*sfs_bc[N][:-1])
-    #divide the spectra by the file count to normalize                              
-    for N in sfs_bsc:                                                                 
-        sfs_bsc[N]/=sfs_bsc_filecount[N]                                                  
+    else:
+        from hivwholeseq.theory.betatree.src.sfs import SFS
+        if VERBOSE >= 2:
+            print 'Generating beta coalescent SFS with N = '+str(sample_size)+\
+                    ' and alpha = '+str(alpha)
+        sfs_beta = SFS(sample_size=sample_size, alpha=alpha)
+        sfs_beta.getSFS(ntrees=1000)
+        sfs_beta.binSFS(mode='logit', bins=bins)
+        sfs_beta.bin_center = np.sqrt(bins[1:] * bins[:-1])
 
-    #calculate pi for the spectra and normalize to equal pi (== equal T_2)
-    for N in sfs_bsc:
-        if VERBOSE >= 3:
-            print np.sum(sfs_bc[N]*(1-sfs_bc[N])*sfs_bw[N]*sfs_bsc[N])
-        # normalize bsc SFS to unit pairwise difference
-        sfs_bsc[N]/=np.sum(sfs_bc[N]*(1-sfs_bc[N])*sfs_bw[N]*sfs_bsc[N])
+        sfs_bc = {(sample_size, alpha): sfs_beta.bin_center}
+        sfs_bsc = {(sample_size, alpha): sfs_beta.binned_sfs}
 
     return (sfs_bc, sfs_bsc)
 
@@ -67,7 +57,6 @@ def load_BSC_SFS(VERBOSE=0):
 # Script
 if __name__ == '__main__':
 
-    # Parse input args
     parser = argparse.ArgumentParser(description='Get site frequency spectra',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     parser.add_argument('--patients', nargs='+',
@@ -107,9 +96,6 @@ if __name__ == '__main__':
     delta_af_binsc = 0.5*(delta_af_bins[1:] + delta_af_bins[:-1])
     delta_af_binw = np.diff(delta_af_bins)
     delta_af_hist = np.zeros_like(delta_af_binsc)
-
-    if add_bsc:
-        (sfs_bc, sfs_bsc) = load_BSC_SFS()
 
     if not fragments:
         fragments = ['F'+str(i) for i in xrange(1, 7)]
@@ -156,21 +142,37 @@ if __name__ == '__main__':
                 bins=delta_af_bins, density=False)
             delta_af_hist += h[0] / delta_af_binw
 
+
+    if add_bsc:
+        (sfs_bc, sfs_bsc) = load_beta_SFS(bins=bins, VERBOSE=VERBOSE, alpha=1)
+        tmp = load_beta_SFS(bins=bins, VERBOSE=VERBOSE, alpha=1.25)
+        sfs_bc.update(tmp[0])
+        sfs_bsc.update(tmp[1])
+        tmp = load_beta_SFS(bins=bins, VERBOSE=VERBOSE, alpha=1.5)
+        sfs_bc.update(tmp[0])
+        sfs_bsc.update(tmp[1])
+        for (N, alpha) in sfs_bsc:
+            ind = (sfs_bsc[(N, alpha)] > 0).nonzero()[0]
+            sfs_bc[(N, alpha)] = sfs_bc[(N, alpha)][ind]
+            sfs_bsc[(N, alpha)] = sfs_bsc[(N, alpha)][ind] / sfs_bsc[(N, alpha)][ind[0]] * hist[ind[0]]
     
     if use_plot:
-        N=10000
+        from matplotlib import cm
         import matplotlib.pyplot as plt
         trfun = lambda x: np.log10(x / (1 - x))
 
         fig, ax = plt.subplots()
         ax.plot(trfun(binsc), hist, lw=2, c='k',marker='o', label = 'HIV polymorphisms')
-        alpha = hist[0]
+        al = hist[0]
         if add_bsc:
-            ax.plot(trfun(sfs_bc[N]), alpha*sfs_bsc[N]/sfs_bsc[N][np.argmax(sfs_bc[N]>1.3e-3)], 
-                    lw=2, c='r', ls = '-', label = 'Strong selection')
+            for (N, alpha) in sfs_bc:
+                ax.plot(trfun(sfs_bc[(N, alpha)]), sfs_bsc[(N, alpha)],
+                        lw=2, ls = '-',
+                        color=cm.jet_r(1.0 * (alpha - 1)),
+                        label = 'Beta coalescent, $\\alpha = '+str(alpha)+'$')
         else:
-            ax.plot(trfun(binsc[:8]), alpha*binsc[0]**2/binsc[:8]**2, lw=2, c='r')
-        ax.plot(trfun(binsc), alpha*binsc[0]/binsc, lw=2, c='g', label = 'Neutral')
+            ax.plot(trfun(binsc[:8]), al*binsc[0]**2/binsc[:8]**2, lw=2, c='r')
+        ax.plot(trfun(binsc), al*binsc[0]/binsc, lw=2, c='b', label = 'Neutral')
 
         ax.set_xlabel('derived allele frequency')
         ax.set_ylabel('SFS [density = counts / sum / binsize]')
@@ -193,7 +195,8 @@ if __name__ == '__main__':
         else:
             ax.set_title('All patients, fragments '+str(fragments))
         ax.grid(True)
-        plt.legend()
+        ax.set_ylim(1e2, 1e8)
+        ax.legend(loc=3, fontsize=10)
 
         plt.tight_layout()
 

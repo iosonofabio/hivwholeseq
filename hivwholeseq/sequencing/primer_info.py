@@ -49,11 +49,11 @@ primers_inner = {'F1': ['AAGTAGTGTGTGCCCGTCTGT', rc('TGCCAAAGAGTGATYTGAGGG')],
 primers_outer = {'F1': ['CTCAATAAAGCTTGCCTTGAGTGC', rc('ACTGTATCATCTGCTCCTGTRTCT')],
                  'F2': ['AAATTGCAGGGCYCCTAG', rc('CTRTTAGCTGCCCCATCTACATAG')],
                  'F3a': ['CACACTAATGATGTAARACARTTAACAG', rc('TTCCATGTTYTAATCCTCATCCTGTCTAC')],
-                 # NOTE: F3b and F3c are actually the same, but I forgot about the last G for
+                 # NOTE: F3b and F3B are actually the same, but I forgot about the last G for
                  # the biggest part of the dataset. It's not a huge problem because that G is
                  # FULLY conserved at least across HIV-1 type M (maybe even more widely).
                  'F3b': ['CACACTAATGATGTAARACARTTAACAG', rc('GGGATGTGTACTTCTGAACTTAYTYTTG')],
-                 'F3c': ['CACACTAATGATGTAARACARTTAACAG', rc('GGGATGTGTACTTCTGAACTTAYTYTTGG')],
+                 'F3B': ['CACACTAATGATGTAARACARTTAACAG', rc('GGGATGTGTACTTCTGAACTTAYTYTTGG')],
                  'F4': ['CGGGTTTATTWCAGRGACAGCAGA', rc('GGGGTTAAYTTTACACATGGYTTTA')],
                  'F5a': ['GGCATYTCCTATGGCAGGAAGAAG', rc('GTGGTGCARATGAGTTTTCCAGAGCA')],
                  'F5b': ['AGAATAAGAGAAAGAGCAGAAGA', rc('ATGAGTTTTCCAGAGCANCCCCA')],
@@ -80,7 +80,7 @@ primers_coordinates_HXB2_outer = {'F1': [[523, 547], [2323, 2347]],
                                   'F3a': [[3629, 3657], [5076, 5105]],
                                   # NOTE: this exists only because of the missing G
                                   'F3b': [[3629, 3657], [5185, 5213]],
-                                  'F3c': [[3629, 3657], [5184, 5213]],
+                                  'F3B': [[3629, 3657], [5184, 5213]],
                                   'F4': [[4898, 4922], [6570, 6595]],
                                   'F5a': [[5959, 5982], [8015, 8041]],
                                   'F5b': [[6193, 6216], [8009, 8032]],
