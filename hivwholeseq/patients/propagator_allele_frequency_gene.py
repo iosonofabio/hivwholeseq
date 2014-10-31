@@ -234,7 +234,7 @@ if __name__ == '__main__':
         fig, ax = plt.subplots(figsize=(9, 6))
         ax.set_title(gene+', $\Delta t \in ['+str(dt[0])+', '+str(dt[1])+']$ days')
         props[(gene, 'syn')].plot(heatmap=False, figaxs=(fig, ax), ls='--', marker='s')
-        props[(gene, 'nonsyn')].plot(heatmap=False, figaxs=(fig, ax))
+        props[(gene, 'nonsyn')].plot(heatmap=False, figaxs=(fig, ax), start_nu=False)
 
         plt.ion()
         plt.show()

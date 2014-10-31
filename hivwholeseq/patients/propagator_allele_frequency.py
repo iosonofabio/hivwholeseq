@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 from hivwholeseq.patients.patients import load_patients, filter_patients_n_times, Patient
 from hivwholeseq.patients.filenames import get_initial_reference_filename
 from hivwholeseq.patients.one_site_statistics import get_allele_count_trajectories
+from hivwholeseq import plot_utils
 
 
 
@@ -41,18 +42,19 @@ class Propagator(object):
                 binsy = np.asarray(binsy)
                 binsyc = np.concatenate([[0], 0.5 * (binsy[2:-1] + binsy[1:-2]), [1]])
         else:
-            self.trfun = trfun = lambda x: np.log10(x / (1 - x))
-            self.trfuni = trfuni = lambda y: 1.0 / (1 + 10**(-y))
+            # We need the logit transformation to make bins in case there are none
+            trfun = plot_utils.LogitTransform().transform_non_affine
+            trfuni = plot_utils.LogitTransformInverted().transform_non_affine
 
             binsx = trfun(np.linspace(trfuni(2e-3), trfuni(1.0 - 2e-3), n_binsx))
-            binsxc = trfun(0.5 * (trfuni(binsx)[1:] + trfuni(binsx)[:-1]))
+            binsxc = 0.5 * (binsx[1:] + binsx[:-1])
 
             # The final frequencies include 0 and 1
             if binsy is None:
                 binsy = trfun(np.linspace(trfuni(2e-3), trfuni(1.0 - 2e-3), n_binsy))
                 binsy = np.concatenate([[0], binsy, [1]])
                 binsyc = np.concatenate([[0],
-                            trfun(0.5 * (trfuni(binsy)[2:-1] + trfuni(binsy)[1:-2])),
+                            0.5 * (binsy[2:-1] + binsy[1:-2]),
                                          [1]])
             else:
                 # FIXME: The center of the bin is the arithmetic mean, for now
@@ -73,7 +75,8 @@ class Propagator(object):
         self.histogram = np.zeros((len(binsx) - 1, len(binsy) - 1), float)
 
 
-    def plot(self, figaxs=None, title='', heatmap=True, marker='o', **kwargs):
+    def plot(self, figaxs=None, title='', heatmap=True, marker='o',
+             start_nu=True, **kwargs):
         '''Plot the propagator.
         
         Parameters
@@ -112,10 +115,6 @@ class Propagator(object):
             xf0 = 1.2e-3
             xf1 = 1.0 - 1.2e-3
 
-            if self.use_logit:
-                (xf, xf0, xf1) = map(self.trfun, (xf, xf0, xf1))
-                xi = self.trfun(xi)
-
             ax.plot(xf, y, lw=2, c=cm.jet(1.0 * iz / z.shape[0]),
                     label='$x_i = '+'{:1.1e}'.format(xi)+'$',
                     **kwargs)
@@ -125,21 +124,14 @@ class Propagator(object):
             ax.scatter(xf1, zi[-1], s=80, facecolor='none', lw=2,
                        edgecolor=cm.jet(1.0 * iz / z.shape[0]),
                        marker=marker)
-            ax.axvline(xi, color=cm.jet(1.0 * iz / z.shape[0]), lw=0.5,
-                       alpha=0.5, ls='-')
+
+            if start_nu:
+                ax.axvline(xi, color=cm.jet(1.0 * iz / z.shape[0]), lw=0.5,
+                           alpha=0.5, ls='-')
 
         if self.use_logit:
-            ax.set_xlim(*map(self.trfun, (1e-3, 1 - 1e-3)))
-            tickloc = np.array([0.001, 0.01, 0.1, 0.5, 0.9, 0.99, 0.999])
-            ax.set_xticks(self.trfun(tickloc))
-            ax.set_xticklabels(map(str, tickloc))
-            from matplotlib.ticker import FixedLocator
-            ticklocminor = np.concatenate([[10**po * x for x in xrange(2 , 10)]
-                                           for po in xrange(-4, -1)] + \
-                                          [[0.1 * x for x in xrange(2 , 9)]] + \
-                                          [[1 - 10**po * (10 - x) for x in xrange(2, 10)]
-                                           for po in xrange(-2, -5, -1)])
-            ax.xaxis.set_minor_locator(FixedLocator(self.trfun(ticklocminor)))
+            ax.set_xscale('logit')
+            ax.set_xlim(1e-3, 1 - 1e-3)
 
         else:
             ax.set_xscale('log')
@@ -213,16 +205,10 @@ def plot_propagator_theory(xis, t, model='BSC', xlim=[0.03, 0.93], ax=None, logi
     else:
         ax_was_none = False
 
-    if logit:
-        trfun = trfun = lambda x: np.log10(x / (1 - x))
-        trfuni = trfuni = lambda y: 1.0 / (1 + 10**(-y))
-
     for i, (xi, xf, rho) in enumerate(izip(xis, xfs, rhos)):
         ind_out1 = (xf < xlim[0])
         ind_in = (xf >= xlim[0]) & (xf <= xlim[1])
         ind_out2 = (xf > xlim[1])
-        if logit:
-            xf = trfun(xf)
         ax.plot(xf[ind_in], rho[ind_in],
                 color=cm.jet(1.0 * i / len(xis)),
                 lw=2,
@@ -238,17 +224,8 @@ def plot_propagator_theory(xis, t, model='BSC', xlim=[0.03, 0.93], ax=None, logi
         ax.set_xlabel('Final frequency')
 
         if logit:
-            ax.set_xlim(-3.1, 3.1)
-            tickloc = np.array([0.001, 0.01, 0.1, 0.5, 0.9, 0.99, 0.999])
-            ax.set_xticks(trfun(tickloc))
-            ax.set_xticklabels(map(str, tickloc))
-            from matplotlib.ticker import FixedLocator
-            ticklocminor = np.concatenate([[10**po * x for x in xrange(2 , 10)]
-                                           for po in xrange(-4, -1)] + \
-                                          [[0.1 * x for x in xrange(2 , 9)]] + \
-                                          [[1 - 10**po * (10 - x) for x in xrange(2, 10)]
-                                           for po in xrange(-2, -5, -1)])
-            ax.xaxis.set_minor_locator(FixedLocator(trfun(ticklocminor)))
+            ax.set_xlim(10**(-3.1), 1.0 - 10**(-3.1))
+            ax.set_xscale('logit')
         else:
             ax.set_xscale('log')
 
