@@ -135,13 +135,25 @@ class Patient(pd.Series):
         return (act.sum(axis=1), ind)
 
 
-    def get_allele_frequency_trajectories(self, fragment, use_PCR1=1, cov_min=1):
+    def get_allele_frequency_trajectories(self, fragment, use_PCR1=1, cov_min=1,
+                                          depth_min=None):
         '''Get the allele frequency trajectories from files
         
         Args:
-          cov_min (int): minimal coverage accepted, anything lower will be masked.
+          cov_min (int): minimal coverage accepted, anything lower are masked.
+          depth_min (float): minimal depth, both by sequencing and template numbers.
+            Time points with less templates are excluded, and positions are masked.
+            For convenience depth is defined > 1, e.g. 100 takes frequencies down
+            to 1%.
         '''
         (act, ind) = self.get_allele_count_trajectories(fragment, use_PCR1=use_PCR1)
+
+        # FIXME: there is something fishy about depth_min...
+        if depth_min is not None:
+            indd = self.n_templates[ind] >= depth_min
+            act = act[indd]
+            ind = ind[indd]
+            cov_min = max(cov_min, depth_min)
 
         covt = act.sum(axis=1)
         mask = np.zeros_like(act, bool)

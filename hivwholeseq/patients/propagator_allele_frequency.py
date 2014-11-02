@@ -189,7 +189,6 @@ def plot_propagator_theory(xis, t, model='BSC', xlim=[0.03, 0.93], ax=None, logi
 
     if VERBOSE >= 1:
         print 'Make the propagators'
-    xis = pp.binsxc
     xfs = []
     rhos = []
     for i, xi in enumerate(xis): 

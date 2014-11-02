@@ -112,8 +112,8 @@ if __name__ == '__main__':
 
     if VERBOSE >= 1:
         print 'Load alignment, reference, and coordinate map'
-    ali = load_custom_alignment('HIV1_FLT_2013_genome_DNA')
-    alim = np.array(ali, 'S1')
+    #ali = load_custom_alignment('HIV1_FLT_2013_genome_DNA')
+    #alim = np.array(ali, 'S1')
     S = np.zeros(alim.shape[1])
     for a in alpha[:5]:
         nu = (alim == a).mean(axis=0)
@@ -152,7 +152,7 @@ if __name__ == '__main__':
 
             mapco = patient.get_map_coordinates_reference(fragment, refname=refname)
     
-            # TODO: include low depth due to low viral load
+            # FIXME: there is something fishy about depth_min...
             aft, ind = patient.get_allele_frequency_trajectories(fragment,
                                                                  cov_min=depth_min)
 
