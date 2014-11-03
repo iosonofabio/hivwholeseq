@@ -154,7 +154,8 @@ if __name__ == '__main__':
     
             # FIXME: there is something fishy about depth_min...
             aft, ind = patient.get_allele_frequency_trajectories(fragment,
-                                                                 cov_min=depth_min)
+                                                                 cov_min=500,
+                                                                 depth_min=depth_min)
 
             if VERBOSE >= 2:
                 print 'Filter out masked positions'
@@ -166,6 +167,7 @@ if __name__ == '__main__':
 
             if VERBOSE >= 2:
                 print 'Filter out ancestral alleles'
+            # FIXME: Treat first time point as ancestral no matter what viral load is
             for i, ai in enumerate(aft[0].argmax(axis=0)):
                 aft_der[:, ai, i] = 0
                 # take out everything at high frequency in first sample to

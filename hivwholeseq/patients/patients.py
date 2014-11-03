@@ -9,7 +9,6 @@ import numpy as np
 import pandas as pd
 
 from hivwholeseq.sequencing.filenames import table_filename
-from hivwholeseq.patients.samples import * # FIXME
 
 
 
@@ -20,6 +19,7 @@ class Patient(pd.Series):
     def __init__(self, *args, **kwargs):
         '''Initialize a patient with all his samples'''
         super(Patient, self).__init__(*args, **kwargs)
+        from hivwholeseq.patients.samples import load_samples_sequenced
         samples = load_samples_sequenced(patients=[self.name])
         self.samples = samples
 
@@ -80,7 +80,7 @@ class Patient(pd.Series):
     @property
     def n_templates(self, n_reactions=6):
         '''Get the time course of the number of templates to PCR, limiting depth'''
-        n = self.viral_load
+        n = self.viral_load.copy()
         # We take 400 ul of serum
         n *= 0.4
         # We typically have 6 reactions with that total volume (plus the F4 dilution
@@ -97,6 +97,7 @@ class Patient(pd.Series):
 
     def itersamples(self):
         '''Generator for samples in this patient, each with extended attributes'''
+        from hivwholeseq.patients.samples import SamplePat
         for samplename, sample in self.samples.iterrows():
             yield SamplePat(sample)
 
@@ -136,7 +137,7 @@ class Patient(pd.Series):
 
 
     def get_allele_frequency_trajectories(self, fragment, use_PCR1=1, cov_min=1,
-                                          depth_min=None):
+                                          depth_min=None, always_first=False):
         '''Get the allele frequency trajectories from files
         
         Args:
@@ -145,12 +146,17 @@ class Patient(pd.Series):
             Time points with less templates are excluded, and positions are masked.
             For convenience depth is defined > 1, e.g. 100 takes frequencies down
             to 1%.
+          always_first (bool): always include the first time point, disregarding
+            viral load. Useful for polarization.
         '''
         (act, ind) = self.get_allele_count_trajectories(fragment, use_PCR1=use_PCR1)
 
         # FIXME: there is something fishy about depth_min...
         if depth_min is not None:
             indd = self.n_templates[ind] >= depth_min
+            if always_first:
+                indd[0] = True
+
             act = act[indd]
             ind = ind[indd]
             cov_min = max(cov_min, depth_min)

@@ -114,7 +114,11 @@ if __name__ == '__main__':
                 print patient.name, fragment
     
             aft, ind = patient.get_allele_frequency_trajectories(fragment,
-                                                                 depth_min=depth_min)
+                                                                 depth_min=depth_min,
+                                                                 always_first=True)
+
+            aft0 = aft[0].copy()
+            aft = aft[1:]
 
             if VERBOSE >= 2:
                 print 'Filter out masked positions'

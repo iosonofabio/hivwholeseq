@@ -4,21 +4,38 @@ author:     Fabio Zanini
 date:       02/11/14
 content:    Test reading SHAPE data for the NL4-3 sequence.
 '''
+# Globals
+_seqs = None
+_shape = None
+
+
 # Functions
 def load_SHAPE():
     '''Load the SHAPE data of a reference sequence (for now only NL4-3)'''
-    import numpy as np
-    import pandas as pd
-    from hivwholeseq.filenames import reference_folder
+    global _seqs
+    global _shape
 
-    fn = reference_folder+'SHAPE/nmeth.3029-S2.xlsx'
-    table = pd.read_excel(fn, index_col=0, parse_cols='A:D')
+    if _seqs is None:
 
-    seqm = table.loc[:, 'Nt identity']
-    seqs = str(''.join(seqm))
-    
-    shape = table.loc[:, '1M7 SHAPE MaP']
-    shape = np.ma.masked_where(shape < -990, shape)
+        import numpy as np
+        import pandas as pd
+        from hivwholeseq.filenames import reference_folder
+
+        fn = reference_folder+'SHAPE/nmeth.3029-S2.xlsx'
+        table = pd.read_excel(fn, index_col=0, parse_cols='A:D')
+
+        seqm = table.loc[:, 'Nt identity']
+        seqs = str(''.join(seqm))
+        
+        shape = table.loc[:, '1M7 SHAPE MaP']
+        shape = np.ma.masked_where(shape < -990, shape)
+
+        _seqs = str(seqs)
+        _shape = shape.copy()
+
+    else:
+        seqs = str(_seqs)
+        shape = _shape.copy()
     
     return (seqs, shape)
 
@@ -27,6 +44,17 @@ def add_SHAPE_to_seqrecord(seqrecord, VERBOSE=0):
     '''Add SHAPE info to an HIV sequence (no need to be genomewide)'''
     import numpy as np
     from seqanpy import align_overlap
+
+    global _seqs
+    global _shape
+
+    if _seqs is None:
+        seqs, shape = load_SHAPE()
+    else:
+        # No need to copy, they are nodified within this function and no pointers
+        # are transmitted outside
+        seqs = _seqs
+        shape = _shape
 
     (score, ali1, ali2) = align_overlap(seqs, seqrecord)
     if VERBOSE >= 3:

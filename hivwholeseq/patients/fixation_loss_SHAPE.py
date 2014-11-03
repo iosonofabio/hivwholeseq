@@ -19,6 +19,7 @@ from hivwholeseq.miseq import alpha
 from hivwholeseq.reference import load_custom_reference
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.patients.propagator_allele_frequency import Propagator
+from hivwholeseq.shape import add_SHAPE_to_seqrecord
 
 
 
@@ -166,12 +167,16 @@ if __name__ == '__main__':
     else:
         patients = patients.loc[patients.index != '15107']
 
+    # Min-max frequencies to calculate correlations on
+    xmin = 0.25
+    xmax = 0.75
+    xloss = 0.01
+    xfix = 0.99
+
     # Prepare output structures
-    n_binsx = 10
-    binsx = np.logspace(-2, np.log10(0.99), n_binsx)
-    binsxc = np.sqrt(binsx[1:] * binsx[:-1])
-    props = {(gene, synkey): np.zeros((n_binsx - 1, 2))
-             for gene in genes for synkey in ('syn', 'nonsyn')}
+    props = {(gene, synkey, fate): []
+             for gene in genes for synkey in ('syn', 'nonsyn')
+             for fate in ('fix', 'loss')}
 
     for pname, patient in patients.iterrows():
         patient = Patient(patient)
@@ -203,6 +208,11 @@ if __name__ == '__main__':
                 except IndexError:
                     continue
 
+                add_SHAPE_to_seqrecord(fragseq, VERBOSE=VERBOSE)
+                shapefrag = fragseq.letter_annotations['SHAPE']
+                if VERBOSE >= 2:
+                    print 'SHAPE added'
+
                 # Get allele freqs
                 aft, ind = patient.get_allele_frequency_trajectories(fragment,
                                                                      cov_min=depth_min)
@@ -222,6 +232,8 @@ if __name__ == '__main__':
                 genem = alpha[aft[0].argmax(axis=0)]
 
                 # Collect counts
+                # FIXME: one should add the contraint that the mutation must BREAK
+                # the pair for SHAPE to be reliable
                 for pos in xrange(aft.shape[2]):
                     pos_cod = pos // 3
                     pos_wn = pos % 3
@@ -231,6 +243,9 @@ if __name__ == '__main__':
                     # FIXME: this is slightly more messed up than that, for now skip the
                     # whole codon
                     if '-' in genem[pos_cod * 3: (pos_cod + 1) * 3]:
+                        continue
+
+                    if shapefrag.mask[pos]:
                         continue
 
                     for ia, a in enumerate(alpha[:4]):
@@ -246,50 +261,49 @@ if __name__ == '__main__':
                         is_syn = translate(''.join(cod_anc)) == translate(''.join(cod_new))
                         is_syn &= (-overlap[pos])
                         if is_syn:
-                            count = props[(gene, 'syn')]
+                            synkey = 'syn'
                         else:
-                            count = props[(gene, 'nonsyn')]
+                            synkey = 'nonsyn'
 
                         afp = aft[:, ia, pos]
-                        for ib in xrange(n_binsx - 1):
-                            ibt = ((afp[:-1] >= binsx[ib]) & (afp[:-1] < binsx[ib + 1])).nonzero()[0]
-                            if not len(ibt):
-                                continue
-                            
-                            ibt = ibt[0]
-                            tfix = (afp[ibt:] > binsx[-1]).nonzero()[0] + ibt
-                            tlos = (afp[ibt:] < binsx[0]).nonzero()[0] + ibt
-                            if (not len(tlos)) and (not len(tfix)):
-                                continue
+                        ibt = ((afp[:-1] >= xmin) & (afp[:-1] <= xmax)).nonzero()[0]
+                        if not len(ibt):
+                            continue
+                        
+                        ibt = ibt[0]
+                        tfix = (afp[ibt:] > xfix).nonzero()[0] + ibt
+                        tlos = (afp[ibt:] < xloss).nonzero()[0] + ibt
+                        if (not len(tlos)) and (not len(tfix)):
+                            continue
 
-                            elif not len(tfix):
-                                count[ib, 0] += 1
+                        elif not len(tfix):
+                            fate = 'loss'
 
-                            elif not len(tlos):
-                                count[ib, 1] += 1
+                        elif not len(tlos):
+                            fate = 'fix'
 
+                        else:
+                            if tfix[0] < tlos[0]:
+                                fate = 'fix'
                             else:
-                                count[ib, tfix[0] < tlos[0]] += 1
+                                fate = 'loss'
 
+                        props[(gene, synkey, fate)].append(shapefrag[pos])
 
-    Pfixs = {key: np.ma.masked_where(value.sum(axis=1) == 0, value[:, 1] / value.sum(axis=1))
-             for (key, value) in props.iteritems()}
 
     if plot:
         fig, ax = plt.subplots(figsize=(8, 6))
-        for (gene, synkey), Pfix in Pfixs.iteritems():
-            ax.plot(binsxc, Pfix, lw=2,
-                    label=gene+', '+synkey)
+        for (gene, synkey, fate), shapes in props.iteritems():
+            shapes = np.sort(shapes)
+            ax.plot(shapes, np.linspace(0, 1, len(shapes)), lw=2,
+                    label=', '.join([gene, synkey, fate]))
 
-        ax.plot([0, 1], [0, 1], c='k', lw=2, label='Neutral')
-
-        ax.set_xlabel('Initial frequency')
-        ax.set_ylabel('Pfix')
-        ax.set_title('Fixation probability')
+        ax.set_xlabel('SHAPE score')
+        ax.set_ylabel('Cumulative distribution')
+        ax.set_title('Correlation between fixation and SHAPE score')
         ax.grid(True)
-        ax.set_xlim(-0.05, 1.05)
         ax.set_ylim(-0.05, 1.05)
-        ax.legend(loc=2, fontsize=14)
+        ax.legend(loc=4, fontsize=14)
 
         plt.ion()
         plt.show()
