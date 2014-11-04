@@ -92,11 +92,6 @@ if __name__ == '__main__':
     binw = np.diff(bins)
     hist = np.zeros_like(binsc)
 
-    delta_af_bins = np.concatenate([-np.logspace(-2,0,11)[::-1], np.logspace(-2,0,11)])
-    delta_af_binsc = 0.5*(delta_af_bins[1:] + delta_af_bins[:-1])
-    delta_af_binw = np.diff(delta_af_bins)
-    delta_af_hist = np.zeros_like(delta_af_binsc)
-
     if not fragments:
         fragments = ['F'+str(i) for i in xrange(1, 7)]
     if VERBOSE >= 2:
@@ -140,20 +135,10 @@ if __name__ == '__main__':
                 # improve polarization
                 aft_der[:, af0[:, i] > 0.1, i] = 0
 
-            # Add to the histogram
-            hist += np.histogram(aft_der, bins=bins, density=False)[0]/binw
-            delta_af = np.diff(aft_der, axis=0)
-            h = np.histogram(\
-                delta_af[np.where((aft_der[:-1,:,:] > 0.1)*(aft_der[:-1,:,:] < 0.2))], 
-                bins=delta_af_bins, density=False)
-            delta_af_hist += h[0] / delta_af_binw
-
-
+            hist += np.histogram(aft_der, bins=bins, density=False)[0] / binw
+            
     if add_bsc:
         (sfs_bc, sfs_bsc) = load_beta_SFS(bins=bins, VERBOSE=VERBOSE, alpha=1)
-        tmp = load_beta_SFS(bins=bins, VERBOSE=VERBOSE, alpha=1.25)
-        sfs_bc.update(tmp[0])
-        sfs_bsc.update(tmp[1])
         tmp = load_beta_SFS(bins=bins, VERBOSE=VERBOSE, alpha=1.5)
         sfs_bc.update(tmp[0])
         sfs_bsc.update(tmp[1])
@@ -168,7 +153,7 @@ if __name__ == '__main__':
         import matplotlib.pyplot as plt
 
         fig, ax = plt.subplots()
-        ax.plot(binsc, hist, lw=2, c='k',marker='o', label = 'HIV polymorphisms')
+        ax.plot(binsc, hist, lw=2, c='k',marker='o', label = 'HIV, depth >= '+str(depth_min))
         al = hist[0]
         if add_bsc:
             for (N, alpha) in sfs_bc:
@@ -192,7 +177,7 @@ if __name__ == '__main__':
             ax.set_title('All patients, fragments '+str(fragments))
         ax.grid(True)
         ax.set_ylim(1e2, 1e8)
-        ax.legend(loc=3, fontsize=10)
+        ax.legend(loc=(0.53, 0.68), fontsize=14)
 
         plt.tight_layout()
 

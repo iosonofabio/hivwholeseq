@@ -169,7 +169,7 @@ class Patient(pd.Series):
         (act, ind) = self.get_allele_count_trajectories(fragment, use_PCR1=use_PCR1)
 
         if depth_min is not None:
-            indd = self.n_templates[ind] >= depth_min
+            indd = np.array(self.n_templates[ind] >= depth_min)
             act = act[indd]
             ind = ind[indd]
             cov_min = max(cov_min, depth_min)

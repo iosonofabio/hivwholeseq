@@ -19,41 +19,11 @@ from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.patients.one_site_statistics import plot_allele_frequency_trajectories as plot_nus
 from hivwholeseq.patients.one_site_statistics import plot_allele_frequency_trajectories_3d as plot_nus_3d
 from hivwholeseq.patients.one_site_statistics import get_allele_frequency_trajectories
+from hivwholeseq.patients.plot_SFS import load_beta_SFS
 
 
 
 # Functions
-def load_beta_SFS(VERBOSE=0, alpha=1, bins=20):
-    '''Load sfs of direct bsc simulations'''
-    sample_size = 3000
-
-    import os
-    from hivwholeseq.theory.filenames import get_sfs_betatree_filename
-    fn = get_sfs_betatree_filename(sample_size, alpha)
-    if os.path.isfile(fn):
-        if VERBOSE >= 2:
-            print 'Recycling beta coalescent SFS with N = '+str(sample_size)+\
-                    ' and alpha = '+str(alpha)
-        data = np.loadtxt(fn, unpack=True)
-        sfs_bc = {(sample_size, alpha): data[0]}
-        sfs_bsc = {(sample_size, alpha): data[1]}
-
-    else:
-        from hivwholeseq.theory.betatree.src.sfs import SFS
-        if VERBOSE >= 2:
-            print 'Generating beta coalescent SFS with N = '+str(sample_size)+\
-                    ' and alpha = '+str(alpha)
-        sfs_beta = SFS(sample_size=sample_size, alpha=alpha)
-        sfs_beta.getSFS(ntrees=1000)
-        sfs_beta.binSFS(mode='logit', bins=bins)
-        sfs_beta.bin_center = np.sqrt(bins[1:] * bins[:-1])
-
-        sfs_bc = {(sample_size, alpha): sfs_beta.bin_center}
-        sfs_bsc = {(sample_size, alpha): sfs_beta.binned_sfs}
-
-    return (sfs_bc, sfs_bsc)
-
-
 def get_coordinate_map(refname, ali):
     '''Get coordinate map of sequence in alignment'''
     for seq in ali:
@@ -112,8 +82,8 @@ if __name__ == '__main__':
 
     if VERBOSE >= 1:
         print 'Load alignment, reference, and coordinate map'
-    #ali = load_custom_alignment('HIV1_FLT_2013_genome_DNA')
-    #alim = np.array(ali, 'S1')
+    ali = load_custom_alignment('HIV1_FLT_2013_genome_DNA')
+    alim = np.array(ali, 'S1')
     S = np.zeros(alim.shape[1])
     for a in alpha[:5]:
         nu = (alim == a).mean(axis=0)
@@ -151,10 +121,14 @@ if __name__ == '__main__':
                 print patient.name, fragment
 
             mapco = patient.get_map_coordinates_reference(fragment, refname=refname)
-    
-            # FIXME: there is something fishy about depth_min...
+
+            if VERBOSE >= 2:
+                print 'Get initial allele frequencies'
+            af0 = patient.get_initial_allele_frequencies(fragment, cov_min=depth_min)
+
+            if VERBOSE >= 2:
+                print 'Get allele frequencies'
             aft, ind = patient.get_allele_frequency_trajectories(fragment,
-                                                                 cov_min=500,
                                                                  depth_min=depth_min)
 
             if VERBOSE >= 2:
@@ -163,23 +137,23 @@ if __name__ == '__main__':
 
             if VERBOSE >= 2:
                 print 'Remove first time sample'
-            aft_der = aft[1:].copy()
+            aft_der = aft[int(0 in ind):].copy()
 
             if VERBOSE >= 2:
                 print 'Filter out ancestral alleles'
-            # FIXME: Treat first time point as ancestral no matter what viral load is
-            for i, ai in enumerate(aft[0].argmax(axis=0)):
+            for i, ai in enumerate(af0.argmax(axis=0)):
                 aft_der[:, ai, i] = 0
                 # take out everything at high frequency in first sample to
                 # improve polarization
-                aft_der[:, aft[0, :, i] > 0.1, i] = 0
+                aft_der[:, af0[:, i] > 0.1, i] = 0
 
             # Add to the histograms
             for ih in xrange(len(S_bins) - 1):
                 ind = mapco[Srefind[mapco[:, 0]] == ih, 1]
                 # Discard masked sites (low coverage and similia)
                 ind = ind[ind_nonmasked[ind]]
-                hists[ih] += np.histogram(aft_der[:, :, ind], bins=bins, density=False)[0]/binw
+                hists[ih] += np.histogram(aft_der[:, :, ind],
+                                          bins=bins, density=False)[0] / binw
 
     if add_bsc:
         (sfs_bc, sfs_bsc) = load_beta_SFS(bins=bins, VERBOSE=VERBOSE, alpha=1)
@@ -248,7 +222,7 @@ if __name__ == '__main__':
         ax.set_xlim(10**(-3.1), 1.0 - 10**(-3.1))
         ax.set_ylim([1e-3, 1.2])
         tickloc = np.array([0.001, 0.01, 0.1, 0.5, 0.9, 0.99, 0.999])
-        ax.set_xscale('logit')
+        ax.set_xscale('linear')
         ax.set_yscale('log')
         if len(fragments) == 6:
             ax.set_title('All patients, all fragments')
