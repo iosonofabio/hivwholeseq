@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 
 from hivwholeseq.sequencing.filenames import table_filename
+from hivwholeseq.patients.samples import * # FIXME: lots of scripts import from here still
 
 
 
@@ -130,6 +131,24 @@ class Patient(pd.Series):
         return get_consensi_tree_filename(self.name, fragment)
 
 
+    def get_initial_allele_counts(self, fragment):
+        '''Get allele counts from the initial time point'''
+        import os
+        from hivwholeseq.patients.samples import SamplePat
+        for i in xrange(len(self.samples)):
+            sample = SamplePat(self.samples.iloc[i])
+            if os.path.isfile(sample.get_allele_counts_filename(fragment)):
+                return sample.get_allele_counts(fragment)
+
+
+    def get_initial_allele_frequencies(self, fragment, cov_min=1):
+        '''Get the allele frequencies from the initial time point'''
+        counts = self.get_initial_allele_counts(fragment)
+        cov = counts.sum(axis=0)
+        af = np.ma.masked_where(np.tile(cov < cov_min, (counts.shape[0], 1)), counts)
+        return af
+
+
     def get_coverage_trajectories(self, fragment, use_PCR1=1):
         '''Get coverage as a function of time'''
         (act, ind) = self.get_allele_count_trajectories(fragment, use_PCR1=use_PCR1)
@@ -137,7 +156,7 @@ class Patient(pd.Series):
 
 
     def get_allele_frequency_trajectories(self, fragment, use_PCR1=1, cov_min=1,
-                                          depth_min=None, always_first=False):
+                                          depth_min=None):
         '''Get the allele frequency trajectories from files
         
         Args:
@@ -146,17 +165,11 @@ class Patient(pd.Series):
             Time points with less templates are excluded, and positions are masked.
             For convenience depth is defined > 1, e.g. 100 takes frequencies down
             to 1%.
-          always_first (bool): always include the first time point, disregarding
-            viral load. Useful for polarization.
         '''
         (act, ind) = self.get_allele_count_trajectories(fragment, use_PCR1=use_PCR1)
 
-        # FIXME: there is something fishy about depth_min...
         if depth_min is not None:
             indd = self.n_templates[ind] >= depth_min
-            if always_first:
-                indd[0] = True
-
             act = act[indd]
             ind = ind[indd]
             cov_min = max(cov_min, depth_min)

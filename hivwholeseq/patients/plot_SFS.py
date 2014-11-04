@@ -112,30 +112,33 @@ if __name__ == '__main__':
         for fragment in fragments:
             if VERBOSE >= 1:
                 print patient.name, fragment
-    
-            aft, ind = patient.get_allele_frequency_trajectories(fragment,
-                                                                 depth_min=depth_min,
-                                                                 always_first=True)
 
-            aft0 = aft[0].copy()
-            aft = aft[1:]
+            if VERBOSE >= 2:
+                print 'Get initial allele frequencies'
+            af0 = patient.get_initial_allele_frequencies(fragment, cov_min=depth_min)
+
+            if VERBOSE >= 2:
+                print 'Get allele frequencies'
+            aft, ind = patient.get_allele_frequency_trajectories(fragment,
+                                                                 depth_min=depth_min)
 
             if VERBOSE >= 2:
                 print 'Filter out masked positions'
             ind_nonmasked = -aft.mask.any(axis=0).any(axis=0)
+            af0 = af0[:, ind_nonmasked]
             aft = aft[:, :, ind_nonmasked].data
 
             if VERBOSE >= 2:
-                print 'Remove first time sample'
-            aft_der = aft[1:].copy()
+                print 'Remove first time sample (if still there)'
+            aft_der = aft[int(0 in ind):].copy()
 
             if VERBOSE >= 2:
                 print 'Filter out ancestral alleles'
-            for i, ai in enumerate(aft[0].argmax(axis=0)):
+            for i, ai in enumerate(af0.argmax(axis=0)):
                 aft_der[:, ai, i] = 0
                 # take out everything at high frequency in first sample to
                 # improve polarization
-                aft_der[:, aft[0, :, i] > 0.1, i] = 0
+                aft_der[:, af0[:, i] > 0.1, i] = 0
 
             # Add to the histogram
             hist += np.histogram(aft_der, bins=bins, density=False)[0]/binw

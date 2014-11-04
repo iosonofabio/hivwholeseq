@@ -49,10 +49,28 @@ def check_status(sample, step, detail=1):
         elif step == 'mapped_initial':
             return [(fr, os.path.isfile(sample.get_mapped_to_initial_filename(fr)))
                     for fr in sample.regions_generic]
-        
         elif step == 'mapped_filtered':
-            return [(fr, os.path.isfile(sample.get_mapped_filtered_filename(fr)))
-                    for fr in sample.regions_generic]
+            # Check whether the mapped filtered is older than the mapped_initial
+            from hivwholeseq.generic_utils import modification_date
+            out = []
+            for fr in sample.regions_generic:
+                fn_mi = sample.get_mapped_to_initial_filename(fr)
+                fn_mf = sample.get_mapped_filtered_filename(fr)
+                if not os.path.isfile(fn_mf):
+                    out.append((fr, False))
+                    continue
+
+                if not os.path.isfile(fn_mi):
+                    out.append((fr, True))
+                    continue
+
+                md_mi = modification_date(fn_mi)
+                md_mf = modification_date(fn_mf)
+                if md_mf < md_mi:
+                    out.append((fr, 'OLD'))
+                else:
+                    out.append((fr, True))
+            return out
 
     elif detail == 2:
         if step in ('filtered', 'consensus'):

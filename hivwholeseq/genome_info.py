@@ -6,6 +6,8 @@ content:    Information module on the HIV genome.
 '''
 # Globals
 genes = ('gag', 'pol', 'env', 'vif', 'vpr', 'vpu', 'tat', 'rev', 'nef')
+proteins = ('p17', 'p24', 'p2', 'p7', 'p1', 'p6', 'PR', 'RT', 'p15', 'IN', 'gp120', 'gp41')
+RNA_structures = ('RRE', "LTR5'", "LTR3'")
 
 # Edges of genes (fuzzy)
 gag_edges = ['ATGGGTGCGAGAGCGTCAGTA', 'GACCCCTCGTCACAATAA']
