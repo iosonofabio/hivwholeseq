@@ -22,6 +22,47 @@ cell_len = 7
 
 
 # Functions
+def check_reference_overlap(p, VERBOSE=0):
+    '''Check whether the reference from the various fragments overlap correctly'''
+    from seqanpy import align_ladder
+    from hivwholeseq.sequence_utils import pretty_print_pairwise_ali
+
+    fragments = ['F'+str(i+1) for i in xrange(6)]
+    title = 'Overlaps'
+    line = ('{:<'+str(title_len)+'}').format(title+':')
+    stati = []
+    for i in xrange(len(fragments) - 1):
+        ref1 = p.get_reference(fragments[i])
+        ref2 = p.get_reference(fragments[i+1])
+        (score, ali1, ali2) = align_ladder(ref1, ref2,
+                                           score_gapopen=-10,
+                                           score_gapext=-1)
+
+        start2 = len(ali2) - len(ali2.lstrip('-'))
+        end1 = len(ali1.rstrip('-'))
+
+        if VERBOSE >= 4:
+            pretty_print_pairwise_ali((ali1[start2: end1], ali2[start2: end1]),
+                                      name1=fragments[i],
+                                      name2=fragments[i+1],
+                                      width=100)
+        
+        if ali1[start2: end1].count('-') == ali2[start2: end1].count('-'):
+            status = 'OK'
+        else:
+            status = 'GAPS'
+            import ipdb; ipdb.set_trace()
+
+        line = line+fragments[i]+': '+\
+            ('{:>'+str(cell_len - len(fragments[i]) - 1)+'}').format(status)+'  '
+        stati.append(status)
+
+    print line
+
+    if 'GAPS' in stati:
+        raise ValueError('GAPS status found') 
+
+
 def pretty_print_info(p, title, name, method, name_requisite=None, mod_dates={}):
     '''Pretty printer for patient pipeline info'''
     import os, sys
@@ -222,6 +263,8 @@ if __name__ == '__main__':
         if status != 'OK':
             print ''
             continue
+
+        check_reference_overlap(p)
 
         pretty_print_info(p, 'Map + filter', 'filter',
                           'get_mapped_filtered_filename',

@@ -12,7 +12,7 @@ subsrate = '0.05'
 
 # Functions
 def pair_generator(iterable):
-    '''Generator for pairs in interleaved files'''
+    '''Generator for pairs in interleaved files, such as BAM files'''
     # Note: the last item is lost if odd
     it = iter(iterable)
     while True:

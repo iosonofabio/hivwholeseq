@@ -293,6 +293,8 @@ if __name__ == '__main__':
                         help='Number of (random) reads used for the local consensi')
     parser.add_argument('--PCR', default=1, type=int,
                         help='PCR to analyze (1 or 2)')
+    parser.add_argument('--raw', action='store_true',
+                        help='Use non decontaminated reads')
 
     args = parser.parse_args()
     pnames = args.patients
@@ -304,6 +306,7 @@ if __name__ == '__main__':
     n_reads_per_ali = args.reads_per_alignment
     block_len = args.block_len
     PCR = args.PCR
+    use_raw_reads = args.raw
 
     samples = load_samples_sequenced()
     if pnames is not None:
@@ -339,9 +342,10 @@ if __name__ == '__main__':
             refm = np.array(refseq)
             len_reference = len(refseq)
 
+            # NOTE: we need consensi to decontaminate, so
             bamfilename = sample.get_mapped_filtered_filename(fragment,
                                             PCR=PCR,
-                                            decontaminated=True) #FIXME
+                                            decontaminated=(not use_raw_reads))
             if not os.path.isfile(bamfilename):
                 continue
             
