@@ -209,6 +209,28 @@ class Patient(pd.Series):
         return get_mapped_filtered_filename(self.patient, samplename, fragment, PCR=PCR)
 
 
+    def get_divergence(self, fragment, **kwargs):
+        '''Get divergence of a fragment
+        
+        Args:
+          **kwargs: passed to the allele frequency trajectories.
+        '''
+        from hivwholeseq.patients.get_divergence_diversity import get_divergence
+        aft, ind = self.get_allele_frequency_trajectories(fragment, **kwargs)
+        return (get_divergence(aft), ind)
+
+
+    def get_diversity(self, fragment, **kwargs):
+        '''Get diversity of a fragment
+        
+        Args:
+          **kwargs: passed to the allele frequency trajectories.
+        '''
+        from hivwholeseq.patients.get_divergence_diversity import get_diversity
+        aft, ind = self.get_allele_frequency_trajectories(fragment, **kwargs)
+        return (get_diversity(aft), ind)
+
+
     @property
     def transmission_date(self):
         '''The most likely time of transmission'''

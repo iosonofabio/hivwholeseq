@@ -13,7 +13,7 @@ from Bio import SeqIO
 from seqanpy import align_overlap
 
 from hivwholeseq.miseq import alpha
-from hivwholeseq.patients.patients import load_patient
+from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_mapped_to_initial_filename, get_allele_frequency_trajectories_filename, \
         get_allele_count_trajectories_filename
@@ -25,64 +25,48 @@ from hivwholeseq.patients.one_site_statistics import \
 
 
 # Functions
-def merge_allele_frequency_trajectories(conss_genomewide, acss, VERBOSE=0):
+def merge_allele_count_trajectories(ref_genomewide, acss, VERBOSE=0):
     '''Merge the allele frequency trajectories of all fragments by summing counts'''
 
-    consm = np.fromstring(conss_genomewide, 'S1')
-    acs = np.zeros((acss[0].shape[0], len(alpha), len(conss_genomewide)), int)
+    _, _, inds = zip(*acss)
+    ind_min = min(map(min, inds))
+    ind_max = max(map(max, inds))
+    acs = np.zeros((ind_max + 1 - ind_min, len(alpha), len(ref_genomewide)), int)
 
-    # Put the first fragment
-    pos_ref = 0
-    for pos in xrange(acss[0].shape[2]):
-        acs[:, :, pos] = acss[0][:, :, pos]
+    pos_ref = 1000
+    for ifr, (ref, acsi, ind) in enumerate(acss):
+        ind -= ind_min
 
-    # Blend in subsequent fragments (does NOT require genomewide consensus to be complete!)
-    for ifr, acsi in enumerate(acss[1:], 1):
-        seed = alpha[acsi[0, :, :30].argmax(axis=0)]
-        sl = len(seed)
-        n_match = np.array([(consm[i: i + sl] == seed).sum()
-                            for i in xrange(pos_ref, len(consm) - sl)], int)
-        pos_seed = n_match.argmax()
-        if n_match[pos_seed] < 0.75 * sl:
-            raise ValueError('Fragment could not be found')
-        pos_seed += pos_ref
+        # Find the coordinates
+        (score, ali1, ali2) = align_overlap(ref_genomewide[pos_ref - 1000: pos_ref + 3000],
+                                            ref, score_gapopen=-20)
+        fr_start = len(ali2) - len(ali2.lstrip('-'))
+        fr_end = len(ali2.rstrip('-'))
 
-        if VERBOSE >= 2:
-            print 'F'+str(ifr+1), 'seed:', pos_seed
+        if VERBOSE:
+            print 'F'+str(ifr+1), pos_ref - 1000 + fr_start, pos_ref - 1000 + fr_end
 
-        # Align the afc block to the global consensus
-        cons_acsi = ''.join(alpha[acsi[0].argmax(axis=0)])
-        ali = align_overlap(conss_genomewide[pos_seed: pos_seed + acsi.shape[2] + 100],
-                            cons_acsi, band=100)
-        ali = list(ali)
-        ali[2] = ali[2].rstrip('-')
-        ali[1] = ali[1][:len(ali[2])]
-        # Scan the new fragment and check the major allele, infer gaps that way
-        # (somewhat sloppy, but ok)
-        pos_gw = pos_seed
-        pos_acsi = 0
-        for pos in xrange(len(ali[2])):
-            # Match
-            if (ali[1][pos] != '-') and (ali[2][pos] != '-'):
-                acs[:, :, pos_gw] += acsi[:, :, pos_acsi]
-                pos_gw += 1
-                pos_acsi += 1
-            
-            # Insert in the block: discard
-            elif (ali[1][pos] == '-'):
-                pos_acsi += 1
+        # Scan the alignment
+        pos_ref = pos_ref - 1000 + fr_start
+        pos_fr = 0
+        for pos_ali in xrange(fr_start, fr_end):
+            # Gap in genomewise, ignore position
+            if ali1[pos_ali] == '-':
+                pos_fr += 1
+                continue
 
-            # Deletion in block: ignore (we should dig into inserts, but as far
-            # as frequencies are concerned, it should be fine)
-            else:
-                pos_gw += 1
+            # Gap in fragment, ignore FIXME: probably we should put deletions! 
+            elif ali2[pos_ali] == '-':
+                pos_ref += 1
+                continue
 
-        pos_ref = pos_seed
+            acs[ind, :, pos_ref] = acsi[:, :, pos_fr]
+            pos_fr += 1
+            pos_ref += 1
 
-    # Normalize to frequencies
-    afs = (1.0 * acs.swapaxes(0, 1) / acs.sum(axis=1)).swapaxes(0, 1)
+    ind = np.arange(ind_min, ind_max + 1)
 
-    return (acs, afs)
+    return (acs, ind)
 
 
 
@@ -90,8 +74,9 @@ def merge_allele_frequency_trajectories(conss_genomewide, acss, VERBOSE=0):
 if __name__ == '__main__':
 
     # Parse input args
-    parser = argparse.ArgumentParser(description='Update initial consensus')
-    parser.add_argument('--patient', required=True,
+    parser = argparse.ArgumentParser(description='Update initial consensus',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--patients', nargs='+',
                         help='Patient to analyze')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
@@ -105,74 +90,61 @@ if __name__ == '__main__':
                         help='Take only PCR1 samples [0=off, 1=where both available, 2=always]')
 
     args = parser.parse_args()
-    pname = args.patient
+    pnames = args.patients
     VERBOSE = args.verbose
     save_to_file = args.save
     plot = args.plot
     use_PCR1 = args.PCR1
     use_logit = args.logit
 
-    # Get patient and the sequenced samples (and sort them by date)
-    patient = load_patient(pname)
+    patients = load_patients()
+    if pnames is not None:
+        patients = patients.loc[pnames]
 
     fragments = ['F'+str(i) for i in xrange(1, 7)]
     
-    # Collect the allele count trajectories
-    acts = []
-    for fragment in fragments:
-        act_filename = get_allele_count_trajectories_filename(pname, fragment)
-        acsi = np.load(act_filename)
-        acts.append(acsi)
+    for pname, patient in patients.iterrows():
+        patient = Patient(patient)
+        if VERBOSE:
+            print pname
 
-    # Get the initial genomewide consensus
-    cons_filename = get_initial_reference_filename(pname, 'genomewide')
-    cons_rec = SeqIO.read(cons_filename, 'fasta')
-    conss_genomewide = str(cons_rec.seq)
+        # Get the initial genomewide consensus
+        conss_genomewide = ''.join(patient.get_reference('genomewide'))
 
-    # Merge allele counts
-    (act, aft) = merge_allele_frequency_trajectories(conss_genomewide, acts,
+        # Collect the allele count trajectories
+        acts = []
+        for fragment in fragments:
+            ref = ''.join(patient.get_reference(fragment))
+            act, ind = patient.get_allele_count_trajectories(fragment)
+            acts.append((ref, act, ind))
+
+        # Merge allele counts
+        (act, ind) = merge_allele_count_trajectories(conss_genomewide, acts,
                                                      VERBOSE=VERBOSE)
+        # Normalize to frequencies
+        afs = (1.0 * act.swapaxes(0, 1) / (0.1 + act.sum(axis=1))).swapaxes(0, 1)
 
-    if save_to_file:
-        act.dump(get_allele_count_trajectories_filename(pname, 'genomewide'))
-        aft.dump(get_allele_frequency_trajectories_filename(pname, 'genomewide'))
+        if save_to_file:
+            fn_out = get_allele_count_trajectories_filename(pname, 'genomewide')
+            np.savez(fn_out, ind=ind, act=act)
+
+        if plot is not None:
+            import matplotlib.pyplot as plt
+
+            times = patient.times[ind]
+            ntemplates = patient.n_templates[ind]
+
+            if plot in ('2D', '2d', ''):
+                plot_nus_from_act(times, act, title='Patient '+pname, VERBOSE=VERBOSE,
+                                  ntemplates=ntemplates,
+                                  logit=use_logit,
+                                  threshold=0.9)
+
+            if plot in ('3D', '3d'):
+                plot_nus_from_act_3d(times, act, title='Patient '+pname, VERBOSE=VERBOSE,
+                                     logit=use_logit,
+                                     threshold=0.9)
 
     if plot is not None:
-        import matplotlib.pyplot as plt
-
-        #FIXME: find out what samples were taken!
-        samples = patient.samples
-        times = (samples.date - patient.transmission_date) / np.timedelta64(1, 'D')
-
-        # FIXME: the number of molecules to PCR depends on the number of
-        # fragments for that particular experiment... integrate Lina's table!
-        # Note: this refers to the TOTAL # of templates, i.e. the factor 2x for
-        # the two parallel RT-PCR reactions
-        ntemplates = samples['viral load'] * 0.4 / 12 * 2
-
-        if plot in ('2D', '2d', ''):
-            plot_nus_from_act(times, act, title='Patient '+pname, VERBOSE=VERBOSE,
-                              ntemplates=ntemplates,
-                              logit=use_logit,
-                              threshold=0.9)
-
-        if plot in ('3D', '3d'):
-            plot_nus_from_act_3d(times, act, title='Patient '+pname, VERBOSE=VERBOSE,
-                                 logit=use_logit,
-                                 threshold=0.9)
-
-
-
         plt.ion()
         plt.show()
-    
-    ## Average in windows of 50 bp
-    #window_size = 50
-    #afs_win = np.zeros((afs.shape[0], afs.shape[1], afs.shape[2] // window_size))
-    #for i in xrange(afs_win.shape[2]):
-    #    afs_win[:, :, i] = afs[:, :, i * window_size: (i+1) * window_size].mean(axis=2)
-
-    #if plot:
-    #    times = patient.times()
-    #    plot_nus_3d(times, afs_win, title='Patient '+pname, VERBOSE=VERBOSE)
-

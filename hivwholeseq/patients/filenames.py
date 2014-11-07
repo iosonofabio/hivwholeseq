@@ -147,14 +147,14 @@ def get_consensus_filename(pname, samplename_pat, fragment, PCR=1, format='fasta
 
 def get_allele_count_trajectories_filename(pname, fragment):
     '''Get the matrix with allele counts on the initial reference'''
-    filename = 'allele_counts_trajectories_'+fragment+'.npy'
+    filename = 'allele_counts_trajectories_'+fragment+'.npz'
     filename = get_foldername(pname)+filename
     return filename
 
 
 def get_allele_frequency_trajectories_filename(pname, fragment):
     '''Get the matrix with allele frequencies on the initial reference'''
-    filename = 'allele_frequency_trajectories_'+fragment+'.npy'
+    filename = 'allele_frequency_trajectories_'+fragment+'.npz'
     filename = get_foldername(pname)+filename
     return filename
 

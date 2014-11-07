@@ -22,6 +22,21 @@ from hivwholeseq.patients.one_site_statistics import \
 from hivwholeseq.fork_cluster import fork_get_allele_frequency_trajectory as fork_self
 
 
+# Functions
+def get_divergence(aft):
+    '''Get divergence from allele frequency trajectories'''
+    
+    cons_ind = aft[0].argmax(axis=0)
+    dg = 1 - aft[:, cons_ind, np.arange(aft.shape[2])].mean(axis=1)
+    return dg
+
+
+def get_diversity(aft):
+    '''Get diversity from allele frequency trajectories'''
+    ds = (aft * (1 - aft)).sum(axis=1).mean(axis=1)
+    return ds
+
+
 
 # Script
 if __name__ == '__main__':
@@ -82,9 +97,8 @@ if __name__ == '__main__':
                                                                  cov_min=10)
             times = patient.times[ind]
 
-            cons_ind = aft[0].argmax(axis=0)
-            dg = 1 - aft[:, cons_ind, np.arange(aft.shape[2])].mean(axis=1)
-            ds = (aft * (1 - aft)).sum(axis=1).mean(axis=1)
+            dg = get_divergence(aft)
+            ds = get_diversity(aft)
 
             dgs[(pname, fragment)] = dg
             dss[(pname, fragment)] = ds

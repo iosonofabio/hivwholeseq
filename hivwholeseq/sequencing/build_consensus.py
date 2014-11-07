@@ -299,7 +299,7 @@ if __name__ == '__main__':
                         help='Adapter IDs to analyze (e.g. TS2)')
     parser.add_argument('--fragments', nargs='*',
                         help='Fragment to map (e.g. F1 F6 genomewide)')
-    parser.add_argument('--block-length', type=int, default=100, dest='block_len',
+    parser.add_argument('--block-length', type=int, default=150, dest='block_len',
                         help='Length of each local consensus block')
     parser.add_argument('--reads-per-alignment', type=int, default=31,
                         dest='reads_per_alignment',
