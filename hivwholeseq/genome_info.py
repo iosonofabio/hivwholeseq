@@ -9,6 +9,12 @@ genes = ('gag', 'pol', 'env', 'vif', 'vpr', 'vpu', 'tat', 'rev', 'nef')
 proteins = ('p17', 'p24', 'p2', 'p7', 'p1', 'p6', 'PR', 'RT', 'p15', 'IN', 'gp120', 'gp41')
 RNA_structures = ('RRE', "LTR5'", "LTR3'")
 
+# Relation protein-genes
+protein_genes = {'p17': 'gag', 'p24': 'gag', 'p2': 'gag', 'p7': 'gag',
+                 'p1': 'gag', 'p6': 'gag',
+                 'PR': 'pol', 'RT': 'pol', 'p15': 'pol', 'IN': 'pol',
+                 'gp120': 'env', 'gp41': 'env'}
+
 # Edges of genes (fuzzy)
 gag_edges = ['ATGGGTGCGAGAGCGTCAGTA', 'GACCCCTCGTCACAATAA']
 pol_edges = ['TTTTTTAGGGAAAATTTG', 'ACAGGATGAGGATTAG']

@@ -56,8 +56,63 @@ def get_diversity_filename(pname, fragment):
 
 
 def get_coverage_filename(pname, fragment):
-    '''Get the filename of genetic diversity'''
+    '''Get the filename of coverage'''
     filename = 'coverage_'+pname+'_'+fragment+'.npz'
     filename = get_foldername('one_site')+filename
     return filename
+
+
+def get_allele_count_trajectories_filename(pname, fragment):
+    '''Get the filename of allele count trajectories'''
+    filename = 'allele_counts_'+pname+'_'+fragment+'.npz'
+    filename = get_foldername('one_site')+filename
+    return filename
+
+
+def get_patient_reference_filename(pname, fragment='genomewide', format='gb'):
+    '''Get the filename of the patient reference'''
+    filename = 'reference_'+pname+'_'+fragment+'.'+format
+    filename = get_foldername('sequences')+filename
+    return filename
+    
+
+def get_SFS_filename(pnames, fragments, suffix=None):
+    '''Get the filename of the SFS'''
+    filename = 'sfs'
+    if len(fragments) == 6:
+        filename = filename+'_allfrags'
+    else:
+        filename = filename+'_'+'_'.join(fragments)
+    
+    filename = filename+'_'+'_'.join(pnames)
+
+    if suffix is not None:
+        filename = filename+'_'+suffix
+
+    filename = filename+'.npz'
+
+    filename = get_foldername('one_site')+filename
+    return filename
+
+
+def get_propagator_filename(pnames, fragments, dt, suffix=None):
+    '''Get the filename of the propagator'''
+    filename = 'propagator'
+    if len(fragments) == 6:
+        filename = filename+'_allfrags'
+    else:
+        filename = filename+'_'+'_'.join(fragments)
+    
+    filename = filename+'_'+'_'.join(pnames)
+
+    filename = filename+'_dt_'+'_'.join(map(str, dt))
+
+    if suffix is not None:
+        filename = filename+'_'+suffix
+
+    filename = filename+'.npz'
+
+    filename = get_foldername('one_site')+filename
+    return filename
+
 

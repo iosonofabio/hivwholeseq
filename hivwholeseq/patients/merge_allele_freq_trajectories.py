@@ -26,7 +26,12 @@ from hivwholeseq.patients.one_site_statistics import \
 
 # Functions
 def merge_allele_count_trajectories(ref_genomewide, acss, VERBOSE=0):
-    '''Merge the allele frequency trajectories of all fragments by summing counts'''
+    '''Merge the allele frequency trajectories of all fragments by summing counts
+    
+    Note: we obviously do not require full coverage of all fragments, the missing
+          ones will just have zero counts. Sometimes, cherry-picking the data
+          fragment by fragment might be a better choice.
+    '''
 
     _, _, inds = zip(*acss)
     ind_min = min(map(min, inds))
@@ -55,7 +60,7 @@ def merge_allele_count_trajectories(ref_genomewide, acss, VERBOSE=0):
                 pos_fr += 1
                 continue
 
-            # Gap in fragment, ignore FIXME: probably we should put deletions! 
+            # Gap in fragment, ignore FIXME: probably we should put deletions
             elif ali2[pos_ali] == '-':
                 pos_ref += 1
                 continue

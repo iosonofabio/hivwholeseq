@@ -136,7 +136,11 @@ if __name__ == '__main__':
                 aft_der[:, af0[:, i] > 0.1, i] = 0
 
             hist += np.histogram(aft_der, bins=bins, density=False)[0] / binw
-            
+    
+    # Add neutral spectrum
+    sfs_neu = hist[0] * binsc[0]/binsc
+
+    # Add selection spectra
     if add_bsc:
         (sfs_bc, sfs_bsc) = load_beta_SFS(bins=bins, VERBOSE=VERBOSE, alpha=1)
         tmp = load_beta_SFS(bins=bins, VERBOSE=VERBOSE, alpha=1.5)
@@ -146,7 +150,14 @@ if __name__ == '__main__':
             ind = (sfs_bsc[(N, alpha)] > 0).nonzero()[0]
             sfs_bc[(N, alpha)] = sfs_bc[(N, alpha)][ind]
             sfs_bsc[(N, alpha)] = sfs_bsc[(N, alpha)][ind] / sfs_bsc[(N, alpha)][ind[0]] * hist[ind[0]]
-    
+    else:
+        indmax = (binsc < 0.1).nonzero()[0][-1] + 1
+        sfs_sel = hist[0] * binsc[0]**2 / binsc[:indmax]**2
+
+    if use_save:
+        if pnames is None:
+            fn_out = get_SFS_filename(['all'], fragments)
+
     if use_plot:
         from hivwholeseq import plot_utils
         from matplotlib import cm
@@ -154,7 +165,6 @@ if __name__ == '__main__':
 
         fig, ax = plt.subplots()
         ax.plot(binsc, hist, lw=2, c='k',marker='o', label = 'HIV, depth >= '+str(depth_min))
-        al = hist[0]
         if add_bsc:
             for (N, alpha) in sfs_bc:
                 ax.plot(sfs_bc[(N, alpha)], sfs_bsc[(N, alpha)],
@@ -162,8 +172,8 @@ if __name__ == '__main__':
                         color=cm.jet_r(1.0 * (alpha - 1)),
                         label = 'Beta coalescent, $\\alpha = '+str(alpha)+'$')
         else:
-            ax.plot(binsc[:8], al*binsc[0]**2/binsc[:8]**2, lw=2, c='r')
-        ax.plot(binsc, al*binsc[0]/binsc, lw=2, c='b', label = 'Neutral, $\\alpha = 2$')
+            ax.plot(binsc[:len(sfs_sel)], sfs_sel, lw=2, c='r')
+        ax.plot(binsc, sfs_neu, lw=2, c='b', label = 'Neutral, $\\alpha = 2$')
 
         ax.set_xlabel('derived allele frequency')
         ax.set_ylabel('SFS [density = counts / sum / binsize]')
@@ -180,7 +190,6 @@ if __name__ == '__main__':
         ax.legend(loc=(0.53, 0.68), fontsize=14)
 
         plt.tight_layout()
-
 
         if use_saveplot:
             from hivwholeseq.patients.filenames import get_SFS_figure_filename

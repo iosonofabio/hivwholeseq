@@ -262,7 +262,7 @@ if __name__ == '__main__':
     pnames = args.patients
     fragments = args.fragments
     VERBOSE = args.verbose
-    save_to_file = args.save
+    use_save = args.save
     plot = args.plot
     dt = args.deltat
     use_logit = args.logit
@@ -285,14 +285,7 @@ if __name__ == '__main__':
              0.998,
              1.]
     pp = Propagator(n_binsx, binsy=binsy, use_logit=use_logit)
-
-    binsd = np.array([-0.5, -0.4, -0.3, -0.2, -0.1, -0.05, -0.02, -0.01, -0.003,
-                      0.003, 0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5])
-    binsdc = 0.5 * (binsd[1:] + binsd[:-1])
-    binsdw = binsd[1:] - binsd[:-1]
-
-    histr = pp.histogram
-    histd = np.zeros((len(pp.binsx) - 1, len(binsd) - 1), float)
+    hist = pp.histogram
 
     for pname, patient in patients.iterrows():
         patient = Patient(patient)
@@ -326,13 +319,27 @@ if __name__ == '__main__':
                     if ((ts[j] - ts[i]) > dt[1]) or ((ts[j] - ts[i]) < dt[0]):
                         continue
 
-                    histr += np.histogram2d(aft[i].ravel(),
+                    hist += np.histogram2d(aft[i].ravel(),
                                             aft[j].ravel(),
                                             bins=[pp.binsx, pp.binsy])[0]
 
-                    histd += np.histogram2d(aft[i].ravel(),
-                                            aft[j].ravel() - aft[i].ravel(),
-                                            bins=[pp.binsx, binsd])[0]
+    if use_save:
+        from hivwholeseq.patients.filenames import get_propagator_filename
+        if pnames is None:
+            fn_out = get_propagator_filename(['all'], fragments, dt)
+        else:
+            fn_out = get_propagator_filename(pnames, fragments, dt)
+        # NOTE: do NOT make the call below recursive by default
+        if not os.path.isdir(os.path.dirname(fn_out)):
+            os.mkdir(os.path.dirname(fn_out))
+
+        d_out = {'HIV_final_frequency': pp.binsyc,
+                 'HIV_initial_frequency': pp.binsxc,
+                 'HIV_prop': hist,
+                 'HIV_dt': np.array(dt, int)}
+        # TODO: add theoretical curves (this requires some restructuring)
+
+        np.savez(fn_out, **d_out)
 
     if plot:
         title = 'Propagator for allele frequencies\n'+\

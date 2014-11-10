@@ -166,6 +166,54 @@ def get_coordinate_map_filename(pname, fragment, refname='HXB2'):
     return filename
 
 
+def get_SFS_filename(pnames, fragments, suffix=None):
+    '''Get the filename of the SFS'''
+    filename = 'SFS'
+    if len(fragments) == 6:
+        filename = filename+'_allfrags'
+    else:
+        filename = filename+'_'+'_'.join(fragments)
+    
+    if len(pnames) == 1:
+        pname = pnames[0]
+    else:
+        pname = 'all'
+        filename = filename+'_'+'_'.join(pnames)
+
+    if suffix is not None:
+        filename = filename+'_'+suffix
+
+    filename = filename+'.npz'
+
+    filename = get_foldername(pname)+'sfs/'+filename
+    return filename
+
+
+def get_propagator_filename(pnames, fragments, dt, suffix=None):
+    '''Get the filename of the propagator'''
+    filename = 'propagator'
+    if len(fragments) == 6:
+        filename = filename+'_allfrags'
+    else:
+        filename = filename+'_'+'_'.join(fragments)
+    
+    if len(pnames) == 1:
+        pname = pnames[0]
+    else:
+        pname = 'all'
+        filename = filename+'_'+'_'.join(pnames)
+
+    filename = filename+'_dt_'+'_'.join(map(str, dt))
+
+    if suffix is not None:
+        filename = filename+'_'+suffix
+
+    filename = filename+'.npz'
+
+    filename = get_foldername(pname)+'propagator/'+filename
+    return filename
+
+
 
 # FIGURES
 def get_figure_folder(pname):

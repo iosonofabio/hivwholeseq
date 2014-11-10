@@ -53,13 +53,14 @@ def annotate_sequence(seqrecord, additional_edges={}, VERBOSE=0):
     from hivwholeseq.genome_info import gene_edges, RNA_structure_edges, \
             other_edges, find_region_edges, find_region_edges_multiple, \
             locate_gene
-    edge_dict = {'genes': gene_edges,
-                 'RNA structures': RNA_structure_edges,
+    edge_dict = {'gene': gene_edges,
+                 'RNA structure': RNA_structure_edges,
                  'other': other_edges}
     edge_dict.update(additional_edges)
+    features = edge_dict.keys() + ['protein']
 
     if VERBOSE:
-        print 'Features:', ', '.join(edge_dict.iterkeys())
+        print 'Features:', ', '.join(features)
 
     smat = np.array(seqrecord)
 
@@ -112,6 +113,69 @@ def annotate_sequence(seqrecord, additional_edges={}, VERBOSE=0):
             feature = SeqFeature(location, type=feature_type, id=name, strand=1)
             seqrecord.features.append(feature)
 
+    # Add proteins
+    from operator import attrgetter
+    from seqanpy import align_overlap
+    from hivwholeseq.genome_info import proteins
+    from hivwholeseq.reference import load_custom_reference
+    ref_ann = load_custom_reference('HXB2', 'gb')
+    for prot in proteins:
+        if VERBOSE >= 2:
+            print prot,
+
+        protfea = ref_ann.features[map(attrgetter('id'), ref_ann.features).index(prot)]
+        protseq = protfea.extract(ref_ann)
+        (score, ali1, ali2) = align_overlap(seqrecord, protseq, score_gapopen=-20)
+        pr_start = len(ali2) - len(ali2.lstrip('-'))
+        pr_end = len(ali2.rstrip('-'))
+        pr_end -= ali1[pr_start: pr_end].count('-')
+
+        location = FeatureLocation(pr_start, pr_end)
+        if VERBOSE >= 2:
+            print 'found:', location
+
+        feature = SeqFeature(location, type='protein', id=prot, strand=1)
+        seqrecord.features.append(feature)
+
+
+def compare_annotations(refseq_new, refseq_old, VERBOSE=0):
+    '''Compare annotations of two sequences that are supposed to match'''
+    from operator import attrgetter
+    feanames_old = map(attrgetter('id'), refseq_old.features)
+    feanames_new = map(attrgetter('id'), refseq_new.features)
+
+    feanames = list(feanames_old)
+    feanames.extend([fn for fn in feanames_new if fn not in feanames])
+
+    if VERBOSE >= 1:
+        print 'Comparison of old and new annotations'
+    alert = False
+    for fn in feanames:
+        if (fn in feanames_old) and (fn not in feanames_new):
+            if VERBOSE >= 1:
+                print fn, 'present only in old sequence'
+            alert = True
+            continue
+            
+        if (fn not in feanames_old) and (fn in feanames_new):
+            if VERBOSE >= 1:
+                print fn, 'present only in new sequence'
+            continue
+            
+        feaold = refseq_old.features[feanames_old.index(fn)]
+        feanew = refseq_new.features[feanames_new.index(fn)]
+        
+        locold = feaold.location
+        locnew = feanew.location
+
+        if str(locold) != str(locnew):
+            if VERBOSE >= 1:
+                print fn, 'coordinates do not correspond', locold, locnew
+            alert = True
+
+    if alert:
+        raise ValueError('Not all features are fine.')
+
 
 
 # Script
@@ -147,7 +211,7 @@ if __name__ == '__main__':
 
         fragment_edges = get_edges_fragments(patient, VERBOSE=VERBOSE)
         annotate_sequence(refseq, VERBOSE=VERBOSE,
-                          additional_edges={'fragments': fragment_edges})
+                          additional_edges={'fragment': fragment_edges})
 
         if VERBOSE >= 1:
             for feature in refseq.features:
@@ -156,11 +220,22 @@ if __name__ == '__main__':
 
                 print feature.id, 
                 from hivwholeseq.genome_info import genes
-                if feature.id in genes:
+                if feature.type in ('gene', 'protein'):
                     print feature.extract(refseq).seq.translate()
                 else:
                     print feature.extract(refseq).seq
             print ''
+
+
+        try:
+            refseq_old = patient.get_reference('genomewide', format='gb')
+        except IOError:
+            if VERBOSE >= 1:
+                print "Old annoted reference not found (that's ok)"
+            refseq_old = None
+
+        if refseq_old is not None:
+            compare_annotations(refseq, refseq_old, VERBOSE=VERBOSE)
 
 
         if use_save:
