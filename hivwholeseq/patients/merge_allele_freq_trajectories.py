@@ -86,13 +86,15 @@ if __name__ == '__main__':
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
     parser.add_argument('--save', action='store_true',
-                        help='Save the allele frequency trajectories to file')
+                        help='Save the allele count trajectories to file')
     parser.add_argument('--plot', nargs='?', default=None, const='2D',
                         help='Plot the allele frequency trajectories')
     parser.add_argument('--logit', action='store_true',
                         help='use logit scale (log(x/(1-x)) in the plots')
     parser.add_argument('--PCR1', type=int, default=1,
                         help='Take only PCR1 samples [0=off, 1=where both available, 2=always]')
+    parser.add_argument('--threshold', type=float, default=0.9,
+                        help='Minimal frequency plotted')
 
     args = parser.parse_args()
     pnames = args.patients
@@ -101,6 +103,7 @@ if __name__ == '__main__':
     plot = args.plot
     use_PCR1 = args.PCR1
     use_logit = args.logit
+    threshold = args.threshold
 
     patients = load_patients()
     if pnames is not None:
@@ -126,12 +129,12 @@ if __name__ == '__main__':
         # Merge allele counts
         (act, ind) = merge_allele_count_trajectories(conss_genomewide, acts,
                                                      VERBOSE=VERBOSE)
-        # Normalize to frequencies
-        afs = (1.0 * act.swapaxes(0, 1) / (0.1 + act.sum(axis=1))).swapaxes(0, 1)
-
         if save_to_file:
             fn_out = get_allele_count_trajectories_filename(pname, 'genomewide')
             np.savez(fn_out, ind=ind, act=act)
+
+        # Normalize to frequencies
+        afs = (1.0 * act.swapaxes(0, 1) / (0.1 + act.sum(axis=1))).swapaxes(0, 1)
 
         if plot is not None:
             import matplotlib.pyplot as plt
@@ -140,15 +143,21 @@ if __name__ == '__main__':
             ntemplates = patient.n_templates[ind]
 
             if plot in ('2D', '2d', ''):
-                plot_nus_from_act(times, act, title='Patient '+pname, VERBOSE=VERBOSE,
-                                  ntemplates=ntemplates,
-                                  logit=use_logit,
-                                  threshold=0.9)
+                (fig, ax) = plot_nus_from_act(times, act,
+                                              title='Patient '+pname,
+                                              VERBOSE=VERBOSE,
+                                              ntemplates=ntemplates,
+                                              logit=use_logit,
+                                              threshold=threshold)
 
             if plot in ('3D', '3d'):
-                plot_nus_from_act_3d(times, act, title='Patient '+pname, VERBOSE=VERBOSE,
-                                     logit=use_logit,
-                                     threshold=0.9)
+                (fig, ax) = plot_nus_from_act_3d(times, act,
+                                                 title='Patient '+pname,
+                                                 VERBOSE=VERBOSE,
+                                                 logit=use_logit,
+                                                 threshold=threshold)
+
+            # Add interactive handlers to plot
 
     if plot is not None:
         plt.ion()

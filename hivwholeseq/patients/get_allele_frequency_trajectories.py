@@ -18,9 +18,9 @@ from hivwholeseq.patients.patients import load_patient, convert_date_deltas_to_f
 from hivwholeseq.patients.filenames import get_allele_frequency_trajectories_filename, \
         get_allele_count_trajectories_filename
 from hivwholeseq.patients.one_site_statistics import \
-        plot_allele_frequency_trajectories_from_counts as plot_nus_from_act
+        plot_allele_frequency_trajectories as plot_aft
 from hivwholeseq.patients.one_site_statistics import \
-        plot_allele_frequency_trajectories_from_counts_3d as plot_nus_from_act_3d
+        plot_allele_frequency_trajectories_3d as plot_aft_3d
 from hivwholeseq.patients.one_site_statistics import get_allele_count_trajectories
 from hivwholeseq.fork_cluster import fork_get_allele_frequency_trajectory as fork_self
 
@@ -35,7 +35,7 @@ if __name__ == '__main__':
     parser.add_argument('--patient', required=True,
                         help='Patient to analyze')
     parser.add_argument('--fragments', nargs='*',
-                        help='Fragments to analyze (e.g. F1 F6)')
+                        help='Fragments to analyze (e.g. F1 genomewide)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-4]')
     parser.add_argument('--plot', nargs='?', default=None, const='2D',
@@ -46,6 +46,10 @@ if __name__ == '__main__':
                         help='Take only PCR1 samples [0=off, 1=where both available, 2=always]')
     parser.add_argument('--threshold', type=float, default=0.9,
                         help='Minimal frequency plotted')
+    parser.add_argument('--cov-min', type=float, default=200,
+                        help='Minimal coverage (lower sites are masked)')
+    parser.add_argument('--depth-min', type=float, default=200,
+                        help='Minimal depth (lower time points are hidden)')
 
     args = parser.parse_args()
     pname = args.patient
@@ -55,6 +59,8 @@ if __name__ == '__main__':
     use_PCR1 = args.PCR1
     use_logit = args.logit
     threshold = args.threshold
+    cov_min = args.cov_min
+    depth_min = args.depth_min
 
     patient = load_patient(pname)
     patient.discard_nonsequenced_samples()
@@ -71,34 +77,32 @@ if __name__ == '__main__':
 
         # Collect allele counts from patient samples, and return only positive hits
         # sns contains sample names and PCR types
-        (sns, act) = get_allele_count_trajectories(pname, samplenames, fragment,
-                                                   use_PCR1=use_PCR1, VERBOSE=VERBOSE)
-        ind = [i for i, (_, sample) in enumerate(patient.samples.iterrows())
-               if sample.name in map(itemgetter(0), sns)]
-        samples = patient.samples.iloc[ind]
-        times = convert_date_deltas_to_float(samples.date - patient.transmission_date, unit='day')
-        ntemplates = samples['n templates']
-
-        # FIXME: use masked arrays?
-        aft = (1.0 * act.swapaxes(0, 1) / act.sum(axis=1)).swapaxes(0, 1)
-        aft[np.isnan(aft)] = 0
-        aft[(aft < 1e-4)] = 0
+        (aft, ind) = patient.get_allele_frequency_trajectories(fragment,
+                                                           use_PCR1=use_PCR1,
+                                                           cov_min=cov_min,
+                                                           depth_min=depth_min,
+                                                           VERBOSE=VERBOSE)
+        times = patient.times[ind]
+        ntemplates = patient.n_templates[ind]
 
         if plot is not None:
             import matplotlib.pyplot as plt
 
             if plot in ('2D', '2d', ''):
-                plot_nus_from_act(times, act,
-                                  title='Patient '+pname+', '+fragment,
-                                  VERBOSE=VERBOSE, logit=use_logit,
-                                  ntemplates=ntemplates,
-                                  threshold=threshold)
+                (fig, ax) = plot_aft(times, aft,
+                                     title='Patient '+pname+', '+fragment,
+                                     VERBOSE=VERBOSE,
+                                     ntemplates=ntemplates,
+                                     logit=use_logit,
+                                     threshold=threshold)
 
             elif plot in ('3D', '3d'):
-                plot_nus_from_act_3d(times, act,
-                                     title='Patient '+pname+', '+fragment,
-                                     VERBOSE=VERBOSE, logit=use_logit,
-                                     threshold=threshold)
+                (fig, ax) = plot_aft_3d(times, aft,
+                                        title='Patient '+pname+', '+fragment,
+                                        VERBOSE=VERBOSE,
+                                        logit=use_logit,
+                                        ntemplates=ntemplates,
+                                        threshold=threshold)
 
     if plot is not None:
         plt.tight_layout()

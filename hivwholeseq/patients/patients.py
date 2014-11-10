@@ -156,7 +156,7 @@ class Patient(pd.Series):
 
 
     def get_allele_frequency_trajectories(self, fragment, use_PCR1=1, cov_min=1,
-                                          depth_min=None):
+                                          depth_min=None, **kwargs):
         '''Get the allele frequency trajectories from files
         
         Args:
@@ -165,8 +165,11 @@ class Patient(pd.Series):
             Time points with less templates are excluded, and positions are masked.
             For convenience depth is defined > 1, e.g. 100 takes frequencies down
             to 1%.
+          **kwargs: passed down to the get_allele_count_trajectories method.
         '''
-        (act, ind) = self.get_allele_count_trajectories(fragment, use_PCR1=use_PCR1)
+        (act, ind) = self.get_allele_count_trajectories(fragment,
+                                                        use_PCR1=use_PCR1,
+                                                        **kwargs)
 
         if depth_min is not None:
             indd = np.array(self.n_templates[ind] >= depth_min)
@@ -191,15 +194,32 @@ class Patient(pd.Series):
         return (aft, ind)
 
 
-    def get_allele_count_trajectories(self, fragment, use_PCR1=1):
-        '''Get the allele count trajectories from files'''
-        from hivwholeseq.patients.one_site_statistics import get_allele_count_trajectories
-        from operator import itemgetter
-        (sns, act) = get_allele_count_trajectories(self.name, self.samples.index,
-                                                   fragment,
-                                                   use_PCR1=use_PCR1, VERBOSE=0)
-        ind = np.array([i for i, (_, sample) in enumerate(self.samples.iterrows())
-                        if sample.name in map(itemgetter(0), sns)], int)
+    def get_allele_count_trajectories(self, fragment, use_PCR1=1, **kwargs):
+        '''Get the allele count trajectories from files
+        
+        Args:
+          **kwargs: passed down to the function (VERBOSE, etc.).
+
+        Note: the genomewide counts are currently saved to file.
+        '''
+        if fragment == 'genomewide':
+            from hivwholeseq.patients.filenames import \
+                    get_allele_count_trajectories_filename as get_fn
+            fn = get_fn(self.name, fragment)
+            npz = np.load(fn)
+            act = npz['act']
+            ind = npz['ind']
+
+        else:
+            from hivwholeseq.patients.one_site_statistics import \
+                    get_allele_count_trajectories
+            from operator import itemgetter
+            (sns, act) = get_allele_count_trajectories(self.name, self.samples.index,
+                                                       fragment,
+                                                       use_PCR1=use_PCR1, **kwargs)
+            ind = np.array([i for i, (_, sample) in enumerate(self.samples.iterrows())
+                            if sample.name in map(itemgetter(0), sns)], int)
+
         return (act, ind)
 
 

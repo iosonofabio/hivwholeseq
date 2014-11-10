@@ -111,78 +111,172 @@ def get_allele_frequency_trajectories(pname, samples, fragment, qual_min=30, VER
 
 def plot_allele_frequency_trajectories(times, nus, title='', VERBOSE=0,
                                        threshold=0.1, options=[], logit=False,
-                                       ntemplates=None):
+                                       ntemplates=None, figax=None, offset=True):
     '''Plot the allele frequency trajectories from a patient'''
+    if logit:
+        import hivwholeseq.plot_utils
     import matplotlib.pyplot as plt
     from matplotlib import cm
     import numpy as np
 
-    fig, ax = plt.subplots(1, 1)
+    if figax is not None:
+        fig, ax = figax
+    else:
+        fig, ax = plt.subplots(1, 1)
+
+    if offset:
+        offset_step = 10.0 / nus.shape[2] # 10 days max offset
+    else:
+        offset_step = 0
+
     for i in xrange(nus.shape[2]):
         for j in xrange(nus.shape[1]):
             nu = nus[:, j, i]
-            if (nu[0] < 0.5) and (nu > threshold).any():
+            mask = nus.mask[:, j, i]
+            if mask.all():
+                continue
+            
+            times_nu = times[-mask]
+            nu = nu[-mask]
 
-                # Use dashed lines for synonymous if requested
-                if 'syn-nonsyn' in options:
-                    cod_initial = alpha[nus[0, :, i - i%3: i - i%3 + 3].argmax(axis=0)]
-                    cod_mut = cod_initial.copy()
-                    cod_mut[i%3] = alpha[j]
-                    if ('-' in cod_mut) or \
-                       (str(Seq(''.join(cod_initial), ambiguous_dna).translate()) != \
-                        str(Seq(''.join(cod_mut), ambiguous_dna).translate())):
-                        ls = '-'
-                    else:
-                        ls= '--'
-                else:
+            if nu[0] > 0.5:
+                continue
+
+            if (nu < threshold).all():
+                continue
+
+            # Use dashed lines for synonymous if requested
+            if 'syn-nonsyn' in options:
+                cod_initial = alpha[nus[0, :, i - i%3: i - i%3 + 3].argmax(axis=0)]
+                cod_mut = cod_initial.copy()
+                cod_mut[i%3] = alpha[j]
+                if ('-' in cod_mut) or \
+                   (str(Seq(''.join(cod_initial), ambiguous_dna).translate()) != \
+                    str(Seq(''.join(cod_mut), ambiguous_dna).translate())):
                     ls = '-'
-
-                if logit:
-                    y = np.log10((nu + 1e-4)/(1-1e-4-nu))
                 else:
-                    y = nu + 1e-4
-                ax.plot(times, y, lw=1.5, ls=ls,
-                        color=cm.jet(int(255.0 * i / nus.shape[2])))
+                    ls= '--'
+            else:
+                ls = '-'
+
+            ax.plot(times_nu + i * offset_step, nu, lw=1.5, ls=ls,
+                    color=cm.jet(int(255.0 * i / nus.shape[2])))
 
     if ntemplates is not None:
         depthmax = 1.0 / ntemplates
-        if logit:
-            y = np.log10(depthmax/(1 - depthmax))
-        else:
-            y = depthmax
+        y = depthmax
         ax.plot(times, y, lw=3.5, ls='-',
                 color='k', label='Max depth (# templates)')
+        ax.plot(times, 1 - y, lw=3.5, ls='-',
+                color='k')
+
+    # Plot PCR error threshold
+    y = np.repeat(2e-3, len(times))
+    ax.plot(times, y, lw=3.5, ls='-',
+            color='k', label='Max depth (PCR error rate)')
+    ax.plot(times, 1 - y, lw=3.5, ls='-',
+            color='k')
 
     ax.set_xlim(times[0] -10, times[-1] + 10)
     ax.set_xlabel('Time [days from initial sample]')
     if logit:
-        ax.set_ylim(-4.1, 4.1)
+        ax.set_yscale('logit')
+        ax.set_ylim(10**(-4.1), 1 - 10**(-4.1))
+    else:
+        ax.set_yscale('log')
+        ax.set_ylim(9e-5, 1.5)
+
+    ax.set_ylabel(r'$\nu$', fontsize=16)
+    ax.set_title(title)
+    ax.grid(True)
+
+    return (fig, ax)
+
+
+def plot_allele_frequency_trajectories_3d(times, nus, title='', VERBOSE=0,
+                                          threshold=0.1, logit=False,
+                                          ntemplates=None, figax=None):
+    '''Plot the allele freq traj in 3D'''
+    # NOTE: logscales in 3d plots is an open matplotlib issue (!!), forget logit ones
+    from mpl_toolkits.mplot3d import Axes3D
+    from matplotlib import cm
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    if figax is not None:
+        fig, ax = figax
+    else:
+        fig = plt.figure(figsize=(12, 12))
+        ax = fig.gca(projection='3d')
+        ax.view_init(5, 150)
+
+    for i in xrange(nus.shape[2]):
+        for j in xrange(nus.shape[1]):
+            nu = nus[:, j, i]
+            if (nu[0] < 0.5) and (nu > threshold).any():
+                if logit:
+                    ax.plot(times, [i] * len(times), np.log10((nu + 1e-4)/(1-1e-4-nu)),
+                            lw=2,
+                            color=cm.jet(int(255.0 * i / nus.shape[2])))
+                else:
+                    ax.plot(times, [i] * len(times), np.log10(nu + 1e-4),
+                            lw=2,
+                            color=cm.jet(int(255.0 * i / nus.shape[2])))
+
+    if ntemplates is not None:
+        # It's a poly-plane in 3d, parallel to Y axis
+        X, Y = np.meshgrid([times[0] - 1] + list(times) + [times[-1] + 1],
+                           [0, nus.shape[2] - 1])
+        Zs = [np.tile([1.0 / ntemplates[0]] + list(1.0 / ntemplates) +
+                      [1.0 / ntemplates[-1]], (2, 1))]
+        Zs.append(1 - Zs[0])
+        for Z in Zs:
+            if logit:
+                Z = np.log10((Z / (1.0 - Z)))
+            else:
+                Z = np.log10(Z)
+
+            ax.plot_surface(X, Y, Z,
+                            rstride=1, cstride=1, color='k',
+                            linewidth=0, antialiased=False)
+
+    ax.set_xlim(times[0] -10, times[-1] + 10)
+    ax.set_xlabel('Time [days from initial sample]')
+    ax.set_ylabel('Position [bp]')
+    if logit:
+        ax.set_zlim(-4.1, 4.1)
         trfun = lambda x: np.log10(x / (1 - x))
         tickloc = np.array([0.0001, 0.01, 0.5, 0.99, 0.9999])
-        ax.set_yticks(trfun(tickloc))
-        ax.set_yticklabels(map(str, tickloc))
+        ax.set_zticks(trfun(tickloc))
+        ax.set_zticklabels(map(str, tickloc))
         from matplotlib.ticker import FixedLocator
         ticklocminor = np.concatenate([[10**po * x for x in xrange(2 , 10)] for po in xrange(-4, -1)] + \
                                       [[0.1 * x for x in xrange(2 , 9)]] + \
                                       [[1 - 10**po * (10 - x) for x in xrange(2, 10)] for po in xrange(-2, -5, -1)])
-        ax.yaxis.set_minor_locator(FixedLocator(trfun(ticklocminor)))
+        ax.zaxis.set_minor_locator(FixedLocator(trfun(ticklocminor)))
+        ax.set_zlabel(r'$\nu$', fontsize=18)
     else:
-        ax.set_ylim(9e-5, 1.5)
-        ax.set_yscale('log')
-
-    ax.set_ylabel(r'$\nu$', fontsize=16)
+        ax.set_zlim(-4.1, 0.1)
+        ax.set_zlabel(r'$\log_{10} \nu$', fontsize=18)
     ax.set_title(title)
+    ax.grid(True)
+
+    return (fig, ax)
 
 
 def plot_allele_frequency_trajectories_from_counts(times, act, title='', VERBOSE=0,
                                        threshold=0.1, options=[], logit=False,
-                                       ntemplates=None):
+                                       ntemplates=None, figax=None):
     '''Plot the allele frequency trajectories from a patient'''
     import matplotlib.pyplot as plt
     from matplotlib import cm
     import numpy as np
 
-    fig, ax = plt.subplots(1, 1)
+    if figax is not None:
+        fig, ax = figax
+    else:
+        fig, ax = plt.subplots(1, 1)
+
     for i in xrange(act.shape[2]):
         cov = act[:, :, i].sum(axis=1)
         # Take only time points with enough coverage
@@ -251,65 +345,24 @@ def plot_allele_frequency_trajectories_from_counts(times, act, title='', VERBOSE
     ax.set_ylabel(r'$\nu$', fontsize=16)
     ax.set_title(title)
 
-
-def plot_allele_frequency_trajectories_3d(times, nus, title='', VERBOSE=0,
-                                          threshold=0.1, logit=False):
-    '''Plot the allele freq traj in 3D'''
-    from mpl_toolkits.mplot3d import Axes3D
-    from matplotlib import cm
-    import matplotlib.pyplot as plt
-    import numpy as np
-
-    fig = plt.figure(figsize=(12, 12))
-    ax = fig.gca(projection='3d')
-    ax.view_init(5, 150)
-
-    for i in xrange(nus.shape[2]):
-        for j in xrange(nus.shape[1]):
-            nu = nus[:, j, i]
-            if (nu[0] < 0.5) and (nu > threshold).any():
-                if logit:
-                    ax.plot(times, [i] * len(times), np.log10((nu + 1e-4)/(1-1e-4-nu)),
-                            lw=2,
-                            color=cm.jet(int(255.0 * i / nus.shape[2])))
-                else:
-                    ax.plot(times, [i] * len(times), np.log10(nu + 1e-4),
-                            lw=2,
-                            color=cm.jet(int(255.0 * i / nus.shape[2])))
-
-    ax.set_xlim(times[0] -10, times[-1] + 10)
-    ax.set_xlabel('Time [days from initial sample]')
-    ax.set_ylabel('Position [bp]')
-    if logit:
-        ax.set_zlim(-4.1, 4.1)
-        trfun = lambda x: np.log10(x / (1 - x))
-        tickloc = np.array([0.0001, 0.01, 0.5, 0.99, 0.9999])
-        ax.set_zticks(trfun(tickloc))
-        ax.set_zticklabels(map(str, tickloc))
-        from matplotlib.ticker import FixedLocator
-        ticklocminor = np.concatenate([[10**po * x for x in xrange(2 , 10)] for po in xrange(-4, -1)] + \
-                                      [[0.1 * x for x in xrange(2 , 9)]] + \
-                                      [[1 - 10**po * (10 - x) for x in xrange(2, 10)] for po in xrange(-2, -5, -1)])
-        ax.zaxis.set_minor_locator(FixedLocator(trfun(ticklocminor)))
-        ax.set_zlabel(r'$\nu$', fontsize=18)
-    else:
-        ax.set_zlim(-4.1, 0.1)
-        ax.set_zlabel(r'$\log_{10} \nu$', fontsize=18)
-    ax.set_title(title)
-    ax.grid(True)
+    return (fig, ax)
 
 
 def plot_allele_frequency_trajectories_from_counts_3d(times, act, title='', VERBOSE=0,
-                                          threshold=0.1, options=[], logit=False):
+                                          threshold=0.1, options=[], logit=False,
+                                                     figax=None):
     '''Plot the allele freq traj in 3D'''
     from mpl_toolkits.mplot3d import Axes3D
     from matplotlib import cm
     import matplotlib.pyplot as plt
     import numpy as np
 
-    fig = plt.figure(figsize=(16, 12))
-    ax = fig.gca(projection='3d')
-    ax.view_init(5, 150)
+    if figax is not None:
+        fig, ax = figax
+    else:
+        fig = plt.figure(figsize=(16, 12))
+        ax = fig.gca(projection='3d')
+        ax.view_init(5, 150)
 
     for i in xrange(act.shape[2]):
         cov = act[:, :, i].sum(axis=1)
@@ -368,6 +421,8 @@ def plot_allele_frequency_trajectories_from_counts_3d(times, act, title='', VERB
     else:
         ax.set_zlim(-4.1, 0.1)
         ax.set_zlabel(r'$\log_{10} \nu$', fontsize=18)
+
+    return (fig, ax)
 
 
 def plot_coverage_trajectories(times, covt, title='', labels=None, legendtitle='',
