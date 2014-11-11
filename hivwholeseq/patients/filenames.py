@@ -214,6 +214,21 @@ def get_propagator_filename(pnames, fragments, dt, suffix=None):
     return filename
 
 
+def get_divergence_trajectories_local_filename(pname, fragment):
+    '''Get filename of the trajectories of local divergence'''
+    filename = 'divergence_trajectories_local_'+fragment+'.npz'
+    filename = get_foldername(pname)+filename
+    return filename
+    
+
+def get_diversity_trajectories_local_filename(pname, fragment):
+    '''Get filename of the trajectories of local diversity'''
+    filename = 'diversity_trajectories_local_'+fragment+'.npz'
+    filename = get_foldername(pname)+filename
+    return filename
+    
+
+
 
 # FIGURES
 def get_figure_folder(pname):

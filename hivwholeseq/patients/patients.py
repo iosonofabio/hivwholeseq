@@ -44,12 +44,15 @@ class Patient(pd.Series):
         samples_sequenced_set = set(samples_sequenced.loc[:, 'patient sample']) - set(['nan'])
         samples = self.samples.loc[self.samples.index.isin(samples_sequenced_set)]
 
-        # Add info on sequencing
-        samples_seq_col = []
-        for samplename in samples.index:
-            ind = samples_sequenced.loc[:, 'patient sample'] == samplename
-            samples_seq_col.append(samples_sequenced.loc[ind])
-        samples['samples seq'] = samples_seq_col
+        ## Add info on sequencing
+        ## FIXME: why is this here?!
+        ## FIXME: this is buggy is so many ways... pandas is nto great at this
+        #samples_seq_col = []
+        #for samplename in samples.index:
+        #    ind = samples_sequenced.loc[:, 'patient sample'] == samplename
+        #    samples_seq_col.append(samples_sequenced.loc[ind])
+
+        #samples.loc[:, 'samples seq'] = samples_seq_col
 
         self.samples = samples
 

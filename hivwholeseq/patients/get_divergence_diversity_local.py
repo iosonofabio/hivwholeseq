@@ -27,7 +27,7 @@ from hivwholeseq.fork_cluster import fork_get_allele_frequency_trajectory as for
 
 # Functions
 def get_divergence_diversity_sliding(aft, block_length, VERBOSE=0):
-    '''Get local divergence and diversity in blocks'''
+    '''Get local divergence and diversity in a sliding window'''
 
     cons_ind = aft[0].argmax(axis=0)
     aft_nonanc = 1.0 - aft[:, cons_ind, np.arange(aft.shape[2])]
@@ -101,6 +101,8 @@ if __name__ == '__main__':
                         help='Use a sliding window instead of dividing into blocks')
     parser.add_argument('--include-coverage', action='store_true', dest='include_cov',
                         help='Also calculate/plot the coverage')
+    parser.add_argument('--save', action='store_true',
+                        help='Save the divergence and diversity to file')
 
     args = parser.parse_args()
     pnames = args.patients
@@ -111,6 +113,7 @@ if __name__ == '__main__':
     block_length = args.block_length
     use_sliding = args.sliding
     use_coverage = args.include_cov
+    save_to_file = args.save
 
     patients = load_patients()
     if pnames != ['all']:
@@ -126,20 +129,21 @@ if __name__ == '__main__':
 
     for pname, patient in patients.iterrows():
         patient = Patient(patient)
-        patient.discard_nonsequenced_samples()
 
         for ifr, fragment in enumerate(fragments):
             if VERBOSE >= 1:
                 print pname, fragment
 
-            aft, ind = patient.get_allele_frequency_trajectories(fragment, use_PCR1=use_PCR1,
-                                                                 cov_min=10)
+            # NOTE: we should use depth instead of cov_min but I need to resync times
+            aft, ind = patient.get_allele_frequency_trajectories(fragment,
+                                                                 use_PCR1=use_PCR1,
+                                                                 cov_min=100)
+
             if use_coverage:
-                (covt, ind2) = patient.get_coverage_trajectories(fragment, use_PCR1=use_PCR1)
+                (covt, ind2) = patient.get_coverage_trajectories(fragment,
+                                                                 use_PCR1=use_PCR1)
                 if set(ind).symmetric_difference(set(ind2)):
                     raise ValueError('Indices for allele freqs and coverage differ!')
-
-            times = patient.times[ind]
 
             if use_sliding:
                 (x, dg, ds) = get_divergence_diversity_sliding(aft, block_length,
@@ -148,8 +152,29 @@ if __name__ == '__main__':
                 (x, dg, ds) = get_divergence_diversity_blocks(aft, block_length,
                                                               VERBOSE=VERBOSE)
 
-            dgs[(pname, fragment)] = (times, dg)
-            dss[(pname, fragment)] = (times, ds)
+            # FIXME: avoid this var to get different conv and aft indices
+            times = patient.times[ind]
+            dgs[(pname, fragment)] = (patient.times[ind], dg)
+            dss[(pname, fragment)] = (patient.times[ind], ds)
+
+            if save_to_file:
+                from hivwholeseq.patients.filenames import \
+                        get_divergence_trajectories_local_filename, \
+                        get_diversity_trajectories_local_filename
+
+                # savez does not support masked arrays
+                dg_save = dg.data.copy()
+                dg_save[dg.mask] = -1
+                ds_save = ds.data.copy()
+                ds_save[ds.mask] = -1
+
+                fn_out = get_divergence_trajectories_local_filename(pname, fragment)
+                np.savez(fn_out, ind=ind, dg=dg_save, block_length=[block_length])
+                fn_out = get_diversity_trajectories_local_filename(pname, fragment)
+                np.savez(fn_out, ind=ind, ds=ds_save, block_length=[block_length])
+                if VERBOSE >= 1:
+                    print 'saved to file'
+
 
             if plot:
                 fig, axs = plt.subplots(1, 2 + use_coverage,
@@ -181,15 +206,15 @@ if __name__ == '__main__':
                     ax3.set_xlim(-150, aft.shape[2] + 50)
                     ax3.grid(True)
 
-                for it in xrange(len(times)):
+                for it in xrange(len(patient.times[ind])):
                     ax1.plot(x, dg[it] + 1e-4,
-                             lw=2, label=str(times[it]),
-                             color=cm.jet(1.0 * it / len(times)),
+                             lw=2, label=str(patient.times[ind][it]),
+                             color=cm.jet(1.0 * it / len(patient.times[ind])),
                              alpha=0.5)
 
                     ax2.plot(x, ds[it] + 1e-4,
                              lw=2,
-                             color=cm.jet(1.0 * it / len(times)),
+                             color=cm.jet(1.0 * it / len(patient.times[ind])),
                              alpha=0.5)
 
                     if use_coverage:

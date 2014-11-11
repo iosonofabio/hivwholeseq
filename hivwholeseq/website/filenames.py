@@ -116,3 +116,15 @@ def get_propagator_filename(pnames, fragments, dt, suffix=None):
     return filename
 
 
+def get_divergence_trajectories_filename(pname, fragment):
+    '''Get the filename of the local divergence trajectories'''
+    filename = 'divergence_trajectory_'+pname+'_'+fragment+'.npz'
+    filename = get_foldername('divdiv')+filename
+    return filename
+
+
+def get_diversity_trajectories_filename(pname, fragment):
+    '''Get the filename of the local diversity trajectories'''
+    filename = 'diversity_trajectory_'+pname+'_'+fragment+'.npz'
+    filename = get_foldername('divdiv')+filename
+    return filename
