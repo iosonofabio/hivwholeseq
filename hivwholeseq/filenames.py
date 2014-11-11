@@ -11,12 +11,15 @@ import hivwholeseq
 
 
 # Globals
+stampy_bin = None
+spades_bin = None
+bwa_bin = None
 # FIXME: use env vars and similia
 if os.path.isdir('/media/FZ_MPI/HIV_Sweden/'):
     root_data_folder = '/media/FZ_MPI/HIV_Sweden/'
     stampy_bin = '/usr/bin/stampy'
-    spades_bin = None
-    bwa_bin = None
+elif os.path.isdir('/var/www/hivwholeweb/'):
+    root_data_folder = '/var/www/hivwholeweb/app/hiv/static/data/'
 else:
     root_data_folder = '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/'
     stampy_bin = '/ebio/ag-neher/share/programs/bundles/stampy-1.0.22/stampy.py'
