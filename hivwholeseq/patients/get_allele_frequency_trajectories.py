@@ -64,7 +64,6 @@ if __name__ == '__main__':
 
     patient = load_patient(pname)
     patient.discard_nonsequenced_samples()
-    samplenames = patient.samples.index
 
     if not fragments:
         fragments = ['F'+str(i) for i in xrange(1, 7)]
