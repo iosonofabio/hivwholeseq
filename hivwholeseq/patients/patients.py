@@ -96,7 +96,8 @@ class Patient(pd.Series):
     @property
     def initial_sample(self):
         '''The initial sample used as a mapping reference'''
-        return self.samples.iloc[0]
+        from .samples import SamplePat
+        return SamplePat(self.samples.iloc[0])
 
 
     def itersamples(self):
@@ -149,6 +150,8 @@ class Patient(pd.Series):
         counts = self.get_initial_allele_counts(fragment)
         cov = counts.sum(axis=0)
         af = np.ma.masked_where(np.tile(cov < cov_min, (counts.shape[0], 1)), counts)
+        af.harden_mask()
+        af = 1.0 * af / af.sum(axis=0)
         return af
 
 

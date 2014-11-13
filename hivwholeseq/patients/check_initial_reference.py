@@ -25,18 +25,8 @@ from hivwholeseq.sequencing.primer_info import fragments_genes
 # Functions
 def check_similarity_initial_sample(refseq, sample_seq, fragment, VERBOSE=0, maxdiff=10):
     '''Check whether the reference looks similar to the initial sample'''
-    consseq = SeqIO.read(sample_seq.get_consensus_filename(fragment), 'fasta')
-
     from seqanpy import align_global
-    (score, ali1, ali2) = align_global(str(refseq.seq), str(consseq.seq), band=50)
-
-    # PCR2 samples are shorter: if the consensus got complemented by PCR1 wings,
-    # ignore the wings
-    if int(sample_seq.PCR) == 2:
-        start = len(ali2) - len(ali2.lstrip('-'))
-        end = len(ali2.rstrip('-'))
-        ali1 = ali1[start: end]
-        ali2 = ali2[start: end]
+    (score, ali1, ali2) = align_global(str(refseq.seq), str(sample_seq.seq), band=50)
 
     alim = np.zeros((2, len(ali1)), 'S1')
     alim[0] = np.fromstring(ali1, 'S1')
@@ -53,7 +43,7 @@ def check_similarity_initial_sample(refseq, sample_seq, fragment, VERBOSE=0, max
         return False
     elif VERBOSE >=3:
         print 'OK: reference is similar to initial consensus ('+\
-                str(sample_init_seq.name)+', '+sample_seq['seq run']+' '+sample_seq.adapter+', '+\
+                str(sample_init_seq.name)+', '+\
                 str(n_diff)+' differences)'
 
     return True
@@ -1095,21 +1085,10 @@ if __name__ == '__main__':
         if patient.samples.shape[0] < 2:
             print 'WARNING: patient has less than two samples sequenced. Skipping.'
             continue
-    
-        sample_init = patient.initial_sample
 
         for fragment in fragments:
             if VERBOSE >= 1:
                 print fragment
-
-            if (patient.name in ('15241', '15319')) and (fragment in ('F4', 'F5', 'F6')):
-                sample_init_seq = SampleSeq(sample_init['samples seq'].iloc[1])
-            else:
-                sample_init_seq = SampleSeq(sample_init['samples seq'].iloc[0])
-            frag_specs = sample_init_seq.regions_complete
-
-            if VERBOSE:
-                print 'Initial sample:', sample_init_seq.name, sample_init_seq['seq run'], sample_init_seq.adapter
 
             # Check whether a reference exists at all
             ref_fn = patient.get_reference_filename(fragment)
@@ -1122,7 +1101,15 @@ if __name__ == '__main__':
             refseq = SeqIO.read(ref_fn, 'fasta')
 
             # Check whether the consensus from the first sample is similar to
-            # the reference. If not, it's not going to work
+            # the reference
+            for i, sample in enumerate(patient.itersamples()):
+                if os.path.isfile(sample.get_consensus_filename(fragment)):
+                    sample_init_seq = sample.get_consensus(fragment)
+                    if (VERBOSE >= 1) and (i != 0):
+                        print 'Consensus from initial sample missing, taking time point',
+                        print 'n', i, '(start from zero)'
+
+                    break
             check = check_similarity_initial_sample(refseq, sample_init_seq, fragment,
                                                     VERBOSE=VERBOSE)
             if not check:
@@ -1135,10 +1122,18 @@ if __name__ == '__main__':
             if (len(tmp) >= 3) and (tmp[:2] == fragment):
                 frag_spec = tmp
             else:
-                frag_spec = [fr for fr in frag_specs if fragment in fr][0]
-                # NOTE: we always use outer primer references, if the initial sample
-                # is PCR2 we complement by taking the wings from a later one
-                frag_spec = frag_spec.replace('i', 'o')
+                if fragment == 'F3':
+                    if pname in ('20529', ):
+                        frag_spec = 'F3ao'
+                    else:
+                        frag_spec = 'F3bo'
+                elif fragment == 'F5':
+                    if pname in ('20097', '9669'):
+                        frag_spec = 'F5bo'
+                    else:
+                        frag_spec = 'F5ao'
+                else:
+                    frag_spec = fragment+'o'
 
             # Check whether genes are fine
             check = check_genes(refseq, frag_spec, VERBOSE=VERBOSE)
