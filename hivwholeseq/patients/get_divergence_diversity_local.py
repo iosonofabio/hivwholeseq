@@ -6,6 +6,7 @@ content:    Get divergence and diversity of the patient.
 '''
 # Modules
 import os
+import sys
 import argparse
 from operator import itemgetter
 import numpy as np
@@ -26,10 +27,33 @@ from hivwholeseq.fork_cluster import fork_get_allele_frequency_trajectory as for
 
 
 # Functions
+def get_initial_consensus_noinsertions(aft, VERBOSE=0):
+    '''Make initial consensus from allele frequencies, keep coordinates and masked
+    
+    Returns:
+      np.ndarray: initial consensus, augmented with later time points at masked
+      positions, with Ns if never covered
+    '''
+    af0 = aft[0]
+    # Fill the masked positions with N...
+    cons_ind = af0.argmax(axis=0)
+    cons_ind[af0[0].mask] = 5
+
+    # ...then look in later time points
+    if aft.shape[0] == 1:
+        return cons_ind
+    for af_later in aft[1:]:
+        cons_ind_later = af_later.argmax(axis=0)
+        cons_ind_later[af_later[0].mask] = 5
+        ind_Ns = (cons_ind == 5) & (cons_ind_later != 5)
+        cons_ind[ind_Ns] = cons_ind_later[ind_Ns]
+    return cons_ind
+
+
 def get_divergence_diversity_sliding(aft, block_length, VERBOSE=0):
     '''Get local divergence and diversity in a sliding window'''
 
-    cons_ind = aft[0].argmax(axis=0)
+    cons_ind = get_initial_consensus_noinsertions(aft, VERBOSE=VERBOSE)
     aft_nonanc = 1.0 - aft[:, cons_ind, np.arange(aft.shape[2])]
     aft_var = (aft * (1 - aft)).sum(axis=1)
 
@@ -242,6 +266,18 @@ if __name__ == '__main__':
                 if use_coverage:
                     ax3.legend(loc=3, fontsize=10, ncol=(1 + ((len(times) - 1) // 3)),
                                title='Sample name:')
+
+                if fragment == 'genomewide':
+                    refann = patient.get_reference(fragment, 'gb')
+                    for fea in refann.features:
+                        if fea.type != 'fragment':
+                            continue
+
+                        frn = int(fea.id[1])
+                        frn_even = 1 - (frn % 2)
+                        x = (fea.location.nofuzzy_start, fea.location.nofuzzy_end)
+                        y = [0.95**(1 + frn_even) * ax1.get_ylim()[1]] * 2
+                        ax1.plot(x, y, color='k', lw=2)
 
                 plt.tight_layout(rect=(0, 0, 1, 0.95))
                 #plt.savefig('/ebio/ag-neher/home/fzanini/phd/sequencing/figures/'+\

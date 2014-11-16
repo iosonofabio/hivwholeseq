@@ -49,10 +49,13 @@ def merge_allele_count_trajectories(ref_genomewide, acss, VERBOSE=0):
         fr_end = len(ali2.rstrip('-'))
 
         if VERBOSE:
-            print 'F'+str(ifr+1), pos_ref - 1000 + fr_start, pos_ref - 1000 + fr_end
+            print 'F'+str(ifr+1), pos_ref - 1000 + fr_start, pos_ref - 1000 + fr_end,
+            print ind
 
         # Scan the alignment
         pos_ref = pos_ref - 1000 + fr_start
+        fr_start_ref = pos_ref
+        fr_end_ref = pos_ref + fr_end - fr_start
         pos_fr = 0
         for pos_ali in xrange(fr_start, fr_end):
             # Gap in genomewise, ignore position
@@ -65,9 +68,21 @@ def merge_allele_count_trajectories(ref_genomewide, acss, VERBOSE=0):
                 pos_ref += 1
                 continue
 
-            acs[ind, :, pos_ref] = acsi[:, :, pos_fr]
+            # Add the counts
+            # NOTE: all fragments are treated the same, even in case of coverage
+            # differences of orders of magnitude. This means, larger coverage
+            # always wins. Maybe we want to implement this somewhat differently
+            acs[ind, :, pos_ref] += acsi[:, :, pos_fr]
             pos_fr += 1
             pos_ref += 1
+
+        if VERBOSE >= 3:
+            from hivwholeseq.sequence_utils import pretty_print_pairwise_ali
+            pretty_print_pairwise_ali((ali1[fr_start: fr_end],
+                                       alpha[acs[0, :, fr_start_ref: fr_end_ref].argmax(axis=0)]),
+                                      name1='gw',
+                                      name2='F'+str(ifr+1),
+                                      width=100)
 
     ind = np.arange(ind_min, ind_max + 1)
 
@@ -132,6 +147,8 @@ if __name__ == '__main__':
         if save_to_file:
             fn_out = get_allele_count_trajectories_filename(pname, 'genomewide')
             np.savez(fn_out, ind=ind, act=act)
+            if VERBOSE >= 1:
+                print 'Genomewide allele count trajectories saved to:', fn_out
 
         # Normalize to frequencies
         afs = (1.0 * act.swapaxes(0, 1) / (0.1 + act.sum(axis=1))).swapaxes(0, 1)

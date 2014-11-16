@@ -209,6 +209,7 @@ def get_local_haplotypes(bamfilename, start, end, VERBOSE=0, maxreads=-1):
 def plot_haplotype_frequencies(times, seqs, hft, figax=None, title=''):
     '''Plot haplotype frequencies'''
     import hivwholeseq.plot_utils
+    from matplotlib import cm
     import matplotlib.pyplot as plt
 
     if figax is None:
@@ -296,7 +297,7 @@ if __name__ == '__main__':
                                      maxreads=maxreads)
 
         if VERBOSE >= 2:
-            print 'Cluter haplotypes'
+            print 'Cluster haplotypes'
         haploc = cluster_haplotypes(haplo, VERBOSE=VERBOSE)
 
         if VERBOSE >= 2:
@@ -314,6 +315,8 @@ if __name__ == '__main__':
         store_alignments(alis, save_path)
 
     if use_plot:
+        if VERBOSE >= 1:
+            print 'Plot'
         seqs_set = set()
         for haploc in haplocs:
             seqs_set |= set(haploc.keys())
