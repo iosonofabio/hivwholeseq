@@ -135,6 +135,33 @@ class Patient(pd.Series):
         return get_consensi_tree_filename(self.name, fragment)
 
 
+    @staticmethod
+    def get_initial_consensus_noinsertions(aft, VERBOSE=0):
+        '''Make initial consensus from allele frequencies, keep coordinates and masked
+        
+        Args:
+          aft (np.ma.ndarray): 3d masked array with the allele frequency trajectories
+
+        Returns:
+          np.ndarray: initial consensus, augmented with later time points at masked
+          positions, with Ns if never covered
+        '''
+        af0 = aft[0]
+        # Fill the masked positions with N...
+        cons_ind = af0.argmax(axis=0)
+        cons_ind[af0[0].mask] = 5
+    
+        # ...then look in later time points
+        if aft.shape[0] == 1:
+            return cons_ind
+        for af_later in aft[1:]:
+            cons_ind_later = af_later.argmax(axis=0)
+            cons_ind_later[af_later[0].mask] = 5
+            ind_Ns = (cons_ind == 5) & (cons_ind_later != 5)
+            cons_ind[ind_Ns] = cons_ind_later[ind_Ns]
+        return cons_ind
+
+
     def get_initial_allele_counts(self, fragment):
         '''Get allele counts from the initial time point'''
         import os

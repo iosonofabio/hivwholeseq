@@ -27,33 +27,9 @@ from hivwholeseq.fork_cluster import fork_get_allele_frequency_trajectory as for
 
 
 # Functions
-def get_initial_consensus_noinsertions(aft, VERBOSE=0):
-    '''Make initial consensus from allele frequencies, keep coordinates and masked
-    
-    Returns:
-      np.ndarray: initial consensus, augmented with later time points at masked
-      positions, with Ns if never covered
-    '''
-    af0 = aft[0]
-    # Fill the masked positions with N...
-    cons_ind = af0.argmax(axis=0)
-    cons_ind[af0[0].mask] = 5
-
-    # ...then look in later time points
-    if aft.shape[0] == 1:
-        return cons_ind
-    for af_later in aft[1:]:
-        cons_ind_later = af_later.argmax(axis=0)
-        cons_ind_later[af_later[0].mask] = 5
-        ind_Ns = (cons_ind == 5) & (cons_ind_later != 5)
-        cons_ind[ind_Ns] = cons_ind_later[ind_Ns]
-    return cons_ind
-
-
 def get_divergence_diversity_sliding(aft, block_length, VERBOSE=0):
     '''Get local divergence and diversity in a sliding window'''
-
-    cons_ind = get_initial_consensus_noinsertions(aft, VERBOSE=VERBOSE)
+    cons_ind = Patient.get_initial_consensus_noinsertions(aft)
     aft_nonanc = 1.0 - aft[:, cons_ind, np.arange(aft.shape[2])]
     aft_var = (aft * (1 - aft)).sum(axis=1)
 

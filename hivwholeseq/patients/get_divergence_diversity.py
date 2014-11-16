@@ -25,8 +25,7 @@ from hivwholeseq.fork_cluster import fork_get_allele_frequency_trajectory as for
 # Functions
 def get_divergence(aft):
     '''Get divergence from allele frequency trajectories'''
-    
-    cons_ind = aft[0].argmax(axis=0)
+    cons_ind = Patient.get_initial_consensus_noinsertions(aft)
     dg = 1 - aft[:, cons_ind, np.arange(aft.shape[2])].mean(axis=1)
     return dg
 
