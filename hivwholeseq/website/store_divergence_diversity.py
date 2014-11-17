@@ -29,6 +29,9 @@ if __name__ == '__main__':
             dg, ind = patient.get_divergence(fragment,
                                              cov_min=100)
             times = patient.times[ind]
+            ind = -dg.mask
+            dg = dg[ind].data
+            times = times[ind]
             
             # Write output
             fn_out = get_divergence_filename(patient.code, fragment)
@@ -42,6 +45,9 @@ if __name__ == '__main__':
             ds, ind = patient.get_diversity(fragment,
                                             cov_min=100)
             times = patient.times[ind]
+            ind = -ds.mask
+            ds = ds[ind].data
+            times = times[ind]
 
             # Write output
             fn_out = get_diversity_filename(patient.code, fragment)
@@ -50,4 +56,3 @@ if __name__ == '__main__':
                        delimiter='\t',
                        header='t\tds',
                        comments='')
-

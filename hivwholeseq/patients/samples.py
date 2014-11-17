@@ -116,6 +116,25 @@ class SamplePat(pd.Series):
         return self._sequenced_samples
 
 
+    def get_local_haplotypes(self, fragment, start, end,
+                             VERBOSE=0, maxreads=-1, filters=None):
+        '''Get local haplotypes'''
+        from hivwholeseq.patients.get_local_haplotypes import get_local_haplotypes
+        bamfilename = self.get_mapped_filtered_filename(fragment, PCR=1)
+        haplo = get_local_haplotypes(bamfilename,
+                                     start, end,
+                                     VERBOSE=VERBOSE,
+                                     maxreads=maxreads)
+
+        if filters is not None:
+            if 'noN' in filters:
+                hnames = [hname for hname in haplo.iterkeys() if 'N' in hname]
+                for hname in hnames:
+                    del haplo[hname]
+
+        return haplo
+
+
 
 # Functions
 def load_samples_sequenced(patients=None, include_wrong=False):

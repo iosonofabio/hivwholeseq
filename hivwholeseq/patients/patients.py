@@ -308,6 +308,44 @@ class Patient(pd.Series):
             return mapco[ind]
 
 
+    def get_local_haplotype_trajectories(self, fragment, start, end, **kwargs):
+        '''Get trajectories of local haplotypes'''
+        ind = []
+        haplos = []
+        for i, sample in enumerate(self.itersamples()):
+            try:
+                haplo = sample.get_local_haplotypes(fragment, start, end,
+                                                    **kwargs)
+            except IOError:
+                continue
+
+            haplos.append(haplo)
+            ind.append(i)
+
+        return (haplos, ind)
+
+
+    def get_local_haplotype_count_trajectories(self, fragment, start, end, **kwargs):
+        '''Get trajectories of local haplotypes counts'''
+        (haplos, ind) = self.get_local_haplotype_trajectories(fragment,
+                                                              start, end,
+                                                              **kwargs)
+
+        # Make trajectories of counts
+        seqs_set = set()
+        for haplo in haplos:
+            seqs_set |= set(haplo.keys())
+        seqs_set = list(seqs_set)
+        hct = np.zeros((len(seqs_set), len(haplos)), int)
+        for i, haplo in enumerate(haplos):
+            for seq, count in haplo.iteritems():
+                hct[seqs_set.index(seq), i] = count
+
+        seqs_set = np.array(seqs_set, 'S'+str(np.max(map(len, seqs_set))))
+
+        return (hct.T, ind, seqs_set)
+
+
 
 # Functions
 def load_patients():

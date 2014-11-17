@@ -206,7 +206,8 @@ def get_local_haplotypes(bamfilename, start, end, VERBOSE=0, maxreads=-1):
     return haplotypes
 
 
-def plot_haplotype_frequencies(times, seqs, hft, figax=None, title=''):
+def plot_haplotype_frequencies(times, seqs, hft, figax=None, title='',
+                               picker=None):
     '''Plot haplotype frequencies'''
     import hivwholeseq.plot_utils
     from matplotlib import cm
@@ -218,16 +219,20 @@ def plot_haplotype_frequencies(times, seqs, hft, figax=None, title=''):
         fig, ax = figax
 
     # TODO: The hard part is finding an ordering
-    hft_cum = hft.cumsum(axis=0)
+    hft_cum = hft.cumsum(axis=1)
 
     # Randomize colors to make them more visible
-    colors = cm.jet(1.0 * np.arange(hft.shape[0]) / hft.shape[0])
+    colors = cm.jet(1.0 * np.arange(hft.shape[1]) / hft.shape[1])
     np.random.shuffle(colors)
 
     # Plot first line
-    ax.fill_between(times, hft_cum[0], np.zeros(hft.shape[1]), color=colors[0])
-    for i in xrange(1, hft.shape[0]):
-        ax.fill_between(times, hft_cum[i], hft_cum[i - 1], color=colors[i])
+    ax.fill_between(times, hft_cum[:, 0], np.zeros(hft.shape[0]), color=colors[0],
+                    label=str(0),
+                    picker=picker)
+    for i in xrange(1, hft.shape[1]):
+        ax.fill_between(times, hft_cum[:, i], hft_cum[:, i - 1], color=colors[i],
+                        label=str(i),
+                        picker=picker)
 
     ax.set_xlabel('Time from infection [days]')
     ax.set_ylabel('Haplotype frequency')
@@ -236,6 +241,8 @@ def plot_haplotype_frequencies(times, seqs, hft, figax=None, title=''):
 
     if title:
         ax.set_title(title)
+
+    return (fig, ax)
     
 
 
@@ -293,8 +300,9 @@ if __name__ == '__main__':
 
         if VERBOSE >= 2:
             print 'Get local haplotypes'
-        haplo = get_local_haplotypes(bamfilename, start, end, VERBOSE=VERBOSE,
-                                     maxreads=maxreads)
+        haplo = patient.get_local_haplotypes(start, end,
+                                             VERBOSE=VERBOSE,
+                                             maxreads=maxreads)
 
         if VERBOSE >= 2:
             print 'Cluster haplotypes'
@@ -326,8 +334,9 @@ if __name__ == '__main__':
         for i, haploc in enumerate(haplocs):
             for seq, count in haploc.iteritems():
                 hct[seqs_set.index(seq), i] = count
+        hct = hct.T
 
-        hft = 1.0 * hct / hct.sum(axis=0)
+        hft = (1.0 * hct.T / hct.sum(axis=1))
 
         plot_haplotype_frequencies(patient.times[ind], seqs_set, hft,
                                    title=patient.name+', '+' '.join(map(str, roi)))
