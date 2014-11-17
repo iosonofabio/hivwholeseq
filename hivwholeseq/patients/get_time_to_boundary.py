@@ -63,7 +63,7 @@ if __name__ == '__main__':
         t_bds = []
         t_loss = []
         t_fixs = []
-        n_staypoly = 0
+        n_staypolys = []
         for fragment in fragments:
             if VERBOSE >= 1:
                 print fragment
@@ -77,6 +77,7 @@ if __name__ == '__main__':
             times = patient.times[ind]
             ntemplates = patient.n_templates[ind]
 
+            n_staypoly = 0
             t_bd = []
             t_fix = []
             t_los = []
@@ -102,12 +103,11 @@ if __name__ == '__main__':
                     itbd = it0 + iposbd.nonzero()[0][0]
                     t_bd.append(times[itbd] - times[it0])
 
-                    # FIXME: finish this!
                     iposfix = (aft_pos[it0:] > af_bd[1])
                     iposlos = (aft_pos[it0:] < af_bd[0])
                     if iposfix.any() and (not iposlos.any()):
                         t_fix.append(times[it0 + iposfix.nonzero()[0][0]] - times[it0])
-                    if (not iposfix.any()) and iposlos.any():
+                    elif (not iposfix.any()) and iposlos.any():
                         t_los.append(times[it0 + iposlos.nonzero()[0][0]] - times[it0])
                     else:
                         itfix = it0 + iposfix.nonzero()[0][0]
@@ -115,15 +115,17 @@ if __name__ == '__main__':
                         # It cannot be both fixed and lost at the same time
                         if itfix < itlos:
                             t_fix.append(times[itfix] - times[it0])
-                        else::
+                        else:
                             t_los.append(times[itlos] - times[it0])
 
 
             t_bds.append(t_bd)
             t_fixs.append(t_fix)
             t_loss.append(t_los)
+            n_staypolys.append(n_staypoly)
 
-        data[patient] = {'t_boundary': t_bds, 't_fix': t_fixs, 't_los': t_loss}
+        data[pname] = {'t_boundary': t_bds, 't_fix': t_fixs, 't_los': t_loss,
+                       'staypoly': n_staypolys}
 
         if plot:
             fig, ax = plt.subplots()
@@ -146,8 +148,14 @@ if __name__ == '__main__':
             for ifr, fragment in enumerate(fragments):
                 xfix = np.sort(t_fixs[ifr])
                 xlos = np.sort(t_loss[ifr])
-                y = np.linspace(0, 1, len(x))[::-1]
-                ax.plot(x, y, label=fragment, lw=2,
+                n_staypoly = n_staypolys[ifr]
+                n_tot = n_staypoly + len(xfix) + len(xlos)
+                yfix = 1 - np.linspace(0, 1.0 * len(xfix) / n_tot, len(xfix))
+                ylos = np.linspace(0, 1.0 * len(xlos) / n_tot, len(xlos))
+                ax.plot(xfix, yfix, lw=2,
+                        label=fragment,
+                        color=cm.jet(1.0 * ifr / len(fragments)))
+                ax.plot(xlos, ylos, lw=2,
                         color=cm.jet(1.0 * ifr / len(fragments)))
 
             ax.set_xlabel('Time to boundary [days]')
@@ -156,7 +164,7 @@ if __name__ == '__main__':
             ax.legend(loc=1, fontsize=12, title='Fragments')
             ax.set_title('Time to boundary from '+'-'.join(map(str, af0))+\
                          ', patient '+patient.name)
-            ax.set_xlim(xmax=x[x<10000].max()+1)
+            ax.set_xlim(xmax=max(xfix.max(), xlos.max())+1)
             ax.set_ylim(-0.01, 1.01)
 
 
