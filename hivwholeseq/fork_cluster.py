@@ -821,6 +821,35 @@ def fork_get_allele_frequency_trajectory(pname, fragment, VERBOSE=0):
 
 
 
+# WEBSITE
+def fork_store_haplotypes_website(pname, region, VERBOSE=0):
+    '''Fork to the cluster for each patient and region'''
+    if VERBOSE:
+        print 'Forking to the cluster: patient '+pname+', region '+region
+
+    JOBSCRIPT = JOBDIR+'website/store_precompiled_alignments.py'
+    cluster_time = '23:59:59'
+    vmem = '8G'
+
+    qsub_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'spa'+pname+region,
+                 '-l', 'h_rt='+cluster_time,
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--patients', pname,
+                 '--regions', region,
+                ]
+    qsub_list = map(str, qsub_list)
+    if VERBOSE:
+        print ' '.join(qsub_list)
+    return sp.check_output(qsub_list)
+
+
+
 # THEORY
 def fork_calculate_beta_SFS(alpha, N, VERBOSE=0):
     '''Fork to the cluster in parallel for each alpha and N'''

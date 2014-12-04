@@ -4,6 +4,11 @@ author:     Fabio Zanini
 date:       17/12/13
 content:    Information module on the HIV genome.
 '''
+# Modules
+from Bio.Seq import reverse_complement as rc
+
+
+
 # Globals
 genes = ('gag', 'pol', 'env', 'vif', 'vpr', 'vpu', 'tat', 'rev', 'nef')
 proteins = ('p17', 'p24', 'p2', 'p7', 'p1', 'p6', 'PR', 'RT', 'p15', 'IN', 'gp120', 'gp41')
@@ -55,9 +60,17 @@ RNA_structure_edges = {'RRE': RRE_edges,
 # Edges of other regions
 env_peptide_edges = ['ATGAGAGTGAAGGAGAA', 'TGTAGTGCT']
 psi_element = ['CTCGGCTTGCT', 'AGCGGAGGCTAG']
+V3_edges = ['ACAATGYACACATGGAATTARGCCA', rc('AGAAAAATTCYCCTCYACAATTAAA')]
 
 other_edges = {'env peptide': env_peptide_edges,
-               'psi': psi_element}
+               'psi': psi_element,
+               'V3': V3_edges}
+
+
+# All edges
+all_edges = gene_edges
+all_edges.update(RNA_structure_edges)
+all_edges.update(other_edges)
 
 
 

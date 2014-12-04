@@ -7,6 +7,7 @@ content:    Chop HXB2 into the 6 fragments, which are used as "chromosomes" for
 '''
 # Modules
 import os
+import numpy as np
 from operator import attrgetter
 import Bio.SeqIO as SeqIO
 from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
@@ -40,8 +41,25 @@ coordinates = {'gene': {'gag': [(789, 2292)],
                           },
                'RNA structure': {"LTR5'": [(0, 634)],
                                  "LTR3'": [(9085, 9719)],
-                                }
+                                 'RRE': None,
+                                },
+               'other': {'V3': None,
+                         'psi': None},
               }
+
+def get_coordinates_feature(smat, name):
+    '''Get the coordinates of a feature that's missing them'''
+    #NOTE: this function is semi-official and does not handle compound features
+    from hivwholeseq.genome_info import all_edges, find_region_edges
+
+    edges_chunk = all_edges[name]
+    edges = find_region_edges(smat, edges_chunk)
+    # Some features must be stripped of primers
+    if name in ['V3']:
+        edges[0] += len(edges_chunk[0])
+        edges[1] -= len(edges_chunk[1])
+
+    return [edges]
 
 
 
@@ -51,10 +69,15 @@ if __name__ == '__main__':
     seqold = load_custom_reference('HXB2', 'gb')
 
     seqnew = load_custom_reference('HXB2', 'fasta')
+    smat = np.array(seqnew)
 
     print 'Add features'
     for typ, coord_typ in coordinates.iteritems():
         for name, edges in coord_typ.iteritems():
+            # If coordinates are missing, grab primers
+            if edges is None:
+                edges = get_coordinates_feature(smat, name)
+
             if len(edges) == 1:
                 fea = SeqFeature(FeatureLocation(edges[0][0], edges[0][1], strand=+1),
                                  type=typ,

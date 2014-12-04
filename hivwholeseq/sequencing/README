@@ -44,7 +44,7 @@ CHECKPOINT: quality along read by sample (check_quality_along_read.py).
 3. Preliminary mapping to HXB2, to allow for better filtering immediately afterwards.
    (premap_to_reference.py)
 
-CHECKPOINT: insert size distribution (check_insert_distribution.py --premapped),
+CHECKPOINT: insert size distribution (check_insert_distribution.py --fragments premapped),
             coverage (check_premapped_coverage.py).
 
 4. Trim reads according to:

@@ -61,7 +61,7 @@ class SampleSeq(pd.Series):
         if self._sample_pat is None:
             from hivwholeseq.patients.patients import load_samples_sequenced as lssp
             from hivwholeseq.patients.patients import SamplePat
-            self._sample_pat = SamplePat(lssp().loc[self['patient sample']])
+            self._sample_pat = SamplePat(lssp(include_wrong=True).loc[self['patient sample']])
         return self._sample_pat
 
 

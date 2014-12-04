@@ -27,6 +27,13 @@ def get_consensi_tree_filename(pname, fragment, format='newick'):
     return filename
 
 
+def get_consensi_alignment_filename(pname, fragment, format='fasta'):
+    '''Get the newick filename of a consensus tree'''
+    filename = 'consensi_alignment_'+pname+'_'+fragment+'.'+format
+    filename = get_foldername('alignments')+filename
+    return filename
+
+
 def get_viral_load_filename(pname):
     '''Get the filename of the viral load'''
     filename = 'viral_load_'+pname+'.dat'
@@ -143,4 +150,18 @@ def get_timeline_filename(pname):
     '''Get the filename of the patient timeline'''
     filename = 'timeline.tsv'
     filename = get_foldername('patients')+pname+'/'+filename
+    return filename
+
+
+def get_ntemplates_filename(pname):
+    '''Get the filename of the template numbers'''
+    filename = 'ntemplates_'+pname+'.dat'
+    filename = get_foldername('physiological')+filename
+    return filename
+
+
+def get_precompiled_alignments_filename(pname, region):
+    '''Get the filename of a precompiled alignment'''
+    filename = 'alignments_'+pname+'_'+region+'.zip'
+    filename = get_foldername('alignments')+filename
     return filename

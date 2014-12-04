@@ -257,3 +257,20 @@ def build_local_consensus(seqs, VERBOSE=0, store_allele_counts=False, full_cover
     return cons_local
 
 
+def build_msa_haplotypes(haploc, VERBOSE=0, label=''):
+    '''Build multiple sequence alignment from cluster of haplotypes'''
+    from Bio.SeqRecord import SeqRecord
+    from Bio.Seq import Seq
+    from Bio.Alphabet.IUPAC import ambiguous_dna
+    
+    seqs = [SeqRecord(Seq(seq, ambiguous_dna),
+                      id=label+'count_'+str(count)+'_rank_'+str(i),
+                      name=label+'count_'+str(count)+'_rank_'+str(i),
+                      description='')
+            for i, (seq, count) in enumerate(haploc.most_common())]
+
+    from hivwholeseq.mapping_utils import align_muscle
+    ali = align_muscle(*seqs, sort=True)
+
+    return ali
+

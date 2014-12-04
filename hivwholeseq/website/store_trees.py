@@ -49,7 +49,7 @@ if __name__ == '__main__':
             for leaf in tree.get_terminals():
                 leaf.name = str(int(float(leaf.name.split('_')[0])))+'_days'
 
-            # Ladderize
+            # Ladderize in place
             tree.ladderize()
 
             # Write output

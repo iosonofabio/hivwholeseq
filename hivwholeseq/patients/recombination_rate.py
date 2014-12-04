@@ -58,14 +58,17 @@ if __name__ == '__main__':
     if not fragments:
         fragments = ['F'+str(i) for i in xrange(1, 7)]
 
-    ds_all = []
-    ys_all = []
-    for fragment in fragments:
-        for pname, patient in patients.iterrows():
+
+    # data contains lists of:
+    # distance, dt, dbp, dymax, dymin, sgn(cov0), afmax, ipat, obs
+    idata = 0 
+    data = np.zeros((2000000, 9), float)
+    for ipat, (pname, patient) in enumerate(patients.iterrows()):
+        patient = Patient(patient)
+
+        for fragment in fragments:
             if VERBOSE >= 1:
                 print pname, fragment
-
-            patient = Patient(patient)
 
             refseq = patient.get_reference(fragment)
 
@@ -75,154 +78,207 @@ if __name__ == '__main__':
             times = patient.times[indt]
 
             if VERBOSE >= 2:
-                print 'Get initial cocounts'
-            sample0 = SamplePat(patient.samples.iloc[0])
-            # FIXME: complete those matrices
-            try:
-                acc = sample0.get_allele_cocounts(fragment)
-            except IOError:
-                ds_all.append([])
-                ys_all.append([])
-                continue
+                print 'Iterate over initial times'
 
-            # FIXME: Einstein's style sums should be equivalent to tile + swapaxes
-            # EXCEPT that einsum ignores the mask I should DOUBLE CHECK that. Btw,
-            # if speed is an issue and einsum is faster, we can just do it twice,
-            # with data and mask, and then reglue those togetherfaster, we can just do it twice,
-            # with data and mask, and then reglue those together..
-
-            if VERBOSE >= 2:
-                print 'Restrict to polymorphic sites'
-            # FIXME: deal better with low viral load
-            ind_poly = (aft > 0.01).any(axis=0) & (aft < 1 - 0.01).any(axis=0)
-            ind_poly_cc = broadcast_one_site_to_two_sites(ind_poly)
-            ind_poly_cc = ind_poly_cc & ind_poly_cc.swapaxes(0, 1).swapaxes(2, 3)
-
-            if VERBOSE >= 2:
-                print 'Restrict to pairs with enough cocoverage'
-            # FIXME: make a variable threshold
-            ind_cocoverage = (acc.sum(axis=0).sum(axis=0) > 100)
-            ind_cocoverage_cc = np.einsum('ij,kl->klij',
-                                          ind_cocoverage,
-                                          np.ones(acc.shape[:2], bool))
-
-            if VERBOSE >= 2:
-                print 'Calculate coallele frequencies from cocounts, excluding low-coverage and low-frequency'
-            acf = 1.0 * acc / acc.sum(axis=0).sum(axis=0)
-            acf[ind_cocoverage_cc & (acf < 1e-2)] = 0
-            # Renormalize (small effect)
-            acf /= acf.sum(axis=0).sum(axis=0)
-
-            if VERBOSE >= 2:
-                print 'Take a subset of pairs'
-            indi_good_cc = np.transpose((ind_poly_cc & ind_cocoverage_cc).nonzero())
-            indi_ss = indi_good_cc[np.random.randint(len(indi_good_cc), size=1000)]
-            indi_ts = np.random.randint(len(times), size=(len(indi_ss), 2))
-
-            if VERBOSE >= 2:
-                print 'Computing statistics'
-            ds = np.zeros(len(indi_ss))
-            ys = np.zeros_like(ds)
-            for i, (indi, it) in enumerate(izip(indi_ss, indi_ts)):
-                it1 = np.min(it)
-                it2 = np.max(it)
-
-                if it1 == it2:
+            for it0, t0 in enumerate(times[:-1]):
+                if VERBOSE >= 2:
+                    print 'Get initial cocounts for time point', it0 + 1, 'out of', len(times)
+                sample0 = SamplePat(patient.samples.iloc[it0])
+                try:
+                    acc = sample0.get_allele_cocounts(fragment)
+                except IOError:
                     continue
 
-                # NOTE: tuples are special for indexing (!)
-                sgn = np.sign(acf[tuple(indi)] - \
-                              aft[0, indi[0], indi[2]] * aft[0, indi[1], indi[3]])
-                daf1 = aft[it2, indi[0], indi[2]] - aft[it1, indi[0], indi[2]]
-                daf2 = aft[it2, indi[1], indi[3]] - aft[it1, indi[1], indi[3]]
-                y = sgn * daf1 * daf2
+                if VERBOSE >= 2:
+                    print 'Restrict to polymorphic sites and minor alleles:',
+                # FIXME: deal better with low viral load
+                af0 = aft[it0]
+                ind_poly = (af0 > 0.05) & (af0 < 0.5)
+                indi_poly = ind_poly.nonzero()
+                n_poly = len(indi_poly[0])
+                if VERBOSE >= 2:
+                    print n_poly, 'found'
 
-                dt = times[it2] - times[it1]
-                dpos = np.abs(indi[3] - indi[2])
-                d = dpos * dt
+                if VERBOSE >= 2:
+                    print 'Iterating over pairs'
+                n_pairs_checked = 0
+                for ip1 in xrange(n_poly - 1):
+                    for ip2 in xrange(ip1 + 1, n_poly):
+                        if VERBOSE >= 3:
+                            print 'Pairs checked:', n_pairs_checked
+                        n_pairs_checked += 1
 
-                if VERBOSE >= 4:
-                    print acc[:, :, indi[2], indi[3]]
-                    print acf[:, :, indi[2], indi[3]]
-                    import ipdb; ipdb.set_trace()
+                        pos1, pos2 = indpos12 = tuple(indi_poly[1][[ip1, ip2]])
+                        if pos1 == pos2:
+                            continue
 
-                ds[i] = d
-                ys[i] = y
+                        indp1 = (indi_poly[0][ip1], indi_poly[1][ip1])
+                        indp2 = (indi_poly[0][ip2], indi_poly[1][ip2])
+                        indp12 = (indi_poly[0][ip1], indi_poly[0][ip2],
+                                  indi_poly[1][ip1], indi_poly[1][ip2])
 
-            ds_all.append(ds)
-            ys_all.append(ys)
+                        if VERBOSE >= 3:
+                            print 'Check for pair cocoverage:',
+                        accpos12 = acc[:, :, indpos12[0], indpos12[1]]
+                        cocov = accpos12.sum()
+                        if VERBOSE >= 3:
+                            print cocov
+                        if cocov < 100:
+                            continue
+
+                        if VERBOSE >= 3:
+                            print 'Calculate coallele frequencies:',
+                        acf12 = 1.0 * acc[indp12] / cocov
+                        if VERBOSE >= 3:
+                            print acf12
+
+                        if VERBOSE >= 3:
+                            print 'Check initial correlation:',
+                        corr12 = (acf12 - af0[indp1] * af0[indp2]) / (af0[indp1] * af0[indp2])
+                        sgncorr12 = np.sign(corr12)
+                        if VERBOSE >= 3:
+                            print corr12
+                            print 'The sign of the correlation is', sgncorr12
+
+                        if VERBOSE >= 3:
+                            print 'Take next time point'
+                        it1 = it0 + 1
+                        t1 = times[it1]
+                        af1 = aft[it1]
+
+                        if VERBOSE >= 3:
+                            print 'Calculate delta allele freqs'
+                        daf1 = af1[indp1] - af0[indp1]
+                        daf2 = af1[indp2] - af0[indp2]
+
+                        if VERBOSE >= 3:
+                            print 'Calculate spatiotemporal distance:',
+                        d = np.abs((t1 - t0) * (pos2 - pos1))
+                        if VERBOSE >= 3:
+                            print d, 'days * bp'
+
+                        if VERBOSE >= 3:
+                            print 'Calculate linkage statistics:',
+                        y = sgncorr12 * daf1 * daf2
+                        if VERBOSE >= 3:
+                            print y
+
+                        # The first af if the largest changing
+                        dafs = (daf1, daf2)
+                        daf_max_ind = np.argmax(map(np.abs, dafs))
+                        daf_min_ind = int(not bool(daf_max_ind))
+                        daf_max = dafs[daf_max_ind]
+                        daf_min = dafs[daf_min_ind]
+                        data[idata] = (d, t1 - t0, np.abs(pos2 - pos1),
+                                       daf_max, daf_min, sgncorr12,
+                                       af0[(indp1, indp2)[daf_max_ind]],
+                                       ipat, y)
+                        idata += 1
+
+
+    # Gate the data by spatiotemporal distance AND daf_max
+    def find_bin(x, bins):
+        ind = (x >= bins[:-1]) & (x < bins[1:])
+        if not ind.any():
+            return None
+        else:
+            return ind.nonzero()[0][0]
+
+    bins_d = np.logspace(2.5, 5, 7)
+    bins_af = np.array([0.1, 0.4, 0.9])
+    hist2d = [[[] for b in bins_af[:-1]] for b2 in bins_d[:-1]]
+    for point in data:
+        ind_d = find_bin(point[0], bins_d)
+        if ind_d is None:
+            continue
+
+        ind_af = find_bin(point[3], bins_af)
+        if ind_af is None:
+            continue
+
+        hist2d[ind_d][ind_af].append(point)
+
+    hist2d = np.array(hist2d, object) 
+    for irow, row in enumerate(hist2d):
+        for icol, cell in enumerate(row):
+            hist2d[irow, icol] = np.array(cell, ndmin=2)
 
     if use_plot:
-
-        if VERBOSE >= 2:
-            print 'Plotting'
-
-        dsa = np.concatenate(ds_all)
-        ysa = np.concatenate(ys_all)
-
-        bins = np.linspace(0.001, dsa.max() + 0.001, 30)
-        x = 0.5 * (bins[1:] + bins[:-1])
-        y = np.array([ysa[(dsa >= bins[i]) & (dsa < bins[i+1])].mean()
-                      for i in xrange(len(bins) - 1)])
-        dy = np.array([ysa[(dsa >= bins[i]) & (dsa < bins[i+1])].std()
-                       for i in xrange(len(bins) - 1)])
-
         fig, ax = plt.subplots()
         ax.set_xlabel('Distance [days * bp]')
         ax.set_ylabel('sgn$C_0 \cdot d\\nu_1 \cdot d\\nu_2$')
+        ax.set_xscale('log')
+        ax.set_xlim(0.9 * bins_d[0], 1.1 * bins_d[-1])
+
+        # Plot different af classes separately
+        for icol, col in enumerate(hist2d.T):
+            ind_nonempty = [icell for icell, cell in enumerate(col) if cell.shape[1]]
+            x = np.sqrt(bins_d[1:] * bins_d[:-1])[ind_nonempty]
+            y = [cell[:, -1].mean() for cell in col if cell.shape[1]]
+            label = 'all pats, daf  $\in$ ['+\
+                    str(bins_af[icol])+', '+str(bins_af[icol+1])+'['
+
+            ax.plot(x, y, lw=2, label=label)
+
+        ax.legend(loc=1, fontsize=10)
         ax.grid(True)
 
-        ax.errorbar(x, y, dy, lw=2)
-        
         plt.tight_layout()
         plt.ion()
         plt.show()
 
+    # Gate the data also by ratio days/bp for checking it's a rate process
+    bins_3 = np.array([5, 20, 40])
+    hist3d = [[[[]
+        for b in bins_af[:-1]]
+        for b2 in bins_d[:-1]]
+        for b3 in bins_3[:-1]]
+    for point in data:
+        ind_d = find_bin(point[0], bins_d)
+        if ind_d is None:
+            continue
 
+        ind_af = find_bin(point[3], bins_af)
+        if ind_af is None:
+            continue
 
+        ind_3 = find_bin(1.0 * point[1] / point[2], bins_3)
+        if ind_3 is None:
+            continue
 
+        hist3d[ind_3][ind_d][ind_af].append(point)
 
+    hist3d = np.array(hist3d, object) 
+    for imat, mat in enumerate(hist3d):
+        for irow, row in enumerate(mat):
+            for icol, cell in enumerate(row):
+                hist3d[imat, irow, icol] = np.array(cell, ndmin=2)
 
+    if use_plot:
+        fig, ax = plt.subplots()
+        ax.set_xlabel('Distance [days * bp]')
+        ax.set_ylabel('sgn$C_0 \cdot d\\nu_1 \cdot d\\nu_2$')
+        ax.set_xscale('log')
+        ax.set_xlim(0.9 * bins_d[0], 1.1 * bins_d[-1])
 
-        #if VERBOSE >= 1:
-        #    print 'Initializing matrix of coallele frequencies'
-        #coaft = np.empty((len(samplenames), len(alpha), len(alpha), len(refseq), len(refseq)), float)
-        #if VERBOSE >= 1:
-        #    print 'Collecting cocounts and normalizing'
-        #for i, samplename in enumerate(samplenames):
-        #    if VERBOSE >= 2:
-        #        print pname, fragment, samplename
-        #    cocounts = np.load(get_allele_cocounts_filename(pname, samplename, fragment))
-        #    # NOTE: uncovered will get 0 correlation
-        #    coaft[i] = 1.0 * cocounts / (cocounts.sum(axis=0).sum(axis=0) + 0.1)
-        #    del cocounts
+        # Plot different af classes separately
+        for imat, mat in enumerate(hist3d):
+            for icol, col in enumerate(mat.T):
+                ind_nonempty = [icell for icell, cell in enumerate(col) if cell.shape[1]]
+                x = np.sqrt(bins_d[1:] * bins_d[:-1])[ind_nonempty]
+                y = [cell[:, -1].mean() for cell in col if cell.shape[1]]
+                dy = [cell[:, -1].std() for cell in col if cell.shape[1]]
+                label = r'daf  $\in$ ['+\
+                        str(bins_af[icol])+', '+str(bins_af[icol+1])+'[, '+\
+                        '$\Delta t / \Delta pos \in$ ['+\
+                        str(bins_3[imat])+', '+str(bins_3[imat+1])+'['
 
-        #if VERBOSE >= 1:
-        #    print 'Getting allele frequencies'
-        #aft = np.load(get_allele_frequency_trajectories_filename(pname, fragment))[:coaft.shape[0]]
-        #if VERBOSE >= 1:
-        #    print 'Broadcasting allele frequency product (outer tensor product)'
-        #aftbroad = np.einsum('mij...,m...kl->mikjl', aft, np.ones_like(aft))
-        #aftbroadT = aftbroad.swapaxes(1, 2).swapaxes(3, 4)
-        #if VERBOSE >= 1:
-        #    print 'Subtract product of allele frequencies'
-        #LD = coaft - (aftbroad * aftbroadT)
+                ax.plot(x, y, lw=2, label=label)
 
-        ## Mask LD when allele freqs are too close to 0 or 1
-        #LD = np.ma.array(LD)
-        #LD[(aftbroad < 1e-2) | (aftbroad > 1 - 1e-2) | \
-        #   (aftbroadT < 1e-2) | (aftbroadT > 1 - 1e-2)] = np.ma.masked
+        ax.legend(loc=1, fontsize=10)
+        ax.grid(True)
 
-        ## Take the correlation coefficient, i.e. divide by sqrt(pi qi pj qj)
-        #corr = LD / np.sqrt(aftbroad * (1 - aftbroad) * aftbroadT * (1 - aftbroadT))
+        plt.tight_layout()
+        plt.ion()
+        plt.show()
 
-        #if VERBOSE >= 1:
-        #    print 'Finding initial highly correlated pairs'
-
-        ## FIXME: only use this criterion because we have t0 twice
-        #ind_highLD0 = (corr[0] > 1).nonzero()
-        ##ind_highLD0 = ((LD[0] > 0.1) & (LD[1] > 0.1) & (aftbroad[0] > 1e-3) & (aftbroad[0] < 0.5)).nonzero()
-        #pairs_high_LD0 = zip(*ind_highLD0)
-        #LD_pairs = np.array([LD[:, pair[0], pair[1], pair[2], pair[3]] for pair in pairs_high_LD0]).T
-        #corr_pairs = np.array([corr[:, pair[0], pair[1], pair[2], pair[3]] for pair in pairs_high_LD0]).T
-        #print corr_pairs.T

@@ -181,7 +181,7 @@ if __name__ == '__main__':
             pretty_print_pairwise_ali((ali1, ali2), name1='cons0', name2='clicked', width=120)
 
 
-        (fig, ax) = plot_haplotype_frequencies(patient.times[ind], seqs, hft,
+        (fig, ax) = plot_haplotype_frequencies(patient.times[ind], hft,
                                                title=patient.name+', '+stname,
                                                picker=0.1)
 

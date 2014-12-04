@@ -29,7 +29,10 @@ class RoiAction(argparse.Action):
         try:
             fragment = values[0]
             start = int(values[1])
-            end = int(values[2])
+            if not (values[2] == '+oo'):
+                end = int(values[2])
+            else:
+                end = values[2]
 
         except ValueError:
             raise ArgumentTypeError('Arguments not good for a ROI.')

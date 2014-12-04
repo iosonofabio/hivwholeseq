@@ -82,14 +82,23 @@ class Patient(pd.Series):
 
 
     @property
-    def n_templates(self, n_reactions=6):
+    def n_templates(self):
         '''Get the time course of the number of templates to PCR, limiting depth'''
+        from hivwholeseq.patients.get_template_number import get_template_number
+        n = [get_template_number(dilstr) for dilstr in self.samples.dilutions]
+        n = np.ma.masked_invalid(n)
+        return n
+
+
+    @property
+    def n_templates_viral_load(self):
+        '''Get the number of templates, estimated from the viral load'''
         n = self.viral_load.copy()
         # We take 400 ul of serum
         n *= 0.4
         # We typically have 6 reactions with that total volume (plus the F4 dilution
         # series, but each of those uses only 0.1x template which is very little)
-        n /= (n_reactions + 0.2)
+        n /= 6.1
         return n
 
 
@@ -105,6 +114,12 @@ class Patient(pd.Series):
         from hivwholeseq.patients.samples import SamplePat
         for samplename, sample in self.samples.iterrows():
             yield SamplePat(sample)
+
+
+    def get_fragmented_roi(self, roi, VERBOSE=0):
+        '''Get a region of interest in fragment coordinates'''
+        from hivwholeseq.patients.get_roi import get_fragmented_roi
+        return get_fragmented_roi(self, roi, VERBOSE=VERBOSE)
 
 
     def get_reference_filename(self, fragment, format='fasta'):
@@ -123,10 +138,18 @@ class Patient(pd.Series):
         return refseq
 
 
-    def get_consensi_alignment_filename(self, fragment):
-        '''Get the multiple sequence alignment of all consensi'''
+    def get_consensi_alignment_filename(self, fragment, format='fasta'):
+        '''Get the filename of the multiple sequence alignment of all consensi'''
         from hivwholeseq.patients.filenames import get_consensi_alignment_filename
-        return get_consensi_alignment_filename(self.name, fragment)
+        return get_consensi_alignment_filename(self.name, fragment, format=format)
+
+
+    def get_consensi_alignment(self, fragment, format='fasta'):
+        '''Get the multiple sequence alignment of all consensi'''
+        from Bio import AlignIO
+        return AlignIO.read(self.get_consensi_alignment_filename(fragment,
+                                                                 format=format),
+                            format)
 
 
     def get_consensi_tree_filename(self, fragment):
@@ -310,6 +333,12 @@ class Patient(pd.Series):
 
     def get_local_haplotype_trajectories(self, fragment, start, end, **kwargs):
         '''Get trajectories of local haplotypes'''
+        if fragment not in ['F'+str(i) for i in xrange(1, 7)]:
+            if 'VERBOSE' in kwargs:
+                (fragment, start, end) = self.get_fragmented_roi((fragment, start, end),
+                                                                 VERBOSE=kwargs['VERBOSE'])
+            else:
+                (fragment, start, end) = self.get_fragmented_roi((fragment, start, end))
         ind = []
         haplos = []
         for i, sample in enumerate(self.itersamples()):

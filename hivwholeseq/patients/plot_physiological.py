@@ -34,7 +34,6 @@ if __name__ == '__main__':
     VERBOSE = args.verbose
     use_save = args.save
 
-    # FIXME: write a function for this
     patients = load_patients()
     if pnames is not None:
         patients = patients.loc[patients.index.isin(pnames)]

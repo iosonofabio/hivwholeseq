@@ -87,6 +87,11 @@ def annotate_sequence(seqrecord, additional_edges={}, VERBOSE=0):
                 else:
                     pos_edge = find_region_edges(smat, edges)
 
+                # Cut the primers for some features
+                if (None not in pos_edge) and name in ['V3']:
+                    pos_edge[0] += len(edges[0])
+                    pos_edge[1] -= len(edges[1])
+
                 if pos_edge[0] is None:
                     if name not in ['F1', "LTR5'"]:
                         print 'WARNING: start not found'

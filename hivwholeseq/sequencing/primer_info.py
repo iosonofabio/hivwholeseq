@@ -54,6 +54,7 @@ primers_outer = {'F1': ['CTCAATAAAGCTTGCCTTGAGTGC', rc('ACTGTATCATCTGCTCCTGTRTCT
                  # FULLY conserved at least across HIV-1 type M (maybe even more widely).
                  'F3b': ['CACACTAATGATGTAARACARTTAACAG', rc('GGGATGTGTACTTCTGAACTTAYTYTTG')],
                  'F3B': ['CACACTAATGATGTAARACARTTAACAG', rc('GGGATGTGTACTTCTGAACTTAYTYTTGG')],
+                 'F3c': ['CACACTAATGATGTAARACARTTAACAG', rc('GGGACGTGTACCTCTGAACTTATTTTTGG')],
                  'F4': ['CGGGTTTATTWCAGRGACAGCAGA', rc('GGGGTTAAYTTTACACATGGYTTTA')],
                  'F5a': ['GGCATYTCCTATGGCAGGAAGAAG', rc('GTGGTGCARATGAGTTTTCCAGAGCA')],
                  'F5b': ['AGAATAAGAGAAAGAGCAGAAGA', rc('ATGAGTTTTCCAGAGCANCCCCA')],
@@ -81,6 +82,7 @@ primers_coordinates_HXB2_outer = {'F1': [[523, 547], [2323, 2347]],
                                   # NOTE: this exists only because of the missing G
                                   'F3b': [[3629, 3657], [5185, 5213]],
                                   'F3B': [[3629, 3657], [5184, 5213]],
+                                  'F3c': [[3629, 3657], [5184, 5213]],
                                   'F4': [[4898, 4922], [6570, 6595]],
                                   'F5a': [[5959, 5982], [8015, 8041]],
                                   'F5b': [[6193, 6216], [8009, 8032]],

@@ -195,7 +195,7 @@ if __name__ == '__main__':
                   detail=detail)
         sys.exit()
 
-    samples_pat = lssp()
+    samples_pat = lssp(include_wrong=True)
     samples = lss()
 
     samples = samples.loc[samples['seq run'].isin(seq_runs)]

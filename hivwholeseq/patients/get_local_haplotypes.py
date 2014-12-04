@@ -16,6 +16,7 @@ from Bio import SeqIO, AlignIO
 
 from hivwholeseq.patients.patients import load_patient
 from hivwholeseq.argparse_utils import RoiAction
+from hivwholeseq.sequence_utils import build_msa_haplotypes as build_msa
 
 
 
@@ -49,23 +50,6 @@ def store_alignments(alis, filename):
 
     else:
         raise ValueError('File format not recognized')
-
-
-def build_msa(haploc, VERBOSE=0, label=''):
-    '''Build multiple sequence alignment from cluster of haplotypes'''
-    from Bio.SeqRecord import SeqRecord
-    from Bio.Seq import Seq
-    from Bio.Alphabet.IUPAC import ambiguous_dna
-    
-    seqs = [SeqRecord(Seq(seq, ambiguous_dna),
-                      id=label+'count_'+str(count)+'_#'+str(i),
-                      name=label+'count_'+str(count)+'_#'+str(i))
-            for i, (seq, count) in enumerate(haploc.most_common())]
-
-    from hivwholeseq.mapping_utils import align_muscle
-    ali = align_muscle(*seqs, sort=True)
-
-    return ali
 
 
 def cluster_haplotypes(haplo, VERBOSE=0, min_abundance=1):
@@ -196,8 +180,9 @@ def get_local_haplotypes(bamfilename, start, end, VERBOSE=0, maxreads=-1):
                 seqs = [trim_read_roi(read, start, end) for read in reads]
                 seq = merge_read_pair(*seqs)
 
-            if len(seq) < 0.8 * (end - start):
-                import ipdb; ipdb.set_trace()
+            #FIXME: what is this??
+            #if len(seq) < 0.8 * (end - start):
+            #    import ipdb; ipdb.set_trace()
 
             haplotypes[seq] += 1
             if VERBOSE >= 4:
@@ -206,7 +191,7 @@ def get_local_haplotypes(bamfilename, start, end, VERBOSE=0, maxreads=-1):
     return haplotypes
 
 
-def plot_haplotype_frequencies(times, seqs, hft, figax=None, title='',
+def plot_haplotype_frequencies(times, hft, figax=None, title='',
                                picker=None):
     '''Plot haplotype frequencies'''
     import hivwholeseq.plot_utils
@@ -338,7 +323,7 @@ if __name__ == '__main__':
 
         hft = (1.0 * hct.T / hct.sum(axis=1))
 
-        plot_haplotype_frequencies(patient.times[ind], seqs_set, hft,
+        plot_haplotype_frequencies(patient.times[ind], hft,
                                    title=patient.name+', '+' '.join(map(str, roi)))
 
         plt.ion()
