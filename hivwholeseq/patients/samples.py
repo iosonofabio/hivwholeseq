@@ -80,6 +80,22 @@ class SamplePat(pd.Series):
         return SeqIO.read(self.get_consensus_filename(fragment, PCR=PCR), 'fasta')
 
 
+    def get_reference_filename(self, fragment, format='fasta'):
+        '''Get filename of the reference for mapping'''
+        from hivwholeseq.patients.filenames import get_initial_reference_filename
+        return get_initial_reference_filename(self.patient, fragment, format)
+
+
+    def get_reference(self, fragment, format='fasta'):
+        '''Get the reference for a fragment'''
+        from Bio import SeqIO
+        refseq = SeqIO.read(self.get_reference_filename(fragment, format=format), format)
+        if format in ('gb', 'genbank'):
+            from hivwholeseq.sequence_utils import correct_genbank_features_load
+            correct_genbank_features_load(refseq)
+        return refseq
+
+
     def get_allele_counts(self, fragment, PCR=1, qual_min=30, merge_read_types=True):
         '''Get the allele counts'''
         import numpy as np
