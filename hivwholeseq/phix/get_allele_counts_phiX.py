@@ -19,12 +19,13 @@ from Bio.Alphabet.IUPAC import ambiguous_dna
 import pysam
 import argparse
 
-from hivwholeseq.datasets import MiSeq_runs
+from hivwholeseq.sequencing.samples import load_sequencing_run
 from hivwholeseq.miseq import alpha, read_types
 from hivwholeseq.sequencing.filenames import get_phix_filename, get_mapped_phix_filename, \
         get_allele_counts_phix_filename, get_insert_counts_phix_filename, \
         get_consensus_phix_filename
 from hivwholeseq.mapping_utils import convert_sam_to_bam, get_ind_good_cigars
+from hivwholeseq.fork_cluster import fork_get_allele_counts_phix as fork_self
 
 
 
@@ -32,53 +33,16 @@ from hivwholeseq.mapping_utils import convert_sam_to_bam, get_ind_good_cigars
 match_len_min = 30
 trim_bad_cigars = 3
 
-# Cluster submit
-import hivwholeseq
-JOBDIR = hivwholeseq.__path__[0].rstrip('/')+'/'
-JOBLOGERR = JOBDIR+'logerr'
-JOBLOGOUT = JOBDIR+'logout'
-JOBSCRIPT = JOBDIR+'phix/get_allele_counts_phiX.py'
-cluster_time = '0:59:59'
-vmem = '8G'
-
 
 
 # Functions
-def fork_self(seq_run, maxreads=-1, VERBOSE=0, qual_min=None):
-    '''Fork self for each adapter ID'''
-
-    if VERBOSE:
-        print 'Forking to the cluster'
-
-    qsub_list = ['qsub','-cwd',
-                 '-b', 'y',
-                 '-S', '/bin/bash',
-                 '-o', JOBLOGOUT,
-                 '-e', JOBLOGERR,
-                 '-N', 'acpX'+seq_run,
-                 '-l', 'h_rt='+cluster_time,
-                 '-l', 'h_vmem='+vmem,
-                 JOBSCRIPT,
-                 '--run', seq_run,
-                 '--maxreads', maxreads,
-                 '--verbose', VERBOSE,
-                ]
-    if qual_min is not None:
-        qsub_list.extend(['--qual_min', qual_min])
-    qsub_list = map(str, qsub_list)
-    if VERBOSE >= 2:
-        print ' '.join(qsub_list)
-    sp.call(qsub_list)
-
-
 def get_allele_counts(data_folder, qual_min=0, VERBOSE=0, maxreads=-1):
     '''Extract allele and insert counts from a bamfile'''
+    from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file
 
     reffilename = get_phix_filename()
     refseq = SeqIO.read(reffilename, 'fasta')
 
-    from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file
-    
     bamfilename = get_mapped_phix_filename(data_folder, filtered=True)
     (counts, inserts) = get_allele_counts_insertions_from_file(bamfilename,
                                                                len(refseq),
@@ -86,6 +50,7 @@ def get_allele_counts(data_folder, qual_min=0, VERBOSE=0, maxreads=-1):
                                                                maxreads=maxreads,
                                                                VERBOSE=VERBOSE)
     return (counts, inserts)
+
 
 
 # Script
@@ -117,11 +82,12 @@ if __name__ == '__main__':
         sys.exit()
 
     # Specify the dataset
-    dataset = MiSeq_runs[seq_run]
+    dataset = load_sequencing_run(seq_run)
     data_folder = dataset['folder']
 
     # Get counts
-    counts, inserts = get_allele_counts(data_folder, VERBOSE=VERBOSE, maxreads=maxreads, qual_min=qual_min)
+    counts, inserts = get_allele_counts(data_folder, VERBOSE=VERBOSE,
+                                        maxreads=maxreads, qual_min=qual_min)
     consm = alpha[counts.sum(axis=0).argmax(axis=0)]
     cons_rec = SeqRecord(Seq(''.join(consm), ambiguous_dna),
                          id='PhiX_consensus_run_'+seq_run,

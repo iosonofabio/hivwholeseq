@@ -139,6 +139,9 @@ if __name__ == '__main__':
                                                                  use_PCR1=use_PCR1,
                                                                  cov_min=100)
 
+            # NOTE: Ns should be excluded from diversity and divergence
+            aft = aft[:, :5, :]
+
             if use_coverage:
                 (covt, ind2) = patient.get_coverage_trajectories(fragment,
                                                                  use_PCR1=use_PCR1)

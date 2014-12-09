@@ -20,7 +20,7 @@ from hivwholeseq.mapping_utils import pair_generator, convert_sam_to_bam
 
 # Functions
 def get_insert_size_distribution(data_folder, adaID, fragment, bins=None,
-                                 maxreads=-1, VERBOSE=0):
+                                 maxreads=-1, VERBOSE=0, density=True):
     '''Get the distribution of insert sizes'''
 
     if maxreads <= 0:
@@ -69,9 +69,9 @@ def get_insert_size_distribution(data_folder, adaID, fragment, bins=None,
 
     # Bin it
     if bins is None:
-        h = np.histogram(insert_sizes, density=True)
+        h = np.histogram(insert_sizes, density=density)
     else:
-        h = np.histogram(insert_sizes, bins=bins, density=True)
+        h = np.histogram(insert_sizes, bins=bins, density=density)
 
     return insert_sizes, h
 

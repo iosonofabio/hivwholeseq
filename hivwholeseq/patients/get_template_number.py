@@ -62,6 +62,29 @@ def get_template_number(dilstr):
     return n_templates
 
 
+def get_template_numbers(patients, VERBOSE=0):
+    '''Collect template numbers from all patient samples'''
+    data = [] 
+    for pname, patient in patients.iterrows():
+        patient = Patient(patient)
+
+        if VERBOSE:
+            print pname, patient.code
+
+        samples = patient.samples
+        n_approx = samples['templates approx']
+        dils = [get_dilution(x) for x in samples['dilutions']]
+        n_dils = [2 * estimate_ntemplates_Poisson(x) for x in dils]
+
+        # Attach sample date info
+        age = np.array((datetime.datetime.now() - samples.date)) / 86400e9
+
+        data.append({'n_approx': n_approx, 'n_dil': n_dils, 'age': age,
+                     'pname': patient.code})
+
+    return data
+
+
 
 # Script
 if __name__ == '__main__':
@@ -85,23 +108,7 @@ if __name__ == '__main__':
     if pnames is not None:
         patients = patients.loc[pnames]
 
-    data = [] 
-    for pname, patient in patients.iterrows():
-        patient = Patient(patient)
-
-        if VERBOSE:
-            print pname, patient.code
-
-
-        samples = patient.samples
-        n_approx = samples['templates approx']
-        dils = [get_dilution(x) for x in samples['dilutions']]
-        n_dils = [2 * estimate_ntemplates_Poisson(x) for x in dils]
-
-        # Attach sample date info
-        age = np.array((datetime.datetime.now() - samples.date)) / 86400e9
-
-        data.append({'n_approx': n_approx, 'n_dil': n_dils, 'age': age})
+    data = get_template_numbers(patients, VERBOSE=VERBOSE)
 
     if use_plot:
         fig, axs = plt.subplots(1, 2, figsize=(13, 8))

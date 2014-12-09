@@ -17,7 +17,7 @@ import numpy as np
 from Bio import SeqIO
 from Bio.Seq import reverse_complement as rc
 
-from hivwholeseq.datasets import MiSeq_runs
+from hivwholeseq.sequencing.samples import load_sequencing_run
 from hivwholeseq.miseq import alpha, read_types, alphal
 from hivwholeseq.sequencing.filenames import get_phix_filename, get_allele_counts_phix_filename, \
         get_mapped_phix_filename
@@ -111,13 +111,13 @@ def consensus_vs_reference(seq_run, counts=None, VERBOSE=0):
     return {key: ''.join(value) for key, value in consensus.iteritems()}
 
 
-def minor_alleles_along_genome(seq_run, qual_min=0, maxreads=-1, VERBOSE=0, plot=False):
+def minor_alleles_along_genome(dataset, qual_min=0, maxreads=-1, VERBOSE=0, plot=False):
     '''Show the minor alleles along the phiX genome'''
 
     # Reload counts at different quality filter level
     if VERBOSE:
         print 'Getting allele counts'
-    counts = load_allele_counts(MiSeq_runs[seq_run]['folder'], VERBOSE=VERBOSE,
+    counts = load_allele_counts(dataset['folder'], VERBOSE=VERBOSE,
                                 qual_min=qual_min)
 
     # Study the minor alleles (sequencing errors)
@@ -166,9 +166,10 @@ def minor_alleles_along_genome(seq_run, qual_min=0, maxreads=-1, VERBOSE=0, plot
         axs[1].set_title('Sequencing errors frequencies')
         axs[1].set_xlim(-100, len(minor_counts['fwd']) + 100)
         axs[1].set_yscale('log')
+        axs[1].grid(True)
     
     
-        plt.suptitle('PhiX analysis: run '+str(seq_run), fontsize=20)
+        plt.suptitle('PhiX analysis: run '+str(dataset.name), fontsize=20)
         plt.tight_layout(rect=(0, 0, 1, 0.95))
     
         plt.ion()
@@ -500,7 +501,7 @@ if __name__ == '__main__':
     for seq_run in seq_runs:
     
         # Specify the dataset
-        dataset = MiSeq_runs[seq_run]
+        dataset = load_sequencing_run(seq_run)
         data_folder = dataset['folder']
     
         # Get allele counts
@@ -514,7 +515,7 @@ if __name__ == '__main__':
         # Along genome
         minor_counts, \
         minor_nus, \
-        error_rate_avg = minor_alleles_along_genome(seq_run,
+        error_rate_avg = minor_alleles_along_genome(dataset,
                                                     qual_min=qual_min,
                                                     maxreads=maxreads,
                                                     VERBOSE=VERBOSE,

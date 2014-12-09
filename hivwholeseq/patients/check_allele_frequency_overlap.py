@@ -8,6 +8,7 @@ content:    Check the allele frequencies in overlaps of subsequent fragments.
 import os
 import sys
 import argparse
+from itertools import izip
 import numpy as np
 from matplotlib import cm
 import matplotlib.pyplot as plt
@@ -68,6 +69,8 @@ if __name__ == '__main__':
                         help='use logit scale (log(x/(1-x)) in the plots')
     parser.add_argument('--qualmin', type=int, default=30,
                         help='Minimal quality of base to call')
+    parser.add_argument('--covmin', type=int, default=100,
+                        help='Minimal coverage: lower -> more, higher -> better')
 
     args = parser.parse_args()
     pnames = args.patients
@@ -75,6 +78,7 @@ if __name__ == '__main__':
     overlaps = args.overlaps
     VERBOSE = args.verbose
     qual_min = args.qualmin
+    cov_min = args.covmin
     use_plot = args.plot
     use_logit = args.logit
 
@@ -104,8 +108,11 @@ if __name__ == '__main__':
                 print overlap, samplename
 
             # FIXME: actually use frequencies
-            ac1 = sample.get_allele_counts(fr1, qual_min=qual_min)
-            ac2 = sample.get_allele_counts(fr2, qual_min=qual_min)
+            try:
+                ac1 = sample.get_allele_counts(fr1, qual_min=qual_min)
+                ac2 = sample.get_allele_counts(fr2, qual_min=qual_min)
+            except IOError:
+                continue
 
             coord_map = get_map_overlap(sample, fr1, fr2)
 
@@ -115,7 +122,8 @@ if __name__ == '__main__':
 
             # Convert to frequencies
             afjoint = np.ma.array(acjoint)
-            mask = (acjoint.sum(axis=1) < 100).any(axis=0)
+            cov = acjoint.sum(axis=1)
+            mask = (cov < cov_min).any(axis=0)
             mask = np.tile(mask, (afjoint.shape[0], afjoint.shape[1], 1))
             afjoint.mask = mask
             afjoint = (1.0 * afjoint.swapaxes(0, 1) / afjoint.sum(axis=1)).swapaxes(0, 1)
@@ -123,11 +131,14 @@ if __name__ == '__main__':
             data.append({'af': afjoint,
                          'samplename': samplename,
                          'overlap': overlap,
-                         'io': io})
+                         'io': io,
+                         'n_templates': sample.get_n_templates_dilutions(),
+                         'coverage': cov})
 
     if use_plot:
-        fig, ax = plt.subplots()
 
+        # Plot allele frequencies
+        fig, ax = plt.subplots()
         for ida, datum in enumerate(data):
             afjoint = datum['af']
             color = cm.jet(1.0 * ida / len(data))
@@ -156,7 +167,57 @@ if __name__ == '__main__':
             ax.set_xlim(xmin, 1 - xmin)
             ax.set_ylim(xmin, 1 - xmin)
 
+        # Plot stddev of a certain number of molecules in Poisson sampling
+        n = 300
+        x = np.linspace(-4, 0, 1000)
+        x = 1.0 / (1 + 10**(-x))
+        y = x - np.sqrt(x / n)
+        ax.plot(np.concatenate([x, 1 - y[::-1]]), np.concatenate([y, 1 - x[::-1]]), lw=4, c='black', alpha=0.7)
+        ax.plot(np.concatenate([y, 1 - x[::-1]]), np.concatenate([x, 1 - y[::-1]]), lw=4, c='black', alpha=0.7,
+                label='Poisson noise, n = '+str(n))
+
+        plt.tight_layout()
+
+        ## Plot correlation between template number and y scatter
+        ## Bin by allele frequency, as there is more scatter close to 0/1
+        #bins = np.array([0.01, 0.05, 0.25, 0.75, 0.95, 0.99])
+        #binsc = np.array([0.02, 0.12, 0.5, 0.88, 0.98])
+        #dcorr = [[] for b in bins[:-1]]
+        #for datum in data:
+        #    afjoint = datum['af']
+        #    n_templates = datum['n_templates']
+        #    if np.isnan(n_templates):
+        #        continue
+        #    tmp = np.vstack([np.mean(afjoint, axis=0).ravel(),
+        #                     np.abs(np.diff(afjoint, axis=0)[0].ravel())])
+        #    for ib in xrange(len(bins) - 1):
+        #        ind = (tmp[0] >= bins[ib]) & (tmp[0] <= bins[ib + 1]) & \
+        #              (-tmp.mask.any(axis=0))
+        #        dcorr[ib].extend(zip(tmp[1, ind].data,
+        #                             np.repeat(n_templates, ind.sum())))
+
+        #fig, ax = plt.subplots()
+        #ax.set_xlabel('# templates from dilutions')
+        #ax.set_ylabel('|af1 - af2|')
+        #ax.grid(True)
+        #ax.set_ylim(1e-8, 1)
+        #ax.set_yscale('log')
+        #if (samplenames is not None) and len(samplenames) == 1:
+        #    ax.set_title(samplename)
+        #elif (pnames is not None) and (len(pnames) == 1):
+        #    ax.set_title(pnames[0])
+ 
+        #for ip, (bc, dc) in enumerate(izip(binsc, dcorr)):
+        #    color = cm.jet(1.0 * ip / len(binsc))
+        #    (y, x) = zip(*dc)
+        #    r = np.corrcoef(x, y)[0, 1]
+        #    ax.scatter(x, y, s=50, c=color, alpha=0.5,
+        #               label=str(bc)+', r = '+'{:1.2f}'.format(r))
+
+        #ax.legend(loc=3, fontsize=10)
+
         plt.tight_layout()
         plt.ion()
         plt.show()
+
 

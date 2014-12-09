@@ -55,7 +55,7 @@ def make_output_folders(data_folder, adaID, VERBOSE=0, summary=True):
 
 
 def get_fragments(sample):
-    '''Get fragments for reference'''
+    '''Get fragments to trim the mapping reference to the relevant part'''
     fragments = sample.regions
     if str(fragments) in ('', 'nan'):
         if sample.PCR == 1:

@@ -172,6 +172,29 @@ class SampleSeq(pd.Series):
         return SeqIO.read(self.get_consensus_filename(fragment), 'fasta')
 
 
+    def get_allele_counts_filename(self, fragment):
+        '''Get the filename with the allele counts'''
+        from .filenames import get_allele_counts_filename
+        return get_allele_counts_filename(self.seqrun_folder, self.adapter, fragment)
+
+
+    def get_allele_counts(self, fragment, merge_read_types=False):
+        '''Get the allele counts'''
+        import numpy as np
+        counts = np.load(self.get_allele_counts_filename(fragment))
+        if merge_read_types:
+            counts = counts.sum(axis=0)
+        return counts
+
+
+    def get_insert_size_distribution(self, fragment, VERBOSE=0, **kwargs):
+        '''Get insert size distribution for a fragment'''
+        from .check_insert_distribution import get_insert_size_distribution as gisd
+        return gisd(self.seqrun_folder, self.adapter, fragment, VERBOSE=VERBOSE,
+                    **kwargs)
+
+
+
 class SamplesSeq(pd.DataFrame):
     '''Table of sequenced samples'''
 

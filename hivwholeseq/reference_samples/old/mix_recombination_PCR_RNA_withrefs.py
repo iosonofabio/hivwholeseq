@@ -16,7 +16,7 @@ import pysam
 from Bio import SeqIO
 
 from hivwholeseq.miseq import alpha
-from hivwholeseq.datasets import MiSeq_runs
+from hivwholeseq.sequencing.samples import load_sequencing_run
 from hivwholeseq.sequencing.filenames import get_consensus_filename, \
         get_allele_frequencies_filename, \
         get_mapped_filename
@@ -28,8 +28,8 @@ sd = {'mixPCR1': {'run': 'Tue48', 'adaID': 'N4-S1'},
       'mixPCR2': {'run': 'Tue48', 'adaID': 'N6-S1'},
       'mixPCR1Taq': {'run': 'Tue48', 'adaID': 'N5-S1'},
       'mixPCR2Taq': {'run': 'Tue48', 'adaID': 'N1-S3'},
-      'ref1': ,
-      'ref2': ,
+      #'ref1': ,
+      #'ref2': ,
      }
 
 
@@ -59,23 +59,30 @@ if __name__ == '__main__':
 
     # Enrich dict
     for samplename in sd:
-        sd[samplename]['dataset'] = MiSeq_runs[sd[samplename]['run']]
-        sd[samplename]['folder'] = MiSeq_runs[sd[samplename]['run']]['folder']
+        dataset = load_sequencing_run(sd[samplename]['run'])
+        sd[samplename]['dataset'] = dataset
+        sd[samplename]['folder'] = dataset['folder']
 
     # Get all three consensi and make an alignment
-    consB = SeqIO.read(get_consensus_filename(sd['refB']['folder'], sd['refB']['adaID'], fragment), 'fasta')
-    consC = SeqIO.read(get_consensus_filename(sd['refC']['folder'], sd['refC']['adaID'], fragment), 'fasta')
-    consm = SeqIO.read(get_consensus_filename(sd[mixname]['folder'], sd[mixname]['adaID'], fragment), 'fasta')
+    consB = SeqIO.read(get_consensus_filename(sd['refB']['folder'],
+                                              sd['refB']['adaID'], fragment), 'fasta')
+    consC = SeqIO.read(get_consensus_filename(sd['refC']['folder'],
+                                              sd['refC']['adaID'], fragment), 'fasta')
+    consm = SeqIO.read(get_consensus_filename(sd[mixname]['folder'],
+                                              sd[mixname]['adaID'], fragment), 'fasta')
     ali_cons = align_muscle(consB, consC, consm, sort=True)
 
     # Find private alleles in the references
-    afB = np.load(get_allele_frequencies_filename(sd['refB']['folder'], sd['refB']['adaID'], fragment))
-    afC = np.load(get_allele_frequencies_filename(sd['refC']['folder'], sd['refC']['adaID'], fragment))
+    afB = np.load(get_allele_frequencies_filename(sd['refB']['folder'],
+                                                  sd['refB']['adaID'], fragment))
+    afC = np.load(get_allele_frequencies_filename(sd['refC']['folder'],
+                                                  sd['refC']['adaID'], fragment))
 
     allB = map(lambda x: alpha[np.nonzero(x)[0]].tostring(), (afB > 0.01).T)
     allC = map(lambda x: alpha[np.nonzero(x)[0]].tostring(), (afC > 0.01).T)
 
-    # NOTE: the private allele list uses coordinates in the MIX consensus! - i.e. those of the reads
+    # NOTE: the private allele list uses coordinates in the MIX consensus! -
+    # i.e. those of the reads
     # The alignment coordinates are not used after that point!
     all_priv = []
     posB = 0

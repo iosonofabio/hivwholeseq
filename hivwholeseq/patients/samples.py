@@ -27,6 +27,12 @@ class SamplePat(pd.Series):
         return SamplePat
 
 
+    def get_n_templates_dilutions(self):
+        '''Get the time course of the number of templates to PCR, limiting depth'''
+        from hivwholeseq.patients.get_template_number import get_template_number
+        return get_template_number(self.dilutions)
+
+
     def get_foldername(self, PCR=1):
         '''Get the name of the folder with the data for this sample'''
         from hivwholeseq.patients.filenames import get_sample_foldername
@@ -133,10 +139,10 @@ class SamplePat(pd.Series):
 
 
     def get_local_haplotypes(self, fragment, start, end,
-                             VERBOSE=0, maxreads=-1, filters=None):
+                             VERBOSE=0, maxreads=-1, filters=None, PCR=1):
         '''Get local haplotypes'''
         from hivwholeseq.patients.get_local_haplotypes import get_local_haplotypes
-        bamfilename = self.get_mapped_filtered_filename(fragment, PCR=1)
+        bamfilename = self.get_mapped_filtered_filename(fragment, PCR=PCR)
         haplo = get_local_haplotypes(bamfilename,
                                      start, end,
                                      VERBOSE=VERBOSE,

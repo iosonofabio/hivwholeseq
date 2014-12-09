@@ -72,8 +72,13 @@ def make_symlinks(dataset, VERBOSE=0):
             print 'ERROR: Sample '+sn+': could not find raw data folder. Please fill in the table'
             continue
 
-        sample_fn = raw_root_folder+[fn for fn in os.listdir(raw_root_folder) 
-                                     if raw_fn in fn][0]+'/'
+        try:
+            sample_fn = raw_root_folder+[fn for fn in os.listdir(raw_root_folder) 
+                                         if raw_fn in fn][0]+'/'
+        except IndexError:
+            print 'FAILED:', raw_fn
+            print 'LISTDIR:', '\n'.join(os.listdir(raw_root_folder))
+            raise
 
         fn1 = sample_fn+[fn for fn in os.listdir(sample_fn) if 'L001_R1' in fn][0]
         fn2 = sample_fn+[fn for fn in os.listdir(sample_fn) if 'L001_R2' in fn][0]

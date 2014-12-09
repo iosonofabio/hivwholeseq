@@ -11,6 +11,36 @@ from hivwholeseq.genome_info import genes as genes_all
 
 
 # Functions
+def align_muscle(*seqs, **kwargs):
+    '''Global alignment of sequences via MUSCLE'''
+    import subprocess as sp
+    from Bio import AlignIO, SeqIO
+    from Bio.Align.Applications import MuscleCommandline
+    muscle_cline = MuscleCommandline(diags=True, quiet=True)
+    child = sp.Popen(str(muscle_cline),
+                     stdin=sp.PIPE,
+                     stdout=sp.PIPE,
+                     stderr=sp.PIPE,
+                     shell=True)
+    SeqIO.write(seqs, child.stdin, "fasta")
+    child.stdin.close()
+    align = AlignIO.read(child.stdout, "fasta")
+    child.stderr.close()
+    child.stdout.close()
+
+    if ('sort' in kwargs) and kwargs['sort']:
+        from Bio.Align import MultipleSeqAlignment as MSA
+        alisort = []
+        for seq in seqs:
+            for row in align:
+                if row.id == seq.id:
+                    alisort.append(row)
+                    break
+        align = MSA(alisort)
+
+    return align
+
+
 def expand_ambiguous_seq(seq, seqtype='DNA'):
     '''Expand an ambiguous seq into all possible unambiguous ones'''
     if seqtype == 'DNA':

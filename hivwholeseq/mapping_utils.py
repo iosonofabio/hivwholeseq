@@ -4,6 +4,9 @@ author:     Fabio Zanini
 date:       22/08/13
 content:    Settings of stampy used by our mapping scripts.
 '''
+# Modules
+from .sequence_utils import align_muscle
+
 # Globals
 from hivwholeseq.sequencing.filenames import stampy_bin, bwa_bin, spades_bin
 subsrate = '0.05'
@@ -230,36 +233,6 @@ def index_bam(bamfilename_sorted):
     pysam.index(bamfilename_sorted)
 
 
-def align_muscle(*seqs, **kwargs):
-    '''Global alignment of sequences via MUSCLE'''
-    import subprocess as sp
-    from Bio import AlignIO, SeqIO
-    from Bio.Align.Applications import MuscleCommandline
-    muscle_cline = MuscleCommandline(diags=True, quiet=True)
-    child = sp.Popen(str(muscle_cline),
-                     stdin=sp.PIPE,
-                     stdout=sp.PIPE,
-                     stderr=sp.PIPE,
-                     shell=True)
-    SeqIO.write(seqs, child.stdin, "fasta")
-    child.stdin.close()
-    align = AlignIO.read(child.stdout, "fasta")
-    child.stderr.close()
-    child.stdout.close()
-
-    if ('sort' in kwargs) and kwargs['sort']:
-        from Bio.Align import MultipleSeqAlignment as MSA
-        alisort = []
-        for seq in seqs:
-            for row in align:
-                if row.id == seq.id:
-                    alisort.append(row)
-                    break
-        align = MSA(alisort)
-
-    return align
-
-
 def get_number_reads_fastq_open(handle):
     '''Get the number of reads from a fastq file'''
     from Bio.SeqIO.QualityIO import FastqGeneralIterator as FGI
@@ -320,6 +293,8 @@ def get_number_mapped_reads(bamfilename, format='bam'):
 
 def extract_mapped_pairs_subsample_open(bamfile_in, n_reads, maxreads=-1, VERBOSE=0):
     '''Extract random read pairs (pointers) from an open BAM file'''
+    import numpy as np
+
     n_pairs_tot = get_number_reads_open(bamfile_in) // 2
 
     if n_pairs_tot <= n_reads:

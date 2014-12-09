@@ -9,6 +9,7 @@ import argparse
 from operator import itemgetter
 import numpy as np
 
+from hivwholeseq.sequencing.samples import load_sequencing_run, SampleSeq
 from hivwholeseq.miseq import alpha, read_types
 from hivwholeseq.sequencing.filenames import get_allele_counts_filename, get_coverage_filename, \
         get_allele_frequencies_filename
@@ -251,7 +252,7 @@ if __name__ == '__main__':
     only_filt = args.only_filt
 
     # Specify the dataset
-    dataset = MiSeq_runs[seq_run]
+    dataset = load_sequencing_run(seq_run)
     data_folder = dataset['folder']
 
     # If the script is called with no adaID, iterate over all
@@ -264,17 +265,12 @@ if __name__ == '__main__':
     for adaID in adaIDs:
 
         # If the script is called with no fragment, iterate over all
-        samplename = dataset['samples'][dataset['adapters'].index(adaID)]
+        sample = SampleSeq(dataset.samples.loc[dataset.samples.adapter == adaID].iloc[0])
+        samplename = sample.name
         if not fragments:
-            fragments_sample = [fr[:2] for fr in samples[samplename]['fragments']]
+            fragments_sample = sample.regions_generic
         else:
-            from re import findall
-            fragments_all = samples[samplename]['fragments']
-            fragments_sample = []
-            for fragment in fragments:
-                frs = filter(lambda x: fragment in x, fragments_all)
-                if len(frs):
-                    fragments_sample.append(frs[0][:2])
+            fragments_sample = sorted(set(fragments) & set(sample.regions_generic))
 
         if not only_filt:
             plot_minor_allele_frequency(data_folder, adaID, fragments_sample,

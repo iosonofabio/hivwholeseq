@@ -12,7 +12,7 @@ import numpy as np
 from Bio import SeqIO
 import pysam
 
-from hivwholeseq.datasets import MiSeq_runs
+from hivwholeseq.sequencing.samples import load_sequencing_run
 from hivwholeseq.sequencing.filenames import get_mapped_phix_filename, get_phix_filename, \
         get_consensus_phix_filename
 from hivwholeseq.mapping_utils import pair_generator, convert_sam_to_bam
@@ -187,9 +187,9 @@ if __name__ == '__main__':
         if VERBOSE:
             print seq_run
 
-        dataset = MiSeq_runs[seq_run]
+        dataset = load_sequencing_run(seq_run)
         data_folder = dataset['folder']
-        n_cycles = dataset['n_cycles']
+        n_cycles = dataset['cycles']
 
         counts = phred_errors_position(data_folder, n_cycles,
                                        posrange=posrange,

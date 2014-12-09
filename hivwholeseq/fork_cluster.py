@@ -27,6 +27,7 @@ def empty_log_folders():
     os.mkdir(JOBLOGERR)
 
 
+# SEQUENCING
 def fork_check_pipeline(seq_runs, adaIDs=None, pats=False,
                         detail=1, VERBOSE=0):
     '''Submit checking status of the pipeline to the cluster'''
@@ -540,6 +541,36 @@ def fork_split_for_mapping(seq_run, adaID, fragment, VERBOSE=0, maxreads=-1, chu
         print ' '.join(call_list)
     return sp.check_output(call_list)
 
+
+# PHIX
+def fork_get_allele_counts_phix(seq_run, maxreads=-1, VERBOSE=0, qual_min=None):
+    '''Fork self for each adapter ID'''
+    JOBSCRIPT = JOBDIR+'phix/get_allele_counts_phiX.py'
+    cluster_time = '0:59:59'
+    vmem = '8G'
+
+    if VERBOSE:
+        print 'Forking to the cluster'
+
+    call_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'acpX'+seq_run,
+                 '-l', 'h_rt='+cluster_time,
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--run', seq_run,
+                 '--maxreads', maxreads,
+                 '--verbose', VERBOSE,
+                ]
+    if qual_min is not None:
+        call_list.extend(['--qual_min', qual_min])
+    call_list = map(str, call_list)
+    if VERBOSE >= 2:
+        print ' '.join(call_list)
+    sp.call(call_list)
 
 
 # PATIENTS

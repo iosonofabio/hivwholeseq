@@ -23,14 +23,12 @@ from matplotlib import cm
 import matplotlib.pyplot as plt
 
 from hivwholeseq.miseq import alphal, alpha
-from hivwholeseq.datasets import MiSeq_runs
+from hivwholeseq.sequencing.samples import load_sample_sequenced
 from hivwholeseq.sequencing.filenames import get_consensus_filename, get_mapped_filename, \
         get_allele_counts_filename, get_coverage_filename
 from hivwholeseq.reference import load_custom_reference
 from hivwholeseq.mapping_utils import align_muscle, pair_generator
 from hivwholeseq.sequencing.minor_allele_frequency import filter_nus
-from hivwholeseq.sequencing.coverage_tuples import get_coverage_tuples
-from hivwholeseq.sequencing.samples import samples
 from hivwholeseq.sequence_utils import expand_ambiguous_seq
 from hivwholeseq.sequencing.filenames import get_allele_frequencies_filename
 
@@ -41,7 +39,7 @@ mix_RNA_strains = ['HXB2'] # The other one we have to build ourselves... see bel
 # In addition, hopefully by LAI III they mean HXB2 (!)
 ref2_pol = load_custom_reference('38540_pol')
 
-# Some markers are bad!
+# Some markers are bad (polymorphic in the RNA strains)!
 bad_markers = defaultdict(list)
 bad_markers.update({'N4-S1 F2': [947, 653, 668, 1208, 1802],
                'N5-S1 F2': [947, 653, 668, 1208, 1802],
@@ -57,6 +55,14 @@ bad_markers.update({'N4-S1 F2': [947, 653, 668, 1208, 1802],
 
 
 # Functions
+def get_samplename(PCRtype):
+    '''Get samplename from input arg'''
+    samplename = 'RNA_mix_'+PCRtype[:4]+'_Taq'
+    if 'Taq' not in PCRtype:
+        samplename = samplename + 'HiFi'
+    return samplename
+
+
 def guess_second_reference(seq_run, adaID, fragment, ref1,
                            threshold=0.05):
     '''Guess second reference 38540'''
@@ -462,26 +468,25 @@ if __name__ == '__main__':
 
     # Parse input args: this is used to call itself recursively
     parser = argparse.ArgumentParser(description='Errors in HIV pure strains')
-    parser.add_argument('--adaID',
-                        help='Adapter ID to analyze (e.g. TS2)')
     parser.add_argument('--fragments', nargs='*',
                         help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('-n', type=int, default=100,
                         help='Number of reads analyzed')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
+    parser.add_argument('--PCRtype', default='PCR1',
+                        help='Mix to study (PCR1, PCR2, PCR1Taq, PCR2Taq)')
 
     args = parser.parse_args()
-    seq_run = 'Tue48'
-    adaID = args.adaID
     fragments = args.fragments
     n_reads = args.n
     VERBOSE = args.verbose
 
-    # Specify the dataset
-    dataset = MiSeq_runs[seq_run]
-    data_folder = dataset['folder']
-    samplename = dataset['samples'][dataset['adapters'].index(adaID)]
+    # Get the samplename
+    samplename = get_samplename(args.PCRtype)
+
+    sample = load_sample_sequenced(samplename)
+    adaID = sample.adapter
 
     # If the script is called with no fragment, iterate over all
     if not fragments:

@@ -251,6 +251,8 @@ if __name__ == '__main__':
                         help='Plot local haplotype trajectories')
     parser.add_argument('--save', default=None,
                         help='Save to this filename')
+    parser.add_argument('--mincount', type=int, default=1,
+                        help='Minimal number of observations to keep the haplotype')
 
     args = parser.parse_args()
     pname = args.patient
@@ -260,6 +262,7 @@ if __name__ == '__main__':
     maxreads = args.maxreads
     use_plot = args.plot
     save_path = args.save
+    mincount = args.mincount
 
     (fragment, start, end) = roi
 
@@ -285,13 +288,13 @@ if __name__ == '__main__':
 
         if VERBOSE >= 2:
             print 'Get local haplotypes'
-        haplo = patient.get_local_haplotypes(start, end,
-                                             VERBOSE=VERBOSE,
-                                             maxreads=maxreads)
+        haplo = sample.get_local_haplotypes(fragment, start, end,
+                                            VERBOSE=VERBOSE,
+                                            maxreads=maxreads)
 
         if VERBOSE >= 2:
             print 'Cluster haplotypes'
-        haploc = cluster_haplotypes(haplo, VERBOSE=VERBOSE)
+        haploc = cluster_haplotypes(haplo, VERBOSE=VERBOSE, min_abundance=mincount)
 
         if VERBOSE >= 2:
             print 'Build MSA'
@@ -308,6 +311,8 @@ if __name__ == '__main__':
         store_alignments(alis, save_path)
 
     if use_plot:
+        import matplotlib.pyplot as plt
+
         if VERBOSE >= 1:
             print 'Plot'
         seqs_set = set()
@@ -321,9 +326,9 @@ if __name__ == '__main__':
                 hct[seqs_set.index(seq), i] = count
         hct = hct.T
 
-        hft = (1.0 * hct.T / hct.sum(axis=1))
+        hft = (1.0 * hct.T / hct.sum(axis=1)).T
 
-        plot_haplotype_frequencies(patient.times[ind], hft,
+        plot_haplotype_frequencies(times, hft,
                                    title=patient.name+', '+' '.join(map(str, roi)))
 
         plt.ion()

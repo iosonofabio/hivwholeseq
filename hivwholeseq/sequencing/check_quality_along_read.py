@@ -17,8 +17,7 @@ from itertools import izip
 from Bio.SeqIO.QualityIO import FastqGeneralIterator as FGI
 import pysam
 
-from hivwholeseq.sequencing.filenames import get_demultiplex_summary_filename, get_raw_read_files, \
-        get_premapped_filename, get_read_filenames
+from hivwholeseq.sequencing.filenames import get_read_filenames
 from hivwholeseq.sequencing.adapter_info import adapters_illumina, foldername_adapter
 from hivwholeseq.fork_cluster import fork_quality_along_read as fork_self
 from hivwholeseq.mapping_utils import extract_mapped_reads_subsample_open
@@ -146,7 +145,8 @@ def plot_quality_along_reads(data_folder, adaID, title, quality, VERBOSE=0, save
         plt.show()
 
 
-def plot_cuts_quality_along_reads(data_folder, adaID, title, quality, VERBOSE=0, savefig=False):
+def plot_cuts_quality_along_reads(data_folder, adaID, quality, title='',
+                                  VERBOSE=0, savefig=False):
     '''Plot some cuts of the quality along the read'''
     from scipy.stats import percentileofscore as pof
     import matplotlib.pyplot as plt
@@ -168,14 +168,24 @@ def plot_cuts_quality_along_reads(data_folder, adaID, title, quality, VERBOSE=0,
         ax.set_xlim(-1, len(qual) + 1)
         ax.legend(loc='best')
 
-    fig.suptitle(title, fontsize=20)
+    if title:
+        fig.suptitle(title, fontsize=20)
 
     if savefig:
         from hivwholeseq.generic_utils import mkdirs
-        from hivwholeseq.sequencing.filenames import get_figure_folder, \
-                get_quality_along_reads_filename
-        fig_folder = get_figure_folder(data_folder, adaID)
-        fig_filename = get_quality_along_reads_filename(data_folder, adaID, simple=True)
+        if savefig == True:
+            from hivwholeseq.sequencing.filenames import get_figure_folder, \
+                    get_quality_along_reads_filename
+            fig_folder = get_figure_folder(data_folder, adaID)
+            fig_filename = get_quality_along_reads_filename(data_folder, adaID, simple=True)
+        elif isinstance(savefig, basestring):
+            import os
+            fig_filename = savefig
+            fig_folder = os.path.dirname(fig_filename)
+
+        else:
+            raise ValueError('savefig must be a bool or a figure filename (string)')
+
         mkdirs(fig_folder)
         fig.savefig(fig_filename)
 
@@ -230,8 +240,10 @@ if __name__ == '__main__':
                                         randomreads=(maxreads >= 1),
                                         maxreads=maxreads, VERBOSE=VERBOSE)
 
-    plot_cuts_quality_along_reads(data_folder, adaID, title,
-                                  quality, VERBOSE=VERBOSE,
+    plot_cuts_quality_along_reads(data_folder, adaID,
+                                  quality,
+                                  title=title,
+                                  VERBOSE=VERBOSE,
                                   savefig=savefig)
 
     #if plotfull:
