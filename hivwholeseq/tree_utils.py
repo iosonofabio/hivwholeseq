@@ -17,15 +17,16 @@ def build_tree_fasttree(filename_or_ali, rootname=None, VERBOSE=0):
     import subprocess as sp
     import StringIO
     from Bio import Phylo
+    import numpy as np
 
     if isinstance(filename_or_ali, basestring):
         filename = filename_or_ali
     else:
         ali = filename_or_ali
-        tmp_folder = '/ebio/ag-neher/share/tmp/'
-        filename = tmp_folder+'tmp_fasttree_'+str(np.random.randint(1000000000))+'.fasta.gz'
+        tmp_folder = os.getenv('HOME')+'/tmp/'
+        filename = tmp_folder+'tmp_fasttree_'+str(np.random.randint(1000000000))+'.fasta'
         from Bio import AlignIO
-        with gzip.open(filename, 'w') as outfile:
+        with open(filename, 'w') as outfile:
             AlignIO.write(ali, outfile, 'fasta')
 
     try:

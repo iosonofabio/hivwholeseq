@@ -16,6 +16,20 @@ def align_muscle(*seqs, **kwargs):
     import subprocess as sp
     from Bio import AlignIO, SeqIO
     from Bio.Align.Applications import MuscleCommandline
+    
+    if not len(seqs):
+        return None
+
+    # Convert to SeqRecord if required
+    if isinstance(seqs[0], basestring):
+        from Bio.Seq import Seq
+        from Bio.SeqRecord import SeqRecord
+        from Bio.Alphabet import single_letter_alphabet
+        seqs = [SeqRecord(Seq(s, single_letter_alphabet),
+                          id='seq'+str(i+1), name='seq'+str(i+1),
+                          description='seq'+str(i+1))
+                for i, s in enumerate(seqs)]
+
     muscle_cline = MuscleCommandline(diags=True, quiet=True)
     child = sp.Popen(str(muscle_cline),
                      stdin=sp.PIPE,

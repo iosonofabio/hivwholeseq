@@ -251,7 +251,7 @@ if __name__ == '__main__':
                         help='Plot local haplotype trajectories')
     parser.add_argument('--save', default=None,
                         help='Save to this filename')
-    parser.add_argument('--mincount', type=int, default=1,
+    parser.add_argument('--countmin', type=int, default=1,
                         help='Minimal number of observations to keep the haplotype')
 
     args = parser.parse_args()
@@ -262,7 +262,7 @@ if __name__ == '__main__':
     maxreads = args.maxreads
     use_plot = args.plot
     save_path = args.save
-    mincount = args.mincount
+    countmin = args.countmin
 
     (fragment, start, end) = roi
 
@@ -294,7 +294,7 @@ if __name__ == '__main__':
 
         if VERBOSE >= 2:
             print 'Cluster haplotypes'
-        haploc = cluster_haplotypes(haplo, VERBOSE=VERBOSE, min_abundance=mincount)
+        haploc = cluster_haplotypes(haplo, VERBOSE=VERBOSE, min_abundance=countmin)
 
         if VERBOSE >= 2:
             print 'Build MSA'

@@ -12,7 +12,6 @@ import sys
 import argparse
 import numpy as np
 import StringIO
-import zipfile, zlib
 from Bio import AlignIO
 
 from hivwholeseq.generic_utils import mkdirs
@@ -30,6 +29,7 @@ regions_all = ['PR', 'V3', 'psi']
 # Functions
 def store_alignments(alis, filename):
     '''Store alignments to file'''
+    import zipfile, zlib
     with zipfile.ZipFile(filename, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
         for i, ali in enumerate(alis):
             f = StringIO.StringIO()
