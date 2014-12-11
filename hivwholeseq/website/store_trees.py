@@ -9,14 +9,43 @@ import os
 import sys
 from Bio import Phylo
 
+from hivwholeseq.sequence_utils import align_muscle
+from hivwholeseq.tree_utils import build_tree_fasttree
 from hivwholeseq.generic_utils import mkdirs
 from hivwholeseq.patients.patients import load_patients, Patient
+from hivwholeseq.patients.get_local_trees import get_region_count_trajectories
 from hivwholeseq.patients.filenames import get_consensi_tree_filename as gfn_in
 from hivwholeseq.website.filenames import get_consensi_tree_filename as gfn_out
 
 
 # Globals
 refnames = ['LAI-III']
+regions = ['V3', 'psi', 'PR']
+freqmin = 0.01
+
+
+# Functions
+def annotate_tree(tree, hft, times, seqs):
+    '''Change leaf names to include more info'''
+    # Reroot
+    iseqroot = hft[:, 0].argmax()
+    for leaf in tree.get_terminals():
+        iseq = int(leaf.name[3:]) - 1
+        if iseq == iseqroot:
+            break
+    else:
+        raise ValueError('Not able to reroot!')
+    tree.root_with_outgroup(leaf)
+
+    # Annotate leaves
+    for leaf in tree.get_terminals():
+        iseq = int(leaf.name[3:]) - 1
+        it = hft[iseq].argmax()
+        leaf.day = times[it]
+        leaf.hf = hft[iseq, it]
+        leaf.seq = seqs[iseq]
+        leaf.name = (leaf.seq+'_'+str(int(leaf.day))+'days_fmax_'+
+                     '{:1.2f}'.format(leaf.hf))
 
 
 
@@ -25,11 +54,15 @@ if __name__ == '__main__':
 
     fragments = ['F'+str(i) for i in xrange(1, 7)]
     patients = load_patients()
+
+    # Patient by patient
     for pname, patient in patients.iterrows():
         patient = Patient(patient)
-        print patient.code, patient.name
 
+        # Fragment trees (we recycle extant files for speed reasons)
         for fragment in fragments:
+            print patient.code, patient.name, fragment
+
             fn = patient.get_consensi_tree_filename(fragment)
 
             if not os.path.isfile(fn):
@@ -57,6 +90,41 @@ if __name__ == '__main__':
             Phylo.write([tree], fn_out, 'newick')
 
 
+        # Region trees (we make them de novo from extant alignments)
+        for region in regions:
+            print patient.code, patient.name, region
+
+            print 'Get haplotypes'
+            (hct, ind, seqs) = get_region_count_trajectories(patient, region,
+                                                             VERBOSE=2)
+            hct = hct.T
+            hft = 1.0 * hct / hct.sum(axis=0)
+        
+            # Exclude too rare haplos
+            indseq = (hft >= freqmin).any(axis=1)
+            seqs = seqs[indseq]
+            hft = hft[indseq]
+        
+            times = patient.times[ind]
+        
+            print 'Align sequences'
+            seqsali = align_muscle(*seqs, sort=True)
+        
+            print 'Build local tree'
+            tree = build_tree_fasttree(seqsali, VERBOSE=2)
+
+            # Change names and so on
+            annotate_tree(tree, hft, times, seqs)
+
+            # Ladderize in place
+            tree.ladderize()
+
+            # Write output
+            fn_out = gfn_out(patient.code, region)
+            Phylo.write([tree], fn_out, 'newick')
+
+
+    # Global trees
     print 'All patients'
     for fragment in fragments:
         print fragment
