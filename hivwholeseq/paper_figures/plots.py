@@ -18,6 +18,8 @@ from hivwholeseq.generic_utils import mkdirs
 def plot_cuts_quality_along_reads(data, title='',
                                   VERBOSE=0, savefig=False):
     '''Plot some cuts of the quality along the read'''
+    plt.ioff()
+
     from itertools import izip
 
     if VERBOSE:
@@ -64,6 +66,8 @@ def plot_cuts_quality_along_reads(data, title='',
 
 def plot_phred_errors(data, label='', title='', VERBOSE=0, savefig=False):
     '''Plot the error counts'''
+    plt.ioff()
+
     if VERBOSE:
         print 'Plot phred errors'
 
@@ -110,6 +114,8 @@ def plot_phred_errors(data, label='', title='', VERBOSE=0, savefig=False):
 
 def plot_minor_allele_reference(data, title='', VERBOSE=0, savefig=False):
     '''Plot minor allele in the reference sample'''
+    plt.ioff()
+
     if VERBOSE:
         print 'Plot minor alleles of control sample'
 
@@ -157,6 +163,8 @@ def plot_minor_allele_reference(data, title='', VERBOSE=0, savefig=False):
 
 def plot_template_numbers(data, VERBOSE=0, title='', savefig=False):
     '''Plot template numbers'''
+    plt.ioff()
+
     if VERBOSE:
         print 'Plot template numbers'
 
@@ -223,6 +231,8 @@ def plot_template_numbers(data, VERBOSE=0, title='', savefig=False):
 
 def plot_insert_size_distribution(data, title='', VERBOSE=0, savefig=False):
     '''Plot histogram of insert sizes'''
+    plt.ioff()
+
     if VERBOSE:
         print 'Plot template numbers'
     
@@ -260,7 +270,134 @@ def plot_insert_size_distribution(data, title='', VERBOSE=0, savefig=False):
         plt.show()
 
 
-def plot_rna_amplification_bias(data, title='', VERBOSE=0, savefig=False):
-    '''Plot amplification bias of the RNA mixes'''
-    #TODO
-    pass
+def plot_rna_recombination(data, title='', VERBOSE=0, savefig=False):
+    '''Plot recombination in the RNA mixes'''
+    plt.ioff()
+
+    if VERBOSE >= 1:
+        print 'Plot RNA mix amplification bias and conditional switch probability'
+
+    fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+    sns.set_style('whitegrid')
+
+    for datum in data:
+        switchesn = datum['switchesn']
+        counts = datum['counts']
+        refnames = datum['refnames']
+        al_polyd = datum['aldict']
+        L = np.max(counts.keys())
+
+        # Amplification bias
+        ax = axs[0]
+        ax.set_xlabel('Position [bp]')
+        ax.set_ylabel('Frequency of '+refnames[0])
+        data = [(pos, 1.0 * co[al_polyd[pos][1]] / sum(co.itervalues()))
+                for (pos, co) in counts.iteritems() if sum(co.itervalues()) > 100]
+        (x, y) = np.array(data).T
+        ind = x.argsort()
+        x = x[ind]
+        y = y[ind]
+        y[y > 1-1e-4] = 1-1e-4
+        y[y < 1e-4] = 1e-4
+        ax.plot(x, y, lw=2)
+        ax.set_ylim(0.9e-4, 1 - 0.9e-4)
+        ax.set_yscale('logit')
+        ax.grid(True)
+
+        # Recombination rate
+        ax = axs[1]
+        ax.set_xlabel('Distance [bp]')
+        ax.set_ylabel('Conditional switch probability')
+    
+        colors = sns.dark_palette("cerulean", n_colors=100, reverse=True, input='xkcd')
+        for (pos1, pos2), freq in switchesn.iteritems():
+            posm = 0.5 * (pos1 + pos2)
+            ci = np.array(len(colors) * posm / L, int)
+            ci[ci >= len(colors)] = len(colors) - 1
+            color = colors[ci]
+            ax.scatter(pos2 - pos1, freq + 1e-6, s=30, color=color)
+
+        ax.set_ylim(-0.05, 1.1)
+        ax.grid(True)
+
+    if title:
+        fig.suptitle(title)
+
+    if savefig:
+        fig_filename = savefig
+        fig_folder = os.path.dirname(fig_filename)
+
+        mkdirs(fig_folder)
+        fig.savefig(fig_filename)
+        plt.close(fig)
+
+    else:
+        plt.tight_layout()
+        plt.ion()
+        plt.show()
+
+
+
+def plot_allele_frequency_overlap(data, title='', VERBOSE=0, use_logit=True, savefig=False):
+    '''Plot allele frequency in the overlap regions'''
+
+    fig, ax = plt.subplots()
+    sns.set_style('whitegrid')
+
+    colors = sns.color_palette('Set1', 5)
+    legend = set()
+    for ida, datum in enumerate(data):
+        afjoint = datum['af']
+        color = colors[datum['io']]
+        if datum['overlap'] not in legend:
+            label = datum['overlap']
+            legend.add(datum['overlap'])
+        else:
+            label = None
+        ax.scatter(afjoint[0].ravel(), afjoint[1].ravel(),
+                   s=50,
+                   color=color,
+                   alpha=0.7,
+                   label=label,
+                   edgecolor='none')
+    
+    xmin = 1e-4
+    ax.plot([xmin, 1 - xmin], [xmin, 1 - xmin], lw=2, color='k', alpha=0.5)
+
+    ax.set_xlabel('allele frequency leading fragment')
+    ax.set_ylabel('allele frequency trailing fragment')
+    ax.grid(True)
+
+    if use_logit:
+        ax.set_xscale('logit')
+        ax.set_yscale('logit')
+        ax.set_xlim(xmin, 1 - xmin)
+        ax.set_ylim(xmin, 1 - xmin)
+
+    # Plot stddev of a certain number of molecules in Poisson sampling
+    n = 300
+    x = np.linspace(-4, 0, 1000)
+    x = 1.0 / (1 + 10**(-x))
+    y = x - np.sqrt(x / n)
+    ax.plot(np.concatenate([x, 1 - y[::-1]]), np.concatenate([y, 1 - x[::-1]]), lw=4, c='black', alpha=0.7)
+    ax.plot(np.concatenate([y, 1 - x[::-1]]), np.concatenate([x, 1 - y[::-1]]), lw=4, c='black', alpha=0.7,
+            label='Poisson noise, n = '+str(n))
+
+    ax.legend(loc=2)
+
+    if title:
+        ax.set_title(title)
+
+    if savefig:
+        fig_filename = savefig
+        fig_folder = os.path.dirname(fig_filename)
+
+        mkdirs(fig_folder)
+        fig.savefig(fig_filename)
+        plt.close(fig)
+
+    else:
+        plt.tight_layout()
+        plt.ion()
+        plt.show()
+

@@ -47,6 +47,51 @@ def get_map_overlap(sample, fr1, fr2):
     return np.array(mapco, int)
 
 
+def get_allele_frequency_overlap(samples, overlaps, cov_min=1000,
+                                  VERBOSE=0, qual_min=30):
+    '''Get allele frequency in the overlaps'''
+    data = [] 
+    for io, overlap in enumerate(overlaps):
+        fr1 = overlap[:2]
+        fr2 = 'F'+overlap[-1]
+
+        for samplename, sample in samples.iterrows():
+            sample = SamplePat(sample)
+
+            if VERBOSE >= 1:
+                print overlap, samplename
+
+            # FIXME: actually use frequencies
+            try:
+                ac1 = sample.get_allele_counts(fr1, qual_min=qual_min)
+                ac2 = sample.get_allele_counts(fr2, qual_min=qual_min)
+            except IOError:
+                continue
+
+            coord_map = get_map_overlap(sample, fr1, fr2)
+
+            acjoint = np.zeros((2, ac1.shape[0], coord_map.shape[0]), int)
+            acjoint[0] = ac1[:, coord_map[:, 0]]
+            acjoint[1] = ac2[:, coord_map[:, 1]]
+
+            # Convert to frequencies
+            afjoint = np.ma.array(acjoint)
+            cov = acjoint.sum(axis=1)
+            mask = (cov < cov_min).any(axis=0)
+            mask = np.tile(mask, (afjoint.shape[0], afjoint.shape[1], 1))
+            afjoint.mask = mask
+            afjoint = (1.0 * afjoint.swapaxes(0, 1) / afjoint.sum(axis=1)).swapaxes(0, 1)
+
+            data.append({'af': afjoint,
+                         'samplename': samplename,
+                         'overlap': overlap,
+                         'io': io,
+                         'n_templates': sample.get_n_templates_dilutions(),
+                         'coverage': cov})
+
+    return data
+
+
 
 # Script
 if __name__ == '__main__':
@@ -96,44 +141,8 @@ if __name__ == '__main__':
     if VERBOSE >= 3:
         print 'ovarlaps', overlaps
 
-    data = [] 
-    for io, overlap in enumerate(overlaps):
-        fr1 = overlap[:2]
-        fr2 = 'F'+overlap[-1]
-
-        for samplename, sample in samples.iterrows():
-            sample = SamplePat(sample)
-
-            if VERBOSE >= 1:
-                print overlap, samplename
-
-            # FIXME: actually use frequencies
-            try:
-                ac1 = sample.get_allele_counts(fr1, qual_min=qual_min)
-                ac2 = sample.get_allele_counts(fr2, qual_min=qual_min)
-            except IOError:
-                continue
-
-            coord_map = get_map_overlap(sample, fr1, fr2)
-
-            acjoint = np.zeros((2, ac1.shape[0], coord_map.shape[0]), int)
-            acjoint[0] = ac1[:, coord_map[:, 0]]
-            acjoint[1] = ac2[:, coord_map[:, 1]]
-
-            # Convert to frequencies
-            afjoint = np.ma.array(acjoint)
-            cov = acjoint.sum(axis=1)
-            mask = (cov < cov_min).any(axis=0)
-            mask = np.tile(mask, (afjoint.shape[0], afjoint.shape[1], 1))
-            afjoint.mask = mask
-            afjoint = (1.0 * afjoint.swapaxes(0, 1) / afjoint.sum(axis=1)).swapaxes(0, 1)
-
-            data.append({'af': afjoint,
-                         'samplename': samplename,
-                         'overlap': overlap,
-                         'io': io,
-                         'n_templates': sample.get_n_templates_dilutions(),
-                         'coverage': cov})
+    data = get_allele_frequency_overlap(samples, overlaps, cov_min=cov_min,
+                                        VERBOSE=VERBOSE, qual_min=qual_min)
 
     if use_plot:
 
