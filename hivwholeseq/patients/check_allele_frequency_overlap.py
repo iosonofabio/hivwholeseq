@@ -166,7 +166,7 @@ if __name__ == '__main__':
         ax.grid(True)
         #ax.legend(loc=2, fontsize=10, title='Overlap:')
         if (samplenames is not None) and len(samplenames) == 1:
-            ax.set_title(samplename)
+            ax.set_title(samplenames[0])
         elif (pnames is not None) and (len(pnames) == 1):
             ax.set_title(pnames[0])
 

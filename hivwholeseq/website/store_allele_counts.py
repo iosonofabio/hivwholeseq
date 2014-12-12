@@ -13,6 +13,7 @@ from hivwholeseq.miseq import alphal
 from hivwholeseq.generic_utils import mkdirs
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.website.filenames import get_allele_count_trajectories_filename as get_fn_out
+from hivwholeseq.website.filenames import get_coverage_filename
 from hivwholeseq.patients.filenames import get_allele_count_trajectories_filename
 
 
@@ -26,7 +27,7 @@ if __name__ == '__main__':
         patient = Patient(patient)
         print patient.code, patient.name
 
-        # Coverage
+        # Allele counts
         fn_out = get_allele_count_trajectories_filename(pname, 'genomewide')
         npz = np.load(fn_out)
         ind = npz['ind']
@@ -37,3 +38,10 @@ if __name__ == '__main__':
         # Write output
         fn_out = get_fn_out(patient.code, 'genomewide')
         np.savez(fn_out, times=times, act=act, alpha=alphal)
+
+        # Coverage
+        cov = act.sum(axis=1)
+
+        # Write output
+        fn_out = get_coverage_filename(patient.code, 'genomewide')
+        np.savez(fn_out, times=times, cov=cov)
