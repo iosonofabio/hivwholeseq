@@ -180,10 +180,6 @@ def get_local_haplotypes(bamfilename, start, end, VERBOSE=0, maxreads=-1):
                 seqs = [trim_read_roi(read, start, end) for read in reads]
                 seq = merge_read_pair(*seqs)
 
-            #FIXME: what is this??
-            #if len(seq) < 0.8 * (end - start):
-            #    import ipdb; ipdb.set_trace()
-
             haplotypes[seq] += 1
             if VERBOSE >= 4:
                 import ipdb; ipdb.set_trace()
@@ -210,12 +206,16 @@ def plot_haplotype_frequencies(times, hft, figax=None, title='',
     colors = cm.jet(1.0 * np.arange(hft.shape[1]) / hft.shape[1])
     np.random.shuffle(colors)
 
+    # Use fake zero/one for logit plots
+    freqmin = 1e-6
+
     # Plot first line
-    ax.fill_between(times, hft_cum[:, 0], np.zeros(hft.shape[0]), color=colors[0],
+    ax.fill_between(times, hft_cum[:, 0], freqmin + np.zeros(hft.shape[0]), color=colors[0],
                     label=str(0),
                     picker=picker)
     for i in xrange(1, hft.shape[1]):
-        ax.fill_between(times, hft_cum[:, i], hft_cum[:, i - 1], color=colors[i],
+        ax.fill_between(times, hft_cum[:, i],
+                        np.minimum(1-freqmin, hft_cum[:, i - 1]), color=colors[i],
                         label=str(i),
                         picker=picker)
 

@@ -71,7 +71,12 @@ def get_region_count_trajectories(patient, region, VERBOSE=0, countmin=5):
     seqs_set = np.array(seqs_set, 'S'+str(np.max(map(len, seqs_set))))
     times = np.array(map(itemgetter('time'), alis))
     ind = np.array([i for i, t in enumerate(patient.times) if t in times])
-    
+
+    # Filter out all time points without any counts
+    ind_keep = hct.any(axis=0)
+    ind = ind[ind_keep]
+    hct = hct[:, ind_keep]
+
     return (hct.T, ind, seqs_set)
 
 

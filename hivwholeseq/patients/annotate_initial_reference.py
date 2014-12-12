@@ -179,6 +179,9 @@ def compare_annotations(refseq_new, refseq_old, VERBOSE=0):
                 print fn, 'coordinates do not correspond', locold, locnew
             alert = True
 
+        if fn == 'gp120':
+            alert = False
+
     if alert:
         raise ValueError('Not all features are fine.')
 

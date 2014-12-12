@@ -14,6 +14,7 @@ from hivwholeseq.generic_utils import mkdirs
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.website.filenames import get_patient_reference_filename
 from hivwholeseq.sequence_utils import correct_genbank_features_save
+from hivwholeseq.reference import load_custom_reference
 
 
 
@@ -37,3 +38,9 @@ if __name__ == '__main__':
         fn_out = get_patient_reference_filename(patient.code, format='gb')
         SeqIO.write(ref, fn_out, 'gb')
 
+    # Store HXB2
+    print 'HXB2'
+    ref = load_custom_reference('HXB2', format='gb')
+    correct_genbank_features_save(ref)
+    fn_out = get_patient_reference_filename('HXB2', format='gb')
+    SeqIO.write(ref, fn_out, 'gb')

@@ -331,19 +331,18 @@ class Patient(pd.Series):
             return mapco[ind]
 
 
-    def get_local_haplotype_trajectories(self, fragment, start, end, **kwargs):
+    def get_local_haplotype_trajectories(self, fragment, start, end, VERBOSE=0,
+                                         **kwargs):
         '''Get trajectories of local haplotypes'''
         if fragment not in ['F'+str(i) for i in xrange(1, 7)]:
-            if 'VERBOSE' in kwargs:
-                (fragment, start, end) = self.get_fragmented_roi((fragment, start, end),
-                                                                 VERBOSE=kwargs['VERBOSE'])
-            else:
-                (fragment, start, end) = self.get_fragmented_roi((fragment, start, end))
+            (fragment, start, end) = self.get_fragmented_roi((fragment, start, end),
+                                                             VERBOSE=VERBOSE)
         ind = []
         haplos = []
         for i, sample in enumerate(self.itersamples()):
             try:
                 haplo = sample.get_local_haplotypes(fragment, start, end,
+                                                    VERBOSE=VERBOSE,
                                                     **kwargs)
             except IOError:
                 continue
@@ -354,12 +353,13 @@ class Patient(pd.Series):
         return (haplos, ind)
 
 
-    def get_local_haplotype_count_trajectories(self, fragment, start, end, **kwargs):
+    def get_local_haplotype_count_trajectories(self, fragment, start, end, VERBOSE=0,
+                                               **kwargs):
         '''Get trajectories of local haplotypes counts'''
         (haplos, ind) = self.get_local_haplotype_trajectories(fragment,
                                                               start, end,
+                                                              VERBOSE=VERBOSE,
                                                               **kwargs)
-
         # Make trajectories of counts
         seqs_set = set()
         for haplo in haplos:
@@ -371,8 +371,13 @@ class Patient(pd.Series):
                 hct[seqs_set.index(seq), i] = count
 
         seqs_set = np.array(seqs_set, 'S'+str(np.max(map(len, seqs_set))))
-
         return (hct.T, ind, seqs_set)
+
+    
+    def get_region_count_trajectories(self, region, VERBOSE=0, **kwargs):
+        '''Get trajectories of local haplotypes in a precompiled region'''
+        from .get_local_trees import get_region_count_trajectories
+        return get_region_count_trajectories(self, region, VERBOSE=VERBOSE)
 
 
 
