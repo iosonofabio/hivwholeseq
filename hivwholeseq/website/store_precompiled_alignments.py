@@ -29,7 +29,8 @@ from hivwholeseq.website.filenames import get_consensi_alignment_filename
 
 
 # Globals
-regions_all = ['PR', 'V3', 'psi']
+regions_all = ['PR', 'V3', 'psi', 'vpu', 'vpr', 'RRE', 'p15', 'p17',
+               'p2', 'p7', 'p1', 'p6']
 freqmin = 0.01
 
 
@@ -123,7 +124,8 @@ if __name__ == '__main__':
 
             # Compute alignments
             print 'Get haplotypes'
-            haplos = patient.get_local_haplotype_trajectories(region, 0, '+oo')
+            haplos = patient.get_local_haplotype_trajectories(region, 0, '+oo',
+                                                              filters='nosingletons')
             print 'Align'
             alis = [{'time': patient.times[it],
                      'ali': build_msa(h)}

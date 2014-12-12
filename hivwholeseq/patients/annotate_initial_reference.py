@@ -66,6 +66,7 @@ def annotate_sequence(seqrecord, additional_edges={}, VERBOSE=0):
 
     for feature_type in edge_dict:
         edges_all = edge_dict[feature_type]
+        print feature_type, edge_dict[feature_type].keys()
         for name, edges in edges_all.iteritems():
             if VERBOSE >= 2:
                 print name,
@@ -242,10 +243,8 @@ if __name__ == '__main__':
         if refseq_old is not None:
             compare_annotations(refseq, refseq_old, VERBOSE=VERBOSE)
 
-
         if use_save:
             fn_out = patient.get_reference_filename('genomewide', format='gb')
             correct_genbank_features_save(refseq)
             SeqIO.write(refseq, fn_out, 'gb')
 
-        # TODO: propagate to the single fragment references now

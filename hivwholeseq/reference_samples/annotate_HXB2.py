@@ -36,6 +36,7 @@ coordinates = {'gene': {'gag': [(789, 2292)],
                            'RT': [(2549, 3869)],
                            'p15': [(3869, 4229)],
                            'IN': [(4229, 5096)],
+                           # FIXME: is gp120 w/ or w/o signal peptide? (now w/)
                            'gp120': [(6224, 7757)],
                            'gp41': [(7757, 8795)],
                           },
@@ -44,7 +45,8 @@ coordinates = {'gene': {'gag': [(789, 2292)],
                                  'RRE': None,
                                 },
                'other': {'V3': None,
-                         'psi': None},
+                         'psi': None,
+                         'env peptide': None},
               }
 
 def get_coordinates_feature(smat, name):

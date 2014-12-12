@@ -58,7 +58,7 @@ RNA_structure_edges = {'RRE': RRE_edges,
 
 
 # Edges of other regions
-env_peptide_edges = ['ATGAGAGTGAAGGAGAA', 'TGTAGTGCT']
+env_peptide_edges = ['ATGAGAGTGAAGGAGAA', 'GCTCCTTGGGATGTTGATGATCTGTAGTGCT']
 psi_element = ['CTCGGCTTGCT', 'AGCGGAGGCTAG']
 V3_edges = ['ACAATGYACACATGGAATTARGCCA', rc('AGAAAAATTCYCCTCYACAATTAAA')]
 
@@ -68,7 +68,7 @@ other_edges = {'env peptide': env_peptide_edges,
 
 
 # All edges
-all_edges = gene_edges
+all_edges = dict(gene_edges)
 all_edges.update(RNA_structure_edges)
 all_edges.update(other_edges)
 

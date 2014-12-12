@@ -153,6 +153,11 @@ class SamplePat(pd.Series):
                 hnames = [hname for hname in haplo.iterkeys() if 'N' in hname]
                 for hname in hnames:
                     del haplo[hname]
+            
+            if 'nosingletons' in filters:
+                hnames = [hname for hname, c in haplo.iteritems() if c <= 1]
+                for hname in hnames:
+                    del haplo[hname]
 
         return haplo
 
