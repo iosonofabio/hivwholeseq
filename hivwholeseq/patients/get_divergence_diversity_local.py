@@ -93,8 +93,6 @@ if __name__ == '__main__':
                         help='Verbosity level [0-4]')
     parser.add_argument('--plot', nargs='?', default=None, const='2D',
                         help='Plot the result')
-    parser.add_argument('--PCR1', type=int, default=1,
-                        help='Take only PCR1 samples [0=off, 1=where both available, 2=always]')
     parser.add_argument('--block-length', type=int, default=150,
                         help='Length of block to consider')
     parser.add_argument('--sliding', action='store_true',
@@ -109,7 +107,6 @@ if __name__ == '__main__':
     fragments = args.fragments
     VERBOSE = args.verbose
     plot = args.plot
-    use_PCR1 = args.PCR1
     block_length = args.block_length
     use_sliding = args.sliding
     use_coverage = args.include_cov
@@ -136,15 +133,13 @@ if __name__ == '__main__':
 
             # NOTE: we should use depth instead of cov_min but I need to resync times
             aft, ind = patient.get_allele_frequency_trajectories(fragment,
-                                                                 use_PCR1=use_PCR1,
                                                                  cov_min=100)
 
             # NOTE: Ns should be excluded from diversity and divergence
             aft = aft[:, :5, :]
 
             if use_coverage:
-                (covt, ind2) = patient.get_coverage_trajectories(fragment,
-                                                                 use_PCR1=use_PCR1)
+                (covt, ind2) = patient.get_coverage_trajectories(fragment)
                 if set(ind).symmetric_difference(set(ind2)):
                     raise ValueError('Indices for allele freqs and coverage differ!')
 

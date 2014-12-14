@@ -2,7 +2,7 @@
 '''
 author:     Fabio Zanini
 date:       08/09/14
-content:    Get divergence and diversity of the patient.
+content:    Get substitution rate from divergence.
 '''
 # Modules
 import os
@@ -15,21 +15,6 @@ import matplotlib.pyplot as plt
 
 from hivwholeseq.miseq import alpha
 from hivwholeseq.patients.patients import load_patients, Patient
-
-
-
-# Functions
-def get_divergence(aft):
-    '''Get divergence from allele frequency trajectories'''
-    cons_ind = Patient.get_initial_consensus_noinsertions(aft)
-    dg = 1 - aft[:, cons_ind, np.arange(aft.shape[2])].mean(axis=1)
-    return dg
-
-
-def get_diversity(aft):
-    '''Get diversity from allele frequency trajectories'''
-    ds = (aft * (1 - aft)).sum(axis=1).mean(axis=1)
-    return ds
 
 
 
@@ -68,36 +53,60 @@ if __name__ == '__main__':
             if VERBOSE >= 1:
                 print pname, region
 
-            aft, ind = patient.get_allele_frequency_trajectories(region,
-                                                                 cov_min=10)
+            dg, ind = patient.get_divergence(region, cov_min=10)
             times = patient.times[ind]
 
-            dg = get_divergence(aft)
-            ds = get_diversity(aft)
+            data.append({'pname': pname, 'region': region, 'dg': dg, 't': times})
 
-            data.append({'pname': pname, 'region': region, 'dg': dg, 'ds': ds, 't': times})
+    if VERBOSE >= 1:
+        print 'Fit slopes'
+
+    for d in data:
+        pname = d['pname']
+        region = d['region']
+        dg = d['dg']
+        times = d['t']
+
+        r = np.linalg.lstsq(times[:, np.newaxis], dg)[0][0]
+        d['r'] = r
+
 
     if plot:
-        fig, ax = plt.subplots(1, 1)
+        if VERBOSE >= 1:
+            print 'Plot'
+        fig, axs = plt.subplots(1, 2, figsize=(10, 5), gridspec_kw={'width_ratios':[4, 1]})
+        ax = axs[0]
         ax.set_xlabel('Time from transmission [days]')
-        ax.set_ylabel('Divergence [solid]\nDiversity [dashed]')
+        ax.set_ylabel('Divergence')
         #ax.set_yscale('log')
 
         for i, d in enumerate(data):
             pname = d['pname']
             region = d['region']
             dg = d['dg']
-            ds = d['ds']
             times = d['t']
+            r = d['r']
 
             ax.plot(times, dg, lw=2, label=', '.join([pname, region]),
                     color=cm.jet(1.0 * i / len(data)))
 
-            ax.plot(times, ds, lw=2, ls='--',
+            ax.plot(times, times * r, lw=2, ls='--',
                     color=cm.jet(1.0 * i / len(data)))
+
+            axs[1].scatter(0, r * 365.24, color=cm.jet(1.0 * i / len(data)),
+                           label=', '.join([pname, region]))
 
         ax.legend(loc=4, fontsize=12)
         ax.grid(True)
+
+        ax = axs[1]
+        ax.xaxis.set_ticklabels('')
+        ax.set_ylabel('Substitution rate [changes/site/yr]')
+        ax.set_ylim(0.96 * 365.24 * min(data, key=itemgetter('r'))['r'],
+                    1.04 * 365.24 * max(data, key=itemgetter('r'))['r'])
+        ax.set_xlim(-0.5, 0.5)
+        ax.grid(True)
+
         plt.tight_layout()
 
         plt.ion()

@@ -43,6 +43,13 @@ def build_msa(htseqs, VERBOSE=0):
     return ali
 
 
+def check_main_splitting_sites(alibin, hft):
+    '''Check which mutations are expected to make the difference in the PCA'''
+    pass
+
+
+
+
 # Script
 if __name__ == '__main__':
 
@@ -96,8 +103,14 @@ if __name__ == '__main__':
         indt = indt[ind_keep]
         ht = ht[ind_keep]
 
+        # Prepare data structures, both the matrix with sequences and the hft
+        hft = (1.0 * ht.T / ht.sum(axis=1)).T
         alim = np.array(build_msa(htseqs))
         alibin = alim != alim[ht[0].argmax()]
+
+        # NOTE: this function finds leads for the mutations that SHOULD matter,
+        # as a sanity check for the later diagonalization
+        check_main_splitting_sites(alibin, hft)
     
         if VERBOSE >= 2:
             print 'Restrict to polymorphic sites'
@@ -108,7 +121,6 @@ if __name__ == '__main__':
         # Weight with the frequencies (from all time points??) and subtract mean
         # FIXME: decide on these weights!
         # for now normalize each time point by the coverange and weight equally
-        hft = (1.0 * ht.T / ht.sum(axis=1)).T
         w = (hft.sum(axis=0))**(0)
         yw = (w * y.T).T
         ym = yw - yw.mean(axis=0)

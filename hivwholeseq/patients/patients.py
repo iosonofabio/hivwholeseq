@@ -205,17 +205,18 @@ class Patient(pd.Series):
         return af
 
 
-    def get_coverage_trajectories(self, fragment, use_PCR1=1):
+    def get_coverage_trajectories(self, region, use_PCR1=1):
         '''Get coverage as a function of time'''
-        (act, ind) = self.get_allele_count_trajectories(fragment, use_PCR1=use_PCR1)
+        (act, ind) = self.get_allele_count_trajectories(region, use_PCR1=use_PCR1)
         return (act.sum(axis=1), ind)
 
 
-    def get_allele_frequency_trajectories(self, fragment, use_PCR1=1, cov_min=1,
+    def get_allele_frequency_trajectories(self, region, use_PCR1=1, cov_min=1,
                                           depth_min=None, **kwargs):
         '''Get the allele frequency trajectories from files
         
         Args:
+          region (str): region to study, a fragment or a genomic feature (e.g. V3)
           cov_min (int): minimal coverage accepted, anything lower are masked.
           depth_min (float): minimal depth, both by sequencing and template numbers.
             Time points with less templates are excluded, and positions are masked.
@@ -223,10 +224,9 @@ class Patient(pd.Series):
             to 1%.
           **kwargs: passed down to the get_allele_count_trajectories method.
         '''
-        (act, ind) = self.get_allele_count_trajectories(fragment,
+        (act, ind) = self.get_allele_count_trajectories(region,
                                                         use_PCR1=use_PCR1,
                                                         **kwargs)
-
         if depth_min is not None:
             indd = np.array(self.n_templates[ind] >= depth_min)
             act = act[indd]
@@ -250,29 +250,34 @@ class Patient(pd.Series):
         return (aft, ind)
 
 
-    def get_allele_count_trajectories(self, fragment, use_PCR1=1, **kwargs):
+    def get_allele_count_trajectories(self, region, use_PCR1=1, **kwargs):
         '''Get the allele count trajectories from files
         
         Args:
+          region (str): region to study, a fragment or a genomic feature (e.g. V3)
           **kwargs: passed down to the function (VERBOSE, etc.).
 
         Note: the genomewide counts are currently saved to file.
         '''
-        if fragment == 'genomewide':
-            from hivwholeseq.patients.filenames import \
-                    get_allele_count_trajectories_filename as get_fn
+        if region == 'genomewide':
+            from .filenames import get_allele_count_trajectories_filename as get_fn
             fn = get_fn(self.name, fragment)
             npz = np.load(fn)
             act = npz['act']
             ind = npz['ind']
 
         else:
-            from hivwholeseq.patients.one_site_statistics import \
-                    get_allele_count_trajectories
             from operator import itemgetter
+            from .one_site_statistics import get_allele_count_trajectories
+
+            (fragment, start, end) = self.get_fragmented_roi((region, 0, '+oo'))
             (sns, act) = get_allele_count_trajectories(self.name, self.samples.index,
                                                        fragment,
                                                        use_PCR1=use_PCR1, **kwargs)
+            # Select genomic region
+            act = act[:, :, start: end]
+
+            # Select time points
             ind = np.array([i for i, (_, sample) in enumerate(self.samples.iterrows())
                             if sample.name in map(itemgetter(0), sns)], int)
 
@@ -285,25 +290,25 @@ class Patient(pd.Series):
         return get_mapped_filtered_filename(self.patient, samplename, fragment, PCR=PCR)
 
 
-    def get_divergence(self, fragment, **kwargs):
-        '''Get divergence of a fragment
+    def get_divergence(self, region, **kwargs):
+        '''Get genetic divergence of a region
         
         Args:
           **kwargs: passed to the allele frequency trajectories.
         '''
         from hivwholeseq.patients.get_divergence_diversity import get_divergence
-        aft, ind = self.get_allele_frequency_trajectories(fragment, **kwargs)
+        aft, ind = self.get_allele_frequency_trajectories(region, **kwargs)
         return (get_divergence(aft), ind)
 
 
-    def get_diversity(self, fragment, **kwargs):
-        '''Get diversity of a fragment
+    def get_diversity(self, region, **kwargs):
+        '''Get geneticdiversity of a region
         
         Args:
           **kwargs: passed to the allele frequency trajectories.
         '''
         from hivwholeseq.patients.get_divergence_diversity import get_diversity
-        aft, ind = self.get_allele_frequency_trajectories(fragment, **kwargs)
+        aft, ind = self.get_allele_frequency_trajectories(region, **kwargs)
         return (get_diversity(aft), ind)
 
 
