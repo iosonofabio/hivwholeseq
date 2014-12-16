@@ -62,6 +62,8 @@ CHECKPOINT: check coverage (check_divided_coverage.py)
 
 6. Map the full dataset against the final consensus. (map_to_consensus.py)
 
+CHECKPOINT: check distance distribution to set thresholds for filtering (check_distance_mapped_consensus.py)
+
 7. Filter BAM files of unmapped stuff and similia. (filter_mapped_reads.py)
 
 CHECKPOINT: mapping issues, coverage

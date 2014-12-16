@@ -697,7 +697,7 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, fragments,
         with open(get_divide_summary_filename(data_folder, adaID), 'a') as f:
             f.write('\n')
             f.write('Trim and divide results: adaID '+adaID+'\n')
-            f.write('Total:\t\t'+str(irp)+'\n')
+            f.write('Total:\t\t'+str(irp + 1)+'\n')
             f.write('Mapped:\t\t'+str(sum(n_mapped))+' '+str(n_mapped)+'\n')
             f.write('Unmapped/unpaired/tiny insert:\t'+str(n_unmapped)+'\n')
             f.write('Outer primer\t'+str(n_outer)+'\n')

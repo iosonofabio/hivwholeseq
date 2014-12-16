@@ -32,8 +32,7 @@ from hivwholeseq.sequencing.filenames import get_custom_reference_filename, \
         get_reference_premap_index_filename, get_reference_premap_hash_filename,\
         get_coverage_figure_filename, get_insert_size_distribution_cumulative_filename,\
         get_insert_size_distribution_filename
-from hivwholeseq.mapping_utils import stampy_bin, subsrate, \
-        convert_sam_to_bam, convert_bam_to_sam
+from hivwholeseq.mapping_utils import stampy_bin, convert_sam_to_bam, convert_bam_to_sam
 from hivwholeseq.fork_cluster import fork_premap as fork_self
 from hivwholeseq.clean_temp_files import remove_premapped_tempfiles
 
@@ -196,7 +195,8 @@ def make_index_and_hash(data_folder, adaID, VERBOSE=0, summary=True):
             f.write('\n')
 
 
-def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True, maxreads=-1):
+def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True, maxreads=-1,
+                  subsrate=0.05, gapopen=40, gapextend=3):
     '''Call stampy for actual mapping'''
     if VERBOSE:
         print 'Premapping: adaID ', adaID
@@ -218,7 +218,11 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True, maxrea
                      '-g', get_reference_premap_index_filename(data_folder, adaID, ext=False),
                      '-h', get_reference_premap_hash_filename(data_folder, adaID, ext=False), 
                      '-o', get_premapped_filename(data_folder, adaID, type='sam'),
-                     '--substitutionrate='+subsrate,
+                     '--insertsize=450',
+                     '--insertsd=100',
+                     '--substitutionrate='+str(subsrate),
+                     '--gapopen='+str(gapopen),
+                     '--gapextend='+str(gapextend),
                     ]
         if maxreads > 0:
             call_list.append('--numrecords='+str(maxreads))
@@ -273,7 +277,11 @@ def premap_stampy(data_folder, adaID, VERBOSE=0, threads=1, summary=True, maxrea
                          '-h', get_reference_premap_hash_filename(data_folder, adaID, ext=False), 
                          '-o', get_premapped_filename(data_folder, adaID, type='sam', part=(j+1)),
                          '--processpart='+str(j+1)+'/'+str(threads),
-                         '--substitutionrate='+subsrate,
+                         '--insertsize=450',
+                         '--insertsd=100',
+                         '--substitutionrate='+str(subsrate),
+                         '--gapopen='+str(gapopen),
+                         '--gapextend='+str(gapextend),
                          '-M'] + input_filenames
             call_list = map(str, call_list)
             if VERBOSE >= 2:
@@ -463,6 +471,12 @@ if __name__ == '__main__':
                         help='Do not save results in a summary file')
     parser.add_argument('--trimmed', action='store_true',
                         help='Use trimmed reads as input')
+    parser.add_argument('--subsrate', type=float, default=0.05,
+                        help='Baseline substitution rate')
+    parser.add_argument('--gapopen', type=int, default=40,
+                        help='Penality for gap opening')
+    parser.add_argument('--gapextend', type=int, default=3,
+                        help='Penality for gap extension')
 
     args = parser.parse_args()
     seq_run = args.run
@@ -474,6 +488,9 @@ if __name__ == '__main__':
     summary = args.summary
     use_trimmed = args.trimmed
     maxreads = args.maxreads
+    subsrate = args.subsrate
+    gapopen = args.gapopen
+    gapextend = args.gapextend
 
     # Specify the dataset
     dataset = load_sequencing_run(seq_run)
@@ -494,6 +511,7 @@ if __name__ == '__main__':
         if submit:
             fork_self(seq_run, adaID, VERBOSE=VERBOSE, threads=threads,
                       reference=refname, summary=summary, trimmed=use_trimmed,
+                      subsrate=subsrate, gapopen=gapopen, gapextend=gapextend,
                       maxreads=maxreads)
             continue
 
@@ -505,6 +523,9 @@ if __name__ == '__main__':
                         ' --adaIDs '+adaID+\
                         ' --threads '+str(threads)+\
                         ' --reference '+refname+\
+                        ' --subsrate '+str(subsrate)+\
+                        ' --gapopen '+str(gapopen)+\
+                        ' --gapextend '+str(gapextend)+\
                         ' --verbose '+str(VERBOSE)
                 if maxreads != -1:
                     outstr = outstr + ' --maxreads '+str(maxreads)
@@ -520,10 +541,12 @@ if __name__ == '__main__':
         make_index_and_hash(data_folder, adaID, VERBOSE=VERBOSE, summary=summary)
 
         premap_stampy(data_folder, adaID, VERBOSE=VERBOSE, threads=threads, summary=summary,
+                      subsrate=subsrate, gapopen=gapopen, gapextend=gapextend,
                       maxreads=maxreads)
 
-        if summary:
-            report_coverage(data_folder, adaID, VERBOSE=VERBOSE, summary=summary)
+        #FIXME: reactivate this
+        #if summary:
+        #    report_coverage(data_folder, adaID, VERBOSE=VERBOSE, summary=summary)
 
-            report_insert_size(data_folder, adaID, seq_run,
-                               VERBOSE=VERBOSE, summary=summary)
+        #    report_insert_size(data_folder, adaID, seq_run,
+        #                       VERBOSE=VERBOSE, summary=summary)

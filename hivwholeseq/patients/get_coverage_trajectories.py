@@ -93,6 +93,7 @@ if __name__ == '__main__':
                                                   title='Patient '+pname+', '+fragment,
                                                   VERBOSE=VERBOSE)
 
-    #if plot:
-    #    plt.ion()
-    #    plt.show()
+    if plot:
+        import matplotlib.pyplot as plt
+        plt.ion()
+        plt.show()

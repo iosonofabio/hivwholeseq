@@ -24,7 +24,6 @@ from hivwholeseq.fork_cluster import fork_decontaminate_reads_patient as fork_se
 
 # Globals
 refnames = ['38304', '38540', 'LAI-III']
-maj_contnames = ['12879', '18798', '6154']
 
 
 
@@ -294,9 +293,6 @@ if __name__ == '__main__':
     if submit:
         for fragment in fragments:
             for samplename, sample in samples_focal.iterrows():
-                # Skip the three F4 samples that are majorly contaminated
-                if (fragment == 'F4') and (samplename in maj_contnames):
-                    continue
                 
                 sample = SamplePat(sample)
                 if PCR is None:
@@ -327,18 +323,7 @@ if __name__ == '__main__':
                 print samplename, 'file not found'
                 continue
 
-        # Some consensi are bogus and must be deleted
-        if fragment == 'F4':
-            for consname in maj_contnames:
-                del consensi[consname]
-
         for samplename, sample in samples_focal.iterrows():
-            # Those three samples in F4 must be treated separately 
-            if (fragment == 'F4') and (samplename in maj_contnames):
-                if VERBOSE:
-                    print samplename, fragment, 'majorly contaminated sample, skipping'
-                continue
-
             sample = SamplePat(sample)
             pname = sample.patient
 

@@ -147,6 +147,7 @@ def fork_trim(seq_run, adaID, VERBOSE=0, summary=True):
 
 
 def fork_premap(seq_run, adaID, VERBOSE=0, threads=1, maxreads=-1,
+                subsrate=0.05, gapopen=40, gapextend=3,
                 reference='HXB2', summary=True, trimmed=False):
     '''Submit premap script to the cluster for each adapter ID'''
     if VERBOSE:
@@ -171,6 +172,9 @@ def fork_premap(seq_run, adaID, VERBOSE=0, threads=1, maxreads=-1,
                  '--verbose', VERBOSE,
                  '--threads', threads,
                  '--reference', reference,
+                 '--subsrate', subsrate,
+                 '--gapopen', gapopen,
+                 '--gapextend', gapextend,
                 ]
     if not summary:
         call_list.append('--no-summary')

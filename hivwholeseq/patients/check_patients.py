@@ -63,17 +63,25 @@ def check_reference_overlap(p, VERBOSE=0):
         raise ValueError('GAPS status found') 
 
 
-def pretty_print_info(p, title, name, method, name_requisite=None, mod_dates={}):
+def pretty_print_info(p, title, name, method, name_requisite=None, mod_dates={},
+                      VERBOSE=0):
     '''Pretty printer for patient pipeline info'''
     import os, sys
     from hivwholeseq.patients.samples import SamplePat
+    from hivwholeseq.mapping_utils import get_number_reads
+
+    # NOTE: this function is used to check both entire patients and single samples
+    if isinstance(p, SamplePat):
+        sample_iter = [(p.name, p)]
+    else:
+        sample_iter = p.samples.iterrows()
 
     fragments=['F'+str(i+1) for i in xrange(6)]
 
     stati = set()
     line = ('{:<'+str(title_len)+'}').format(title+':')
     print line
-    for samplename, sample in p.samples.iterrows():
+    for samplename, sample in sample_iter:
         sample = SamplePat(sample)
         title = sample.name
         line = ('{:<'+str(title_len)+'}').format(title+':')
@@ -86,20 +94,18 @@ def pretty_print_info(p, title, name, method, name_requisite=None, mod_dates={})
                 fn = method(sample.patient, samplename, fragment)
             if os.path.isfile(fn):
                 md = modification_date(fn)
+                mod_dates[(name, fragment, samplename)] = md
 
                 if name_requisite is None:
                     status = 'OK'
-                    mod_dates[(name, fragment, samplename)] = md
 
                 elif ((name_requisite, fragment, samplename) in mod_dates) and \
                    (md > mod_dates[(name_requisite, fragment, samplename)]):
                     status = 'OK'
-                    mod_dates[(name, fragment, samplename)] = md
 
                 elif ((name_requisite, fragment) in mod_dates) and \
                    (md > mod_dates[(name_requisite, fragment)]):
                     status = 'OK'
-                    mod_dates[(name, fragment, samplename)] = md
 
                 elif 'contaminated' in sample[fragment]:
                     status = 'CONT'
@@ -109,6 +115,11 @@ def pretty_print_info(p, title, name, method, name_requisite=None, mod_dates={})
 
             else:
                 status = 'MISS'
+
+            # Check the number of reads if requested
+            if (status == 'OK') and (fn[-3:] == 'bam') and (VERBOSE >= 3):
+                status = str(get_number_reads(fn))
+
             stati.add(status)
             line = line+fragment+': '+\
                 ('{:>'+str(cell_len - len(fragment) - 1)+'}').format(status)+'  '
@@ -119,8 +130,9 @@ def pretty_print_info(p, title, name, method, name_requisite=None, mod_dates={})
         raise ValueError('OLD status found') 
 
 
-def pretty_print_info_genomewide(p, title, name, method, mod_dates={}):
+def pretty_print_info_genomewide(p, title, name, method, mod_dates={}, VERBOSE=0):
     '''Pretty printer for patient pipeline info'''
+
     def check_requisite_genomewide(md, name_requisite, samplename, mod_dates):
         '''Check requisites for genomewide observables'''
         fragments=['F'+str(i+1) for i in xrange(6)]
@@ -138,15 +150,19 @@ def pretty_print_info_genomewide(p, title, name, method, mod_dates={}):
                 return True
         return False
 
-
     import os, sys
     from hivwholeseq.patients.samples import SamplePat
 
-    stati = set()
-    
+    # NOTE: this function is used to check both entire patients and single samples
+    if isinstance(p, SamplePat):
+        sample_iter = [(p.name, p)]
+    else:
+        sample_iter = p.samples.iterrows()
+
+    stati = set()    
     line = ('{:<'+str(title_len)+'}').format(title+':')
     print line
-    for samplename, sample in p.samples.iterrows():
+    for samplename, sample in sample_iter:
         sample = SamplePat(sample)
         title = sample.name
         line = ('{:<'+str(title_len)+'}').format(title+':')
@@ -158,14 +174,13 @@ def pretty_print_info_genomewide(p, title, name, method, mod_dates={}):
             fn = method(sample.patient, samplename, 'genomewide')
         if os.path.isfile(fn):
             md = modification_date(fn)
+            mod_dates[(name, 'genomewide', samplename)] = md
 
             if name is None:
                 status = 'OK'
-                mod_dates[(name, 'genomewide', samplename)] = md
 
             elif check_requisite_genomewide(md, name, samplename, mod_dates): 
                 status = 'OK'
-                mod_dates[(name, 'genomewide', samplename)] = md
 
             elif check_contamination_genomewide(sample):
                 status = 'CONT'
@@ -175,6 +190,11 @@ def pretty_print_info_genomewide(p, title, name, method, mod_dates={}):
 
         else:
             status = 'MISS'
+
+        # Check the number of reads if requested
+        if (status == 'OK') and (fn[-3:] == 'bam') and (VERBOSE >= 3):
+            status = str(get_number_reads(fn))
+
         stati.add(status)
         line = line + ('{:<'+str(cell_len)+'}').format(status)
         print line
@@ -266,9 +286,12 @@ if __name__ == '__main__':
 
         check_reference_overlap(p)
 
+        # NOTE: we modify reference annotations all the time, but not the sequence
+        # FIXME: find a better way to do this?
         pretty_print_info(p, 'Map + filter', 'filter',
                           'get_mapped_filtered_filename',
-                          'reference', mod_dates)
+                          None,#'reference',
+                          mod_dates)
 
         pretty_print_info(p, 'Decontaminate', 'decontaminate',
                           get_decontaminate_summary_filename,

@@ -26,11 +26,10 @@ from hivwholeseq.patients.get_local_trees import get_region_count_trajectories
 from hivwholeseq.patients.filenames import get_consensi_tree_filename as gfn_in
 from hivwholeseq.website.filenames import get_consensi_tree_filename as gfn_out
 from hivwholeseq.website.filenames import get_consensi_alignment_filename
+from hivwholeseq.website import _regions as regions_all
 
 
 # Globals
-regions_all = ['PR', 'V3', 'psi', 'vpu', 'vpr', 'RRE', 'p15', 'p17',
-               'p2', 'p7', 'p1', 'p6']
 freqmin = 0.01
 
 
