@@ -25,6 +25,7 @@ import warnings
 
 from hivwholeseq.sequencing.samples import SampleSeq
 from hivwholeseq.patients.patients import load_patients, load_patient, Patient
+from hivwholeseq.patients.samples import SamplePat
 from hivwholeseq.generic_utils import mkdirs
 from hivwholeseq.mapping_utils import stampy_bin, subsrate, \
         convert_sam_to_bam, convert_bam_to_sam, get_number_reads
@@ -435,6 +436,8 @@ if __name__ == '__main__':
                         help='Only map some chunks (cluster optimization): 0 for automatic detection')
     parser.add_argument('--unfiltered', action='store_false', dest='filtered',
                         help='Map unfiltered reads (for quick checks only)')
+    parser.add_argument('--include-contaminated', action='store_true',
+                        help='Include majorly contaminated samples in the map (e.g. 12879 F4)')
 
     args = parser.parse_args()
     pnames = args.patients
@@ -448,6 +451,7 @@ if __name__ == '__main__':
     summary = args.summary
     only_chunks = args.chunks
     filtered = args.filtered
+    use_contaminated = args.include_contaminated
 
     # Collect all sequenced samples from patients
     samples_pat = lssp()
@@ -457,7 +461,8 @@ if __name__ == '__main__':
             patient = load_patient(pname)
             patient.discard_nonsequenced_samples()
             for samplename_pat, sample_pat in patient.samples.iterrows():
-                samples_seq.append(sample_pat['samples seq'])
+                sample_pat = SamplePat(sample_pat)
+                samples_seq.append(sample_pat.samples_seq)
         samples_seq = pd.concat(samples_seq)
 
     else:
@@ -471,7 +476,7 @@ if __name__ == '__main__':
 
     if VERBOSE >= 2:
         print 'samples', samples_seq.index.tolist()
-
+        
     # If the script is called with no fragment, iterate over all
     if not fragments:
         fragments = ['F'+str(i) for i in xrange(1, 7)]
@@ -499,7 +504,7 @@ if __name__ == '__main__':
 
             # Check for contamination
             contstr = sample['suspected contamination']
-            if pd.notnull(contstr) and (fragment in contstr):
+            if (not use_contaminated) and pd.notnull(contstr) and (fragment in contstr):
                 print 'WARNING: This sample has a suspected contamination! Skipping.'
                 continue
 

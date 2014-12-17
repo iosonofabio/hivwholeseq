@@ -55,47 +55,40 @@ if __name__ == '__main__':
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     parser.add_argument('--patients', nargs='+',
                         help='Patient to analyze')
-    parser.add_argument('--fragments', nargs='*',
-                        help='Fragments to analyze (e.g. F1 F6)')
+    parser.add_argument('--regions', nargs='*',
+                        help='Regions to analyze (e.g. F1 V3)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-4]')
-    parser.add_argument('--plot', nargs='?', default=None, const='2D',
-                        help='Plot the allele frequency trajectories')
-    parser.add_argument('--logit', action='store_true',
-                        help='use logit scale (log(x/(1-x)) in the plots')
     parser.add_argument('--PCR1', type=int, default=1,
                         help='Take only PCR1 samples [0=off, 1=where both available, 2=always]')
 
     args = parser.parse_args()
     pnames = args.patients
-    fragments = args.fragments
+    regions = args.regions
     VERBOSE = args.verbose
-    plot = args.plot
     use_PCR1 = args.PCR1
-    use_logit = args.logit
 
 
     patients = load_patients()
-    # FIXME: extend to all patients
-    patients = patients.loc[-patients.index.isin(['15363', '15376', '15313', '20529', '15034', '20097'])]
+    patients = patients.loc[-patients.index.isin(['15107'])] #FIXME: I am remapping this one right now
     if pnames is not None:
         patients = patients.loc[patients.index.isin(pnames)]
 
-    if not fragments:
-        fragments = ['F'+str(i) for i in xrange(1, 7)]
+    if not regions:
+        regions = ['F'+str(i) for i in xrange(1, 7)]
     if VERBOSE >= 2:
-        print 'fragments', fragments
+        print 'regions', regions
 
-    for fragment in fragments:
+    for region in regions:
         if VERBOSE >= 1:
-            print fragment
+            print region
 
         if VERBOSE >= 1:
             print 'Collect initial references'
         refs = []
         for pname, patient in patients.iterrows():
             patient = Patient(patient)
-            ref = patient.get_reference(fragment)
+            ref = patient.get_reference(region)
             refs.append(ref)
 
         if VERBOSE >= 1:
@@ -108,28 +101,23 @@ if __name__ == '__main__':
         maps = build_coordinate_maps(ali, VERBOSE=VERBOSE, stripgaps=True)
 
         afts = np.zeros((maps.shape[0], maps.shape[1], len(alpha)), object)
+        depthmaxs = np.zeros(maps.shape[0], object)
 
         if VERBOSE >= 1:
             print 'Collecting alleles'
         for ip, (pname, patient) in enumerate(patients.iterrows()):
             patient = Patient(patient)
             patient.discard_nonsequenced_samples()
-            samplenames = patient.samples.index
 
             # Collect allele counts from patient samples, and return only positive hits
             # sns contains sample names and PCR types
-            (sns, act) = get_allele_count_trajectories(pname, samplenames, fragment,
-                                                       use_PCR1=use_PCR1, VERBOSE=VERBOSE)
-            ind = [i for i, (_, sample) in enumerate(patient.samples.iterrows())
-                   if sample.name in map(itemgetter(0), sns)]
-            samples = patient.samples.iloc[ind]
-            times = (samples.date - patient.transmission_date) / np.timedelta64(1, 'D')
-            # FIXME: determine better PCR errors?
-            ntemplate = sample['n templates']
-            if ntemplate > 0.1:
-                depthmax = np.maximum(1e-3, 1.0 / ntemplate)
-            else:
-                depthmax = 1e-3
+            act, ind = patient.get_allele_count_trajectories(region,
+                                                             use_PCR1=use_PCR1,
+                                                             VERBOSE=VERBOSE)
+            times = patient.times[ind]
+            depthmax = np.maximum(1.0 / patient.n_templates[ind], 2e-3)
+            #FIXME: for now, put 2e-3 to the masked positions, but this is no good
+            depthmax[depthmax.mask] = 2e-3
 
             # Low-coverage sampled are bitcoded as -1
             aft = np.zeros_like(act, dtype=float)
@@ -142,8 +130,8 @@ if __name__ == '__main__':
                         continue
 
                     af = 1.0 * ac / co
-                    af[af < depthmax] = 0
-                    af[af > 1 - depthmax] = 1
+                    af[af < depthmax[i]] = 0
+                    af[af > 1 - depthmax[i]] = 1
                     af /= af.sum()
                     aft[i, :, k] = af
 
@@ -151,8 +139,11 @@ if __name__ == '__main__':
             for i, ind in enumerate(mapi):
                 for j in xrange(len(alpha)):
                     afts[ip, i, j] = aft[:, j, ind]
+            depthmaxs[ip] = depthmax.data
 
         from hivwholeseq.patients.filenames import root_patient_folder
-        afts.dump(root_patient_folder+'all/aft_shared_'+fragment+'.npy')
-        AlignIO.write(ali, root_patient_folder+'all/aft_shared_ali_'+fragment+'.fasta', 'fasta')
-        maps.dump(root_patient_folder+'all/aft_shared_maps_'+fragment+'.npy')
+        np.savez(root_patient_folder+'all/aft_shared_'+region+'.npz',
+                 afts=afts, depthmaxs=depthmaxs, pnames=np.array(patients.index))
+        AlignIO.write(ali,
+                      root_patient_folder+'all/aft_shared_ali_'+region+'.fasta', 'fasta')
+        maps.dump(root_patient_folder+'all/aft_shared_maps_'+region+'.npy')

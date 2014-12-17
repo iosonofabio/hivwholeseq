@@ -199,11 +199,14 @@ if __name__ == '__main__':
                         help='Patient to analyze')
     parser.add_argument('--save', action='store_true',
                         help='Save annotated reference to file')
+    parser.add_argument('--force', action='store_true',
+                        help='Ignore a single bad fragment and move to the next')
 
     args = parser.parse_args()
     VERBOSE = args.verbose
     pnames = args.patients
     use_save = args.save
+    use_force = args.force
 
     patients = load_patients()
     if pnames is not None:
@@ -244,7 +247,13 @@ if __name__ == '__main__':
             refseq_old = None
 
         if refseq_old is not None:
-            compare_annotations(refseq, refseq_old, VERBOSE=VERBOSE)
+            try:
+                compare_annotations(refseq, refseq_old, VERBOSE=VERBOSE)
+            except ValueError:
+                if use_force:
+                    print 'Annotations differ from old sequence'
+                else:
+                    raise
 
         if use_save:
             fn_out = patient.get_reference_filename('genomewide', format='gb')

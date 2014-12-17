@@ -15,11 +15,12 @@ from hivwholeseq.sequencing.filenames import table_filename
 # Classes
 class SamplePat(pd.Series):
     '''Patient sample'''
-    _sequenced_samples = None
+
 
     def __init__(self, *args, **kwargs):
         '''Initialize a patient sample'''
         super(SamplePat, self).__init__(*args, **kwargs)
+        self._sequenced_samples = None
 
 
     @property
@@ -45,15 +46,29 @@ class SamplePat(pd.Series):
         return get_mapped_filtered_filename(self.patient, self.name, fragment,
                                             PCR=PCR, **kwargs)
 
+    @property
+    def samples_seq(self):
+        '''Sequencing samples that refer to this patient sample'''
+        if self._sequenced_samples is None:
+
+            #TODO: optimize this call
+            from hivwholeseq.patients.filenames import get_mapped_to_initial_filename
+            from hivwholeseq.sequencing.samples import load_samples_sequenced as lss
+            samples_seq = lss()
+            samples_seq = samples_seq.loc[samples_seq['patient sample'] == self.name]
+            self._sequenced_samples = samples_seq
+
+        return self._sequenced_samples.copy()
+
+
+    @samples_seq.setter
+    def samples_seq(self, value):
+        self._sequenced_samples = value
+
 
     def get_mapped_filenames(self, fragment, PCR=1):
         '''Get filename(s) of mapped and filtered reads'''
-        # TODO: optimize this call
-        from hivwholeseq.patients.filenames import get_mapped_to_initial_filename
-        from hivwholeseq.sequencing.samples import load_samples_sequenced as lss
-        samples_seq = lss()
-        samples_seq = samples_seq.loc[samples_seq['patient sample'] == self.name]
-
+        samples_seq = self.samples_seq
         fns = [get_mapped_to_initial_filename(self.patient, self.name, samplename,
                                               PCR=PCR)
                for samplename, sample in samples_seq.iterrows()]
@@ -124,18 +139,6 @@ class SamplePat(pd.Series):
                                     merge_read_types=merge_read_types)
         cov = ac.sum(axis=-2)
         return cov
-
-
-    def get_sequenced_samples(self):
-        '''Get the sequencing samples'''
-        if self._sequenced_samples is not None:
-            return self._sequenced_samples
-        
-        from hivwholeseq.sequencing.samples import load_samples_sequenced as lss
-        samples = lss()
-        samples = samples.loc[samples['patient sample'] == self.name].copy()
-        self._sequenced_samples = samples
-        return self._sequenced_samples
 
 
     def get_local_haplotypes(self, fragment, start, end,

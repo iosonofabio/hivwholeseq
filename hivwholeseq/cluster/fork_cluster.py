@@ -8,14 +8,18 @@ content:    Module with all submit functions for the cluster. With this we can
 # Globals
 import subprocess as sp
 
-import hivwholeseq
-JOBDIR = hivwholeseq.__path__[0].rstrip('/')+'/'
-JOBLOGOUT = JOBDIR+'logout/'
-JOBLOGERR = JOBDIR+'logerr/'
+from . import JOBDIR, JOBLOGERR, JOBLOGOUT
 
 
 
 # Functions
+def nothing():
+    '''Test function'''
+    print 'JOBDIR', JOBDIR
+    print 'JOBLOGERR', JOBLOGERR
+    print 'JOBLOGOUT', JOBLOGOUT
+
+
 def empty_log_folders():
     '''Empty log folders of old files'''
     import shutil, os

@@ -79,40 +79,40 @@ if __name__ == '__main__':
         if VERBOSE >= 1:
             print 'Plot'
 
-        ## Plot divergence and the fit
-        #fig, axs = plt.subplots(1, 2, figsize=(10, 5), gridspec_kw={'width_ratios':[4, 1]})
-        #ax = axs[0]
-        #ax.set_xlabel('Time from transmission [days]')
-        #ax.set_ylabel('Divergence')
-        ##ax.set_yscale('log')
+        # Plot divergence and the fit
+        fig, axs = plt.subplots(1, 2, figsize=(10, 5), gridspec_kw={'width_ratios':[4, 1]})
+        ax = axs[0]
+        ax.set_xlabel('Time from transmission [days]')
+        ax.set_ylabel('Divergence')
+        #ax.set_yscale('log')
 
-        #for i, d in enumerate(data):
-        #    pname = d['pname']
-        #    region = d['region']
-        #    dg = d['dg']
-        #    times = d['t']
-        #    r = d['r']
+        for i, d in enumerate(data):
+            pname = d['pname']
+            region = d['region']
+            dg = d['dg']
+            times = d['t']
+            r = d['r']
 
-        #    ax.plot(times, dg, lw=2, label=', '.join([pname, region]),
-        #            color=cm.jet(1.0 * i / len(data)))
+            ax.plot(times, dg, lw=2, label=', '.join([pname, region]),
+                    color=cm.jet(1.0 * i / len(data)))
 
-        #    ax.plot(times, times * r, lw=2, ls='--',
-        #            color=cm.jet(1.0 * i / len(data)))
+            ax.plot(times, times * r, lw=2, ls='--',
+                    color=cm.jet(1.0 * i / len(data)))
 
-        #    axs[1].scatter(0, r * 365.24, color=cm.jet(1.0 * i / len(data)),
-        #                   label=', '.join([pname, region]))
+            axs[1].scatter(0, r * 365.24, color=cm.jet(1.0 * i / len(data)),
+                           label=', '.join([pname, region]))
 
-        #ax.legend(loc=4, fontsize=12)
-        #ax.grid(True)
+        ax.legend(loc=4, fontsize=12)
+        ax.grid(True)
 
-        #ax = axs[1]
-        #ax.xaxis.set_ticklabels('')
-        #ax.set_ylabel('Substitution rate [changes/site/yr]')
-        #ax.set_ylim(0.96 * 365.24 * min(data, key=itemgetter('r'))['r'],
-        #            1.04 * 365.24 * max(data, key=itemgetter('r'))['r'])
-        #ax.set_xlim(-0.5, 0.5)
-        #ax.grid(True)
-        #plt.tight_layout()
+        ax = axs[1]
+        ax.xaxis.set_ticklabels('')
+        ax.set_ylabel('Substitution rate [changes/site/yr]')
+        ax.set_ylim(0.96 * 365.24 * min(data, key=itemgetter('r'))['r'],
+                    1.04 * 365.24 * max(data, key=itemgetter('r'))['r'])
+        ax.set_xlim(-0.5, 0.5)
+        ax.grid(True)
+        plt.tight_layout()
 
         # Plot just the slope
         nrows = 1 + (len(regions) - 1) // 4

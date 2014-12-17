@@ -128,13 +128,19 @@ class Patient(pd.Series):
         return get_initial_reference_filename(self.name, fragment, format)
 
 
-    def get_reference(self, fragment, format='fasta'):
-        '''Get the reference for a fragment'''
+    def get_reference(self, region, format='fasta'):
+        '''Get the reference for a genomic region'''
         from Bio import SeqIO
+        if region == 'genomewide':
+            fragment = region
+        else:
+            (fragment, start, end) = self.get_fragmented_roi((region, 0, '+oo'))
         refseq = SeqIO.read(self.get_reference_filename(fragment, format=format), format)
         if format in ('gb', 'genbank'):
             from hivwholeseq.sequence_utils import correct_genbank_features_load
             correct_genbank_features_load(refseq)
+        if region != 'genomewide':
+            refseq = refseq[start: end]
         return refseq
 
 

@@ -17,6 +17,9 @@ import pysam
 from Bio import SeqIO
 
 from hivwholeseq.patients.patients import load_patient
+from hivwholeseq.patients.samples import SamplePat
+from hivwholeseq.patients.samples import load_samples_sequenced as lssp
+from hivwholeseq.sequencing.samples import load_samples_sequenced as lss
 from hivwholeseq.sequencing.filter_mapped_reads import plot_distance_histogram, \
         plot_distance_histogram_sliding_window, get_distance_from_consensus, \
         check_overhanging_reads, trim_bad_cigar
@@ -24,9 +27,7 @@ from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_mapped_to_initial_filename, get_filter_mapped_init_summary_filename, \
         get_mapped_filtered_filename
 from hivwholeseq.mapping_utils import convert_sam_to_bam, pair_generator
-from hivwholeseq.fork_cluster import fork_filter_mapped_init as fork_self
-from hivwholeseq.patients.patients import load_samples_sequenced as lssp
-from hivwholeseq.sequencing.samples import load_samples_sequenced as lss
+from hivwholeseq.cluster.fork_cluster import fork_filter_mapped_init as fork_self
 
 
 # Functions
@@ -42,7 +43,7 @@ def filter_mapped_reads(sample, fragment,
     '''Filter the reads to good chunks'''
     pname = sample.patient
     samplename_pat = sample.name
-    samplenames_seq = sample['samples seq'].index.tolist()
+    samplenames_seq = sample.samples_seq.index.tolist()
 
     if VERBOSE >= 1:
         print 'Filtering reads:', pname, samplename_pat, fragment, PCR
@@ -246,7 +247,8 @@ if __name__ == '__main__':
             patient = load_patient(pname)
             patient.discard_nonsequenced_samples()
             for samplename_pat, sample_pat in patient.samples.iterrows():
-                samples_seq.append(sample_pat['samples seq'])
+                sample_pat = SamplePat(sample_pat)
+                samples_seq.append(sample_pat.samples_seq)
         samples_seq = pd.concat(samples_seq)
 
     elif samplenames is not None:
@@ -277,7 +279,7 @@ if __name__ == '__main__':
     for (samplename_pat, PCR), samplenames_seq in samples_groups.groups.iteritems():
         sample_pat = samples_pat.loc[samplename_pat].copy()
         samples_seq_group = samples_seq.loc[samples_seq.index.isin(samplenames_seq)]
-        sample_pat.set_value('samples seq', samples_seq_group)
+        sample_pat.samples_seq = samples_seq_group
         pname = sample_pat.patient
         PCR = int(PCR)
 

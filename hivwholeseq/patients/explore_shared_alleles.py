@@ -10,9 +10,45 @@ import os
 import argparse
 from operator import itemgetter
 import numpy as np
-import matplotlib.pyplot as plt
 from Bio import SeqIO, AlignIO
+import matplotlib.pyplot as plt
 
+
+
+# Functions
+def classify_sites(afts):
+    '''Classify sites: 0 = conserved, 1 = polymorphic, 2 = sweeping'''
+    site_class = np.zeros((afts.shape[0], afts.shape[1]), int)
+    for i, aft in enumerate(afts):
+        for j, aftpos in enumerate(aft):
+            aftpos = np.vstack(aftpos)
+            ia0 = aftpos[:, 0].argmax()
+            if set((aftpos > 0.5).nonzero()[0]) - set([ia0]):
+                site_class[i, j] = 2
+    
+            # FIXME: make this dependent on depth
+            elif set((aftpos > 0.01).nonzero()[0]) - set([ia0]):
+                site_class[i, j] = 1
+
+    return site_class
+
+
+def get_distance_class(site_class):
+    '''Get distance matrix given a site class matrix'''
+    d = np.zeros((site_class.shape[0], site_class.shape[0]), float)
+    for i in xrange(d.shape[0]):
+        for j in xrange(d.shape[0]):
+            d[i, j] = ((site_class[i] != 0) != (site_class[j] != 0)).mean()
+    return d
+
+
+def reshape_single_aft(aft):
+    '''Reshape a single aft (it's square now)'''
+    aftn = np.ma.zeros((aft.shape[0], aft.shape[1], aft[0, 0].shape[0]), float)
+    for i, af in enumerate(aft):
+        aftn[i] = np.vstack(af)
+    aftn.mask = aftn == -1
+    return aftn
 
 
 
@@ -22,97 +58,64 @@ if __name__ == '__main__':
     # Parse input args
     parser = argparse.ArgumentParser(description='Get shared allele trajectories',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
-    parser.add_argument('--fragments', nargs='*',
-                        help='Fragments to analyze (e.g. F1 F6)')
+    parser.add_argument('--regions', nargs='+', required=True,
+                        help='Regions to analyze (e.g. F1 V3)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-4]')
 
     args = parser.parse_args()
-    fragments = args.fragments
+    regions = args.regions
     VERBOSE = args.verbose
 
-    if not fragments:
-        fragments = ['F'+str(i) for i in xrange(1, 7)]
-    if VERBOSE >= 2:
-        print 'fragments', fragments
-
-    plt.ioff()
-
-    for fragment in fragments:
+    for region in regions:
         if VERBOSE >= 1:
-            print fragment
+            print region
 
         # Low-coverage regions are bytecoded by -1
         from hivwholeseq.patients.filenames import root_patient_folder
-        afts = np.load(root_patient_folder+'all/aft_shared_'+fragment+'.npy')
-        afts = afts.swapaxes(0, 1).swapaxes(1, 2)
-        n_patients = afts.shape[2]
+        data = np.load(root_patient_folder+'all/aft_shared_'+region+'.npz')
+        afts = data['afts']
+        pnames = data['pnames']
+        depthmaxs = data['depthmaxs']
+        n_patients = len(pnames)
 
-        # Look for parallel positive selection
-        hist_sweep = np.zeros(n_patients + 1, int)
-        for pos, aft_pos in enumerate(afts):
-            if VERBOSE >= 3:
-                print pos
-            for aft_nuc in aft_pos:
-                n = 0
-                for aft_pat in aft_nuc:
-                    if (-0.1 < aft_pat[0] < 0.5) and (aft_pat[1:] > 0.5).any():
-                        n += 1
-                hist_sweep[n] += 1
+        # Classes by sweeping, polymorphic, conserved
+        site_class = classify_sites(afts)        
+        d = get_distance_class(site_class)
 
-        print '{:25s}'.format('Sweep sharing:')+' '.join(map('{:>7d}'.format, hist_sweep))
-
-        # Look for parallel conservation
-        threshold = 0.005
-        hist_cons = np.zeros(n_patients + 1, int)
-        for pos, aft_pos in enumerate(afts):
-            if VERBOSE >= 3:
-                print pos
-            for aft_nuc in aft_pos:
-                n = 0
-                for aft_pat in aft_nuc:
-                    # FIXME: deal better with missing data (low coverage)
-                    times_cov = aft_pat >= -0.1
-                    if times_cov.sum() < 2:
-                        continue
-                    aft_pat = aft_pat[times_cov]
-                    if ((aft_pat > threshold) & (aft_pat < 1 - threshold)).any():
-                        n += 1
-                hist_cons[n_patients - n] += 1
-
-        print '{:25s}'.format('Cons sharing ('+str(threshold * 100)+'%):')+' '.join(map('{:>7d}'.format, hist_cons))
-
-        # Build measure of conservation based on that
-        n_cov = np.zeros(afts.shape[0], int)
-        n_poly = np.zeros((afts.shape[0], afts.shape[1]), int)
-        for pos, aft_pos in enumerate(afts):
-            if VERBOSE >= 3:
-                print pos
-            for j, aft_nuc in enumerate(aft_pos):
-                n = 0
-                nc = 0
-                for aft_pat in aft_nuc:
-                    # FIXME: deal better with missing data (low coverage)
-                    times_cov = aft_pat >= -0.1
-                    if times_cov.sum() < 2:
-                        continue
-                    nc += 1
-                    aft_pat = aft_pat[times_cov]
-                    if ((aft_pat > threshold) & (aft_pat < 1 - threshold)).any():
-                        n += 1
-                n_cov[pos] = nc
-                n_poly[pos, j] = n
-
-        n_poly_max = n_poly.max(axis=1)
-        n_poly_max = np.ma.array(n_poly_max, mask=(n_cov < 3))
-        fig, ax = plt.subplots(figsize=(16, 5))
-        ax.plot(np.arange(len(n_poly_max)), n_poly_max, lw=1.5)
-        ax.set_xlabel('Position [bp]')
-        ax.set_ylabel('# patients polymorphic')
-        ax.set_title(fragment)
-        ax.set_xlim(-1, len(n_poly_max) + 1)
-
-    plt.tight_layout()
-    plt.ion()
-    plt.show()
-
+        from scipy.cluster.hierarchy import linkage, dendrogram
+        Z = linkage(d)
+        
+        # Plot as tree and image
+        fig, axs = plt.subplots(1, 2, figsize=(16, 5), gridspec_kw={'width_ratios': [1, 4]})
+        dg = dendrogram(Z, orientation='right', ax=axs[0], leaf_label_func=lambda x: '')
+        axs[0].set_xticklabels('')
+        ax = axs[1]
+        ax.imshow(site_class[dg['leaves']][::-1], interpolation='nearest', aspect='auto')
+        ax.set_yticks(np.arange(n_patients))
+        ax.set_yticklabels(pnames[dg['leaves']][::-1].tolist())
+        fig.suptitle(region)
+        
+        plt.tight_layout(rect=(0, 0, 1, 0.96))
+        plt.ion()
+        plt.show()
+        
+        ## Parallel sweeps in different patients        
+        #is_sweeping = site_class == 2
+        #h = np.bincount(is_sweeping.sum(axis=0))
+        #fig, ax = plt.subplots()
+        #plt.plot(np.arange(len(h)), h, lw=2, label='Data, '+region)
+        #from scipy.stats import poisson
+        #mu = curve_fit(poisson.pmf, np.arange(len(h)), 1.0 * h / h.sum(), p0=1)[0][0]
+        #hth = poisson.pmf(np.arange(len(h)), mu)
+        #plt.plot(np.arange(len(hth)), hth * h.sum(), lw=2, c='k',
+        #         label='mu = '+'{:1.1e}'.format(mu)+', '+region)
+        #
+        #plt.grid()
+        #plt.ylabel('# sweeping sites')
+        #plt.xlabel('# patients')
+        #plt.yscale('log')
+        #plt.legend(loc=1)
+        #
+        #plt.ion()
+        #plt.show()
