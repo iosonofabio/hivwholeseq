@@ -82,11 +82,13 @@ class SamplePat(pd.Series):
                                           PCR=PCR, qual_min=qual_min)
 
 
-    def get_allele_cocounts_filename(self, fragment, PCR=1, qual_min=30):
+    def get_allele_cocounts_filename(self, fragment, PCR=1, qual_min=30,
+                                     compressed=True):
         '''Get the filename of the allele counts'''
         from hivwholeseq.patients.filenames import get_allele_cocounts_filename
         return get_allele_cocounts_filename(self.patient, self.name, fragment,
-                                            PCR=PCR, qual_min=qual_min)
+                                            PCR=PCR, qual_min=qual_min,
+                                            compressed=compressed)
 
 
     def get_consensus_filename(self, fragment, PCR=1):
@@ -129,7 +131,8 @@ class SamplePat(pd.Series):
     def get_allele_cocounts(self, fragment, PCR=1, qual_min=30):
         '''Get the allele cocounts'''
         import numpy as np
-        acc = np.load(self.get_allele_cocounts_filename(fragment, PCR=PCR, qual_min=qual_min))
+        acc = np.load(self.get_allele_cocounts_filename(fragment, PCR=PCR,
+                                                        qual_min=qual_min))['cocounts']
         return acc
 
 

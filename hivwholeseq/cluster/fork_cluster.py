@@ -795,6 +795,38 @@ def fork_get_cocounts_patient(samplename, fragment, VERBOSE=0,
     return sp.check_output(qsub_list)
 
 
+def fork_compress_cocounts_patient(samplename, fragment, VERBOSE=0,
+                                   PCR=1, qual_min=30):
+    '''Fork to the cluster for each patient, sample, and fragment'''
+    if VERBOSE:
+        print 'Forking to the cluster: sample '+samplename+', fragment '+fragment
+
+    JOBSCRIPT = JOBDIR+'patients/compress_allele_cocounts.py'
+    cluster_time = '23:59:59'
+    vmem = '8G'
+
+    qsub_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'ccc'+fragment+samplename,
+                 '-l', 'h_rt='+cluster_time,
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--fragments', fragment,
+                 '--samples', samplename,
+                 '--verbose', VERBOSE,
+                 '--qualmin', qual_min,
+                 '--PCR', PCR,
+                ]
+    qsub_list = map(str, qsub_list)
+    if VERBOSE:
+        print ' '.join(qsub_list)
+    return sp.check_output(qsub_list)
+
+
+
 def fork_decontaminate_reads_patient(samplename, fragment, VERBOSE=0, PCR=None,
                                      maxreads=-1, summary=True):
     '''Fork to the cluster the decontamination of reads'''

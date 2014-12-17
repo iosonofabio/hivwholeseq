@@ -131,9 +131,15 @@ def get_allele_counts_filename(pname, samplename_pat, fragment, PCR=1, qual_min=
     return filename
 
 
-def get_allele_cocounts_filename(pname, samplename_pat, fragment, PCR=1, qual_min=30):
+def get_allele_cocounts_filename(pname, samplename_pat, fragment, PCR=1, qual_min=30,
+                                 compressed=True):
     '''Get the matrix of allele cocounts on the initial reference'''
-    filename = 'allele_cocounts_'+fragment+'_qual'+str(qual_min)+'+'+'.npy'
+    filename = 'allele_cocounts_'+fragment+'_qual'+str(qual_min)+'+'+'.'
+    if compressed:
+        filename = filename+'npz'
+    else:
+        filename = filename+'npy'
+
     filename = get_sample_foldername(pname, samplename_pat, PCR=PCR)+filename
     return filename
 
