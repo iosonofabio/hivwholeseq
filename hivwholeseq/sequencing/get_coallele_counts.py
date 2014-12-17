@@ -21,7 +21,7 @@ from hivwholeseq.sequencing.filenames import get_mapped_filename, get_allele_cou
         get_coallele_counts_filename, get_consensus_filename
 from hivwholeseq.mapping_utils import pair_generator
 from hivwholeseq.sequencing.get_allele_counts import get_allele_counts
-from hivwholeseq.fork_cluster import fork_get_coallele_counts as fork_self
+from hivwholeseq.cluster.fork_cluster import fork_get_coallele_counts as fork_self
 
 
 # Globals

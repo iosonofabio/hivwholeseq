@@ -22,7 +22,7 @@ from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.sequencing.filenames import get_demultiplex_summary_filename, get_raw_read_files, \
         get_read_filenames, get_unclassified_reads_filenames
 from hivwholeseq.sequencing.adapter_info import adapters_illumina, foldername_adapter
-from hivwholeseq.fork_cluster import fork_demultiplex as fork_self
+from hivwholeseq.cluster.fork_cluster import fork_demultiplex as fork_self
 
 
 

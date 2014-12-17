@@ -25,7 +25,7 @@ from hivwholeseq.patients.filenames import get_initial_index_filename, \
         get_initial_hash_filename, get_initial_reference_filename, \
         get_mapped_to_initial_filename, get_map_initial_summary_filename, \
         get_paste_mapped_chunks_initial_summary_filename
-from hivwholeseq.fork_cluster import fork_paste_mapped_chunks_to_initial_consensus as fork_self
+from hivwholeseq.cluster.fork_cluster import fork_paste_mapped_chunks_to_initial_consensus as fork_self
 from hivwholeseq.clean_temp_files import remove_mapped_init_tempfiles
 from hivwholeseq.patients.filter_mapped_reads import filter_mapped_reads
 

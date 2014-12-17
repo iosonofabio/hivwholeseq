@@ -33,7 +33,7 @@ from hivwholeseq.mapping_utils import test_read_pair_crossoverhang as test_coh
 from hivwholeseq.mapping_utils import main_block_read_pair_low_quality as main_block_low_quality
 from hivwholeseq.mapping_utils import trim_read_pair_low_quality as trim_low_quality
 from hivwholeseq.mapping_utils import trim_read_pair_crossoverhangs as trim_coh
-from hivwholeseq.fork_cluster import fork_trim_and_divide as fork_self
+from hivwholeseq.cluster.fork_cluster import fork_trim_and_divide as fork_self
 
 from hivwholeseq.sequencing.samples import load_sequencing_run
 

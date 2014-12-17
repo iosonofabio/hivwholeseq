@@ -19,7 +19,7 @@ import pysam
 
 from hivwholeseq.sequencing.filenames import get_read_filenames
 from hivwholeseq.sequencing.adapter_info import adapters_illumina, foldername_adapter
-from hivwholeseq.fork_cluster import fork_quality_along_read as fork_self
+from hivwholeseq.cluster.fork_cluster import fork_quality_along_read as fork_self
 from hivwholeseq.mapping_utils import extract_mapped_reads_subsample_open
 from hivwholeseq.sequencing.samples import load_sequencing_run
 

@@ -11,7 +11,7 @@ import os
 import argparse
 import numpy as np
 
-from hivwholeseq.fork_cluster import fork_calculate_beta_SFS as fork_self
+from hivwholeseq.cluster.fork_cluster import fork_calculate_beta_SFS as fork_self
 
 
 

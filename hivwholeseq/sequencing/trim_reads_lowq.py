@@ -20,7 +20,7 @@ import pysam
 
 from hivwholeseq.sequencing.samples import load_sequencing_run
 from hivwholeseq.sequencing.filenames import get_read_filenames, get_trim_summary_filename
-from hivwholeseq.fork_cluster import fork_trim as fork_self
+from hivwholeseq.cluster.fork_cluster import fork_trim as fork_self
 
 
 

@@ -24,7 +24,7 @@ from hivwholeseq.patients.patients import get_patient
 from hivwholeseq.patients.filenames import get_initial_index_filename, \
         get_initial_hash_filename, get_initial_reference_filename, \
         get_mapped_to_initial_filename, get_map_initial_summary_filename
-from hivwholeseq.fork_cluster import fork_split_for_mapping as fork_split
+from hivwholeseq.cluster.fork_cluster import fork_split_for_mapping as fork_split
 from hivwholeseq.clean_temp_files import remove_mapped_init_tempfiles
 from hivwholeseq.sequencing.split_reads_for_mapping import split_reads
 

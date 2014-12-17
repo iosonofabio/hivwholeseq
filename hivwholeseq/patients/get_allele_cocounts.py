@@ -23,7 +23,7 @@ from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_allele_cocounts_filename
 from hivwholeseq.mapping_utils import convert_sam_to_bam, pair_generator
 from hivwholeseq.two_site_statistics import get_coallele_counts_from_file as gac
-from hivwholeseq.fork_cluster import fork_get_cocounts_patient as fork_self
+from hivwholeseq.cluster.fork_cluster import fork_get_cocounts_patient as fork_self
 
 
 

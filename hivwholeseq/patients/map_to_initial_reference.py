@@ -33,7 +33,7 @@ from hivwholeseq.patients.filenames import get_initial_index_filename, \
         get_initial_hash_filename, get_initial_reference_filename, \
         get_mapped_to_initial_filename, get_mapped_to_initial_foldername, \
         get_map_initial_summary_filename
-from hivwholeseq.fork_cluster import fork_map_to_initial_reference as fork_self
+from hivwholeseq.cluster.fork_cluster import fork_map_to_initial_reference as fork_self
 from hivwholeseq.clean_temp_files import remove_mapped_init_tempfiles
 from hivwholeseq.patients.patients import load_samples_sequenced as lssp
 from hivwholeseq.sequencing.samples import load_samples_sequenced as lss

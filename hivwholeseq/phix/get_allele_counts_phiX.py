@@ -25,7 +25,7 @@ from hivwholeseq.sequencing.filenames import get_phix_filename, get_mapped_phix_
         get_allele_counts_phix_filename, get_insert_counts_phix_filename, \
         get_consensus_phix_filename
 from hivwholeseq.mapping_utils import convert_sam_to_bam, get_ind_good_cigars
-from hivwholeseq.fork_cluster import fork_get_allele_counts_phix as fork_self
+from hivwholeseq.cluster.fork_cluster import fork_get_allele_counts_phix as fork_self
 
 
 

@@ -30,7 +30,7 @@ from hivwholeseq.sequencing.filenames import get_divided_filename, \
         get_allele_counts_filename, \
         get_build_consensus_summary_filename, \
         get_reference_consensus_ali_filename
-from hivwholeseq.fork_cluster import fork_build_consensus as fork_self
+from hivwholeseq.cluster.fork_cluster import fork_build_consensus as fork_self
 from hivwholeseq.sequence_utils import build_local_consensus
 
 

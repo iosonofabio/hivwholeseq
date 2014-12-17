@@ -24,7 +24,7 @@ from hivwholeseq.mapping_utils import get_number_reads
 
 from hivwholeseq.sequencing.samples import load_sequencing_run, SampleSeq
 from hivwholeseq.sequencing.samples import load_samples_sequenced as lss
-from hivwholeseq.fork_cluster import fork_premapped_coverage as fork_self
+from hivwholeseq.cluster.fork_cluster import fork_premapped_coverage as fork_self
 
 
 

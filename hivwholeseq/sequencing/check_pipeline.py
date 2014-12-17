@@ -18,7 +18,7 @@ from hivwholeseq.patients.patients import load_samples_sequenced as lssp
 from hivwholeseq.patients.patients import SamplePat
 from hivwholeseq.sequencing.samples import load_samples_sequenced as lss
 from hivwholeseq.mapping_utils import get_number_reads
-from hivwholeseq.fork_cluster import fork_check_pipeline as fork_self
+from hivwholeseq.cluster.fork_cluster import fork_check_pipeline as fork_self
 
 
 # Globals

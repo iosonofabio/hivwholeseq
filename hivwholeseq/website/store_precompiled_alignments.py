@@ -19,7 +19,7 @@ from hivwholeseq.generic_utils import mkdirs
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.sequence_utils import build_msa_haplotypes as build_msa
 from hivwholeseq.website.filenames import get_precompiled_alignments_filename
-from hivwholeseq.fork_cluster import fork_store_haplotypes_website as fork_self
+from hivwholeseq.cluster.fork_cluster import fork_store_haplotypes_website as fork_self
 from hivwholeseq.sequence_utils import align_muscle
 from hivwholeseq.tree_utils import build_tree_fasttree
 from hivwholeseq.patients.get_local_trees import get_region_count_trajectories

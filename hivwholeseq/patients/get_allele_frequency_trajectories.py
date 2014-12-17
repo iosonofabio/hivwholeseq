@@ -22,7 +22,7 @@ from hivwholeseq.patients.one_site_statistics import \
 from hivwholeseq.patients.one_site_statistics import \
         plot_allele_frequency_trajectories_3d as plot_aft_3d
 from hivwholeseq.patients.one_site_statistics import get_allele_count_trajectories
-from hivwholeseq.fork_cluster import fork_get_allele_frequency_trajectory as fork_self
+from hivwholeseq.cluster.fork_cluster import fork_get_allele_frequency_trajectory as fork_self
 
 
 

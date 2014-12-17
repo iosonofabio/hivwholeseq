@@ -18,7 +18,7 @@ from hivwholeseq.patients.patients import SamplePat
 from hivwholeseq.reference import load_custom_reference
 from hivwholeseq.sequence_utils import pretty_print_pairwise_ali
 from hivwholeseq.patients.filenames import get_decontaminate_summary_filename
-from hivwholeseq.fork_cluster import fork_decontaminate_reads_patient as fork_self
+from hivwholeseq.cluster.fork_cluster import fork_decontaminate_reads_patient as fork_self
 
 
 

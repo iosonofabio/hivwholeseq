@@ -16,7 +16,7 @@ from Bio.Alphabet.IUPAC import ambiguous_dna
 
 from hivwholeseq.patients.patients import load_samples_sequenced, SamplePat
 from hivwholeseq.patients.filenames import get_initial_reference_filename
-from hivwholeseq.fork_cluster import fork_build_consensus_patient as fork_self
+from hivwholeseq.cluster.fork_cluster import fork_build_consensus_patient as fork_self
 
 
 
