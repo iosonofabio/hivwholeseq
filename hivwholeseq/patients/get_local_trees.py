@@ -19,11 +19,6 @@ from hivwholeseq.tree_utils import build_tree_fasttree
 from hivwholeseq.argparse_utils import RoiAction
 
 
-# Globals
-regions = ['psi', 'PR', 'V3']
-
-
-
 
 # Functions
 def load_alignments(filename):
@@ -152,11 +147,11 @@ if __name__ == '__main__':
 
     if VERBOSE >= 1:
         print 'Get haplotypes'
-    if roi[0] in regions:
+    try:
         region = roi[0]
         (hct, ind, seqs) = get_region_count_trajectories(patient, region,
                                                          VERBOSE=VERBOSE)
-    else:
+    except IOError:
         region = ' '.join(map(str, roi))
         (hct, ind, seqs) = patient.get_local_haplotype_count_trajectories(*roi,
                                                                           VERBOSE=VERBOSE)

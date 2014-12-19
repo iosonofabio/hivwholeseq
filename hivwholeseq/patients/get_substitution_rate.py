@@ -80,7 +80,8 @@ if __name__ == '__main__':
             print 'Plot'
 
         # Plot divergence and the fit
-        fig, axs = plt.subplots(1, 2, figsize=(10, 5), gridspec_kw={'width_ratios':[4, 1]})
+        fig, axs = plt.subplots(1, 2, figsize=(10, 5),
+                                gridspec_kw={'width_ratios':[4, 1]})
         ax = axs[0]
         ax.set_xlabel('Time from transmission [days]')
         ax.set_ylabel('Divergence')
@@ -118,7 +119,10 @@ if __name__ == '__main__':
         nrows = 1 + (len(regions) - 1) // 4
         ncols = min(len(regions), 4)
         fig, axs = plt.subplots(nrows, ncols, figsize=(2.5 * ncols, 4 * nrows))
-        axs = axs.ravel()
+        if len(regions) > 1:
+            axs = axs.ravel()
+        else:
+            axs = [axs]
         
         # Clean up empty axes
         for ir in xrange(0, len(axs) - len(regions)):
