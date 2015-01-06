@@ -22,13 +22,12 @@ def nothing():
 
 def empty_log_folders():
     '''Empty log folders of old files'''
-    import shutil, os
-
-    shutil.rmtree(JOBLOGOUT)
-    os.mkdir(JOBLOGOUT)
-
-    shutil.rmtree(JOBLOGERR)
-    os.mkdir(JOBLOGERR)
+    import os, glob
+    for folder in (JOBLOGOUT, JOBLOGERR):
+        for fn in glob.glob(folder+'*'):
+            # Keep .gitignore for the folders themselves
+            if '.gitignore' not in fn:
+                os.remove(fn)
 
 
 # SEQUENCING

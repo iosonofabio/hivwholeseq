@@ -193,16 +193,6 @@ def filter_mapped_reads(sample, fragment,
             f.write('Many-mutations:\t\t'+str(n_mutator)+'\n')
             f.write('Bad CIGARs:\t\t'+str(n_badcigar)+'\n')
 
-        # FIXME: implement or not?
-        #plot_distance_histogram(data_folder, adaID, frag_gen,
-        #                        hist_distance_from_consensus,
-        #                        savefig=True)
-
-        #plot_distance_histogram_sliding_window(data_folder, adaID, frag_gen,
-        #                                       len(ref),
-        #                                       hist_dist_along,
-        #                                       binsize=binsize,
-        #                                       savefig=True)
 
 
 # Script

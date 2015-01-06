@@ -56,3 +56,13 @@ def build_tree_fasttree(filename_or_ali, rootname=None, VERBOSE=0):
             os.remove(filename)
 
     return tree
+
+
+def find_parent(tree, node):
+    '''Find the parent node of a tree node'''
+    return tree.root.get_path(node)[-2]
+
+
+def get_path_toroot(tree, node):
+    '''Get the path to root'''
+    return tree.root.get_path(node)[::-1]

@@ -122,7 +122,7 @@ def pileup_trim_reads_coverstart(bamfile, start, VERBOSE=0):
     return seqs
 
 
-def join_block_to_consensus(consensus, cons_block, VERBOSE=0):
+def join_block_to_consensus(consensus, cons_block, VERBOSE=0, deltamax=60):
     '''Join a new block to an extant consensus'''
     import numpy as np
     from seqanpy import align_ladder
@@ -144,15 +144,16 @@ def join_block_to_consensus(consensus, cons_block, VERBOSE=0):
     start2 = len(ali2) - len(ali2.lstrip('-'))
     scoremax = 3 * (end1 - start2)
     delta = scoremax - score
-    if delta > 6 * 10:
-        raise ValueError('Too many mismatches in neighbouring local consensi!')
+    if delta > deltamax:
+        raise ValueError('Too many mismatches in neighbouring local consensi! ('+str(delta)+', max '+str(deltamax)+')')
     consensus = (ali1[:start2] + ali2[start2:]).replace('-', '')
     return consensus
 
 
 def build_consensus(bamfilename, len_reference, VERBOSE=0,
                     block_len=100,
-                    reads_per_alignment=31):
+                    reads_per_alignment=31,
+                    deltamax=60):
     '''Build a consensus from mapped filtered reads'''
     if VERBOSE:
         print 'Build consensus'
@@ -232,7 +233,7 @@ def build_consensus(bamfilename, len_reference, VERBOSE=0,
             # ---------------------------
             #                        --------------------
             consensus = join_block_to_consensus(consensus, cons_block,
-                                                VERBOSE=VERBOSE)
+                                                VERBOSE=VERBOSE, deltamax=deltamax)
 
             start_block += 2 * block_len // 3
             n_block += 1
@@ -261,7 +262,8 @@ def build_consensus(bamfilename, len_reference, VERBOSE=0,
         seqrecs = [SeqRecord(Seq(s, ambiguous_dna), id=str(i), name=str(i))
                    for i, s in enumerate(seqs)]
         cons_block = build_local_consensus(seqrecs, VERBOSE=VERBOSE, full_cover=False)
-        consensus = join_block_to_consensus(consensus, cons_block, VERBOSE=VERBOSE)
+        consensus = join_block_to_consensus(consensus, cons_block, VERBOSE=VERBOSE,
+                                            deltamax=deltamax)
 
     return consensus
 
@@ -295,6 +297,8 @@ if __name__ == '__main__':
                         help='PCR to analyze (1 or 2)')
     parser.add_argument('--raw', action='store_true',
                         help='Use non decontaminated reads')
+    parser.add_argument('--deltamax', type=int, default=60,
+                        help='Max score delta between subsequent local consensi')
 
     args = parser.parse_args()
     pnames = args.patients
@@ -307,6 +311,7 @@ if __name__ == '__main__':
     block_len = args.block_len
     PCR = args.PCR
     use_raw_reads = args.raw
+    deltamax = args.deltamax
 
     samples = load_samples_sequenced()
     if pnames is not None:
@@ -356,7 +361,8 @@ if __name__ == '__main__':
 
             cons = build_consensus(bamfilename, len_reference, VERBOSE=VERBOSE,
                                    block_len=block_len,
-                                   reads_per_alignment=n_reads_per_ali)
+                                   reads_per_alignment=n_reads_per_ali,
+                                   deltamax=deltamax)
             consm = np.fromstring(cons, 'S1')
 
             if VERBOSE >= 2:

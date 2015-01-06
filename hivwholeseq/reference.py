@@ -47,13 +47,22 @@ def load_F10(fragment=None):
                           'fasta')
 
 
-def load_custom_reference(reference, format='fasta'):
+def load_custom_reference(reference, format='fasta', region=None):
     '''Load a custom reference'''
+    if region is not None:
+        format = 'gb'
+
     record = SeqIO.read(get_custom_reference_filename(reference, format=format), format)
 
     # BUG: feature id is lost during write, fake it with the 'note' qualifier
     if format in ['gb' , 'genbank']:
         correct_genbank_features_load(record)
+
+    if region is not None:
+        for feature in record.features:
+            if feature.id == region:
+                return feature.extract(record)
+
     return record
 
 

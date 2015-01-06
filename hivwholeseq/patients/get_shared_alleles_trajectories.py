@@ -34,7 +34,6 @@ def build_coordinate_maps(ali, VERBOSE=0, stripgaps=False):
     cols = ali.get_alignment_length()
 
     maps = np.ma.masked_all((rows, cols), int)
-
     for i, seq in enumerate(ali):
         smat = np.array(seq, 'S1')
         is_nongap = smat != '-'
@@ -46,42 +45,41 @@ def build_coordinate_maps(ali, VERBOSE=0, stripgaps=False):
     return maps
 
 
-
-# Script
-if __name__ == '__main__':
-
-    # Parse input args
-    parser = argparse.ArgumentParser(description='Get shared allele trajectories',
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
-    parser.add_argument('--patients', nargs='+',
-                        help='Patient to analyze')
-    parser.add_argument('--regions', nargs='*',
-                        help='Regions to analyze (e.g. F1 V3)')
-    parser.add_argument('--verbose', type=int, default=0,
-                        help='Verbosity level [0-4]')
-    parser.add_argument('--PCR1', type=int, default=1,
-                        help='Take only PCR1 samples [0=off, 1=where both available, 2=always]')
-
-    args = parser.parse_args()
-    pnames = args.patients
-    regions = args.regions
-    VERBOSE = args.verbose
-    use_PCR1 = args.PCR1
+def build_coordinate_map_reference(alimap, refg, VERBOSE=0):
+    '''Figure out where the aligned alleles are in the reference, for convenience'''
+    refg = np.array(refg)
+    refcs = (refg != '-').cumsum() - 1
+    refcoo = np.array([refcs[pos] for pos in alimap], int)
+    return refcoo
 
 
-    patients = load_patients()
-    patients = patients.loc[-patients.index.isin(['15107'])] #FIXME: I am remapping this one right now
-    if pnames is not None:
-        patients = patients.loc[patients.index.isin(pnames)]
+def get_shared_allele_frequencies(region, pnames=None, VERBOSE=0, save=True,
+                                  reference='HXB2'):
+    '''Align allele frequencies from several patients in a region'''
+    import os
+    from hivwholeseq.patients.filenames import root_patient_folder
 
-    if not regions:
-        regions = ['F'+str(i) for i in xrange(1, 7)]
-    if VERBOSE >= 2:
-        print 'regions', regions
+    fn_aft = root_patient_folder+'all/aft_shared_'+region+'.npz'
+    fn_ali = root_patient_folder+'all/aft_shared_ali_'+region+'.fasta'
+    fn_map = root_patient_folder+'all/aft_shared_maps_'+region+'.npz'
 
-    for region in regions:
+    # Recycle existing files if possible
+    if (not save) and all(map(os.path.isfile, (fn_aft, fn_ali, fn_map))):
+        npdata = np.load(fn_aft)
+        afts = npdata['afts']
+        depthmaxs = npdata['depthmaxs']
+        times = npdata['times']
+        ali = AlignIO.read(fn_ali, 'fasta')
+        maps = np.load(fn_map)
+
+    else:
         if VERBOSE >= 1:
-            print region
+            print 'Load patients'
+        from hivwholeseq.patients.patients import load_patients, Patient
+        patients = load_patients()
+        patients = patients.loc[-patients.index.isin(['15107'])] #FIXME: I am remapping this one right now
+        if pnames is not None:
+            patients = patients.loc[patients.index.isin(pnames)]
 
         if VERBOSE >= 1:
             print 'Collect initial references'
@@ -90,6 +88,9 @@ if __name__ == '__main__':
             patient = Patient(patient)
             ref = patient.get_reference(region)
             refs.append(ref)
+        if reference is not None:
+            from hivwholeseq.reference import load_custom_reference
+            refs.append(load_custom_reference(reference, region=region))
 
         if VERBOSE >= 1:
             print 'Align references'
@@ -97,29 +98,32 @@ if __name__ == '__main__':
 
         if VERBOSE >= 1:
             print 'Getting coordinate maps'
-        # Exclude sites that are not present in all patients
+        # Exclude sites that are not present in all patients + reference
+        # NOTE: the reference does not really restrict and is very convenient
         maps = build_coordinate_maps(ali, VERBOSE=VERBOSE, stripgaps=True)
 
-        afts = np.zeros((maps.shape[0], maps.shape[1], len(alpha)), object)
-        depthmaxs = np.zeros(maps.shape[0], object)
+        # Get map to reference instead of alignment, for convenience
+        if reference is not None:
+            mapref = build_coordinate_map_reference(maps[-1], ali[-1], VERBOSE=VERBOSE)
 
         if VERBOSE >= 1:
             print 'Collecting alleles'
+        afts = np.zeros((len(patients.index), maps.shape[1], len(alpha)), object)
+        depthmaxs = np.zeros(afts.shape[0], object)
+        times = np.zeros(afts.shape[0], object)
         for ip, (pname, patient) in enumerate(patients.iterrows()):
             patient = Patient(patient)
             patient.discard_nonsequenced_samples()
 
-            # Collect allele counts from patient samples, and return only positive hits
-            # sns contains sample names and PCR types
+            # Collect allele counts from patient samples
             act, ind = patient.get_allele_count_trajectories(region,
-                                                             use_PCR1=use_PCR1,
                                                              VERBOSE=VERBOSE)
-            times = patient.times[ind]
+            timespat = patient.times[ind]
             depthmax = np.maximum(1.0 / patient.n_templates[ind], 2e-3)
             #FIXME: for now, put 2e-3 to the masked positions, but this is no good
             depthmax[depthmax.mask] = 2e-3
 
-            # Low-coverage sampled are bitcoded as -1
+            # Low-coverage sampled are bytecoded as -1
             aft = np.zeros_like(act, dtype=float)
             for i in xrange(aft.shape[0]):
                 for k in xrange(aft.shape[2]):
@@ -140,10 +144,70 @@ if __name__ == '__main__':
                 for j in xrange(len(alpha)):
                     afts[ip, i, j] = aft[:, j, ind]
             depthmaxs[ip] = depthmax.data
+            times[ip] = timespat
 
-        from hivwholeseq.patients.filenames import root_patient_folder
-        np.savez(root_patient_folder+'all/aft_shared_'+region+'.npz',
-                 afts=afts, depthmaxs=depthmaxs, pnames=np.array(patients.index))
-        AlignIO.write(ali,
-                      root_patient_folder+'all/aft_shared_ali_'+region+'.fasta', 'fasta')
-        maps.dump(root_patient_folder+'all/aft_shared_maps_'+region+'.npy')
+        # Idem bytecode for maps
+        maps_bytecode = np.ma.filled(maps, -1)
+
+        if save:
+            if VERBOSE >= 1:
+                print 'Saving to file'
+            np.savez_compressed(fn_aft,
+                                afts=afts,
+                                depthmaxs=depthmaxs,
+                                times=times,
+                                pnames=np.array(patients.index))
+            AlignIO.write(ali, fn_ali, 'fasta')
+            mapdict = {'maps': maps_bytecode,
+                       'pnames': np.append(np.array(patients.index), reference)}
+            if reference is not None:
+                mapdict['mapref'] = mapref
+            np.savez_compressed(fn_map, **mapdict)
+
+    data = {'afts': afts,
+            'depthmaxs': depthmaxs,
+            'times': times,
+            'ali': ali,
+            'maps': maps}
+    if reference is not None:
+        data['mapref'] = mapref
+
+    return data
+
+
+
+# Script
+if __name__ == '__main__':
+
+    # Parse input args
+    parser = argparse.ArgumentParser(description='Get shared allele trajectories',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
+    parser.add_argument('--patients', nargs='+',
+                        help='Patient to analyze')
+    parser.add_argument('--regions', nargs='*',
+                        help='Regions to analyze (e.g. F1 V3)')
+    parser.add_argument('--verbose', type=int, default=0,
+                        help='Verbosity level [0-4]')
+    parser.add_argument('--reference', default='HXB2',
+                        help='External reference to align')
+
+    args = parser.parse_args()
+    pnames = args.patients
+    regions = args.regions
+    VERBOSE = args.verbose
+    reference = args.reference
+
+    if not regions:
+        regions = ['F'+str(i) for i in xrange(1, 7)]
+    if VERBOSE >= 2:
+        print 'regions', regions
+
+    for region in regions:
+        if VERBOSE >= 1:
+            print region
+
+        data = get_shared_allele_frequencies(region, pnames, VERBOSE=VERBOSE,
+                                             reference=reference,
+                                             save=True)
+
+

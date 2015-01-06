@@ -63,6 +63,41 @@ def check_reference_overlap(p, VERBOSE=0):
         raise ValueError('GAPS status found') 
 
 
+def pretty_print_info_patient(p, title, name, method, name_requisite=None, mod_dates={},
+                              VERBOSE=0):
+    '''Pretty printer for whole-patient info, fragment by fragment'''
+    import os, sys
+
+    line = ('{:<'+str(title_len)+'}').format(title+':')
+    stati = []
+    for fragment in ('F'+str(i+1) for i in xrange(6)):
+        if isinstance(method, basestring):
+            fun = getattr(p, method)
+            fn = fun(fragment)
+        else:
+            fn = method(p.name, fragment)
+
+        if os.path.isfile(fn):
+            md = modification_date(fn)
+            mod_dates[('refmap', fragment)] = md
+
+            if name_requisite is None:
+                status = 'OK'
+
+            elif ((name_requisite, fragment) in mod_dates):
+                if md > mod_dates[(name_requisite, fragment)]:
+                    status = 'OK'
+                else:
+                    status = 'OLD'
+
+        else:
+            status = 'MISS'
+
+        stati.append(status)
+        line = line + fragment + ': ' + ('{:>'+str(cell_len - len(fragment) - 1)+'}').format(status) + '  '
+    print line
+
+
 def pretty_print_info(p, title, name, method, name_requisite=None, mod_dates={},
                       VERBOSE=0):
     '''Pretty printer for patient pipeline info'''
@@ -92,6 +127,7 @@ def pretty_print_info(p, title, name, method, name_requisite=None, mod_dates={},
                 fn = fun(fragment)
             else:
                 fn = method(sample.patient, samplename, fragment)
+
             if os.path.isfile(fn):
                 md = modification_date(fn)
                 mod_dates[(name, fragment, samplename)] = md
@@ -99,19 +135,23 @@ def pretty_print_info(p, title, name, method, name_requisite=None, mod_dates={},
                 if name_requisite is None:
                     status = 'OK'
 
-                elif ((name_requisite, fragment, samplename) in mod_dates) and \
-                   (md > mod_dates[(name_requisite, fragment, samplename)]):
-                    status = 'OK'
+                elif ((name_requisite, fragment, samplename) in mod_dates):
+                    if md > mod_dates[(name_requisite, fragment, samplename)]:
+                        status = 'OK'
+                    else:
+                        status = 'OLD'
 
-                elif ((name_requisite, fragment) in mod_dates) and \
-                   (md > mod_dates[(name_requisite, fragment)]):
-                    status = 'OK'
+                elif ((name_requisite, fragment) in mod_dates):
+                    if md > mod_dates[(name_requisite, fragment)]:
+                        status = 'OK'
+                    else:
+                        status = 'OLD'
 
                 elif 'contaminated' in sample[fragment]:
                     status = 'CONT'
                 
                 else:
-                    status = 'OLD'
+                    status = 'ERROR'
 
             else:
                 status = 'MISS'
@@ -130,17 +170,36 @@ def pretty_print_info(p, title, name, method, name_requisite=None, mod_dates={},
         raise ValueError('OLD status found') 
 
 
-def pretty_print_info_genomewide(p, title, name, method, mod_dates={}, VERBOSE=0):
+def pretty_print_info_genomewide(p, title, name, method, mod_dates={}, VERBOSE=0,
+                                 require_all=True):
     '''Pretty printer for patient pipeline info'''
 
-    def check_requisite_genomewide(md, name_requisite, samplename, mod_dates):
+    def check_requisite_genomewide(md, name_requisite, samplename, mod_dates,
+                                   require_all=True):
         '''Check requisites for genomewide observables'''
+        stati = []
         fragments=['F'+str(i+1) for i in xrange(6)]
         for fragment in fragments:
-            if ((name_requisite, fragment, samplename) not in mod_dates) or \
-                (md < mod_dates[(name_requisite, fragment, samplename)]):
-                return False
-        return True
+            if (name_requisite, fragment, samplename) not in mod_dates:
+                stati.append('MISS')
+            elif md < mod_dates[(name_requisite, fragment, samplename)]:
+                stati.append('OLD')
+            else:
+                stati.append('OK')
+
+        if 'OLD' in stati:
+            return 'OLD'
+        else:
+            if require_all:
+                if 'MISS' in stati:
+                    return 'MISS'
+                else:
+                    return 'OK'
+            else:
+                if 'OK' in stati:
+                    return 'OK'
+                else:
+                    return 'MISS'
 
     def check_contamination_genomewide(sample):
         '''Check whether any of the fragment samples is contaminated'''
@@ -179,14 +238,12 @@ def pretty_print_info_genomewide(p, title, name, method, mod_dates={}, VERBOSE=0
             if name is None:
                 status = 'OK'
 
-            elif check_requisite_genomewide(md, name, samplename, mod_dates): 
-                status = 'OK'
-
             elif check_contamination_genomewide(sample):
                 status = 'CONT'
-            
+
             else:
-                status = 'OLD'
+                status = check_requisite_genomewide(md, name, samplename, mod_dates,
+                                                    require_all=require_all)
 
         else:
             status = 'MISS'
@@ -293,8 +350,9 @@ if __name__ == '__main__':
                           None,#'reference',
                           mod_dates)
 
+        from hivwholeseq.patients.filenames import get_mapped_filtered_filename
         pretty_print_info(p, 'Decontaminate', 'decontaminate',
-                          get_decontaminate_summary_filename,
+                          lambda pn, sn, fr: get_mapped_filtered_filename(pn, sn, fr, decontaminated=True),
                           'filter', mod_dates)
 
         pretty_print_info(p, 'Consensus', 'consensus',
@@ -312,6 +370,15 @@ if __name__ == '__main__':
         pretty_print_info(p, 'Allele cocounts', 'allele cocounts',
                           'get_allele_cocounts_filename',
                           'decontaminate', mod_dates)
+
+        pretty_print_info_genomewide(p, 'Allele counts genomewide', 'allele counts',
+                                     'get_allele_counts_filename',
+                                     mod_dates, require_all=False)
+
+        pretty_print_info_patient(p, 'Maps to HXB2', 'reference',
+                                  'get_map_coordinates_reference_filename',
+                                  'reference', mod_dates)
+
 
         print ''
 

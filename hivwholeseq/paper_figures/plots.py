@@ -401,3 +401,155 @@ def plot_allele_frequency_overlap(data, title='', VERBOSE=0, use_logit=True, sav
         plt.ion()
         plt.show()
 
+
+def plot_minor_allele_example(data, title='', VERBOSE=0, savefig=False):
+    '''Plot minor allele in a typical sample'''
+    plt.ioff()
+
+    if VERBOSE:
+        print 'Plot minor alleles of example sample'
+
+    fig, axs = plt.subplots(1, 2, figsize=(8, 5), sharey=True,
+                            gridspec_kw={'width_ratios': [3, 1]})
+    sns.set_style('whitegrid')
+
+    labels = ['control', 'patient']
+    alphas = [0.6, 1]
+    colors = [sns.color_palette()[i] for i in [1, 0]]
+    shapes = ['s', 'o']
+
+    for idat, datum in enumerate(data):
+        y = datum['freq_minor']
+        x = np.arange(len(y))
+        #axs[0].plot(x, y, lw=1.5, alpha=0.8)
+        axs[0].scatter(x, y,
+                       marker=shapes[idat],
+                       lw=1.5, edgecolor='none',
+                       facecolor=colors[idat],
+                       zorder=idat+1)
+
+        h = np.histogram(y, bins=np.logspace(-4, 0, 27))
+        axs[1].barh(h[1][:-1], h[0], (h[1][1:] - h[1][:-1]),
+                    color=colors[idat],
+                    alpha=alphas[idat],
+                    zorder=2 - idat)
+
+    axs[0].set_xlabel('Position [bp]')
+    axs[0].set_ylabel('Minor allele frequency')
+    axs[0].set_yscale('log')
+    axs[0].set_ylim(10**(-4), 1)
+    axs[0].set_xlim(-20, y.nonzero()[0][-1] + 21)
+    axs[0].grid(True)
+
+    axs[1].set_xlabel('Number of alleles')
+    axs[1].grid(True)
+    axs[1].set_yscale('log')
+    axs[1].set_xlim(0.8, 2 * h[0].max())
+    axs[1].set_xscale('log')
+    #axs[1].set_xticks([0, 50, 100, 150])
+
+    if title:
+        fig.suptitle(title)
+
+    if savefig:
+        fig_filename = savefig
+        fig_folder = os.path.dirname(fig_filename)
+
+        mkdirs(fig_folder)
+        fig.savefig(fig_filename)
+        plt.close(fig)
+
+    else:
+        plt.tight_layout()
+        plt.ion()
+        plt.show()
+
+
+def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
+                                color_by='age_frac'):
+    '''Plot tree of minor haplotypes in a typical sample'''
+    from Bio import Phylo
+
+    def assign_color(tree, cmap='jet', attrname='age_frac'):
+        '''Assign color to leaves based on a colormap'''
+        if isinstance(cmap, basestring):
+            from matplotlib import cm
+            cmap = getattr(cm, cmap)
+    
+        for node in tree.get_terminals():
+            attr = getattr(node, attrname)
+            color = [int(255 * c) for c in cmap(1.0 * attr)[:3]]
+            node.color = color
+    
+        for node in tree.get_nonterminals():
+            attr = getattr(node, attrname)
+            color = [int(255 * c) for c in cmap(1.0 * attr)[:3]]
+            node.color = color
+
+
+    plt.ioff()
+
+    if VERBOSE:
+        print 'Plot haplotype tree of example sample'
+
+    fig, ax = plt.subplots(1, 1, figsize=(9, 9))
+    sns.set_style('white')
+    ax.grid(False)
+
+    for datum in data:
+        tree = datum['tree']
+        htf = datum['htf']
+
+        assign_color(tree, attrname=color_by)
+        labels = [leaf.name[:-3] for leaf in tree.get_terminals()]
+        depths = tree.depths()
+        maxdepth = max(depths.itervalues())
+
+        # Collect data for circle plot
+        rmin = 5
+        rmax = 250
+        data_circles = []
+        for il, leaf in enumerate(tree.get_terminals(), 1):
+            iseq = leaf.iseq
+            it = leaf.it
+            r = rmin + (rmax - rmin) * (htf[it, iseq] - 0.015)**(0.5)
+            y = il
+            x = depths[leaf]
+            c = [tone / 255.0 for tone in leaf.color.to_rgb()]
+            data_circles.append((x, y, 2 * r, c))
+
+        # Draw the background lines from the dots to the right axis
+        for (x, y, s, c) in data_circles:
+            ax.plot([x, ax.get_xlim()[1]], [y, y], c='darkgrey', alpha=0.5,
+                    ls='--', dashes=(8, 3), zorder=1)
+
+        # Draw the tree
+        Phylo.draw(tree, show_confidence=False, label_func=lambda x: '', axes=ax,
+                   do_show=False)
+        ax.set_yticks(np.arange(1, len(labels) + 1))
+        ax.set_yticklabels(labels)
+        ax.yaxis.tick_right()
+        ax.set_ylabel('')
+        ax.set_xlabel('Genetic distance [changes / site]')
+        
+        # Add circles to the leaves
+        (x, y, s, c) = zip(*data_circles)
+        ax.scatter(x, y, s=s, c=c, edgecolor='none', zorder=2)
+
+        ax.set_xlim(-0.04 * maxdepth, 1.04 * maxdepth)
+
+    if title:
+        fig.suptitle(title)
+
+    if savefig:
+        fig_filename = savefig
+        fig_folder = os.path.dirname(fig_filename)
+
+        mkdirs(fig_folder)
+        fig.savefig(fig_filename)
+        plt.close(fig)
+
+    else:
+        plt.tight_layout(rect=(0, 0, 0.98, 1))
+        plt.ion()
+        plt.show()

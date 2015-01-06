@@ -24,6 +24,17 @@ def print_stdout(fn):
         print f.read()
 
 
+def print_stderr(fn):
+    '''Print stdout of filename'''
+
+    # Accepts index or filename (we are sloppy, we should use a closure)
+    if isinstance(fn, int):
+        fn = fn_errs[fn]
+
+    with open(JOBLOGERR+fn, 'r') as f:
+        print f.read()
+
+
 
 
 
@@ -39,8 +50,11 @@ if __name__ == '__main__':
 
         with open(JOBLOGERR+fn, 'r') as f:
             for line in f:
-                line = line.rstrip('\n').strip('\s')
+                line = line.rstrip('\n').strip()
                 if '.Xauthority' in line:
+                    continue
+
+                if line[:7] == 'stampy:':
                     continue
 
                 if len(line):
