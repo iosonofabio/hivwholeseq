@@ -218,6 +218,11 @@ if __name__ == '__main__':
 
         data['spearmanr-time'] = [[spearmanr(Spat_t, Ssub) for Spat_t in np.vstack(Spat).T]
                                   for Spat in Spats['time']]
+
+        Ssub_shuffled = Ssub; np.random.shuffle(Ssub_shuffled)
+        data['spearmanr-time-shuffled'] = [[spearmanr(Spat_t, Ssub_shuffled)
+                                            for Spat_t in np.vstack(Spat).T]
+                                           for Spat in Spats['time']]
         
 
         if plot:

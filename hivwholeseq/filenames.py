@@ -29,7 +29,8 @@ else:
 
 reference_folder = root_data_folder+'reference/'
 theory_folder = root_data_folder+'theory/'
-table_filename = hivwholeseq.__path__[0] + '/tables/HIV_reservoir_all.xlsx'
+table_folder = hivwholeseq.__path__[0] + '/tables/'
+table_filename = table_folder+'HIV_reservoir_all.xlsx'
 
 
 
