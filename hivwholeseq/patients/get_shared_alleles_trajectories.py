@@ -53,7 +53,7 @@ def build_coordinate_map_reference(alimap, refg, VERBOSE=0):
     return refcoo
 
 
-def get_shared_allele_frequencies(region, pnames=None, VERBOSE=0, save=True,
+def get_shared_allele_frequencies(region, pnames=None, VERBOSE=0, save=False,
                                   reference='HXB2'):
     '''Align allele frequencies from several patients in a region'''
     import os
@@ -70,14 +70,15 @@ def get_shared_allele_frequencies(region, pnames=None, VERBOSE=0, save=True,
         depthmaxs = npdata['depthmaxs']
         times = npdata['times']
         ali = AlignIO.read(fn_ali, 'fasta')
-        maps = np.load(fn_map)
+        mapdict = np.load(fn_map)
+        maps = mapdict['maps']
+        mapref = mapdict['mapref']
 
     else:
         if VERBOSE >= 1:
             print 'Load patients'
         from hivwholeseq.patients.patients import load_patients, Patient
         patients = load_patients()
-        patients = patients.loc[-patients.index.isin(['15107'])] #FIXME: I am remapping this one right now
         if pnames is not None:
             patients = patients.loc[patients.index.isin(pnames)]
 
@@ -117,7 +118,8 @@ def get_shared_allele_frequencies(region, pnames=None, VERBOSE=0, save=True,
 
             # Collect allele counts from patient samples
             act, ind = patient.get_allele_count_trajectories(region,
-                                                             VERBOSE=VERBOSE)
+                                                             VERBOSE=VERBOSE,
+                                                             safe=True)
             timespat = patient.times[ind]
             depthmax = np.maximum(1.0 / patient.n_templates[ind], 2e-3)
             #FIXME: for now, put 2e-3 to the masked positions, but this is no good

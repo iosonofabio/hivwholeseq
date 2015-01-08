@@ -61,6 +61,22 @@ def entropy_sites(afts):
     return M
 
 
+def derived_frequency(afts):
+    '''Derived allele frequencies'''
+    n_samples = sum(len(aft[0, 0]) for aft in afts)
+    M = np.ma.zeros((n_samples, afts.shape[1]), float)
+    isam = 0
+    for aft in afts:
+        aft = reshape_single_aft(aft).swapaxes(0, 2)
+        # New axes: time, alphabet, position
+
+        # 1 - initial major allele frequency
+        ic0 = aft[0].argmax(axis=0)
+        M[isam: isam + aft.shape[0]] = 1.0 - aft[:, ic0, np.arange(len(ic0))]
+        isam += aft.shape[0]
+    return M
+
+
 def get_distance(M, criterion='subtract'):
     '''Get distance matrix given a site class matrix'''
     d = np.zeros((M.shape[0], M.shape[0]), float)
@@ -218,6 +234,8 @@ if __name__ == '__main__':
         #    ax.set_xlim(0, M.shape[1])
 
         # SAMPLE BY SAMPLE
+        data_plot_samples = []
+
         # Entropy sample-by-sample
         site_S1 = entropy_sites(afts)
         snames = np.array([pn+'_'+str(i+1) for ip, pn in enumerate(pnames)
@@ -230,8 +248,20 @@ if __name__ == '__main__':
         snames = snames[ind_good]
         site_S1 = site_S1[ind_good]
         d_S1 = get_distance(site_S1, criterion='subtract')
+        data_plot_samples.append((d_S1, site_S1, snames, 'entropy'))
 
-        data_plot_samples = [(d_S1, site_S1, snames, 'entropy')]
+        # Derived allele freuency sample-by-sample
+        aft_der = derived_frequency(afts)
+        snames = np.array([pn+'_'+str(i+1) for ip, pn in enumerate(pnames)
+                           for i in xrange(len(afts[ip, 0, 0]))], 'S30')
+        d = get_distance(aft_der, criterion='subtract')
+        ind_good = list((-np.isnan(d)).nonzero()) + \
+                   list((aft_der.mask.mean(axis=1) < mask_fraction_max).nonzero())
+        ind_good = reduce(np.intersect1d, ind_good)
+        snames = snames[ind_good]
+        aft_der = aft_der[ind_good]
+        d = get_distance(aft_der, criterion='subtract')
+        data_plot_samples.append((d, aft_der, snames, 'derived allele freq'))
 
         for data_single in data_plot_samples:
             plot_sample_by_sample(data_single, VERBOSE=VERBOSE, cluster=False)

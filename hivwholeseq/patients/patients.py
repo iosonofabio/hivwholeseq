@@ -116,10 +116,10 @@ class Patient(pd.Series):
             yield SamplePat(sample)
 
 
-    def get_fragmented_roi(self, roi, VERBOSE=0):
+    def get_fragmented_roi(self, roi, VERBOSE=0, **kwargs):
         '''Get a region of interest in fragment coordinates'''
         from hivwholeseq.patients.get_roi import get_fragmented_roi
-        return get_fragmented_roi(self, roi, VERBOSE=VERBOSE)
+        return get_fragmented_roi(self, roi, VERBOSE=VERBOSE, **kwargs)
 
 
     def get_reference_filename(self, fragment, format='fasta'):
@@ -134,7 +134,7 @@ class Patient(pd.Series):
         if region == 'genomewide':
             fragment = region
         else:
-            (fragment, start, end) = self.get_fragmented_roi((region, 0, '+oo'))
+            (fragment, start, end) = self.get_fragmented_roi((region, 0, '+oo'), include_genomewide=True)
         refseq = SeqIO.read(self.get_reference_filename(fragment, format=format), format)
         if format in ('gb', 'genbank'):
             from hivwholeseq.sequence_utils import correct_genbank_features_load
@@ -256,7 +256,7 @@ class Patient(pd.Series):
         return (aft, ind)
 
 
-    def get_allele_count_trajectories(self, region, use_PCR1=1, **kwargs):
+    def get_allele_count_trajectories(self, region, use_PCR1=2, safe=False, **kwargs):
         '''Get the allele count trajectories from files
         
         Args:
@@ -265,27 +265,35 @@ class Patient(pd.Series):
 
         Note: the genomewide counts are currently saved to file.
         '''
-        if region == 'genomewide':
-            from .filenames import get_allele_count_trajectories_filename as get_fn
-            fn = get_fn(self.name, fragment)
-            npz = np.load(fn)
-            act = npz['act']
-            ind = npz['ind']
+        from operator import itemgetter
+        from .one_site_statistics import get_allele_count_trajectories
 
-        else:
-            from operator import itemgetter
-            from .one_site_statistics import get_allele_count_trajectories
+        # Fall back on genomewide counts if no single fragment is enough
+        (fragment, start, end) = self.get_fragmented_roi((region, 0, '+oo'),
+                                                         include_genomewide=True)
+        (sns, act) = get_allele_count_trajectories(self.name, self.samples.index,
+                                                   fragment,
+                                                   use_PCR1=use_PCR1, **kwargs)
+        # Select genomic region
+        act = act[:, :, start: end]
 
-            (fragment, start, end) = self.get_fragmented_roi((region, 0, '+oo'))
-            (sns, act) = get_allele_count_trajectories(self.name, self.samples.index,
-                                                       fragment,
-                                                       use_PCR1=use_PCR1, **kwargs)
-            # Select genomic region
-            act = act[:, :, start: end]
+        # Select time points
+        ind = np.array([i for i, (_, sample) in enumerate(self.samples.iterrows())
+                        if sample.name in map(itemgetter(0), sns)], int)
 
-            # Select time points
-            ind = np.array([i for i, (_, sample) in enumerate(self.samples.iterrows())
-                            if sample.name in map(itemgetter(0), sns)], int)
+        # If safe, take only samples tagged with 'OK'
+        if safe:
+            ind_safe = np.zeros(len(ind), bool)
+            for ii, i in enumerate(ind):
+                sample = self.samples.iloc[i]
+                from .get_roi import get_fragments_covered
+                frags = get_fragments_covered(self, (fragment, start, end))
+                ind_safe[ii] = all(getattr(sample, fr).upper() == 'OK'
+                                   for fr in frags)
+
+            act = act[ind_safe]
+            ind = ind[ind_safe]
+
 
         return (act, ind)
 

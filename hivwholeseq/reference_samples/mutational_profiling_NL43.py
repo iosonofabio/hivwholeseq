@@ -30,7 +30,7 @@ def load_table(align_to_reference=None):
                                'RC Index': float},
                        )
 
-    table['Pos'] = table['Mutation'].str[1:-1].astype(int) - 1
+    table['Pos NL4-3'] = table['Mutation'].str[1:-1].astype(int) - 1
     table['Ancestral'] = table['Mutation'].str[0]
     table['Derived'] = table['Mutation'].str[-1]
 
@@ -65,7 +65,7 @@ def add_coordinates_reference(table, refname='HXB2', filter_missing=True, VERBOS
     posdict = dict(poss.T)
 
     # Fill the new vector
-    possref1 = table['Pos']
+    possref1 = table['Pos NL4-3']
     possref2 = - np.ones(len(possref1), int)
     for i, pos1 in enumerate(possref1):
         if pos1 not in posdict:
@@ -97,7 +97,7 @@ if __name__ == '__main__':
     print 'Checking coordinates with NL4-3...',
     ref = load_custom_reference('NL4-3')
     for _, row in table.iterrows():
-        pos = row['Pos']
+        pos = row['Pos NL4-3']
         anc = row['Ancestral']
         if anc != ref[pos]:
             print pos, anc, ref[pos]

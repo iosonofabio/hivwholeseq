@@ -318,3 +318,52 @@ def build_msa_haplotypes(haploc, VERBOSE=0, label=''):
 
     return ali
 
+
+def get_coordinates_genomic_region(ref, region):
+    '''Get coordinates of region in an annotated sequence'''
+    for feature in ref.features:
+        if region == feature.id:
+            return feature.location
+
+    raise ValueError('Region not found')
+
+
+def translate_with_gaps(seq):
+    '''Translate sequence with gaps'''
+    from Bio.Seq import Seq
+    from Bio.Alphabet.IUPAC import protein
+
+    L = len(seq)
+    if L % 3:
+        raise ValueError('The sequence length is not a multiple of 3')
+
+    prot = []
+    for i in xrange(L // 3):
+        codon = seq[3 * i: 3 * (i+1)]
+        if str(codon) == '---':
+            prot.append('-')
+        elif '-' in codon:
+            raise ValueError('Non-aligned gaps found')
+        else:
+            prot.append(''.join(codon.translate()))
+    prot = Seq(''.join(prot), protein)
+    return prot
+
+
+def translate_alignment(ali_sub, VERBOSE=0):
+    '''Translate multiple sequence alignment'''
+    from Bio.SeqRecord import SeqRecord
+    from Bio.Align import MultipleSeqAlignment as MSA
+
+    L = ali_sub.get_alignment_length()
+    if L % 3:
+        raise ValueError('The alignment length is not a multiple of 3')
+
+    prots = []
+    for seq in ali_sub:
+        prot = SeqRecord(translate_with_gaps(seq.seq),
+                         id=seq.id, name=seq.name, description=seq.description)
+        prots.append(prot)
+
+    return MSA(prots)
+

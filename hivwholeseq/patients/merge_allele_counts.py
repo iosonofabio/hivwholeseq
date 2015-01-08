@@ -10,7 +10,7 @@ import argparse
 import numpy as np
 from Bio import SeqIO
 
-from hivwholeseq.miseq import alpha
+from hivwholeseq.miseq import alpha, read_types
 from hivwholeseq.patients.samples import load_samples_sequenced as lssp
 from hivwholeseq.patients.samples import SamplePat
 from hivwholeseq.patients.filenames import get_initial_reference_filename
@@ -25,9 +25,10 @@ def merge_allele_counts(ref_genomewide, acs, VERBOSE=0):
           ones will just have zero counts. Sometimes, cherry-picking the data
           fragment by fragment might be a better choice.
     '''
+    from hivwholeseq.miseq import alpha, read_types
     from seqanpy import align_overlap
 
-    ac = np.zeros((len(alpha), len(ref_genomewide)), int)
+    ac = np.zeros((len(read_types), len(alpha), len(ref_genomewide)), int)
 
     pos_ref = 1000
     for (fr, ref, acsi) in acs:
@@ -61,14 +62,15 @@ def merge_allele_counts(ref_genomewide, acs, VERBOSE=0):
             # NOTE: all fragments are treated the same, even in case of coverage
             # differences of orders of magnitude. This means, larger coverage
             # always wins. Maybe we want to implement this somewhat differently
-            ac[:, pos_ref] += acsi[:, pos_fr]
+            ac[:, :, pos_ref] += acsi[:, :, pos_fr]
             pos_fr += 1
             pos_ref += 1
 
         if VERBOSE >= 3:
             from hivwholeseq.sequence_utils import pretty_print_pairwise_ali
+            cons = alpha[ac.sum(axis=0).argmax(axis=0)]
             pretty_print_pairwise_ali((ali1[fr_start: fr_end],
-                                       alpha[ac[:, fr_start_ref: fr_end_ref].argmax(axis=0)]),
+                                       cons[fr_start: fr_end]),
                                       name1='gw',
                                       name2=fr,
                                       width=100)
@@ -83,7 +85,7 @@ if __name__ == '__main__':
     # Parse input args
     parser = argparse.ArgumentParser(description='Update initial consensus',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    pats_or_samples = parser.add_mutually_exclusive_group(required=True)
+    pats_or_samples = parser.add_mutually_exclusive_group(required=False)
     pats_or_samples.add_argument('--patients', nargs='+',
                                  help='Patient to analyze')
     pats_or_samples.add_argument('--samples', nargs='+',
@@ -124,7 +126,7 @@ if __name__ == '__main__':
         for fragment in ['F'+str(i) for i in xrange(1, 7)]:
             try:
                 ref = ''.join(SeqIO.read(get_initial_reference_filename(pname, fragment), 'fasta'))
-                ac = sample.get_allele_counts(fragment)
+                ac = sample.get_allele_counts(fragment, merge_read_types=False)
                 acs.append((fragment, ref, ac))
             except IOError:
                 continue

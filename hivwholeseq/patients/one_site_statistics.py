@@ -18,7 +18,7 @@ from hivwholeseq.miseq import alpha
 
 # Functions
 def get_allele_count_trajectories(pname, samplenames, fragment, use_PCR1=1,
-                                           VERBOSE=0):
+                                  VERBOSE=0):
     '''Get allele counts for a single patient sample'''
     if VERBOSE >= 1:
         print 'Getting allele counts:', pname, fragment

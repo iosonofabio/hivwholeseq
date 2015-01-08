@@ -22,11 +22,13 @@ from hivwholeseq.miseq import alpha, alphal
 from hivwholeseq.patients.filenames import root_patient_folder
 from hivwholeseq.sequencing.filenames import reference_folder
 from hivwholeseq.patients.patients import load_patients, Patient
+from hivwholeseq.sequence_utils import translate_alignment
+from hivwholeseq.patients.get_shared_alleles_trajectories import (
+    get_shared_allele_frequencies)
 
 
 
 # Globals
-tree_ali_foldername = reference_folder+'alignments_trees/typeM/'
 colors = {'p17': 'r',
           'p24': 'g',
           'PR': 'r',
@@ -38,44 +40,56 @@ colors = {'p17': 'r',
 
 
 # Functions
-def get_subtype_alignment(region, subtype='B', VERBOSE=0):
-    '''Get the observables from subtype B alignments'''
-    aliB_fn = tree_ali_foldername+region+'.'+subtype+'.nuc.aligned.fasta'
+def get_subtype_reference_alignment(region, subtype='B', VERBOSE=0, refname='HXB2',
+                                    type='nuc'):
+    '''Get the observables from subtype B reference alignments'''
+    tree_ali_foldername = reference_folder+'alignments/pairwise_to_'+refname+'/'
+    aliB_fn = tree_ali_foldername+region+'.'+subtype+'.'+type+'.aligned.fasta'
+    if VERBOSE >= 3:
+        print 'Alignment file:', aliB_fn
     aliB = AlignIO.read(aliB_fn, 'fasta')
     return aliB
 
 
-def get_allele_freqs_alignment(alim, VERBOSE=0):
+def get_allele_freqs_alignment(alim, positions=None, VERBOSE=0):
     '''Get allele frequencies from alignment'''
     from hivwholeseq.miseq import alpha, alphal
 
     # Make sure it's a numpy matrix, efficiently
     alim = np.asarray(alim, 'S1')
 
+    if positions is None:
+        positions = np.arange(alim.shape[-1])
+
     # Get allele freqs ignoring ambiguous: N, Y, R, etc. and renormalizing
     num = np.array([(alim == a).mean(axis=0) for a in alpha[:5]])
     num /= num.sum(axis=0)
 
-    return num
+    return num[:, positions]
 
 
 def get_entropy(num, VERBOSE=0):
     '''Get entropy from allele freqs'''
-    S = np.zeros(num.shape[1])
-    for nu in num:
-        S -= (nu) * np.log2(nu + 1e-8)
-    
-    # Transform -0 in +0, for visual convenience
-    S = np.abs(S)
+    S = np.maximum(0, -((num) * np.log2(np.maximum(num, 1e-8))).sum(axis=0))
     return S
 
 
-def bridge_coordinate_maps(refcoos, ref, VERBOSE=0):
-    '''Bridge patient alignment maps to subtype alignment'''
-    refm = np.array(ref, 'S1')
-    alics = (refm != '-').cumsum() - 1
-    alicoos = np.array([(alics == refcoo).nonzero()[0][0] for refcoo in refcoos], int)
-    return alicoos
+def get_ali_entropy(ali, positions=None, alpha=alpha[:5], VERBOSE=0):
+    '''Get entropy of alignment at some positions'''
+    if positions is None:
+        positions = np.arange(len(ali[0]))
+
+    afs = np.zeros((5, len(positions)))
+    for i, pos in enumerate(positions):
+        af = np.zeros(len(alpha))
+        col = np.fromstring(ali[:, pos], 'S1')
+        for ia, nuc in enumerate(alpha):
+            af[ia] = (col == nuc).sum()
+        af /= af.sum()
+        afs[:, i] = af
+
+    S = get_entropy(afs)
+    return S
 
 
 def get_entropy_pats(afts, VERBOSE=0):
@@ -111,12 +125,15 @@ def get_entropy_pats(afts, VERBOSE=0):
 
 
 
+
+
 # Script
 if __name__ == '__main__':
 
     # Parse input args
-    parser = argparse.ArgumentParser(description='Explore conservation levels across patients and subtype',
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
+    parser = argparse.ArgumentParser(
+        description='Explore conservation levels across patients and subtype',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     parser.add_argument('--regions', nargs='+', required=True,
                         help='Regions to analyze (e.g. F1 p17)')
     parser.add_argument('--verbose', type=int, default=0,
@@ -136,11 +153,6 @@ if __name__ == '__main__':
         if VERBOSE >= 1:
             print region
 
-        if VERBOSE >= 2:
-            print 'Get patient alignment coordinates, stripping gaps'
-        fn_ali = root_patient_folder+'all/aft_shared_ali_'+region+'.fasta'
-        ali = AlignIO.read(fn_ali, 'fasta')
-        refseq = ali[-1]
 
         if VERBOSE >= 2:
             print 'Get map of aligned positions to reference (HXB2)'
@@ -156,46 +168,30 @@ if __name__ == '__main__':
 
 
         if VERBOSE >= 2:
-            print 'Get subtype B multiple sequence alignment of', region
-        ali_sub = get_subtype_alignment(region, VERBOSE=VERBOSE)
-
-
-        if VERBOSE >= 2:
-            print 'Find reference in subtype alignment'
-        for iref_sub, refseq_sub in enumerate(ali_sub):
-            if refname in refseq_sub.name:
-                break
-        else:
-            raise ValueError('Reference '+refname+' not found in subtype alignment')
-
-
-        if VERBOSE >= 2:
-            print 'Check integrity of reference from patient ali and subtype ali'
-        if str(refseq.seq.ungap('-')) != str(refseq_sub.seq.ungap('-')):
-            raise ValueError('Reference '+refname+' differs from the patient ali and subtype ali')
-
-
-        if VERBOSE >= 2:
-            print 'Build bridge map between aligned patients and subtype alignment via reference'
-        map_ali = bridge_coordinate_maps(mapref, refseq_sub, VERBOSE=VERBOSE)
-
+            print 'Get subtype B reference sequence alignment to HXB2 of', region
+        ali_sub = get_subtype_reference_alignment(region, VERBOSE=VERBOSE)
 
         if VERBOSE >= 2:
             print 'Get shared allele trajectories'
-        
-        # FIXME: we should use the function in the other script, that's what it's there for
         # Low-coverage regions are bytecoded by -1
-        from hivwholeseq.patients.filenames import root_patient_folder
-        npdata = np.load(root_patient_folder+'all/aft_shared_'+region+'.npz')
-        # NOTE: this is not a rectangular tensor, so we keep the bytecode and will deal
-        # with it as a mask all along
-        afts = npdata['afts']
-        times = npdata['times']
+        data = get_shared_allele_frequencies(region, VERBOSE=VERBOSE, save=False)
+        afts = data['afts']
+        times = data['times']
         n_patients = afts.shape[0]
         lseq = afts.shape[1]
         lalpha = afts.shape[2]
 
+        # Shrink coordinates (Pavel trimmed some protein e.g. RT)
+        if mapref[-1] >= ali_sub.get_alignment_length():
+            indpos = (mapref < ali_sub.get_alignment_length())
+            mapref = mapref[indpos]
+            afts = afts[:, indpos]
+            lseq = afts.shape[1]
 
+
+        ##############################################
+        # SITE ENTROPY
+        ##############################################
         if VERBOSE >= 2:
             print 'Get entropy of patients'
         Spats = get_entropy_pats(afts, VERBOSE=VERBOSE)
@@ -203,28 +199,24 @@ if __name__ == '__main__':
 
         if VERBOSE >= 2:
             print 'Get entropy in subtype alignment'
-        alim_sub = np.array(ali_sub)
-        af_sub = get_allele_freqs_alignment(alim_sub, VERBOSE=VERBOSE)[:, map_ali]
-        Ssub = get_entropy(af_sub, VERBOSE=VERBOSE)
+        Ssub = get_ali_entropy(ali_sub, positions=mapref, VERBOSE=VERBOSE)
 
     
         if VERBOSE >= 2:
             print 'Comparing entropy in each patient and in the subtype'
-        
         data = {}
-        from scipy.stats import spearmanr, pearsonr
         data['spearmanr'] = [spearmanr(Spat, Ssub) for Spat in Spats['mean']]
         data['pearsonr'] = [pearsonr(Spat, Ssub) for Spat in Spats['mean']]
-
-        data['spearmanr-time'] = [[spearmanr(Spat_t, Ssub) for Spat_t in np.vstack(Spat).T]
+        data['spearmanr-time'] = [[spearmanr(Spat_t, Ssub)
+                                   for Spat_t in np.vstack(Spat).T]
                                   for Spat in Spats['time']]
 
+        # Shuffle as a sanity check
         Ssub_shuffled = Ssub; np.random.shuffle(Ssub_shuffled)
         data['spearmanr-time-shuffled'] = [[spearmanr(Spat_t, Ssub_shuffled)
                                             for Spat_t in np.vstack(Spat).T]
                                            for Spat in Spats['time']]
         
-
         if plot:
             if VERBOSE >= 2:
                 print 'Plot correlations'
@@ -245,4 +237,25 @@ if __name__ == '__main__':
             plt.tight_layout()
             plt.ion()
             plt.show()
+
+
+        ###############################################
+        ## DEGENERATE CODONS
+        ###############################################
+        #if VERBOSE >= 2:
+        #    print 'Get translated alignment'
+        #ali_prot = get_subtype_reference_alignment(region, VERBOSE=VERBOSE, type='aa')
+        #if len(ali_prot) != len(ali_sub):
+        #    # Sometimes the first sequence is HXB2 itself, for some obscure reason
+        #    if ((len(ali_prot) == len(ali_sub) + 1) and 
+        #        ('HXB2' in ali_prot[0].name) and \
+        #        ([seq.name for seq in ali_sub] == [seq.name for seq in ali_prot[1:]])):
+        #        ali_prot = ali_prot[1:]
+
+        #    # If things go bad, just remake the translated alignment
+        #    else:
+        #        ali_prot = translate_alignment(ali_sub, VERBOSE=VERBOSE)
+
+        ## Get 4-fold degenerate codon positions
+        #pos_4fold = get_degenerate_pos()
 
