@@ -72,6 +72,22 @@ def expand_ambiguous_seq(seq, seqtype='DNA'):
     return seqs
 
 
+def reduce_ambiguous_seqs(seqs, seqtype='DNA'):
+    '''Get the most specific ambiguous DNA/RNA sequence of a set'''
+    if seqtype == 'DNA':
+        from Bio.Data.IUPACData import ambiguous_dna_values as ttable
+    elif seqtype == 'RNA':
+        from Bio.Data.IUPACData import ambiguous_rna_values as ttable
+    del ttable['X']
+
+    ttable_back = {frozenset(value): key for (key, value) in ttable.iteritems()}
+
+    from itertools import imap, izip
+    seq = ''.join(imap(ttable_back.get, imap(frozenset, izip(*seqs))))
+
+    return seq
+
+
 def pretty_print_pairwise_ali(ali, name1='', name2='', width=50, len_name=10):
     '''Pretty print function for pairwise alignments'''
     from itertools import izip

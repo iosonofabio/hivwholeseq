@@ -10,6 +10,7 @@ import numpy as np
 from seqanpy import align_overlap
 
 from hivwholeseq.patients.patients import load_patients, Patient
+from hivwholeseq.sequence_utils import reduce_ambiguous_seqs
 
 
 # Globals
@@ -21,36 +22,6 @@ primers_default = {'fwd1': fwd1,
                    'fwd2': fwd2,
                    'rev1': rev1,
                    'rev2': rev2}
-
-
-# Functions
-def ambiguize_sequences(seqs):
-    '''Get the most specific ambiguous DNA sequence of a set'''
-    from operator import itemgetter
-
-    ambiguous_dict = {frozenset('AC'): 'M', # Amino
-                      frozenset('GT'): 'K', # Keto
-                      frozenset('AG'): 'R', # Purine
-                      frozenset('CT'): 'Y', # Pyrimidine
-                      frozenset('GC'): 'S', # Strong
-                      frozenset('AT'): 'W', # Weak
-                      frozenset('CGT'): 'B',
-                      frozenset('AGT'): 'D',
-                      frozenset('ACT'): 'H',
-                      frozenset('ACG'): 'V',
-                      frozenset('ACGT'): 'N',
-                      }
-    amb = []
-    for i in xrange(map(len, seqs)[0]):
-        col = map(itemgetter(i), seqs)
-        nuc = frozenset(col)
-        if len(nuc) == 1:
-            amb.append(col[0])
-        else:
-            amb.append(ambiguous_dict[nuc])
-
-    return ''.join(amb)
-
 
 
 # Script
@@ -82,7 +53,7 @@ if __name__ == '__main__':
             prset = set(htseqs[(htf > 0.1).any(axis=0)])
 
             primers[(pname, prname)] = prset
-            primers_ambiguous[(pname, prname)] = ambiguize_sequences(prset)
+            primers_ambiguous[(pname, prname)] = reduce_ambiguous_seqs(prset)
 
     from collections import defaultdict
     primers_dicts = {}
