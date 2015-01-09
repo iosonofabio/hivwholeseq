@@ -627,6 +627,24 @@ def build_consensus_from_mapped_reads(bamfilename, maxreads=2000, block_len=100,
     return consensus
 
 
+def get_allele_frequencies_alignment(ali, alpha=alpha, VERBOSE=0):
+    '''Get allele frequencies from MSA'''
+    if len(ali.shape) > 1:
+        af = np.zeros((len(alpha), len(ali[1])))
+    else:
+        af = np.zeros(len(alpha))
+    alim = np.asarray(ali)
+    for ia, a in enumerate(alpha):
+        af[ia] = (alim == a).mean(axis=0)
+
+    return af
+
+
+def get_entropy(afs, alphabet_axis=-2, VERBOSE=0):
+    '''Get entropy from allele freqs'''
+    S = np.maximum(0, -((afs) * np.log2(np.maximum(afs, 1e-8))).sum(axis=alphabet_axis))
+    return S
+
 
 # PLOT
 def plot_coverage(data_folder, adaID, fragment, counts, VERBOSE=0, savefig=False):
@@ -727,9 +745,4 @@ def plot_SFS_folded(data_folder, adaID, fragment, nu_filtered, VERBOSE=0, savefi
         plt.ion()
         plt.show()
 
-
-def get_entropy(afs, alphabet_axis=-2, VERBOSE=0):
-    '''Get entropy from allele freqs'''
-    S = np.maximum(0, -((afs) * np.log2(np.maximum(afs, 1e-8))).sum(axis=alphabet_axis))
-    return S
 

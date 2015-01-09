@@ -18,10 +18,6 @@ from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_mapped_to_initial_filename, get_allele_frequency_trajectories_filename, \
         get_allele_count_trajectories_filename
-from hivwholeseq.patients.one_site_statistics import \
-        plot_allele_frequency_trajectories_from_counts as plot_nus_from_act
-from hivwholeseq.patients.one_site_statistics import \
-        plot_allele_frequency_trajectories_from_counts_3d as plot_nus_from_act_3d
 from hivwholeseq.patients.one_site_statistics import get_allele_count_trajectories
 from hivwholeseq.cluster.fork_cluster import fork_get_allele_frequency_trajectory as fork_self
 
@@ -52,6 +48,35 @@ def build_coordinate_map_reference(alimap, refg, VERBOSE=0):
     refcs = (refg != '-').cumsum() - 1
     refcoo = np.array([refcs[pos] for pos in alimap], int)
     return refcoo
+
+
+def get_patient_indices(samplenames, VERBOSE=0):
+    '''Get which sample is in which patient'''
+    inds = []
+    ind = None
+    pname_old = None
+    for i, samplename in enumerate(samplenames):
+        pname = samplename.split('_')[0]
+        if pname == pname_old:
+            ind.append(i)
+        else:
+            inds.append(ind)
+            ind = [i]
+            pname_old = pname
+    inds.append(ind)
+    inds = inds[1:]
+
+    return inds
+
+
+def group_by_patient(array, patinds, VERBOSE=0):
+    '''Group samples by patient'''
+    return [array[patind] for patind in patinds]
+
+
+def ungroup_by_patient(arrays, VERBOSE=0):
+    '''Ungroup samples by patient'''
+    return np.concatenate(arrays, axis=0)
 
 
 def get_shared_allele_frequencies(region, pnames=None, VERBOSE=0, save=False,
@@ -152,7 +177,7 @@ def get_shared_allele_frequencies(region, pnames=None, VERBOSE=0, save=False,
         # Stack
         data = dict(data)
         for key, val in data.iteritems():
-            data[key] = np.concatenate(val, axis=0)
+            data[key] = ungroup_by_patient(val)
 
         # Idem bytecode for maps
         maps_bytecode = np.ma.filled(maps, -1)
@@ -173,25 +198,6 @@ def get_shared_allele_frequencies(region, pnames=None, VERBOSE=0, save=False,
         data['ali'] = ali
 
     return data
-
-
-def get_patient_indices(samplenames, VERBOSE=0):
-    '''Get which sample is in which patient'''
-    inds = []
-    ind = None
-    pname_old = None
-    for i, samplename in enumerate(samplenames):
-        pname = samplename.split('_')[0]
-        if pname == pname_old:
-            ind.append(i)
-        else:
-            inds.append(ind)
-            ind = [i]
-            pname_old = pname
-    inds.append(ind)
-    inds = inds[1:]
-
-    return inds
 
 
 

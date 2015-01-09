@@ -23,9 +23,9 @@ from hivwholeseq.patients.filenames import root_patient_folder
 from hivwholeseq.sequencing.filenames import reference_folder
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.sequence_utils import translate_alignment
-from hivwholeseq.patients.get_shared_alleles_trajectories import (
-    get_shared_allele_frequencies, get_patient_indices)
 from hivwholeseq.one_site_statistics import get_entropy
+from hivwholeseq.multipatient.get_shared_alleles_trajectories import (
+    get_shared_allele_frequencies, get_patient_indices)
 
 
 
@@ -169,7 +169,7 @@ if __name__ == '__main__':
         if mapref[-1] >= ali_sub.get_alignment_length():
             indpos = (mapref < ali_sub.get_alignment_length())
             mapref = mapref[indpos]
-            afts = afts[:, indpos]
+            afts = afts[:, :, indpos]
             lseq = afts.shape[1]
 
 

@@ -346,24 +346,37 @@ def get_coordinates_genomic_region(ref, region):
 
 def translate_with_gaps(seq):
     '''Translate sequence with gaps'''
-    from Bio.Seq import Seq
+    from Bio.SeqRecord import SeqRecord
+    from Bio.Seq import Seq, translate
     from Bio.Alphabet.IUPAC import protein
 
     L = len(seq)
     if L % 3:
         raise ValueError('The sequence length is not a multiple of 3')
 
+    seqstr = ''.join(seq)
     prot = []
     for i in xrange(L // 3):
-        codon = seq[3 * i: 3 * (i+1)]
-        if str(codon) == '---':
+        codon = seqstr[3 * i: 3 * (i+1)]
+        if codon == '---':
             prot.append('-')
         elif '-' in codon:
             raise ValueError('Non-aligned gaps found')
         else:
-            prot.append(''.join(codon.translate()))
-    prot = Seq(''.join(prot), protein)
-    return prot
+            prot.append(''.join(translate(codon)))
+    prot = ''.join(prot)
+
+    # Output in various formats
+    if isinstance(seq, basestring):
+        return prot
+    elif isinstance(seq, Seq):
+        return Seq(prot, protein)
+    elif isinstance(seq, SeqRecord):
+        return SeqRecord(Seq(prot, protein), id=seq.id, name=seq.name,
+                         description=seq.description)
+    else:
+        import numpy as np
+        return np.fromstring(prot, 'S1')
 
 
 def translate_alignment(ali_sub, VERBOSE=0):
@@ -383,3 +396,11 @@ def translate_alignment(ali_sub, VERBOSE=0):
 
     return MSA(prots)
 
+
+def get_subalignment(ali, ind):
+    '''Get an alignment of only some sequences.
+    
+    NOTE: this is really a bugfix for Biopython, come on!
+    '''
+    from Bio.Align import MultipleSeqAlignment
+    return MultipleSeqAlignment([ali._records[i] for i in ind], ali._alphabet)
