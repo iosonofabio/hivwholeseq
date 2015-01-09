@@ -24,7 +24,8 @@ from hivwholeseq.sequencing.filenames import reference_folder
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.sequence_utils import translate_alignment
 from hivwholeseq.patients.get_shared_alleles_trajectories import (
-    get_shared_allele_frequencies)
+    get_shared_allele_frequencies, get_patient_indices)
+from hivwholeseq.one_site_statistics import get_entropy
 
 
 
@@ -66,12 +67,6 @@ def get_allele_freqs_alignment(alim, positions=None, VERBOSE=0):
     num /= num.sum(axis=0)
 
     return num[:, positions]
-
-
-def get_entropy(num, VERBOSE=0):
-    '''Get entropy from allele freqs'''
-    S = np.maximum(0, -((num) * np.log2(np.maximum(num, 1e-8))).sum(axis=0))
-    return S
 
 
 def get_ali_entropy(ali, positions=None, alpha=alpha[:5], VERBOSE=0):
@@ -125,8 +120,6 @@ def get_entropy_pats(afts, VERBOSE=0):
 
 
 
-
-
 # Script
 if __name__ == '__main__':
 
@@ -153,20 +146,6 @@ if __name__ == '__main__':
         if VERBOSE >= 1:
             print region
 
-
-        if VERBOSE >= 2:
-            print 'Get map of aligned positions to reference (HXB2)'
-        fn_map = root_patient_folder+'all/aft_shared_maps_'+region+'.npz'
-        npdata = np.load(fn_map)
-        mapref = np.ma.masked_equal(npdata['mapref'], -1)
-        refname = npdata['pnames'][-1]
-        pnames = npdata['pnames'][:-1]
-
-        if ir == 0:
-            patients = load_patients()
-            patients = patients.loc[patients.index.isin(pnames)]
-
-
         if VERBOSE >= 2:
             print 'Get subtype B reference sequence alignment to HXB2 of', region
         ali_sub = get_subtype_reference_alignment(region, VERBOSE=VERBOSE)
@@ -177,9 +156,14 @@ if __name__ == '__main__':
         data = get_shared_allele_frequencies(region, VERBOSE=VERBOSE, save=False)
         afts = data['afts']
         times = data['times']
+        mapref = np.ma.masked_equal(data['mapref'], -1)
+        refname = data['pnames'][-1]
+        pnames = data['pnames'][:-1]
+        samplenames = data['samplenames']
         n_patients = afts.shape[0]
         lseq = afts.shape[1]
         lalpha = afts.shape[2]
+        patinds = get_patient_indices(samplenames, VERBOSE=VERBOSE)
 
         # Shrink coordinates (Pavel trimmed some protein e.g. RT)
         if mapref[-1] >= ali_sub.get_alignment_length():
@@ -194,37 +178,36 @@ if __name__ == '__main__':
         ##############################################
         if VERBOSE >= 2:
             print 'Get entropy of patients'
-        Spats = get_entropy_pats(afts, VERBOSE=VERBOSE)
+        Spats = get_entropy(afts, VERBOSE=VERBOSE)
 
 
         if VERBOSE >= 2:
             print 'Get entropy in subtype alignment'
         Ssub = get_ali_entropy(ali_sub, positions=mapref, VERBOSE=VERBOSE)
 
-    
+
         if VERBOSE >= 2:
             print 'Comparing entropy in each patient and in the subtype'
-        data = {}
-        data['spearmanr'] = [spearmanr(Spat, Ssub) for Spat in Spats['mean']]
-        data['pearsonr'] = [pearsonr(Spat, Ssub) for Spat in Spats['mean']]
-        data['spearmanr-time'] = [[spearmanr(Spat_t, Ssub)
-                                   for Spat_t in np.vstack(Spat).T]
-                                  for Spat in Spats['time']]
+        data = defaultdict(list)
+        Ssub_shuffled = Ssub.copy(); np.random.shuffle(Ssub_shuffled)
 
-        # Shuffle as a sanity check
-        Ssub_shuffled = Ssub; np.random.shuffle(Ssub_shuffled)
-        data['spearmanr-time-shuffled'] = [[spearmanr(Spat_t, Ssub_shuffled)
-                                            for Spat_t in np.vstack(Spat).T]
-                                           for Spat in Spats['time']]
+
+        # Time resolved
+        for ipat, pname in enumerate(pnames):
+            Spat = Spats[patinds[ipat]]
+            data['spearmanr-time'].append([spearmanr(Spat_t, Ssub) for Spat_t in Spat])
+            data['spearmanr-time-shuffled'].append([spearmanr(Spat_t, Ssub_shuffled)
+                                                    for Spat_t in Spat])
         
         if plot:
             if VERBOSE >= 2:
-                print 'Plot correlations'
+                print 'Plot entropy correlations with time'
 
             fig, ax = plt.subplots()
-            for ipat, (ts, rps) in enumerate(izip(times, data['spearmanr-time'])):
-                ax.plot(ts, zip(*rps)[0], lw=2, label=patients.iloc[ipat].name,
-                        color=cm.jet(1.0 * ipat / len(patients)))
+            for ipat, rps in enumerate(data['spearmanr-time']):
+                ts = times[patinds[ipat]]
+                ax.plot(ts, zip(*rps)[0], lw=2, label=pnames[ipat],
+                        color=cm.jet(1.0 * ipat / len(pnames)))
 
             ax.set_xlabel('Time from infection [days]')
             ax.set_ylabel('Spearman r on entropy (pat VS subtype B)')
@@ -237,6 +220,47 @@ if __name__ == '__main__':
             plt.tight_layout()
             plt.ion()
             plt.show()
+
+
+        ## Time and entropy-class resolved
+        #Sbins = [1e-3, 1e-1, 2]
+        #ls = ['--', '-']
+        #for Spat in Spats['time']:
+        #    Spat = np.vstack(Spat).T
+
+        #    Stmp = []
+        #    for i in xrange(len(Sbins) - 1):
+        #        ind = (Ssub >= Sbins[i]) & (Ssub < Sbins[i+1])
+        #        Stmp.append([spearmanr(Spat_t[ind], Ssub[ind]) for Spat_t in Spat])
+        #    data['spearmanr-time-entropy'].append(Stmp)
+
+
+        ## Plot the various entropy classes
+        #if plot:
+        #    fig, ax = plt.subplots()
+        #    for ipat, (ts, rpsS) in enumerate(izip(times, data['spearmanr-time-entropy'])):
+        #        # FIXME: select only some patients for clarity
+        #        if patients.iloc[ipat].name not in ['20097', '15319', '15107']:
+        #            continue
+        #        for iSbin, rps in enumerate(rpsS):
+        #            ax.plot(ts, zip(*rps)[0], lw=2,
+        #                    label=patients.iloc[ipat].name+', S_B e ['+str(Sbins[iSbin])+', '+str(Sbins[iSbin+1])+']',
+        #                    ls=ls[iSbin], 
+        #                    color=cm.jet(1.0 * ipat / len(patients)))
+
+        #    ax.set_xlabel('Time from infection [days]')
+        #    ax.set_ylabel('Spearman r on entropy (pat VS subtype B)')
+
+        #    ax.legend(loc=2, fontsize=10, ncol=2)
+        #    ax.set_ylim(0, 0.5)
+        #    ax.grid(True)
+        #    ax.set_title(region)
+
+        #    plt.tight_layout()
+
+
+        #    plt.ion()
+        #    plt.show()
 
 
         ###############################################

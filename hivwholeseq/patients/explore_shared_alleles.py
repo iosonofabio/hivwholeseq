@@ -14,6 +14,10 @@ from scipy.cluster.hierarchy import linkage, dendrogram
 from Bio import SeqIO, AlignIO
 import matplotlib.pyplot as plt
 
+from hivwholeseq.patients.get_shared_alleles_trajectories import (
+    get_shared_allele_frequencies, get_patient_indices)
+from hivwholeseq.one_site_statistics import get_entropy
+
 
 
 # Functions
@@ -61,19 +65,15 @@ def entropy_sites(afts):
     return M
 
 
-def derived_frequency(afts):
+def get_derived_frequency(afts, patinds):
     '''Derived allele frequencies'''
-    n_samples = sum(len(aft[0, 0]) for aft in afts)
-    M = np.ma.zeros((n_samples, afts.shape[1]), float)
-    isam = 0
-    for aft in afts:
-        aft = reshape_single_aft(aft).swapaxes(0, 2)
-        # New axes: time, alphabet, position
-
-        # 1 - initial major allele frequency
+    M = np.ma.zeros((afts.shape[0], afts.shape[2]), float)
+    L = M.shape[-1]
+    for ipat, patind in enumerate(patinds):
+        aft = afts[patind]
         ic0 = aft[0].argmax(axis=0)
-        M[isam: isam + aft.shape[0]] = 1.0 - aft[:, ic0, np.arange(len(ic0))]
-        isam += aft.shape[0]
+        M[patind] = 1.0 - aft[:, ic0, np.arange(L)]
+        
     return M
 
 
@@ -146,7 +146,7 @@ def plot_sample_by_sample(data_single, VERBOSE=0, cluster=True):
     ax.set_yticklabels('')
     ax.set_xlim(0, M.shape[1])
     
-    # Add lines at patient boundaries to some plots
+    # Add lines at patient boundaries to the central plot
     leafnames = labels[leaves][::-1]
     for isam, sname1 in enumerate(leafnames[:-1]):
         sname2 = leafnames[isam + 1]
@@ -164,6 +164,17 @@ def plot_sample_by_sample(data_single, VERBOSE=0, cluster=True):
     ax.set_yticklabels(labels[leaves][::-1].tolist(), fontsize=10)
     ax.set_xticklabels('')
     ax.imshow(dshu[::-1], interpolation='nearest', aspect='auto')
+
+    # Add lines at patient boundaries to the distance matrix plots
+    leafnames = labels[leaves][::-1]
+    for isam, sname1 in enumerate(leafnames[:-1]):
+        sname2 = leafnames[isam + 1]
+        pname1 = sname1.split('_')[0]
+        pname2 = sname2.split('_')[0]
+        if pname1 != pname2:
+            ax.plot(ax.get_xlim(), [0.5 + isam] * 2, lw=2, c='k')
+            ax.plot([len(leafnames) - 1.5 - isam] * 2, ax.get_xlim(), lw=2, c='k')
+
 
     if cluster:
         plt.tight_layout(rect=(0, 0, 1, 0.96), w_pad=0.01)
@@ -198,67 +209,36 @@ if __name__ == '__main__':
             print region
 
         # Low-coverage regions are bytecoded by -1
-        from hivwholeseq.patients.filenames import root_patient_folder
-        data = np.load(root_patient_folder+'all/aft_shared_'+region+'.npz')
-        afts = data['afts']
-        pnames = data['pnames']
+        data = get_shared_allele_frequencies(region, VERBOSE=VERBOSE, save=False)
+        afts = np.ma.masked_less(data['afts'], -0.99)
+        pnames = data['pnames'][:-1]
         depthmaxs = data['depthmaxs']
         n_patients = len(pnames)
-
-        # PATIENT BY PATIENT
-        ## Classes by sweeping, polymorphic, conserved
-        #site_class = classify_sites(afts)        
-        #d_class = get_distance(site_class, criterion='discrete')
-
-        ## Maximal entropy in history
-        #site_S = maxentropy_sites(afts)
-        #d_S = get_distance(site_S, criterion='subtract')
-
-        #data_plot = [(d_class, site_class, pnames, 'class'),
-        #             (d_S, site_S, pnames, 'maxentropy')]
-
-        #for (d, M, labels, label) in data_plot:
-        #    Z = linkage(d + 1e-8)
-        #    
-        #    # Plot as tree and image
-        #    figsize=(16, 5)
-        #    fig, axs = plt.subplots(1, 2, figsize=figsize, gridspec_kw={'width_ratios': [1, 4]})
-        #    fig.suptitle(region)
-
-        #    dg = dendrogram(Z, orientation='right', ax=axs[0], leaf_label_func=lambda x: '')
-        #    axs[0].set_xticklabels('')
-        #    ax = axs[1]
-        #    ax.imshow(M[dg['leaves']][::-1], interpolation='nearest', aspect='auto')
-        #    ax.set_yticks(np.arange(len(labels)))
-        #    ax.set_yticklabels(labels[dg['leaves']][::-1].tolist(), fontsize=10)
-        #    ax.set_xlim(0, M.shape[1])
+        samplenames = data['samplenames']
+        patinds = get_patient_indices(samplenames, VERBOSE=VERBOSE)
 
         # SAMPLE BY SAMPLE
         data_plot_samples = []
 
         # Entropy sample-by-sample
-        site_S1 = entropy_sites(afts)
-        snames = np.array([pn+'_'+str(i+1) for ip, pn in enumerate(pnames)
-                           for i in xrange(len(afts[ip, 0, 0]))], 'S30')
+        site_S1 = get_entropy(afts, VERBOSE=VERBOSE)
 
         d_S1 = get_distance(site_S1, criterion='subtract')
         ind_good = list((-np.isnan(d_S1)).nonzero()) + \
                    list((site_S1.mask.mean(axis=1) < mask_fraction_max).nonzero())
         ind_good = reduce(np.intersect1d, ind_good)
-        snames = snames[ind_good]
+        snames = samplenames[ind_good]
         site_S1 = site_S1[ind_good]
         d_S1 = get_distance(site_S1, criterion='subtract')
         data_plot_samples.append((d_S1, site_S1, snames, 'entropy'))
 
         # Derived allele freuency sample-by-sample
-        aft_der = derived_frequency(afts)
-        snames = np.array([pn+'_'+str(i+1) for ip, pn in enumerate(pnames)
-                           for i in xrange(len(afts[ip, 0, 0]))], 'S30')
+        aft_der = get_derived_frequency(afts, patinds)
         d = get_distance(aft_der, criterion='subtract')
         ind_good = list((-np.isnan(d)).nonzero()) + \
                    list((aft_der.mask.mean(axis=1) < mask_fraction_max).nonzero())
         ind_good = reduce(np.intersect1d, ind_good)
-        snames = snames[ind_good]
+        snames = samplenames[ind_good]
         aft_der = aft_der[ind_good]
         d = get_distance(aft_der, criterion='subtract')
         data_plot_samples.append((d, aft_der, snames, 'derived allele freq'))

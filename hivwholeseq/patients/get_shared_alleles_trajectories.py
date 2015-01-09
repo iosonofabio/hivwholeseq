@@ -7,6 +7,7 @@ content:    Get trajectories of alleles across patients.
 # Modules
 import os
 import argparse
+from collections import defaultdict
 from operator import itemgetter
 import numpy as np
 from Bio import SeqIO, AlignIO
@@ -66,13 +67,12 @@ def get_shared_allele_frequencies(region, pnames=None, VERBOSE=0, save=False,
     # Recycle existing files if possible
     if (not save) and all(map(os.path.isfile, (fn_aft, fn_ali, fn_map))):
         npdata = np.load(fn_aft)
-        afts = npdata['afts']
-        depthmaxs = npdata['depthmaxs']
-        times = npdata['times']
         ali = AlignIO.read(fn_ali, 'fasta')
         mapdict = np.load(fn_map)
-        maps = mapdict['maps']
-        mapref = mapdict['mapref']
+
+        data = dict(npdata)
+        data['ali'] = ali
+        data.update(mapdict)
 
     else:
         if VERBOSE >= 1:
@@ -109,19 +109,17 @@ def get_shared_allele_frequencies(region, pnames=None, VERBOSE=0, save=False,
 
         if VERBOSE >= 1:
             print 'Collecting alleles'
-        afts = np.zeros((len(patients.index), maps.shape[1], len(alpha)), object)
-        depthmaxs = np.zeros(afts.shape[0], object)
-        times = np.zeros(afts.shape[0], object)
+        data = defaultdict(list)
         for ip, (pname, patient) in enumerate(patients.iterrows()):
             patient = Patient(patient)
             patient.discard_nonsequenced_samples()
 
             # Collect allele counts from patient samples
-            act, ind = patient.get_allele_count_trajectories(region,
+            act, indt = patient.get_allele_count_trajectories(region,
                                                              VERBOSE=VERBOSE,
                                                              safe=True)
-            timespat = patient.times[ind]
-            depthmax = np.maximum(1.0 / patient.n_templates[ind], 2e-3)
+            timespat = patient.times[indt]
+            depthmax = np.maximum(1.0 / patient.n_templates[indt], 2e-3)
             #FIXME: for now, put 2e-3 to the masked positions, but this is no good
             depthmax[depthmax.mask] = 2e-3
 
@@ -141,40 +139,59 @@ def get_shared_allele_frequencies(region, pnames=None, VERBOSE=0, save=False,
                     af /= af.sum()
                     aft[i, :, k] = af
 
+            # Set the data
+            data['depthmaxs'].append(depthmax.data)
+            data['times'].append(timespat)
             mapi = maps[ip]
+            afts = np.zeros((aft.shape[0], len(alpha), len(mapi)), float)
             for i, ind in enumerate(mapi):
-                for j in xrange(len(alpha)):
-                    afts[ip, i, j] = aft[:, j, ind]
-            depthmaxs[ip] = depthmax.data
-            times[ip] = timespat
+                afts[:, :, i] = aft[:, :, ind]
+            data['afts'].append(afts)
+            data['samplenames'].append([pname+'_'+str(it) for it in indt])
+
+        # Stack
+        data = dict(data)
+        for key, val in data.iteritems():
+            data[key] = np.concatenate(val, axis=0)
 
         # Idem bytecode for maps
         maps_bytecode = np.ma.filled(maps, -1)
 
+        mapdict = {'maps': maps_bytecode,
+                   'pnames': np.append(np.array(patients.index), reference)}
+        if reference is not None:
+            mapdict['mapref'] = mapref
+
         if save:
             if VERBOSE >= 1:
                 print 'Saving to file'
-            np.savez_compressed(fn_aft,
-                                afts=afts,
-                                depthmaxs=depthmaxs,
-                                times=times,
-                                pnames=np.array(patients.index))
+            np.savez_compressed(fn_aft, **data)
             AlignIO.write(ali, fn_ali, 'fasta')
-            mapdict = {'maps': maps_bytecode,
-                       'pnames': np.append(np.array(patients.index), reference)}
-            if reference is not None:
-                mapdict['mapref'] = mapref
             np.savez_compressed(fn_map, **mapdict)
 
-    data = {'afts': afts,
-            'depthmaxs': depthmaxs,
-            'times': times,
-            'ali': ali,
-            'maps': maps}
-    if reference is not None:
-        data['mapref'] = mapref
+        data.update(mapdict)
+        data['ali'] = ali
 
     return data
+
+
+def get_patient_indices(samplenames, VERBOSE=0):
+    '''Get which sample is in which patient'''
+    inds = []
+    ind = None
+    pname_old = None
+    for i, samplename in enumerate(samplenames):
+        pname = samplename.split('_')[0]
+        if pname == pname_old:
+            ind.append(i)
+        else:
+            inds.append(ind)
+            ind = [i]
+            pname_old = pname
+    inds.append(ind)
+    inds = inds[1:]
+
+    return inds
 
 
 

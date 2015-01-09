@@ -728,3 +728,8 @@ def plot_SFS_folded(data_folder, adaID, fragment, nu_filtered, VERBOSE=0, savefi
         plt.show()
 
 
+def get_entropy(afs, alphabet_axis=-2, VERBOSE=0):
+    '''Get entropy from allele freqs'''
+    S = np.maximum(0, -((afs) * np.log2(np.maximum(afs, 1e-8))).sum(axis=alphabet_axis))
+    return S
+
