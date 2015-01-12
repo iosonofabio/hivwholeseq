@@ -168,7 +168,7 @@ def get_allele_frequency_trajectories_filename(pname, fragment):
 def get_coordinate_map_filename(pname, fragment, refname='HXB2'):
     '''Get the filename of the map to HXB2 or other ref coordinates'''
     filename = 'map_coord_to_'+refname+'_'+fragment+'.dat'
-    filename = get_foldername(pname)+filename
+    filename = get_foldername(pname)+'coordinate_maps/'+filename
     return filename
 
 

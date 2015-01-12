@@ -33,18 +33,6 @@ from hivwholeseq.multipatient.explore_entropy_patsubtype import (
 
 
 
-
-# Globals
-colors = {'p17': 'r',
-          'p24': 'g',
-          'PR': 'r',
-          'RT': 'g',
-          'p15': 'purple',
-          'IN': 'orange',
-          'gp41': 'r'}
-
-
-
 # Functions
 def get_degenerate_dict():
     '''Get dictionary of degeneracies'''

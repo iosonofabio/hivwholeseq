@@ -20,12 +20,15 @@ from scipy.stats import pearsonr, spearmanr
 
 from hivwholeseq.miseq import alpha, alphal
 from hivwholeseq.patients.filenames import root_patient_folder
-from hivwholeseq.sequencing.filenames import reference_folder
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.sequence_utils import translate_alignment
 from hivwholeseq.one_site_statistics import get_entropy
 from hivwholeseq.multipatient.get_shared_alleles_trajectories import (
     get_shared_allele_frequencies, get_patient_indices)
+from hivwholeseq.cross_sectional.get_subtype_entropy import (
+    get_subtype_reference_alignment,
+    get_ali_entropy,
+    get_subtype_reference_alignment_entropy)
 
 
 
@@ -41,17 +44,6 @@ colors = {'p17': 'r',
 
 
 # Functions
-def get_subtype_reference_alignment(region, subtype='B', VERBOSE=0, refname='HXB2',
-                                    type='nuc'):
-    '''Get the observables from subtype B reference alignments'''
-    tree_ali_foldername = reference_folder+'alignments/pairwise_to_'+refname+'/'
-    aliB_fn = tree_ali_foldername+region+'.'+subtype+'.'+type+'.aligned.fasta'
-    if VERBOSE >= 3:
-        print 'Alignment file:', aliB_fn
-    aliB = AlignIO.read(aliB_fn, 'fasta')
-    return aliB
-
-
 def get_allele_freqs_alignment(alim, positions=None, VERBOSE=0):
     '''Get allele frequencies from alignment'''
     from hivwholeseq.miseq import alpha, alphal
@@ -67,24 +59,6 @@ def get_allele_freqs_alignment(alim, positions=None, VERBOSE=0):
     num /= num.sum(axis=0)
 
     return num[:, positions]
-
-
-def get_ali_entropy(ali, positions=None, alpha=alpha[:5], VERBOSE=0):
-    '''Get entropy of alignment at some positions'''
-    if positions is None:
-        positions = np.arange(len(ali[0]))
-
-    afs = np.zeros((5, len(positions)))
-    for i, pos in enumerate(positions):
-        af = np.zeros(len(alpha))
-        col = np.fromstring(ali[:, pos], 'S1')
-        for ia, nuc in enumerate(alpha):
-            af[ia] = (col == nuc).sum()
-        af /= af.sum()
-        afs[:, i] = af
-
-    S = get_entropy(afs)
-    return S
 
 
 def get_entropy_pats(afts, VERBOSE=0):

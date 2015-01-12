@@ -119,6 +119,8 @@ class Patient(pd.Series):
     def get_fragmented_roi(self, roi, VERBOSE=0, **kwargs):
         '''Get a region of interest in fragment coordinates'''
         from hivwholeseq.patients.get_roi import get_fragmented_roi
+        if isinstance(roi, basestring):
+            roi = (roi, 0, '+oo')
         return get_fragmented_roi(self, roi, VERBOSE=VERBOSE, **kwargs)
 
 
@@ -339,19 +341,33 @@ class Patient(pd.Series):
         return get_coordinate_map_filename(self.name, fragment, refname=refname)
 
 
-    def get_map_coordinates_reference(self, fragment, refname='HXB2', roi=None):
+    def get_map_coordinates_reference(self, roi, refname='HXB2'):
         '''Get the map of coordinate to some external reference
         
         Returns:
           mapco (2D int array): the first column are the positions in the reference,
             the second column the position in the patient initial reference. 
         '''
-        fn = self.get_map_coordinates_reference_filename(fragment, refname=refname)
+        if isinstance(roi, basestring):
+            region = roi
+        else:
+            region = roi[0]
+
+        fn = self.get_map_coordinates_reference_filename(region, refname=refname)
         mapco = np.loadtxt(fn, dtype=int)
-        if roi is None:
+
+        if isinstance(roi, basestring):
             return mapco
         else:
-            ind = (mapco[:, 1] >= roi[0]) & (mapco[:, 1] < roi[1])
+            start = roi[1]
+            ind = (mapco[:, 1] >= start)
+
+            if roi[2] != '+oo':
+                end = roi[2]
+                ind &= (mapco[:, 1] < end)
+
+            # The patient coordinates are referred to the roi itself!
+            mapco[:, 1] -= start
             return mapco[ind]
 
 

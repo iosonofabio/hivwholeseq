@@ -21,6 +21,7 @@ from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_foldername, get_coordinate_map_filename
 
 
+
 # Function
 def build_coordinate_map(refseq, patseq, VERBOSE=0, **kwargs):
     '''Build the coordinate map
@@ -69,8 +70,8 @@ if __name__ == '__main__':
                         help='Select reference strain to align against')
     parser.add_argument('--patients', nargs='+',
                         help='Patient to analyze')
-    parser.add_argument('--fragments', nargs='+',
-                        help='Fragment to map (e.g. F1 F6)')
+    parser.add_argument('--regions', nargs='+',
+                        help='regions to make coordinate maps for (e.g. V3 F6)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
     parser.add_argument('--save', action='store_true',
@@ -79,7 +80,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     refname = args.reference
     pnames = args.patients
-    fragments = args.fragments
+    regions = args.regions
     VERBOSE = args.verbose
     save_to_file = args.save
 
@@ -91,30 +92,33 @@ if __name__ == '__main__':
     if not len(patients):
         raise ValueError('No patients found!')
 
-    if fragments is None:
-        fragments = ['F'+str(i) for i in xrange(1, 7)] + ['genomewide']
-    if VERBOSE >= 3:
-        print 'fragments', fragments
-
     maps_coord = defaultdict(dict)
     for pname, patient in patients.iterrows():
         patient = Patient(patient)
-        for fragment in fragments:
+
+        # Make maps for all annotations if not explicit
+        if regions is None:
+            patseqann = patient.get_reference('genomewide', format='gb')
+            regionspat = map(attrgetter('id'), patseqann.features) + ['genomewide']
+        else:
+            regionspat = regions
+
+        for region in regionspat:
             if VERBOSE >= 1:
-                print pname, fragment
+                print pname, region
 
             refseq = load_custom_reference(refname)
-            patseq = patient.get_reference(fragment)
+            patseq = patient.get_reference(region)
 
             mapco = build_coordinate_map(refseq, patseq, VERBOSE=VERBOSE)
 
-            maps_coord[(fragment, pname)] = mapco 
+            maps_coord[(region, pname)] = mapco 
 
             if save_to_file:
-                out_fn = get_coordinate_map_filename(pname, fragment, refname=refname)
+                out_fn = get_coordinate_map_filename(pname, region, refname=refname)
                 np.savetxt(out_fn, np.array(mapco, int), fmt='%d',
                            delimiter='\t',
-                           header=refname+'\t'+pname+'_'+fragment)
+                           header=refname+'\t'+pname+'_'+region)
                 if VERBOSE:
-                    print 'Saved to file:', pname, fragment
+                    print 'Saved to file:', pname, region
 
