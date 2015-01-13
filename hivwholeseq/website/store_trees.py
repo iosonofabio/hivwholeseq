@@ -7,11 +7,15 @@ content:    Store phylogenetic trees in a suitable format for the website.
 # Modules
 import os
 import sys
+from operator import attrgetter
 
 from hivwholeseq.generic_utils import mkdirs
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.patients.filenames import get_consensi_tree_filename as gfn_in
 from hivwholeseq.website.filenames import get_consensi_tree_filename as gfn_out
+from hivwholeseq.tree_utils import tree_to_json
+from hivwholeseq.generic_utils import write_json
+
 
 
 # Globals
@@ -22,45 +26,45 @@ refnames = ['LAI-III']
 # Script
 if __name__ == '__main__':
 
-    fragments = ['F'+str(i) for i in xrange(1, 7)]
     patients = load_patients()
 
     # Patient by patient
     for pname, patient in patients.iterrows():
         patient = Patient(patient)
 
-        # Fragment trees (we recycle extant files for speed reasons)
-        for fragment in fragments:
-            print patient.code, patient.name, fragment
+        refseq_gw = patient.get_reference('genomewide', 'gb')
+        regions = map(attrgetter('id'), refseq_gw.features) + ['genomewide']
 
-            fn = patient.get_consensi_tree_filename(fragment)
+        for region in regions:
+            print patient.code, patient.name, region
 
+            fn = patient.get_consensi_tree_filename(region, format='json')
             if not os.path.isfile(fn):
                continue
 
-            tree = Phylo.read(fn, 'newick')
+            tree = patient.get_consensi_tree(region, format='json')
 
             # Delete initial reference
             for leaf in tree.get_terminals():
-                if 'init' in leaf.name:
+                if 'reference' in leaf.name:
                     break
             else:
                 raise ValueError('Initial reference not found in tree')
             tree.prune(leaf)
 
-            # Rename nodes without sample names
-            for leaf in tree.get_terminals():
-                leaf.name = str(int(float(leaf.name.split('_')[0])))+'_days'
-
-            # Ladderize in place
             tree.ladderize()
 
             # Write output
-            fn_out = gfn_out(patient.code, fragment)
-            Phylo.write([tree], fn_out, 'newick')
+            fn_out = gfn_out(patient.code, region, format='json')
+            write_json(tree_to_json(tree.root), fn_out, indent=1)
+
+    # FIXME: make json global trees
+    import sys; sys.exit()
 
     # Global trees
     print 'All patients'
+    # TODO: make alignments of other regions
+    fragments = ['F'+str(i) for i in xrange(1, 7)]
     for fragment in fragments:
         print fragment
         fn = gfn_in('all', fragment)

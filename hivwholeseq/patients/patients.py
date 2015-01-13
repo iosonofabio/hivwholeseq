@@ -166,14 +166,16 @@ class Patient(pd.Series):
         return get_consensi_tree_filename(self.name, region, format=format)
 
 
-    def get_consensi_tree(self, region):
+    def get_consensi_tree(self, region, format='newick'):
         '''Get consensi tree from the patient'''
         import os.path
-        fn = self.get_consensi_tree_filename(region, format='json')
-        if os.path.isfile(fn):
-            # TODO: import/write this function
-            load_tree_from_json = lambda x: 'NOT IMPLEMENTED'
-            return load_tree_from_json(fn)
+
+        if format == 'json':
+            fn = self.get_consensi_tree_filename(region, format='json')
+            if os.path.isfile(fn):
+                from ..generic_utils import read_json
+                from ..tree_utils import tree_from_json
+                return tree_from_json(read_json(fn))
 
         fn = self.get_consensi_tree_filename(region, format='newick')
         if os.path.isfile(fn):

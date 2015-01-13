@@ -72,6 +72,7 @@ if __name__ == '__main__':
                 if VERBOSE == 1:
                     print ''
 
+            # FIXME: tat and rev are messed up still!
             refseq = patient.get_reference(region)
             refseq.id = 'reference_'+refseq.id
             refseq.name = 'reference_'+refseq.name

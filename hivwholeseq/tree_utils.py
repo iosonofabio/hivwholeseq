@@ -69,12 +69,14 @@ def get_path_toroot(tree, node):
 
 
 def tree_to_json(node,
-                 fields=('DSI','seq','muts','fmax', 'freq','readcount', 'VL', 'CD4'),
+                 fields=('DSI','seq','muts','fmax', 'freq','readcount', 'VL', 'CD4',
+                         'confidence'),
                 ):
     '''Convert tree in nested dictionary (JSON)'''
 
-    json = {'name':node.name}
-    json = {'branch_length':node.branch_length}
+    json = {'name': node.name,
+            'branch_length': node.branch_length}
+
     for field in fields:
         if hasattr(node, field):
             val = node.__getattribute__(field)
@@ -91,3 +93,26 @@ def tree_to_json(node,
 
     return json
 
+
+def tree_from_json(json):
+    '''Convert JSON into a Biopython tree'''
+    from Bio import Phylo
+
+    def node_from_json(json, node):
+        '''Biopython Clade from json (for recursive call)'''
+        for attr,val in json.iteritems():
+            if attr == 'children':
+                for sub_json in val:
+                    child = Phylo.BaseTree.Clade()
+                    node.clades.append(child)
+                    node_from_json(sub_json, child)
+            else:
+                try:
+                    node.__setattr__(attr, float(val))
+                except:
+                    node.__setattr__(attr, val)
+
+    tree = Phylo.BaseTree.Tree()
+    node_from_json(json, tree.root)
+    tree.root.branch_length=0.01
+    return tree

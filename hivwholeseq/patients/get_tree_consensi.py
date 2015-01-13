@@ -19,6 +19,53 @@ from hivwholeseq.tree_utils import build_tree_fasttree
 
 
 
+# Functions
+def annotate_tree(patient, tree, ali=None, VERBOSE=0,
+                  fields=('DSI', 'muts', 'VL', 'ntemplates', 'CD4')):
+    '''Annotate a tree with info on the nodes'''
+    if ali is None:
+        ali = patient.get_consensi_alignment(region)
+
+    seqnames = [seq.name for seq in ali]
+    for seq in ali:
+        if 'reference' in seq.name:
+            refm = np.array(seq, 'S1')
+            break
+    else:
+        raise ValueError('Reference sequence not found in alignment')
+
+    for node in tree.get_terminals():
+        label = node.name
+        entries = label.split('_')
+        node.name = entries[0]
+
+        if node.name != 'reference':
+
+            # Days Since Infection
+            if 'DSI' in fields:
+                time = float(entries[0])
+                node.DSI = time
+            
+            sample = patient.samples.loc[patient.times == time].iloc[0]
+    
+            if 'CD4' in fields:
+                node.CD4 = sample['CD4+ count']
+
+            if 'VL' in fields:
+                node.VL = sample['viral load']
+
+            # FIXME: shall we check the patient method for this?
+            if 'ntemplates' in fields:
+                node.ntemplates = sample['n templates']
+
+            if 'muts' in fields:
+                seqm = np.array(ali[seqnames.index(label)], 'S1')
+                posm = (seqm != refm).nonzero()[0]
+                muts = [refm[p]+str(p+1)+seqm[p] for p in posm]
+                node.muts = ', '.join(muts)
+
+
+
 # Script
 if __name__ == '__main__':
 
@@ -75,11 +122,20 @@ if __name__ == '__main__':
 
             if use_save:
                 if VERBOSE >= 2:
-                    print 'Save tree'
+                    print 'Save tree (Newick)'
                 from Bio import Phylo
-                fn_out = patient.get_consensi_tree_filename(region)
+                fn_out = patient.get_consensi_tree_filename(region, format='newick')
                 mkdirs(os.path.dirname(fn_out))
                 Phylo.write(tree, fn_out, 'newick')
+
+                if VERBOSE >= 2:
+                    print 'Save tree (JSON)'
+                from hivwholeseq.tree_utils import tree_to_json
+                from hivwholeseq.generic_utils import write_json
+                annotate_tree(patient, tree, ali=ali, VERBOSE=VERBOSE)
+                tree_json = tree_to_json(tree.root)
+                fn_out = patient.get_consensi_tree_filename(region, format='json')
+                write_json(tree_json, fn_out)
 
             if use_plot:
                 import matplotlib.pyplot as plt

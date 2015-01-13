@@ -77,7 +77,8 @@ def write_json(data, file_name, indent=None):
     Parameters:
        data       -- dictionary
        file_name  -- name of file to save dict
-       indent     -- indentation of json file, default None, 0 = only line breaks
+       indent     -- indentation of json file: default None, 0 = only line breaks,
+                     1 = all
     '''
     import json
 
