@@ -66,3 +66,28 @@ def find_parent(tree, node):
 def get_path_toroot(tree, node):
     '''Get the path to root'''
     return tree.root.get_path(node)[::-1]
+
+
+def tree_to_json(node,
+                 fields=('DSI','seq','muts','fmax', 'freq','readcount', 'VL', 'CD4'),
+                ):
+    '''Convert tree in nested dictionary (JSON)'''
+
+    json = {'name':node.name}
+    json = {'branch_length':node.branch_length}
+    for field in fields:
+        if hasattr(node, field):
+            val = node.__getattribute__(field)
+            if val is None:
+                json[field] = "undefined"
+            else:
+                json[field] = val
+
+    # repeat for all children
+    if len(node.clades):
+        json["children"] = []
+        for ch in node.clades:
+            json["children"].append(tree_to_json(ch))
+
+    return json
+

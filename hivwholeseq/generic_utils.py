@@ -58,3 +58,34 @@ def modification_date(filename):
     import datetime
     t = os.path.getmtime(filename)
     return datetime.datetime.fromtimestamp(t)
+
+
+def read_json(file_name):
+    '''Read the json file with name file_name into a dict'''
+    import json
+
+    try:
+        with open(file_name, 'r') as infile:
+            data = json.load(infile)
+    except IOError:
+        print("Cannot open "+file_name)
+    return data
+
+
+def write_json(data, file_name, indent=None):
+    '''Dump a dict as a json to file
+    Parameters:
+       data       -- dictionary
+       file_name  -- name of file to save dict
+       indent     -- indentation of json file, default None, 0 = only line breaks
+    '''
+    import json
+
+    try:
+        with open(file_name, 'w') as outfile:
+            json.dump(data, outfile, indent=indent)
+    except IOError:
+        print("Cannot open "+file_name)
+
+
+
