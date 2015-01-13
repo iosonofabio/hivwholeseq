@@ -640,8 +640,14 @@ def get_allele_frequencies_alignment(ali, alpha=alpha, VERBOSE=0):
     return af
 
 
-def get_entropy(afs, alphabet_axis=-2, VERBOSE=0):
+def get_entropy(afs, alphabet_axis=None, VERBOSE=0):
     '''Get entropy from allele freqs'''
+    if alphabet_axis is None:
+        if len(afs.shape) == 1:
+            alphabet_axis = 0
+        else:
+            alphabet_axis = -2
+
     S = np.maximum(0, -((afs) * np.log2(np.maximum(afs, 1e-8))).sum(axis=alphabet_axis))
     return S
 

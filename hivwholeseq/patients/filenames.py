@@ -103,17 +103,17 @@ def get_initial_hash_filename(pname, fragment, ext=True):
     return filename
 
 
-def get_consensi_alignment_filename(pname, fragment, format='fasta'):
+def get_consensi_alignment_filename(pname, region, format='fasta'):
     '''Get the MSA of all consensi of the patient, sorted by time point'''
-    filename = 'consensi_alignment_'+fragment+'.'+format
-    filename = get_foldername(pname)+filename
+    filename = 'consensi_alignment_'+region+'.'+format
+    filename = get_foldername(pname)+'alignments/'+filename
     return filename
 
 
-def get_consensi_tree_filename(pname, fragment):
+def get_consensi_tree_filename(pname, fragment, format='newick'):
     '''Get the newick filename of the consensus tree'''
-    filename = 'consensi_tree_'+fragment+'.newick'
-    filename = get_foldername(pname)+filename
+    filename = 'consensi_tree_'+fragment+'.'+format
+    filename = get_foldername(pname)+'trees/'+filename
     return filename
 
 

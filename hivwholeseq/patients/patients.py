@@ -146,24 +146,39 @@ class Patient(pd.Series):
         return refseq
 
 
-    def get_consensi_alignment_filename(self, fragment, format='fasta'):
+    def get_consensi_alignment_filename(self, region, format='fasta'):
         '''Get the filename of the multiple sequence alignment of all consensi'''
         from hivwholeseq.patients.filenames import get_consensi_alignment_filename
-        return get_consensi_alignment_filename(self.name, fragment, format=format)
+        return get_consensi_alignment_filename(self.name, region, format=format)
 
 
-    def get_consensi_alignment(self, fragment, format='fasta'):
+    def get_consensi_alignment(self, region, format='fasta'):
         '''Get the multiple sequence alignment of all consensi'''
         from Bio import AlignIO
-        return AlignIO.read(self.get_consensi_alignment_filename(fragment,
+        return AlignIO.read(self.get_consensi_alignment_filename(region,
                                                                  format=format),
                             format)
 
 
-    def get_consensi_tree_filename(self, fragment):
-        '''Get the filename of the consensi of the patient'''
+    def get_consensi_tree_filename(self, region, format='newick'):
+        '''Get the filename of the consensi tree of the patient'''
         from hivwholeseq.patients.filenames import get_consensi_tree_filename
-        return get_consensi_tree_filename(self.name, fragment)
+        return get_consensi_tree_filename(self.name, region, format=format)
+
+
+    def get_consensi_tree(self, region):
+        '''Get consensi tree from the patient'''
+        import os.path
+        fn = self.get_consensi_tree_filename(region, format='json')
+        if os.path.isfile(fn):
+            # TODO: import/write this function
+            load_tree_from_json = lambda x: 'NOT IMPLEMENTED'
+            return load_tree_from_json(fn)
+
+        fn = self.get_consensi_tree_filename(region, format='newick')
+        if os.path.isfile(fn):
+            from Bio import Phylo
+            return Phylo.read(fn, 'newick')
 
 
     @staticmethod
