@@ -22,7 +22,7 @@ from hivwholeseq.website.filenames import get_precompiled_alignments_filename
 from hivwholeseq.cluster.fork_cluster import fork_store_haplotypes_website as fork_self
 from hivwholeseq.sequence_utils import align_muscle
 from hivwholeseq.tree_utils import build_tree_fasttree
-from hivwholeseq.patients.get_local_trees import get_region_count_trajectories
+from hivwholeseq.patients.get_tree_local import get_region_count_trajectories
 from hivwholeseq.patients.filenames import get_consensi_tree_filename as gfn_in
 from hivwholeseq.website.filenames import get_consensi_tree_filename as gfn_out
 from hivwholeseq.website.filenames import get_consensi_alignment_filename

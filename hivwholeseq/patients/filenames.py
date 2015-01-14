@@ -111,8 +111,15 @@ def get_consensi_alignment_filename(pname, region, format='fasta'):
 
 
 def get_consensi_tree_filename(pname, fragment, format='newick'):
-    '''Get the newick filename of the consensus tree'''
+    '''Get the filename of the consensus tree'''
     filename = 'consensi_tree_'+fragment+'.'+format
+    filename = get_foldername(pname)+'trees/'+filename
+    return filename
+
+
+def get_local_tree_filename(pname, fragment, format='json'):
+    '''Get the filename of the local haplotype tree'''
+    filename = 'local_tree_'+fragment+'.'+format
     filename = get_foldername(pname)+'trees/'+filename
     return filename
 

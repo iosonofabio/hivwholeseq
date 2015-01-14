@@ -23,16 +23,23 @@ from hivwholeseq.tree_utils import build_tree_fasttree
 def annotate_tree(patient, tree, ali=None, VERBOSE=0,
                   fields=('DSI', 'muts', 'VL', 'ntemplates', 'CD4')):
     '''Annotate a tree with info on the nodes'''
+    from seqanpy import align_global
+
     if ali is None:
         ali = patient.get_consensi_alignment(region)
 
-    seqnames = [seq.name for seq in ali]
-    for seq in ali:
-        if 'reference' in seq.name:
-            refm = np.array(seq, 'S1')
-            break
+    if len(ali) == 1:
+        seq = ali[0]
     else:
-        raise ValueError('Reference sequence not found in alignment')
+        seqnames = [seq.name for seq in ali]
+        for seq in ali:
+            if 'reference' in seq.name:
+                break
+        else:
+            raise ValueError('Reference sequence not found in alignment')
+    
+    ref = ''.join(seq)
+    refm = np.fromstring(ref, 'S1')
 
     for node in tree.get_terminals():
         label = node.name
@@ -59,7 +66,12 @@ def annotate_tree(patient, tree, ali=None, VERBOSE=0,
                 node.ntemplates = sample['n templates']
 
             if 'muts' in fields:
-                seqm = np.array(ali[seqnames.index(label)], 'S1')
+                if hasattr(node, 'sequence'):
+                    # The sequence must be aligned already
+                    seqm = np.fromstring(node.sequence, 'S1')
+                else:
+                    seqm = np.fromstring(''.join(ali[seqnames.index(label)]), 'S1')
+
                 posm = (seqm != refm).nonzero()[0]
                 muts = [refm[p]+str(p+1)+seqm[p] for p in posm]
                 node.muts = ', '.join(muts)

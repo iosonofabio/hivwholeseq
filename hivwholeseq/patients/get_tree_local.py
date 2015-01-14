@@ -17,6 +17,7 @@ from hivwholeseq.patients.patients import load_patient
 from hivwholeseq.sequence_utils import align_muscle
 from hivwholeseq.tree_utils import build_tree_fasttree
 from hivwholeseq.argparse_utils import RoiAction
+from hivwholeseq.patients.get_tree_consensi import annotate_tree
 
 
 
@@ -75,17 +76,13 @@ def get_region_count_trajectories(patient, region, VERBOSE=0, countmin=5):
     return (hct.T, ind, seqs_set)
 
 
-def annotate_tree(tree, hft, times, minfreq=0.1):
+def expand_duplicates_annotate_tree(tree, htf, times, seqs, minfreq=0.01):
     '''Annotate tree with days and colors'''
     from operator import attrgetter
-
-    cmap = cm.jet
-    last_tp = times[-1]
-    def get_color(node):
-        return map(int, np.array(cmap(node.day/last_tp*0.9)[:-1]) * 255)
+    from Bio.Phylo.BaseTree import Clade
 
     # Reroot
-    iseqroot = hft[:, 0].argmax()
+    iseqroot = htf[:, 0].argmax()
     for leaf in tree.get_terminals():
         iseq = int(leaf.name[3:]) - 1
         if iseq == iseqroot:
@@ -94,24 +91,71 @@ def annotate_tree(tree, hft, times, minfreq=0.1):
         raise ValueError('Not able to reroot!')
     tree.root_with_outgroup(leaf)
 
+    # Expand duplicates (same sequence but different time points)
+    leaves = tree.get_terminals()
+    for leaf in leaves:
+        iseq = int(leaf.name[3:]) - 1
+        seq = seqs[iseq]
+        ht = htf[iseq]
+
+        # Check how many copies of the leaf we need
+        indseq = set((ht > minfreq).nonzero()[0])
+        indseq.add(ht.argmax())
+        indseq = sorted(indseq)
+
+        # One copy only, just rename
+        if len(indseq) == 1:
+            it = indseq[0]
+            h = ht[it]
+            t = '{:1.1f}'.format(times[it])
+
+            leaf.name = str(t)+'_'+seq
+            leaf.frequency = h
+            leaf.sequence = seq
+            leaf.DSI = t
+
+            continue
+
+        # Several copy, transform into internal node and append subtree
+        for it in indseq:
+            it = indseq[0]
+            h = ht[it]
+            t = '{:1.1f}'.format(times[it])
+
+            name = str(t)+'_'+seq
+            newleaf = Clade(branch_length=1e-4, name=name)
+            newleaf.frequency = h
+            newleaf.sequence = seq
+            newleaf.DSI = t
+
+            leaf.clades.append(newleaf)
+
+        leaf.name = None
+        leaf.confidence = 1.0
+
+
+def annotate_tree_for_plot(tree, htf, times, seqs, minfreq=0.02):
+    '''Add annotations for plotting'''
+    from matplotlib import cm
+    cmap = cm.jet
+
+    last_tp = max(leaf.DSI for leaf in tree.get_terminals())
+    def get_color(node):
+        return map(int, np.array(cmap(node.DSI/last_tp*0.9)[:-1]) * 255)
+
     # Annotate leaves
     for leaf in tree.get_terminals():
-        iseq = int(leaf.name[3:]) - 1
-        it = hft[iseq].argmax()
-        leaf.day = times[it]
-        leaf.hf = hft[iseq, it]
-
         leaf.color = get_color(leaf)
 
         if leaf.hf >= minfreq:
-            leaf.label = 't = '+str(int(leaf.day))+', f = '+'{:1.2f}'.format(leaf.hf)
+            leaf.label = 't = '+str(int(leaf.DSI))+', f = '+'{:1.2f}'.format(leaf.frequency)
         else:
             leaf.label = ''
 
     # Color internal branches
     for node in tree.get_nonterminals(order='postorder'):
         node.label = ''
-        node.day = np.mean([c.day for c in node.clades])
+        node.DSI = np.mean([c.DSI for c in node.clades])
         node.color = get_color(node)
 
 
@@ -134,6 +178,8 @@ if __name__ == '__main__':
                         help='Plot local haplotype trajectories')
     parser.add_argument('--freqmin', type=int, default=0.01,
                         help='Minimal frequency to keep the haplotype')
+    parser.add_argument('--save', action='store_true',
+                        help='Save alignment to file')
 
     args = parser.parse_args()
     pname = args.patient
@@ -142,6 +188,7 @@ if __name__ == '__main__':
     maxreads = args.maxreads
     use_plot = args.plot
     freqmin = args.freqmin
+    use_save = args.save
 
     patient = load_patient(pname)
 
@@ -157,12 +204,16 @@ if __name__ == '__main__':
                                                                           VERBOSE=VERBOSE)
     
     hct = hct.T
-    hft = 1.0 * hct / hct.sum(axis=0)
+    htf = 1.0 * hct / hct.sum(axis=0)
+
+    # Get initial top haplo
+    iseq0 = htf[:, 0].argmax()
+    seq0 = seqs[iseq0]
 
     # Exclude too rare haplos
-    indseq = (hft >= freqmin).any(axis=1)
+    indseq = (htf >= freqmin).any(axis=1)
     seqs = seqs[indseq]
-    hft = hft[indseq]
+    htf = htf[indseq]
 
     times = patient.times[ind]
 
@@ -173,10 +224,24 @@ if __name__ == '__main__':
     if VERBOSE >= 1:
         print 'Build local tree'
     tree = build_tree_fasttree(seqsali, VERBOSE=VERBOSE)
-    annotate_tree(tree, hft, times, minfreq=0.1)
+    expand_duplicates_annotate_tree(tree, htf, times, map(''.join, seqsali), minfreq=0.01)
     tree.ladderize()
+
+    if use_save:
+        if VERBOSE >= 2:
+            print 'Save tree (JSON)'
+        from hivwholeseq.tree_utils import tree_to_json
+        from hivwholeseq.generic_utils import write_json
+        annotate_tree(patient, tree, ali=[seqsali[iseq0]], VERBOSE=VERBOSE)
+        tree_json = tree_to_json(tree.root)
+        fn_out = patient.get_local_tree_filename(region, format='json')
+        write_json(tree_json, fn_out)
+
     
     if use_plot:
+
+        annotate_tree_for_plot(tree, htf, times, seqs, minfreq=0.1)
+
         if VERBOSE >= 1:
             print 'Plot'
         fig, axs = plt.subplots(1, 2, figsize=(10, 5))
@@ -184,7 +249,7 @@ if __name__ == '__main__':
  
         # Plot haplotype frequencies
         ax = axs[1]
-        for hf in hft:
+        for hf in htf:
             ax.plot(times, hf, lw=2)
         
         ax.set_xlabel('Time [days]')

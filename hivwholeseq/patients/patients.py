@@ -183,6 +183,23 @@ class Patient(pd.Series):
             return Phylo.read(fn, 'newick')
 
 
+    def get_local_tree_filename(self, region, format='json'):
+        '''Get the filename of the consensi tree of the patient'''
+        from hivwholeseq.patients.filenames import get_local_tree_filename
+        return get_local_tree_filename(self.name, region, format=format)
+
+
+    def get_local_tree(self, region):
+        '''Get consensi tree from the patient'''
+        import os.path
+
+        fn = self.get_local_tree_filename(region, format='json')
+        if os.path.isfile(fn):
+            from ..generic_utils import read_json
+            from ..tree_utils import tree_from_json
+            return tree_from_json(read_json(fn))
+
+
     @staticmethod
     def get_initial_consensus_noinsertions(aft, VERBOSE=0):
         '''Make initial consensus from allele frequencies, keep coordinates and masked
@@ -433,7 +450,7 @@ class Patient(pd.Series):
     
     def get_region_count_trajectories(self, region, VERBOSE=0, **kwargs):
         '''Get trajectories of local haplotypes in a precompiled region'''
-        from .get_local_trees import get_region_count_trajectories
+        from .get_tree_local import get_region_count_trajectories
         return get_region_count_trajectories(self, region, VERBOSE=VERBOSE)
 
 
