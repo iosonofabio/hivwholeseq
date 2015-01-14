@@ -69,7 +69,10 @@ def get_path_toroot(tree, node):
 
 
 def tree_to_json(node,
-                 fields=('DSI','seq','muts','fmax', 'freq','readcount', 'VL', 'CD4',
+                 fields=('DSI', 'seq', 'muts',
+                         'fmax', 'freq',
+                         'readcount',
+                         'VL', 'CD4',
                          'confidence'),
                 ):
     '''Convert tree in nested dictionary (JSON)'''
@@ -79,7 +82,7 @@ def tree_to_json(node,
 
     for field in fields:
         if hasattr(node, field):
-            val = node.__getattribute__(field)
+            val = getattr(node, field)
             if val is None:
                 json[field] = "undefined"
             else:
@@ -89,7 +92,7 @@ def tree_to_json(node,
     if len(node.clades):
         json["children"] = []
         for ch in node.clades:
-            json["children"].append(tree_to_json(ch))
+            json["children"].append(tree_to_json(ch, fields=fields))
 
     return json
 

@@ -20,61 +20,61 @@ from hivwholeseq.tree_utils import build_tree_fasttree
 
 
 # Functions
-def annotate_tree(patient, tree, ali=None, VERBOSE=0,
+def annotate_tree(patient, tree, VERBOSE=0,
                   fields=('DSI', 'muts', 'VL', 'ntemplates', 'CD4')):
     '''Annotate a tree with info on the nodes'''
-    from seqanpy import align_global
-
-    if ali is None:
-        ali = patient.get_consensi_alignment(region)
-
-    if len(ali) == 1:
-        seq = ali[0]
-    else:
-        seqnames = [seq.name for seq in ali]
-        for seq in ali:
-            if 'reference' in seq.name:
-                break
-        else:
-            raise ValueError('Reference sequence not found in alignment')
-    
-    ref = ''.join(seq)
-    refm = np.fromstring(ref, 'S1')
-
     for node in tree.get_terminals():
         label = node.name
         entries = label.split('_')
         node.name = entries[0]
 
-        if node.name != 'reference':
+        if node.name == 'reference':
+            continue
 
-            # Days Since Infection
-            if 'DSI' in fields:
-                time = float(entries[0])
-                node.DSI = time
-            
-            sample = patient.samples.loc[patient.times == time].iloc[0]
+        # Days Since Infection
+        if 'DSI' in fields:
+            time = float(entries[0])
+            node.DSI = time
+        
+        sample = patient.samples.loc[patient.times == time].iloc[0]
     
-            if 'CD4' in fields:
-                node.CD4 = sample['CD4+ count']
+        if 'CD4' in fields:
+            node.CD4 = sample['CD4+ count']
 
-            if 'VL' in fields:
-                node.VL = sample['viral load']
+        if 'VL' in fields:
+            node.VL = sample['viral load']
 
-            # FIXME: shall we check the patient method for this?
-            if 'ntemplates' in fields:
-                node.ntemplates = sample['n templates']
+        # FIXME: shall we check the patient method for this?
+        if 'ntemplates' in fields:
+            node.ntemplates = sample['n templates']
 
-            if 'muts' in fields:
-                if hasattr(node, 'sequence'):
-                    # The sequence must be aligned already
-                    seqm = np.fromstring(node.sequence, 'S1')
-                else:
-                    seqm = np.fromstring(''.join(ali[seqnames.index(label)]), 'S1')
+    # For the mutations on branches, all nodes must have sequences already
+    if ('muts') in fields or ('mutsprot' in fields):
+        from Bio.Seq import translate
+        from hivwholeseq.tree_utils import find_parent
+        # NOTE: the root has no mutations by definition
+        for node in tree.get_terminals() + tree.get_nonterminals():
+            try:
+                parent = find_parent(tree, node)
+            except IndexError:
+                continue
 
-                posm = (seqm != refm).nonzero()[0]
-                muts = [refm[p]+str(p+1)+seqm[p] for p in posm]
-                node.muts = ', '.join(muts)
+            pseq = parent.sequence
+            nseq = node.sequence
+
+            for attrname in ('muts', 'mutsprot'):
+                if attrname not in fields:
+                    continue
+                
+                if attrname == 'mutsprot':
+                    pseq = translate(pseq)
+                    nseq = translate(nseq)
+
+                pseqm = np.fromstring(pseq, 'S1')
+                nseqm = np.fromstring(nseq, 'S1')
+                posm = (pseqm != nseqm).nonzero()[0]
+                muts = [pseqm[p]+str(p+1)+nseqm[p] for p in posm]
+                setattr(node, attrname, ', '.join(muts))
 
 
 
@@ -144,7 +144,8 @@ if __name__ == '__main__':
                     print 'Save tree (JSON)'
                 from hivwholeseq.tree_utils import tree_to_json
                 from hivwholeseq.generic_utils import write_json
-                annotate_tree(patient, tree, ali=ali, VERBOSE=VERBOSE)
+                # FIXME: preannotate with sequences
+                annotate_tree(patient, tree, VERBOSE=VERBOSE)
                 tree_json = tree_to_json(tree.root)
                 fn_out = patient.get_consensi_tree_filename(region, format='json')
                 write_json(tree_json, fn_out)

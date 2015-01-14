@@ -168,7 +168,11 @@ if __name__ == '__main__':
         if VERBOSE >= 1:
             print region
 
-        Ssub = get_subtype_reference_alignment_entropy(region)
+        try:
+            Ssub = get_subtype_reference_alignment_entropy(region)
+        except IOError:
+            # FIXME: this is a hack
+            Ssub = defaultdict(int)
 
         for ipat, (pname, patient) in enumerate(patients.iterrows()):
 
@@ -327,37 +331,42 @@ if __name__ == '__main__':
     #print comparison_Abram2010(mu)
 
     if plot:
-        # Plot the mean only
-        fig, ax = plt.subplots()
-        ax.set_title(title, fontsize=10)
+        for indices in [['Class', 'Trclass']]:
 
-        for icl, (keys, arr) in enumerate(pdata.iterrows()):
-            # Vary both color and line type instead of only color
-            color = cm.jet(1.0 * icl / len(pdata))
+            # Plot the mean only
+            fig, ax = plt.subplots()
+            ax.set_title(title, fontsize=10)
 
-            x = arr.index
-            y = np.array(arr)
+            # Fit change in time (mutation rate?)
+            meangrouped = data['aft'].groupby(indices + ['Time']).mean()['af']
+            pdata = meangrouped.unstack('Time')
 
-            # Linear LS fit (shall we do it on all data instead?)
-            m = np.inner(x, y) / np.inner(x, x)
+            for icl, (keys, arr) in enumerate(pdata.iterrows()):
+                # Vary both color and line type instead of only color
+                color = cm.jet(1.0 * icl / len(pdata))
 
-            ax.scatter(x, y, lw=2, color=color)
+                x = arr.index
+                y = np.array(arr)
 
-            xfit = np.linspace(x.min(), x.max(), 1000)
-            ax.plot(xfit, m * xfit,
-                    lw=2,
-                    ls='-',
-                    label=', '.join(keys)+' '+'{:1.1e}'.format(m)+' changes/day',
-                    color=color)
+                # Linear LS fit (shall we do it on all data instead?)
+                m = np.inner(x, y) / np.inner(x, x)
 
-        ax.grid(True)
-        ax.legend(loc=2, fontsize=10)
-        ax.set_xlabel('Time [days from infection]')
-        ax.set_ylabel('Allele frequency')
-        ax.set_yscale('log')
-        ax.set_ylim(1e-4, 1)
-        plt.tight_layout()
+                ax.scatter(x, y, lw=2, color=color)
 
+                xfit = np.linspace(x.min(), x.max(), 1000)
+                ax.plot(xfit, m * xfit,
+                        lw=2,
+                        ls='-',
+                        label=', '.join(keys)+' '+'{:1.1e}'.format(m)+' changes/day',
+                        color=color)
+
+            ax.grid(True)
+            ax.legend(loc=2, fontsize=10)
+            ax.set_xlabel('Time [days from infection]')
+            ax.set_ylabel('Allele frequency')
+            ax.set_yscale('log')
+            ax.set_ylim(1e-4, 1)
+            plt.tight_layout()
 
         plt.ion()
         plt.show()

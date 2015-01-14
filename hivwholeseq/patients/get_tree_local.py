@@ -13,11 +13,12 @@ from matplotlib import cm
 import matplotlib.pyplot as plt
 from Bio import Phylo
 
-from hivwholeseq.patients.patients import load_patient
+from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.sequence_utils import align_muscle
 from hivwholeseq.tree_utils import build_tree_fasttree
 from hivwholeseq.argparse_utils import RoiAction
 from hivwholeseq.patients.get_tree_consensi import annotate_tree
+from hivwholeseq.utils.nehercook.ancestral import ancestral_sequences
 
 
 
@@ -118,7 +119,6 @@ def expand_duplicates_annotate_tree(tree, htf, times, seqs, minfreq=0.01):
 
         # Several copy, transform into internal node and append subtree
         for it in indseq:
-            it = indseq[0]
             h = ht[it]
             t = '{:1.1f}'.format(times[it])
 
@@ -132,9 +132,10 @@ def expand_duplicates_annotate_tree(tree, htf, times, seqs, minfreq=0.01):
 
         leaf.name = None
         leaf.confidence = 1.0
+        leaf.sequence = seq
 
 
-def annotate_tree_for_plot(tree, htf, times, seqs, minfreq=0.02):
+def annotate_tree_for_plot(tree, minfreq=0.02):
     '''Add annotations for plotting'''
     from matplotlib import cm
     cmap = cm.jet
@@ -147,8 +148,9 @@ def annotate_tree_for_plot(tree, htf, times, seqs, minfreq=0.02):
     for leaf in tree.get_terminals():
         leaf.color = get_color(leaf)
 
-        if leaf.hf >= minfreq:
-            leaf.label = 't = '+str(int(leaf.DSI))+', f = '+'{:1.2f}'.format(leaf.frequency)
+        if leaf.frequency >= minfreq:
+            leaf.label = ('t = '+str(int(leaf.DSI))+
+                          ', f = '+'{:1.2f}'.format(leaf.frequency))
         else:
             leaf.label = ''
 
@@ -166,8 +168,8 @@ if __name__ == '__main__':
     # Parse input args
     parser = argparse.ArgumentParser(description='Get local trees',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
-    parser.add_argument('--patient', required=True,
-                        help='Patient to analyze')
+    parser.add_argument('--patients', nargs='+',
+                        help='Patients to analyze')
     parser.add_argument('--roi', required=True, action=RoiAction,
                         help='Region of interest (e.g. F1 300 350 or V3 0 +oo)')
     parser.add_argument('--verbose', type=int, default=0,
@@ -182,7 +184,7 @@ if __name__ == '__main__':
                         help='Save alignment to file')
 
     args = parser.parse_args()
-    pname = args.patient
+    pnames = args.patients
     roi = args.roi
     VERBOSE = args.verbose
     maxreads = args.maxreads
@@ -190,79 +192,107 @@ if __name__ == '__main__':
     freqmin = args.freqmin
     use_save = args.save
 
-    patient = load_patient(pname)
+    patients = load_patients()
+    if pnames is not None:
+        patients = patients.loc[pnames]
 
-    if VERBOSE >= 1:
-        print 'Get haplotypes'
-    try:
-        region = roi[0]
-        (hct, ind, seqs) = get_region_count_trajectories(patient, region,
-                                                         VERBOSE=VERBOSE)
-    except IOError:
-        region = ' '.join(map(str, roi))
-        (hct, ind, seqs) = patient.get_local_haplotype_count_trajectories(*roi,
-                                                                          VERBOSE=VERBOSE)
-    
-    hct = hct.T
-    htf = 1.0 * hct / hct.sum(axis=0)
-
-    # Get initial top haplo
-    iseq0 = htf[:, 0].argmax()
-    seq0 = seqs[iseq0]
-
-    # Exclude too rare haplos
-    indseq = (htf >= freqmin).any(axis=1)
-    seqs = seqs[indseq]
-    htf = htf[indseq]
-
-    times = patient.times[ind]
-
-    if VERBOSE >= 1:
-        print 'Align sequences'
-    seqsali = align_muscle(*seqs, sort=True)
-
-    if VERBOSE >= 1:
-        print 'Build local tree'
-    tree = build_tree_fasttree(seqsali, VERBOSE=VERBOSE)
-    expand_duplicates_annotate_tree(tree, htf, times, map(''.join, seqsali), minfreq=0.01)
-    tree.ladderize()
-
-    if use_save:
-        if VERBOSE >= 2:
-            print 'Save tree (JSON)'
-        from hivwholeseq.tree_utils import tree_to_json
-        from hivwholeseq.generic_utils import write_json
-        annotate_tree(patient, tree, ali=[seqsali[iseq0]], VERBOSE=VERBOSE)
-        tree_json = tree_to_json(tree.root)
-        fn_out = patient.get_local_tree_filename(region, format='json')
-        write_json(tree_json, fn_out)
-
-    
-    if use_plot:
-
-        annotate_tree_for_plot(tree, htf, times, seqs, minfreq=0.1)
+    for pname, patient in patients.iterrows():
+        patient = Patient(patient)
 
         if VERBOSE >= 1:
-            print 'Plot'
-        fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-        fig.suptitle(patient.code+', '+region)
- 
-        # Plot haplotype frequencies
-        ax = axs[1]
-        for hf in htf:
-            ax.plot(times, hf, lw=2)
-        
-        ax.set_xlabel('Time [days]')
-        ax.set_ylabel('Haplotype frequency')
-        ax.grid(True)
+            print pname
+    
+        if (not use_save) and os.path.isfile(patient.get_local_tree_filename(roi[0], format='json')):
+            if VERBOSE >= 2:
+                print 'Get tree'
+            region = roi[0]
+            tree = patient.get_local_tree(region)
 
-        # Plot tree
-        ax = axs[0]
-        Phylo.draw(tree, axes=ax, do_show=False, label_func=attrgetter('label'),
-                   show_confidence=False)
-        ax.grid(True)
-        ax.set_ylim(ax.get_ylim()[0] * 1.04, -ax.get_ylim()[0] * 0.04)
-        
-        plt.tight_layout(rect=(0, 0, 1, 0.95))
-        plt.ion()
-        plt.show()
+        elif (not use_save) and os.path.isfile(patient.get_local_tree_filename(' '.join(map(str, roi)), format='json')):
+            if VERBOSE >= 2:
+                print 'Get tree'
+            region = ' '.join(map(str, roi))
+            tree = patient.get_local_tree(region)
+
+        else:
+            if VERBOSE >= 1:
+                print 'Get haplotypes'
+            try:
+                region = roi[0]
+                (hct, ind, seqs) = get_region_count_trajectories(patient, region,
+                                                                 VERBOSE=VERBOSE)
+            except IOError:
+                region = ' '.join(map(str, roi))
+                (hct, ind, seqs) = patient.get_local_haplotype_count_trajectories(*roi,
+                                                                                  VERBOSE=VERBOSE)
+            
+            hct = hct.T
+            htf = 1.0 * hct / hct.sum(axis=0)
+
+            # Exclude too rare haplos
+            indseq = (htf >= freqmin).any(axis=1)
+            seqs = seqs[indseq]
+            htf = htf[indseq]
+
+            # Get initial top haplo
+            iseq0 = htf[:, 0].argmax()
+            seq0 = seqs[iseq0]
+
+            times = patient.times[ind]
+
+            if VERBOSE >= 1:
+                print 'Align sequences'
+            ali = align_muscle(*seqs, sort=True)
+
+            if VERBOSE >= 1:
+                print 'Build local tree'
+            tree = build_tree_fasttree(ali, VERBOSE=VERBOSE)
+
+            if VERBOSE >= 2:
+                print 'Infer ancestral sequences'
+            a = ancestral_sequences(tree, ali, alphabet='ACGT-N', copy_tree=False,
+                                    attrname='sequence', seqtype='str')
+            a.calc_ancestral_sequences()
+            a.cleanup_tree()
+
+            expand_duplicates_annotate_tree(tree, htf, times, map(''.join, ali), minfreq=0.01)
+            
+            # FIXME: for the amino acid mutations, we must make sure that we are
+            # codon aligned (with codon_align). The problem is that sometimes
+            # V3 has gaps of 1-2 nucleotides... at frequency 10%??
+            annotate_tree(patient, tree,
+                          VERBOSE=VERBOSE)
+                
+            tree.ladderize()
+
+            if use_save:
+                if VERBOSE >= 2:
+                    print 'Save tree (JSON)'
+                from hivwholeseq.tree_utils import tree_to_json
+                from hivwholeseq.generic_utils import write_json
+                fn = patient.get_local_tree_filename(region, format='json')
+                tree_json = tree_to_json(tree.root,
+                                         fields=('DSI', 'sequence', 'muts',
+                                                 'VL', 'CD4',
+                                                 'frequency',
+                                                 'confidence'),
+                                        )
+                write_json(tree_json, fn)
+
+        if use_plot:
+
+            annotate_tree_for_plot(tree, minfreq=0.1)
+
+            if VERBOSE >= 1:
+                print 'Plot'
+            fig, ax = plt.subplots()
+            ax.set_title(patient.code+', '+region)
+            
+            Phylo.draw(tree, axes=ax, do_show=False, label_func=attrgetter('label'),
+                       show_confidence=False)
+            ax.grid(True)
+            ax.set_ylim(ax.get_ylim()[0] * 1.04, -ax.get_ylim()[0] * 0.04)
+            
+            plt.tight_layout()
+            plt.ion()
+            plt.show()
