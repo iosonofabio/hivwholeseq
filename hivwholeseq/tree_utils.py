@@ -80,13 +80,24 @@ def tree_to_json(node,
     json = {'name': node.name,
             'branch_length': node.branch_length}
 
-    for field in fields:
-        if hasattr(node, field):
+    if fields is None:
+        fieldsnode = set(node.__dict__.keys())
+        fieldsnode -= set(['name', 'branch_length', 'clades', 'width', '_color'])
+        for field in fieldsnode:
             val = getattr(node, field)
             if val is None:
                 json[field] = "undefined"
             else:
                 json[field] = val
+
+    else:
+        for field in fields:
+            if hasattr(node, field):
+                val = getattr(node, field)
+                if val is None:
+                    json[field] = "undefined"
+                else:
+                    json[field] = val
 
     # repeat for all children
     if len(node.clades):

@@ -3,9 +3,12 @@
 author:     Fabio Zanini
 date:       06/11/14
 content:    Store phylogenetic trees in a suitable format for the website.
+
+            NOTE: the trees have been JSONed and anonymyzed already.
 '''
 # Modules
 import os
+import shutil
 import sys
 from operator import attrgetter
 
@@ -56,7 +59,11 @@ if __name__ == '__main__':
 
             # Write output
             fn_out = gfn_out(patient.code, region, format='json')
-            write_json(tree_to_json(tree.root), fn_out, indent=1)
+            tree_json = tree_to_json(tree.root,
+                                     fields=('DSI', 'sequence', 'muts',
+                                             'VL', 'CD4', 'confidence'),
+                                    )
+            write_json(tree_json, fn_out, indent=1)
 
     # FIXME: make json global trees
     import sys; sys.exit()
