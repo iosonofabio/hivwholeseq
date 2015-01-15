@@ -498,3 +498,30 @@ def plot_coverage_trajectories_heatmap(times, covt, title='', VERBOSE=0):
     ax.set_yticklabels(map(str, times), fontsize=16)
     ax.set_title(title)
 
+
+def get_codons_n_polymorphic(aft, icons=None, n=[0, 1], VERBOSE=0, threshold=0.95):
+    '''Get indices of codons in which only n sites is polymorphic
+    
+    Parameters:
+       aft (ndarray): allele frequency trajectories (time, nucleotide, position)
+       icons (ndarray of int): alphabet index of the initial consensus
+       n (list of int): how many sites in the codon can be polymorphic?
+       threshold (float): polymorphic = major allele less than threshold
+    '''
+    if aft.shape[-1] % 3:
+        raise ValueError('Length is not a multiple of 3')
+
+    if icons is None:
+        icons = aft[0].argmax(axis=0)
+
+    indcods = []
+    pospoly = []
+    for icod in xrange(aft.shape[-1] // 3):
+        poly = [(aft[:, icons[icod * 3 + i], icod * 3 + i] < threshold).any()
+                for i in xrange(3)]
+        if sum(poly) in n:
+            indcods.append(icod)
+            pospoly.append(np.nonzero(poly)[0])
+
+    return indcods, pospoly
+
