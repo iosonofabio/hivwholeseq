@@ -55,6 +55,47 @@ def align_muscle(*seqs, **kwargs):
     return align
 
 
+def align_codon_pairwise(seqstr, refstr, **kwargs):
+    '''Pairwise alignment via codons
+    
+    Parameters:
+       **kwargs: passed down to SeqAn alignment function
+    '''
+    from Bio.Seq import translate
+    from seqanpy import align_global
+    from itertools import izip
+
+    if len(seqstr) % 3:
+        raise ValueError('The length of the first sequence is not a multiple of 3')
+    elif len(refstr) % 3:
+        raise ValueError('The length of the second sequence is not a multiple of 3')
+
+    seqpr = translate(seqstr)
+    refpr = translate(refstr)
+    (score, alis, alir) = align_global(seqpr, refpr, **kwargs)
+    aliseq = []
+    aliref = []
+    poss = 0
+    posr = 0
+    for aas, aar in izip(alis, alir):
+        if aas == '-':
+            aliseq.append('---')
+        else:
+            aliseq.append(seqstr[poss: poss+3])
+            poss += 3
+
+        if aar == '-':
+            aliref.append('---')
+        else:
+            aliref.append(refstr[posr: posr+3])
+            posr += 3
+
+    aliseq = ''.join(aliseq)
+    aliref = ''.join(aliref)
+
+    return (aliseq, aliref)
+
+
 def expand_ambiguous_seq(seq, seqtype='DNA'):
     '''Expand an ambiguous seq into all possible unambiguous ones'''
     if seqtype == 'DNA':

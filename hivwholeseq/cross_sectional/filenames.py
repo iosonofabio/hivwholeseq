@@ -46,4 +46,6 @@ def get_subtype_reference_alignment_entropy_syn_filename(region, subtype='B',
     return ali_fn
 
 
-
+def get_raw_LANL_sequences_filename(region):
+    '''Get filename of raw sequences from LANL'''
+    return reference_folder+'raw_LANL/'+region+'.fasta'

@@ -19,6 +19,8 @@ from hivwholeseq.tree_utils import build_tree_fasttree
 from hivwholeseq.argparse_utils import RoiAction
 from hivwholeseq.patients.get_tree_consensi import annotate_tree
 from hivwholeseq.utils.nehercook.ancestral import ancestral_sequences
+from hivwholeseq.tree_utils import tree_to_json
+from hivwholeseq.generic_utils import write_json
 
 
 
@@ -260,16 +262,17 @@ if __name__ == '__main__':
             # FIXME: for the amino acid mutations, we must make sure that we are
             # codon aligned (with codon_align). The problem is that sometimes
             # V3 has gaps of 1-2 nucleotides... at frequency 10%??
-            annotate_tree(patient, tree,
-                          VERBOSE=VERBOSE)
+            if VERBOSE >= 2:
+                print 'Annotate tree'
+            annotate_tree(patient, tree, VERBOSE=VERBOSE)
                 
+            if VERBOSE >= 2:
+                print 'Ladderize tree'
             tree.ladderize()
 
             if use_save:
                 if VERBOSE >= 2:
                     print 'Save tree (JSON)'
-                from hivwholeseq.tree_utils import tree_to_json
-                from hivwholeseq.generic_utils import write_json
                 fn = patient.get_local_tree_filename(region, format='json')
                 tree_json = tree_to_json(tree.root,
                                          fields=('DSI', 'sequence', 'muts',

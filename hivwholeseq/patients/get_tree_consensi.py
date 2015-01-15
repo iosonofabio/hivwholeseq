@@ -16,6 +16,9 @@ from hivwholeseq.generic_utils import mkdirs
 from hivwholeseq.sequencing.samples import SampleSeq
 from hivwholeseq.patients.patients import load_patients, Patient, SamplePat
 from hivwholeseq.tree_utils import build_tree_fasttree
+from hivwholeseq.utils.nehercook.ancestral import ancestral_sequences
+from hivwholeseq.tree_utils import tree_to_json
+from hivwholeseq.generic_utils import write_json
 
 
 
@@ -121,34 +124,45 @@ if __name__ == '__main__':
                 if VERBOSE == 1:
                     print ''
 
+
             if VERBOSE >= 2:
                 print 'Get alignment'
             ali = patient.get_consensi_alignment(region)
+
 
             if VERBOSE >= 2:
                 print 'Build tree'
                 sys.stdout.flush()
             tree = build_tree_fasttree(ali, rootname=ali[0].id,
                                        VERBOSE=VERBOSE)
+
+
+            if VERBOSE >= 2:
+                print 'Infer ancestral sequences'
+            a = ancestral_sequences(tree, ali, alphabet='ACGT-N', copy_tree=False,
+                                    attrname='sequence', seqtype='str')
+            a.calc_ancestral_sequences()
+            a.cleanup_tree()
+
+
+            if VERBOSE >= 2:
+                print 'Annotate tree'
+            annotate_tree(patient, tree, VERBOSE=VERBOSE)
+
+
+            if VERBOSE >= 2:
+                print 'Ladderize tree'
             tree.ladderize()
 
             if use_save:
                 if VERBOSE >= 2:
-                    print 'Save tree (Newick)'
-                from Bio import Phylo
-                fn_out = patient.get_consensi_tree_filename(region, format='newick')
-                mkdirs(os.path.dirname(fn_out))
-                Phylo.write(tree, fn_out, 'newick')
-
-                if VERBOSE >= 2:
                     print 'Save tree (JSON)'
-                from hivwholeseq.tree_utils import tree_to_json
-                from hivwholeseq.generic_utils import write_json
-                # FIXME: preannotate with sequences
-                annotate_tree(patient, tree, VERBOSE=VERBOSE)
-                tree_json = tree_to_json(tree.root)
-                fn_out = patient.get_consensi_tree_filename(region, format='json')
-                write_json(tree_json, fn_out)
+                fn = patient.get_consensi_tree_filename(region, format='json')
+                tree_json = tree_to_json(tree.root,
+                                         fields=('DSI', 'sequence', 'muts',
+                                                 'VL', 'CD4', 'confidence'),
+                                        )
+                write_json(tree_json, fn)
 
             if use_plot:
                 import matplotlib.pyplot as plt
