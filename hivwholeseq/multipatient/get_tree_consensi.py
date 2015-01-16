@@ -43,8 +43,8 @@ if __name__ == '__main__':
                                  help='Patient to analyze')
     pats_or_samples.add_argument('--samples', nargs='+',
                                  help='Samples to map (e.g. VL98-1253 VK03-4298)')
-    parser.add_argument('--fragments', nargs='+',
-                        help='Fragment to map (e.g. F1 F6)')
+    parser.add_argument('--regions', nargs='+',
+                        help='Regions to analyze (e.g. V3 F6)')
     parser.add_argument('--submit', action='store_true',
                         help='Execute the script in parallel on the cluster')
     parser.add_argument('--verbose', type=int, default=0,
@@ -61,6 +61,10 @@ if __name__ == '__main__':
     summary = args.summary
 
 
+    refseq = load_custom_reference('HXB2', 'gb')
+
+    # FIXME: finish to port this to JSON
+
     samples = lssp()
     # Collect all sequenced samples from patients
     if pnames is not None:
@@ -71,12 +75,6 @@ if __name__ == '__main__':
 
     if VERBOSE >= 2:
         print 'samples', samples.index.tolist()
-
-    # If the script is called with no fragment, iterate over all
-    if not fragments:
-        fragments = ['F'+str(i) for i in xrange(1, 7)]
-    if VERBOSE >= 3:
-        print 'fragments', fragments
 
     for fragment in fragments:
         consensi = [load_custom_reference(refname+'_'+fragment) for refname in refnames]

@@ -63,6 +63,8 @@ def get_alignment(samples, fragment, VERBOSE=0):
 
     else:
         from hivwholeseq.mapping_utils import align_muscle
+        sample = samples[0]
+        samplerefs = samples[1:3]
         ali = align_muscle(sample.get_consensus(fragment),
                            samplerefs[0].get_consensus(fragment),
                            samplerefs[1].get_consensus(fragment),
@@ -276,7 +278,8 @@ if __name__ == '__main__':
                             VERBOSE=VERBOSE)
         alim = np.array(ali)
 
-        al_polyd = get_good_polymorphic_sites(alim, samplerefs, VERBOSE=VERBOSE)
+        al_polyd = get_good_polymorphic_sites(alim, samplerefs, fragment,
+                                              VERBOSE=VERBOSE)
 
         if VERBOSE >= 1:
             cons = sample.get_consensus(fragment)

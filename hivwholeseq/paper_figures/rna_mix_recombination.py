@@ -21,9 +21,10 @@ from hivwholeseq.paper_figures.plots import plot_rna_recombination
 
 # Globals
 strains = ['LAI-III', '38540']
-fragment = 'F2'
 maxreads = 10000
 freqmin = 6e-3
+fragment = 'F2'
+PCRtype = 'PCR2'
 
 
 
@@ -67,11 +68,10 @@ if __name__ == '__main__':
     foldername = get_figure_folder(username, 'controls')
     fn_data = foldername+'data/'
     mkdirs(fn_data)
-    fn_data = fn_data + 'mix_rna_recombination.pickle'
+    fn_data = fn_data + 'mix_rna_recombination_'+PCRtype+'_'+fragment+'.pickle'
 
     if not os.path.isfile(fn_data):
 
-        PCRtype = 'PCR2'
         samplename = get_samplename(PCRtype)
         sample = load_sample_sequenced(samplename)
         samplerefs = [load_sample_sequenced(strain) for strain in strains]
@@ -93,11 +93,12 @@ if __name__ == '__main__':
     else:
         data = load_data(fn_data)
         
-    filename = foldername+'mix_rna_recombination'
-    for ext in ['png', 'pdf', 'svg']:
-        plot_rna_recombination(data,
-                               VERBOSE=VERBOSE,
-                               savefig=filename+'.'+ext)
+    filename = foldername+'mix_rna_recombination_'+PCRtype+'_'+fragment
+    #for ext in ['png', 'pdf', 'svg']:
+    #    plot_rna_recombination(data,
+    #                           VERBOSE=VERBOSE,
+    #                           savefig=filename+'.'+ext)
 
     plot_rna_recombination(data,
+                           title=', '.join([PCRtype, fragment]),
                            VERBOSE=VERBOSE)
