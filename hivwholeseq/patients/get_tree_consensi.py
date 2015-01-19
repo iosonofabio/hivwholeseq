@@ -61,7 +61,7 @@ def annotate_tree(patient, tree, VERBOSE=0,
 
     if 'subtype' in fields:
         for node in tree.get_terminals() + tree.get_nonterminals():
-            node.subtype = patient.subtype
+            node.subtype = patient.Subtype
     
     if 'muts' in fields:
         add_mutations_tree(tree, translate=False, mutation_attrname='muts')
