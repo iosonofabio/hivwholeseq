@@ -22,10 +22,17 @@ from hivwholeseq.generic_utils import write_json
 
 
 
+# Globals
+regionsprot = ['PR', 'RT']
+
+
+
 # Functions
 def annotate_tree(patient, tree, VERBOSE=0,
                   fields=('DSI', 'muts', 'VL', 'ntemplates', 'CD4')):
     '''Annotate a tree with info on the nodes'''
+    from hivwholeseq.tree_utils import add_mutations_tree
+
     for node in tree.get_terminals():
         label = node.name
         entries = label.split('_')
@@ -48,36 +55,19 @@ def annotate_tree(patient, tree, VERBOSE=0,
             node.VL = sample['viral load']
 
         # FIXME: shall we check the patient method for this?
+        # Well, we are going to quantify fragment-by-fragment, so...
         if 'ntemplates' in fields:
             node.ntemplates = sample['n templates']
 
-    # For the mutations on branches, all nodes must have sequences already
-    if ('muts') in fields or ('mutsprot' in fields):
-        from Bio.Seq import translate
-        from hivwholeseq.tree_utils import find_parent
-        # NOTE: the root has no mutations by definition
+    if 'subtype' in fields:
         for node in tree.get_terminals() + tree.get_nonterminals():
-            try:
-                parent = find_parent(tree, node)
-            except IndexError:
-                continue
+            node.subtype = patient.subtype
+    
+    if 'muts' in fields:
+        add_mutations_tree(tree, translate=False, mutation_attrname='muts')
 
-            pseq = parent.sequence
-            nseq = node.sequence
-
-            for attrname in ('muts', 'mutsprot'):
-                if attrname not in fields:
-                    continue
-                
-                if attrname == 'mutsprot':
-                    pseq = translate(pseq)
-                    nseq = translate(nseq)
-
-                pseqm = np.fromstring(pseq, 'S1')
-                nseqm = np.fromstring(nseq, 'S1')
-                posm = (pseqm != nseqm).nonzero()[0]
-                muts = [pseqm[p]+str(p+1)+nseqm[p] for p in posm]
-                setattr(node, attrname, ', '.join(muts))
+    if 'mutsprot' in fields:
+        add_mutations_tree(tree, translate=True, mutation_attrname='mutsprot')
 
 
 
@@ -147,21 +137,25 @@ if __name__ == '__main__':
 
             if VERBOSE >= 2:
                 print 'Annotate tree'
-            annotate_tree(patient, tree, VERBOSE=VERBOSE)
+            fields = ['DSI', 'muts', 'VL', 'ntemplates', 'CD4', 'subtype']
+            if region in regionsprot:
+                fields.append('mutsprot')
+            annotate_tree(patient, tree,
+                          fields=fields,
+                          VERBOSE=VERBOSE)
 
 
             if VERBOSE >= 2:
                 print 'Ladderize tree'
             tree.ladderize()
 
+
             if use_save:
                 if VERBOSE >= 2:
                     print 'Save tree (JSON)'
+                fields.extend(['sequence', 'confidence'])
                 fn = patient.get_consensi_tree_filename(region, format='json')
-                tree_json = tree_to_json(tree.root,
-                                         fields=('DSI', 'sequence', 'muts',
-                                                 'VL', 'CD4', 'confidence'),
-                                        )
+                tree_json = tree_to_json(tree.root, fields=fields)
                 write_json(tree_json, fn)
 
             if use_plot:

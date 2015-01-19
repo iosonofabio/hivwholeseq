@@ -18,6 +18,7 @@ from hivwholeseq.patients.filenames import get_consensi_tree_filename as gfn_in
 from hivwholeseq.website.filenames import get_consensi_tree_filename as gfn_out
 from hivwholeseq.tree_utils import tree_to_json
 from hivwholeseq.generic_utils import write_json
+from hivwholeseq.reference import load_custom_reference
 
 
 
@@ -61,59 +62,27 @@ if __name__ == '__main__':
             fn_out = gfn_out(patient.code, region, format='json')
             tree_json = tree_to_json(tree.root,
                                      fields=('DSI', 'sequence', 'muts',
-                                             'VL', 'CD4', 'confidence'),
+                                             'VL', 'CD4', 'confidence',
+                                             'subtype'),
                                     )
             write_json(tree_json, fn_out, indent=1)
 
-    # FIXME: make json global trees
-    import sys; sys.exit()
 
-    # Global trees
     print 'All patients'
-    # TODO: make alignments of other regions
-    fragments = ['F'+str(i) for i in xrange(1, 7)]
-    for fragment in fragments:
-        print fragment
-        fn = gfn_in('all', fragment)
+
+    refseq = load_custom_reference('HXB2', 'gb')
+    regions = ([fea.id for fea in refseq.features if len(fea.location.parts) == 1] +
+               ['F'+str(i) for i in xrange(1, 7)])
+
+    for region in regions:
+        print region,
+        fn = gfn_in('all', region, format='json')
         if not os.path.isfile(fn):
-           continue
-
-        tree = Phylo.read(fn, 'newick')
-
-        for pname, patient in patients.iterrows():
-            patient = Patient(patient)
-            print patient.code, patient.name
-
-            for leaf in tree.get_terminals():
-                if patient.name not in leaf.name:
-                    continue
-
-                found = False
-                leaf_sn = leaf.name.split('_')[-1]
-                for samplename, sample in patient.samples.iterrows():
-                    if samplename == leaf_sn:
-                        found = True
-                        break
-
-                if found:
-                    label = patient.code+'_'+str(sample['days since infection'])+'_days'
-                    leaf.name = label
-        
-        # Prune wrong samples and unknown references
-        leaves_to_prune = []
-        for leaf in tree.get_terminals():
-            if leaf.name[0] == 'p':
-                continue
-
-            for refname in refnames:
-                if refname in leaf.name:
-                    leaf.name = refname
-                else:
-                    leaves_to_prune.append(leaf)
-
-        for leaf in leaves_to_prune:
-            tree.prune(leaf)
+            print 'SKIP'
+            continue
 
         # Write output
-        fn_out = gfn_out('all', fragment)
-        Phylo.write([tree], fn_out, 'newick')
+        fn_out = gfn_out('all', region, format='json')
+        shutil.copy(fn, fn_out)
+
+        print 'OK'

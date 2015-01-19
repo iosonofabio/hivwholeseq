@@ -76,28 +76,44 @@ def tree_to_json(node,
                          'confidence'),
                 ):
     '''Convert tree in nested dictionary (JSON)'''
-
-    json = {'name': node.name,
-            'branch_length': node.branch_length}
+    from numpy import isnan
 
     if fields is None:
         fieldsnode = set(node.__dict__.keys())
-        fieldsnode -= set(['name', 'branch_length', 'clades', 'width', '_color'])
-        for field in fieldsnode:
-            val = getattr(node, field)
-            if val is None:
-                json[field] = "undefined"
-            else:
-                json[field] = val
+        fieldsnode -= set(['clades', 'width', '_color'])
 
     else:
-        for field in fields:
-            if hasattr(node, field):
-                val = getattr(node, field)
-                if val is None:
-                    json[field] = "undefined"
-                else:
-                    json[field] = val
+        fieldsnode = ['name', 'branch_length'] + list(fields)
+
+    json = {}
+    for field in fieldsnode:
+        if not hasattr(node, field):
+            json[field] = "undefined"
+            continue
+
+        val = getattr(node, field)
+        if val is None:
+            # The root is missing a branch length (maybe a FastTree or Biopython bug)
+            if field == 'branch_length': 
+                json[field] = 0
+                continue
+
+            json[field] = "undefined"
+            continue
+
+        if isinstance(val, basestring):
+            if val.lower() == 'nan':
+                json[field] = "undefined"
+                continue
+
+            json[field] = val
+            continue
+
+        if isnan(val):
+            json[field] = "undefined"
+            continue
+
+        json[field] = val
 
     # repeat for all children
     if len(node.clades):
@@ -130,3 +146,36 @@ def tree_from_json(json):
     node_from_json(json, tree.root)
     tree.root.branch_length=0.01
     return tree
+
+
+def add_mutations_tree(tree, translate=False,
+                       sequence_attrname='sequence',
+                       mutation_attrname='muts'):
+    '''Add mutations to a tree
+    
+    NOTE: the nodes must have sequences already
+    '''
+    import numpy as np
+    from Bio.Seq import translate as tran
+    from hivwholeseq.tree_utils import find_parent
+
+    # NOTE: the root has no mutations by definition
+    for node in tree.get_terminals() + tree.get_nonterminals():
+        try:
+            parent = find_parent(tree, node)
+        except IndexError:
+            continue
+
+        pseq = getattr(parent, sequence_attrname)
+        nseq = getattr(node, sequence_attrname)
+
+        if translate:
+            pseq = tran(pseq)
+            nseq = tran(nseq)
+
+        pseqm = np.fromstring(pseq, 'S1')
+        nseqm = np.fromstring(nseq, 'S1')
+        posm = (pseqm != nseqm).nonzero()[0]
+        muts = [pseqm[p]+str(p+1)+nseqm[p] for p in posm]
+
+        setattr(node, mutation_attrname, ', '.join(muts))
