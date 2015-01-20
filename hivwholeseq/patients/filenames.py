@@ -241,6 +241,13 @@ def get_diversity_trajectories_local_filename(pname, fragment):
     return filename
     
 
+def get_ntemplates_by_fragment_filename(format='tsv'):
+    '''Get the filename of the number of templates fragment by fragment'''
+    from hivwholeseq.filenames import table_folder
+    filename = 'n_templates_by_fragment.'+format
+    return table_folder+filename
+    
+
 
 
 # FIGURES

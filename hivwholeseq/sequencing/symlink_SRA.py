@@ -104,7 +104,7 @@ def make_symlinks(dataset, VERBOSE=0):
 if __name__ == '__main__':
 
     # Parse input args
-    parser = argparse.ArgumentParser(description='Demultiplex HIV reads')
+    parser = argparse.ArgumentParser(description='Symlink HIV read files')
     parser.add_argument('--run', required=True,
                         help='Seq run to analyze (e.g. Tue28, test_tiny)')
     parser.add_argument('--verbose', type=int, default=0,
