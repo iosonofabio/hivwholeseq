@@ -90,6 +90,9 @@ class TestAlleleCounts(unittest.TestCase):
         np.testing.assert_array_equal(counts, counts_check)
 
 
+#TODO: write a test class for the filtering function in /patients, because it
+# has a bug with reads that start before the fragment start
+
 
 
 if __name__ == '__main__':

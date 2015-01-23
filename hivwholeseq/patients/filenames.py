@@ -103,6 +103,13 @@ def get_initial_hash_filename(pname, fragment, ext=True):
     return filename
 
 
+def get_reference_alignment_filename(fragment, format='fasta'):
+    '''Get the MSA of all patient references'''
+    filename = 'reference_alignment_'+fragment+'.'+format
+    filename = get_foldername('all')+'alignments/'+filename
+    return filename
+
+
 def get_consensi_alignment_filename(pname, region, format='fasta'):
     '''Get the MSA of all consensi of the patient, sorted by time point'''
     filename = 'consensi_alignment_'+region+'.'+format

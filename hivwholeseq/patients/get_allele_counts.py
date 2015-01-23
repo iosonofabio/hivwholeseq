@@ -40,7 +40,7 @@ if __name__ == '__main__':
                         help='Save the allele counts to file')
     parser.add_argument('--submit', action='store_true',
                         help='Execute the script in parallel on the cluster')
-    parser.add_argument('--plot', nargs='?', default=None, const='2D',
+    parser.add_argument('--plot', action='store_true',
                         help='Plot the allele frequency trajectories')
     parser.add_argument('--logit', action='store_true',
                         help='use logit scale (log(x/(1-x)) in the plots')
@@ -95,6 +95,7 @@ if __name__ == '__main__':
             fn_out = sample.get_allele_counts_filename(fragment, PCR=PCR, qual_min=qual_min)
             fn = sample.get_mapped_filtered_filename(fragment, PCR=PCR, decontaminated=True) #FIXME
             
+            # If --save, recalculate and save
             if save_to_file:
                 if os.path.isfile(fn):
                     (count, inserts) = gac(fn, len(refseq),
@@ -108,6 +109,7 @@ if __name__ == '__main__':
 
                     counts.append(count)
 
+            # If not --save, try to load from file and recalculate as a fallback
             elif os.path.isfile(fn_out):
                 count = np.load(fn_out)
                 counts.append(count)
@@ -120,12 +122,20 @@ if __name__ == '__main__':
 
 
             if use_plot:
-                # FIXME: actually plot allele counts!
-                cov = count.sum(axis=0).sum(axis=0)
+                cou = count.sum(axis=0)
+                x = np.tile(np.arange(cou.shape[1]), (cou.shape[0], 1))
+                color = np.tile(np.arange(cou.shape[0]), (cou.shape[1], 1)).T
+
                 fig, ax = plt.subplots(figsize=(12, 6))
-                ax.plot(cov, lw=2)
+                
+                ax.scatter(x, cou + 0.1, lw=2, c=color)
                 ax.set_xlabel('Position [bp]')
                 ax.set_ylabel('Coverage')
+                ax.set_xlim(-1, cou.shape[-1])
+                ax.set_ylim(ymin=0.09)
+                ax.set_yscale('log')
+                ax.grid(True)
+                ax.set_title(samplename)
 
     if use_plot:
         plt.ion()

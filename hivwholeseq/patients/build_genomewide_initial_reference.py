@@ -18,7 +18,7 @@ from hivwholeseq.patients.build_genomewide_consensus import merge_fragments
 if __name__ == '__main__':
 
     # Parse input args
-    parser = argparse.ArgumentParser(description='Build initial reference',
+    parser = argparse.ArgumentParser(description='Build initial genomewide reference',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     parser.add_argument('--patient', required=True,
                         help='Patient to analyze')

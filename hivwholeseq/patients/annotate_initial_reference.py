@@ -200,7 +200,7 @@ if __name__ == '__main__':
     parser.add_argument('--save', action='store_true',
                         help='Save annotated reference to file')
     parser.add_argument('--force', action='store_true',
-                        help='Ignore a single bad fragment and move to the next')
+                        help='Go ahead even if annotations differ from existing sequence')
 
     args = parser.parse_args()
     VERBOSE = args.verbose
@@ -243,7 +243,7 @@ if __name__ == '__main__':
             refseq_old = patient.get_reference('genomewide', format='gb')
         except IOError:
             if VERBOSE >= 1:
-                print "Old annoted reference not found (that's ok)"
+                print "Old annotated reference not found (that's ok)"
             refseq_old = None
 
         if refseq_old is not None:
