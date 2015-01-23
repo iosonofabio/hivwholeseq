@@ -19,15 +19,82 @@ from hivwholeseq.mapping_utils import align_muscle
 
 
 # Functions
-def get_allele_counts_insertions_from_file(bamfilename, length, qual_min=35,
+def get_allele_counts_read(read, counts_out, inserts_out,
+                           qual_min=30, length=None, VERBOSE=0):
+    '''Get allele counts and insertions from a single read
+
+    Parameters:
+       counts_out (ndarray, alphabet x sequence length): output data structure for counts
+       inserts_out (nested defaultdict): output data structure for insertions
+    '''
+
+    # Read CIGARs (they should be clean by now)
+    seq = np.fromstring(read.seq, 'S1')
+    qual = np.fromstring(read.qual, np.int8) - 33
+    pos = read.pos
+
+    # Iterate over CIGARs
+    for ic, (block_type, block_len) in enumerate(read.cigar):
+
+        # Check for pos: it should never exceed the length of the fragment
+        if (length is not None) and (block_type in [0, 1, 2]) and (pos >= length):
+            raise ValueError('Pos exceeded the length of the fragment')
+    
+        # Inline block
+        if block_type == 0:
+            seqb = seq[:block_len]
+            qualb = qual[:block_len]
+            # Increment counts
+            for j, a in enumerate(alpha):
+                posa = ((seqb == a) & (qualb >= qual_min)).nonzero()[0]
+                if len(posa):
+                    counts_out[j, pos + posa] += 1
+    
+            # Chop off this block
+            if ic != len(read.cigar) - 1:
+                seq = seq[block_len:]
+                qual = qual[block_len:]
+                pos += block_len
+    
+        # Deletion
+        elif block_type == 2:
+            # Increment gap counts
+            counts_out[4, pos:pos + block_len] += 1
+    
+            # Chop off pos, but not sequence
+            pos += block_len
+    
+        # Insertion
+        # an insert @ pos 391 means that seq[:391] is BEFORE the insert,
+        # THEN the insert, FINALLY comes seq[391:]
+        elif block_type == 1:
+            seqb = seq[:block_len]
+            qualb = qual[:block_len]
+            # Accept only high-quality inserts
+            if (qualb >= qual_min).all():
+                inserts_out[pos][seqb.tostring()] += 1
+    
+            # Chop off seq, but not pos
+            if ic != len(read.cigar) - 1:
+                seq = seq[block_len:]
+                qual = qual[block_len:]
+    
+        # Other types of cigar?
+        else:
+            raise ValueError('CIGAR type '+str(block_type)+' not recognized')
+
+
+def get_allele_counts_insertions_from_file(bamfilename, length, qual_min=30,
                                            maxreads=-1, VERBOSE=0):
     '''Get the allele counts and insertions'''
+    from collections import defaultdict, Counter
+
     # Prepare output structures
     counts = np.zeros((len(read_types), len(alpha), length), int)
     # Note: the data structure for inserts is a nested dict with:
-    # position --> string --> read type --> count
-    #  (dict)      (dict)       (list)      (int)
-    inserts = defaultdict(lambda: defaultdict(lambda: np.zeros(len(read_types), int)))
+    # read type --> position --> string --> count
+    #  (list)        (dict)      (dict)     (int)
+    inserts = [defaultdict(lambda: Counter()) for rt in read_types]
 
     # Open BAM file
     # Note: the reads should already be filtered of unmapped stuff at this point
@@ -48,61 +115,11 @@ def get_allele_counts_insertions_from_file(bamfilename, length, qual_min=35,
         
             # Divide by read 1/2 and forward/reverse
             js = 2 * read.is_read2 + read.is_reverse
-        
-            # Read CIGARs (they should be clean by now)
-            seq = np.fromstring(read.seq, 'S1')
-            qual = np.fromstring(read.qual, np.int8) - 33
-            pos = read.pos
 
-            # Iterate over CIGARs
-            for ic, (block_type, block_len) in enumerate(read.cigar):
-
-                # Check for pos: it should never exceed the length of the fragment
-                if (block_type in [0, 1, 2]) and (pos >= length):
-                    raise ValueError('Pos exceeded the length of the fragment')
-            
-                # Inline block
-                if block_type == 0:
-                    seqb = seq[:block_len]
-                    qualb = qual[:block_len]
-                    # Increment counts
-                    for j, a in enumerate(alpha):
-                        posa = ((seqb == a) & (qualb >= qual_min)).nonzero()[0]
-                        if len(posa):
-                            counts[js, j, pos + posa] += 1
-            
-                    # Chop off this block
-                    if ic != len(read.cigar) - 1:
-                        seq = seq[block_len:]
-                        qual = qual[block_len:]
-                        pos += block_len
-            
-                # Deletion
-                elif block_type == 2:
-                    # Increment gap counts
-                    counts[js, 4, pos:pos + block_len] += 1
-            
-                    # Chop off pos, but not sequence
-                    pos += block_len
-            
-                # Insertion
-                # an insert @ pos 391 means that seq[:391] is BEFORE the insert,
-                # THEN the insert, FINALLY comes seq[391:]
-                elif block_type == 1:
-                    seqb = seq[:block_len]
-                    qualb = qual[:block_len]
-                    # Accept only high-quality inserts
-                    if (qualb >= qual_min).all():
-                        inserts[pos][seqb.tostring()][js] += 1
-            
-                    # Chop off seq, but not pos
-                    if ic != len(read.cigar) - 1:
-                        seq = seq[block_len:]
-                        qual = qual[block_len:]
-            
-                # Other types of cigar?
-                else:
-                    raise ValueError('CIGAR type '+str(block_type)+' not recognized')
+            get_allele_counts_read(read, counts[js], inserts[js],
+                                   length=length,
+                                   qual_min=qual_min,
+                                   VERBOSE=VERBOSE)
 
     return (counts, inserts)
 
