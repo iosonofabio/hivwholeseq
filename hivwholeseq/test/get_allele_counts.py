@@ -17,11 +17,7 @@ import numpy as np
 from miseq import alphal
 from one_site_statistics import get_allele_counts_read
 
-
-# Mocks
-class Read(object):
-    '''Mock read class'''
-    pass
+from test.utils import Read
 
 
 

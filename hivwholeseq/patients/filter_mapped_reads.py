@@ -22,7 +22,7 @@ from hivwholeseq.patients.samples import load_samples_sequenced as lssp
 from hivwholeseq.sequencing.samples import load_samples_sequenced as lss
 from hivwholeseq.sequencing.filter_mapped_reads import plot_distance_histogram, \
         plot_distance_histogram_sliding_window, get_distance_from_consensus, \
-        check_overhanging_reads, trim_bad_cigar
+        check_overhanging_reads
 from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_mapped_to_initial_filename, get_filter_mapped_init_summary_filename, \
         get_mapped_filtered_filename
@@ -31,6 +31,71 @@ from hivwholeseq.cluster.fork_cluster import fork_filter_mapped_init as fork_sel
 
 
 # Functions
+def filter_read_pair(reads,
+                     ref,
+                     hist_distance_from_consensus=None,
+                     hist_dist_along=None,
+                     binsize=None,
+                     max_mismatches=100,
+                     match_len_min=30,
+                     trim_bad_cigars=3,
+                     VERBOSE=0):
+    '''Filter read pair'''
+    from hivwholeseq.sequencing.filter_mapped_reads import trim_bad_cigar
+
+    (read1, read2) = reads
+    i_fwd = reads[0].is_reverse
+
+    # Check names to make sure we are looking at paired reads, this would
+    # screw up the whole bamfile
+    if read1.qname != read2.qname:
+        n_wrongname += 1
+        raise ValueError('Read pair '+str(irp)+': reads have different names!')
+
+    # Ignore unmapped reads
+    if read1.is_unmapped or read2.is_unmapped:
+        if VERBOSE >= 2:
+            print 'Read pair '+read1.qname+': unmapped'
+        return 'unmapped'
+
+    # Ignore not properly paired reads (this includes mates sitting on
+    # different fragments)
+    if (not read1.is_proper_pair) or (not read2.is_proper_pair):
+        if VERBOSE >= 2:
+            print 'Read pair '+read1.qname+': not properly paired'
+        return 'unpaired'
+        
+    # Mismappings are often characterized by many mutations:
+    # check the number of mismatches and skip reads with too many
+    dc = get_distance_from_consensus(ref, reads, VERBOSE=VERBOSE)
+    
+    if hist_distance_from_consensus is not None:
+        hist_distance_from_consensus[dc.sum()] += 1
+
+    if hist_dist_along is not None:
+        hbin = (reads[i_fwd].pos + reads[i_fwd].isize / 2) // binsize
+        hist_dist_along[hbin, dc.sum()] += 1
+
+    if (dc.sum() > max_mismatches):
+        if VERBOSE >= 2:
+            print 'Read pair '+read1.qname+': too many mismatches '+\
+                    '('+str(dc[0])+' + '+str(dc[1])+')'
+        return 'mutator'
+
+    # Trim the bad CIGARs from the sides, if there are any good ones
+    # FIXME: this must have a bug with leading insertions
+    skip = trim_bad_cigar(reads, match_len_min=match_len_min,
+                          trim_left=trim_bad_cigars,
+                          trim_right=trim_bad_cigars)
+    if skip:
+        return 'bad_cigar'
+    
+    # TODO: we might want to incorporate some more stringent
+    # criterion here, to avoid short reads, cross-overhang, etc.
+    
+    return 'good'
+
+
 def filter_mapped_reads(sample, fragment,
                         PCR=1,
                         maxreads=-1,
@@ -114,61 +179,35 @@ def filter_mapped_reads(sample, fragment,
                     for irp, reads in enumerate(pair_generator(bamfile)):
                         if irp == maxreads:
                             break
+
+                        pair_type = filter_read_pair(reads, ref,
+                                                     hist_distance_from_consensus,
+                                                     hist_dist_along,
+                                                     binsize,
+                                                     max_mismatches=max_mismatches,
+                                                     match_len_min=match_len_min,
+                                                     trim_bad_cigars=trim_bad_cigars,
+                                                     VERBOSE=VERBOSE)
                     
-                        (read1, read2) = reads
-                        i_fwd = reads[0].is_reverse
-    
-                        # Check a few things to make sure we are looking at paired reads
-                        if read1.qname != read2.qname:
-                            n_wrongname += 1
-                            raise ValueError('Read pair '+str(irp)+': reads have different names!')
-    
-                        # Ignore unmapped reads
-                        if read1.is_unmapped or read2.is_unmapped:
-                            if VERBOSE >= 2:
-                                print 'Read pair '+read1.qname+': unmapped'
+                        if pair_type == 'unmapped':
                             n_unmapped += 1
                             map(trashfile.write, reads)
-                            continue
-                    
-                        # Ignore not properly paired reads (this includes mates sitting on
-                        # different fragments)
-                        if (not read1.is_proper_pair) or (not read2.is_proper_pair):
-                            if VERBOSE >= 2:
-                                print 'Read pair '+read1.qname+': not properly paired'
+
+                        elif pair_type == 'unpaired':
                             n_unpaired += 1
                             map(trashfile.write, reads)
-                            continue
-                            
-                        # Mismappings are often characterized by many mutations:
-                        # check the number of mismatches and skip reads with too many
-                        dc = get_distance_from_consensus(ref, reads, VERBOSE=VERBOSE)
-                        hist_distance_from_consensus[dc.sum()] += 1
-                        hbin = (reads[i_fwd].pos + reads[i_fwd].isize / 2) // binsize
-                        hist_dist_along[hbin, dc.sum()] += 1
-                        if (dc.sum() > max_mismatches):
-                            if VERBOSE >= 2:
-                                print 'Read pair '+read1.qname+': too many mismatches '+\
-                                        '('+str(dc[0])+' + '+str(dc[1])+')'
+
+                        elif pair_type == 'mutator':
                             n_mutator += 1
                             map(trashfile.write, reads)
-                            continue
-    
-                        # Trim the bad CIGARs from the sides, if there are any good ones
-                        skip = trim_bad_cigar(reads, match_len_min=match_len_min,
-                                               trim_left=trim_bad_cigars,
-                                               trim_right=trim_bad_cigars)
-                        if skip:
+
+                        elif pair_type == 'bad_cigar':
                             n_badcigar += 1
                             map(trashfile.write, reads)
-                            continue
-    
-                        # TODO: we might want to incorporate some more stringent
-                        # criterion here, to avoid short reads, cross-overhang, etc.
-    
-                        # Write the output
-                        n_good += 1
-                        map(outfile.write, reads)
+
+                        else:
+                            n_good += 1
+                            map(outfile.write, reads)
 
                 finally:
                     file_close(bamfile)
