@@ -28,20 +28,13 @@ class TestAlleleCounts(unittest.TestCase):
         self.reads = []
 
         # Trivial read, only matches
-        read = Read()
-        read.qname = 'matchonly'
-        read.pos = 1
-        read.seq = 'AAAGGGTTTCCC'
-        read.qual = 'G' * len(read.seq)
-        read.cigar = [(0, len(read.seq))]
+        read = Read('AAAGGGTTTCCC', pos=1,
+                    qname='matchonly')
         self.reads.append(read)
 
         # Read that starts with an insertion
-        read = Read()
-        read.qname = 'startins'
-        read.pos = 2
-        read.seq = 'AAAGGGTTTCCC'
-        read.qual = 'G' * len(read.seq)
+        read = Read('AAAGGGTTTCCC', pos=2,
+                    qname='startins')
         read.cigar = [(1, 3), (0, len(read.seq) - 3)]
         self.reads.append(read)
 

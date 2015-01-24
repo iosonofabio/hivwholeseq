@@ -41,10 +41,9 @@ def filter_read_pair(reads,
                      trim_bad_cigars=3,
                      VERBOSE=0):
     '''Filter read pair'''
-    from hivwholeseq.sequencing.filter_mapped_reads import trim_bad_cigar
+    from hivwholeseq.mapping_utils import trim_short_cigars_pair
 
     (read1, read2) = reads
-    i_fwd = reads[0].is_reverse
 
     # Check names to make sure we are looking at paired reads, this would
     # screw up the whole bamfile
@@ -65,6 +64,11 @@ def filter_read_pair(reads,
             print 'Read pair '+read1.qname+': not properly paired'
         return 'unpaired'
         
+    i_fwd = reads[0].is_reverse
+    i_rev = not i_fwd
+    readf = reads[i_fwd]
+    readr = reads[i_rev]
+
     # Mismappings are often characterized by many mutations:
     # check the number of mismatches and skip reads with too many
     dc = get_distance_from_consensus(ref, reads, VERBOSE=VERBOSE)
@@ -73,7 +77,7 @@ def filter_read_pair(reads,
         hist_distance_from_consensus[dc.sum()] += 1
 
     if hist_dist_along is not None:
-        hbin = (reads[i_fwd].pos + reads[i_fwd].isize / 2) // binsize
+        hbin = (readf.pos + readf.isize / 2) // binsize
         hist_dist_along[hbin, dc.sum()] += 1
 
     if (dc.sum() > max_mismatches):
@@ -84,15 +88,21 @@ def filter_read_pair(reads,
 
     # Trim the bad CIGARs from the sides, if there are any good ones
     # FIXME: this must have a bug with leading insertions
-    skip = trim_bad_cigar(reads, match_len_min=match_len_min,
-                          trim_left=trim_bad_cigars,
-                          trim_right=trim_bad_cigars)
+    # NOTE: I rewrote the function, now simpler, it should work
+    skip = trim_short_cigars_pair(reads, match_len_min=match_len_min,
+                                  trim_pad=trim_bad_cigars, throw=False)
     if skip:
         return 'bad_cigar'
+
+    # Check the reads are still long enough after trimming
+    if (len(read1.seq) < 100) or (len(read2.seq) < 100):
+        return 'tiny'
     
-    # TODO: we might want to incorporate some more stringent
-    # criterion here, to avoid short reads, cross-overhang, etc.
-    
+    # NOTE: cross-overhang and similar stuff should never happen, because we
+    # filter only insert sizes > 400 after premapping. Nonetheless...
+    if readf.isize < 300:
+        return 'tiny'
+
     return 'good'
 
 
@@ -155,6 +165,7 @@ def filter_mapped_reads(sample, fragment,
             n_unpaired = 0
             n_mutator = 0
             n_badcigar = 0
+            n_tiny = 0
             binsize = 200
             hist_distance_from_consensus = np.zeros(n_cycles + 1, int)
             hist_dist_along = np.zeros((len(ref) // binsize + 1, n_cycles + 1), int)
@@ -205,6 +216,10 @@ def filter_mapped_reads(sample, fragment,
                             n_badcigar += 1
                             map(trashfile.write, reads)
 
+                        elif pair_type == 'tiny':
+                            n_tiny += 1
+                            map(trashfile.write, reads)
+
                         else:
                             n_good += 1
                             map(outfile.write, reads)
@@ -219,6 +234,7 @@ def filter_mapped_reads(sample, fragment,
         print 'Unpaired:', n_unpaired
         print 'Many-mutations:', n_mutator
         print 'Bad CIGARs:', n_badcigar
+        print 'Tiny:', n_tiny
         print
 
     if summary:
@@ -231,6 +247,7 @@ def filter_mapped_reads(sample, fragment,
             f.write('Unpaired:\t\t'+str(n_unpaired)+'\n')
             f.write('Many-mutations:\t\t'+str(n_mutator)+'\n')
             f.write('Bad CIGARs:\t\t'+str(n_badcigar)+'\n')
+            f.write('Tiny:\t\t\t'+str(n_tiny)+'\n')
 
 
 

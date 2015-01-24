@@ -13,108 +13,96 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), os.pa
 import unittest
 from collections import defaultdict, Counter
 import numpy as np
+from copy import deepcopy
 
 from miseq import alphal
 from patients.filter_mapped_reads import filter_read_pair
 
-from test.utils import Read
+from test.utils import Read, fix_pair
 
 
 # Tests
 class TestFilterReads(unittest.TestCase):
+    ref = 'CCCAAAGGGCCCTTTCCC'
 
+
+class MatchOnly(TestFilterReads):
+    '''Trivial read pair, only matches'''
     def setUp(self):
-        self.ref = 'CCCAAAGGGCCCTTTCCC'
+        readf = Read('AAAGGGCCCTTT', pos=3,
+                     qname='matchonly')
+        readr = Read('AGGGCCCTTTCCC', pos=5,
+                     qname='matchonly',
+                     is_reverse=True)
+        fix_pair((readf, readr))
+        self.pair = (readf, readr)
 
-        self.pairs = []
-
-        # Trivial read pair, only matches
-        readf = Read()
-        readf.qname = 'matchonly'
-        readf.pos = 3
-        readf.seq = 'AAAGGGCCCTTT'
-        readf.qual = 'G' * len(readf.seq)
-        readf.cigar = [(0, len(readf.seq))]
-        readf.is_reverse = False
-        readf.is_unmapped = False
-        readf.is_unpared = False
-        readf.is_proper_pair = True
-
-        readr = Read()
-        readr.qname = 'matchonly'
-        readr.pos = 5
-        readr.seq = 'AGGGCCCTTTCCC'
-        readr.qual = 'G' * len(readr.seq)
-        readr.cigar = [(0, len(readr.seq))]
-        readr.is_reverse = True
-        readr.is_unmapped = False
-        readr.is_unpared = False
-        readr.is_proper_pair = True
-
-        isize = readr.pos + len(readr.seq) - readf.pos
-        readf.isize = isize
-        readr.isize = -isize
-        readf.mpos = readr.pos
-        readr.mpos = readf.pos
-
-        self.pairs.append((readf, readr))
-
-        # The same, but reversed
-        readf = Read()
-        readf.qname = 'reverse'
-        readf.pos = 3
-        readf.seq = 'AAAGGGCCCTTT'
-        readf.qual = 'G' * len(readf.seq)
-        readf.cigar = [(0, len(readf.seq))]
-        readf.is_reverse = False
-        readf.is_unmapped = False
-        readf.is_unpared = False
-        readf.is_proper_pair = True
-
-        readr = Read()
-        readr.qname = 'reverse'
-        readr.pos = 5
-        readr.seq = 'AGGGCCCTTTCCC'
-        readr.qual = 'G' * len(readr.seq)
-        readr.cigar = [(0, len(readr.seq))]
-        readr.is_reverse = True
-        readr.is_unmapped = False
-        readr.is_unpared = False
-        readr.is_proper_pair = True
-
-        isize = readr.pos + len(readr.seq) - readf.pos
-        readf.isize = isize
-        readr.isize = -isize
-        readf.mpos = readr.pos
-        readr.mpos = readf.pos
-
-        self.pairs.append((readr, readf))
-        
-        # TODO: add more complex cases
-
-        self.pairsdict = {reads[0].qname: reads for reads in self.pairs}
-
-
-    def test_matchonly(self):
+    def test(self):
         '''Test match only pairs'''
-        from copy import deepcopy
-
-        pair = self.pairsdict['matchonly']
-        pair_orig = deepcopy(pair)
+        pair_orig = deepcopy(self.pair)
 
         # Call the function
-        pair_type = filter_read_pair(pair, self.ref, match_len_min=3)
+        pair_type = filter_read_pair(self.pair, self.ref, match_len_min=3)
 
         self.assertEqual(pair_type, 'good')
-        self.assertEqual(pair[0], pair_orig[0])
-        self.assertEqual(pair[1], pair_orig[1])
+        self.assertEqual(self.pair, pair_orig)
 
 
+class Reversed(TestFilterReads):
+    '''Trivial but readf/r are reversed'''
+    def setUp(self):
+        readf = Read('AAAGGGCCCTTT', pos=3,
+                     qname='matchonly')
+        readr = Read('AGGGCCCTTTCCC', pos=5,
+                     qname='matchonly',
+                     is_reverse=True)
+        fix_pair((readf, readr))
+        self.pair = (readr, readf)
+
+    def test(self):
+        '''Test match only pairs'''
+        pair_orig = deepcopy(self.pair)
+
+        # Call the function
+        pair_type = filter_read_pair(self.pair, self.ref, match_len_min=3)
+
+        self.assertEqual(pair_type, 'good')
+        self.assertEqual(self.pair, pair_orig)
 
 
+class StartsBefore(TestFilterReads):
+    '''Starts before 0'''
+    def setUp(self):
+        readf = Read('GGCCAACCCAAAGGG', pos=0,
+                     qname='startsbefore')
+        readf.cigar = [(1, 6), (0, len(readf.seq) - 6)]
+        readr = Read('CCAAAGGGCCCTTT', pos=1,
+                     qname='startsbefore',
+                     is_reverse=True)
+        self.pair = (readf, readr)
 
 
-    #TODO: write a test, it has a bug if reads start before the fragment start
+    def test(self):
+        '''Test match only pairs'''
+        pair = deepcopy(self.pair)
+        pair[0].seq = pair[0].seq[7:]
+        pair[0].qual = pair[0].qual[7:]
+        pair[0].pos = 1
+        pair[0].cigar = [(0, len(pair[0].seq))]
+        pair[1].mpos = 1
+        fix_pair(pair)
+
+        # Call the function
+        pair_type = filter_read_pair(self.pair, self.ref,
+                                     trim_bad_cigars=1,
+                                     match_len_min=3)
+
+        self.assertEqual(pair_type, 'good')
+        self.assertEqual(self.pair, pair)
+
+
+# TODO: add more complex cases
+# TODO: go back to the mapped reads and figure out what was wrong with those...
 
 
 

@@ -130,6 +130,112 @@ def get_trims_from_good_cigars(good_cigars, trim_left=3, trim_right=3):
     return trims_left_right
 
 
+def trim_short_cigars(read, match_len_min=20, trim_pad=3, throw=True):
+    '''Trim indels from read edges, plus a few more "pad" bases
+    
+    Parameters:
+       throw (bool): throw an exception in case of errors. If False, return 1.
+
+    NOTE: mate and insert properties have to be fixed afterwards,
+    e.g. mpos and isize.
+    '''
+    # Trim left
+    cigar = read.cigar
+    if (cigar[0][0] != 0) or (cigar[0][1] < match_len_min):
+        pos_ref = read.pos
+        pos_read = 0
+        for icig, (bt, bl) in enumerate(cigar):
+            if bt == 2:
+                pos_ref += bl
+            elif bt == 1:
+                pos_read += bl
+            elif bl < match_len_min:
+                pos_ref += bl
+                pos_read += bl
+            else:
+                cigar_new = [(0, bl - trim_pad)]
+                if icig != len(cigar) - 1:
+                    cigar_new.extend(cigar[icig + 1:])
+                pos_ref += trim_pad
+                pos_read += trim_pad
+
+                # Set new read
+                qual = read.qual[pos_read:]
+                seq = read.seq[pos_read:]
+                read.seq = seq
+                read.qual = qual
+                read.cigar = cigar_new
+                read.pos = pos_ref
+
+                break
+
+        else:
+            if throw:
+                raise ValueError('Read too short to be trimmed from left')
+            else:
+                return True
+
+    # Trim right
+    cigar = read.cigar
+    if (cigar[-1][0] != 0) or (cigar[-1][1] < match_len_min):
+        pos_read = len(read.seq)
+        for icig in xrange(len(cigar) - 1, -1, -1):
+            (bt, bl) = cigar[icig]
+            if bt == 2:
+                pass
+            elif bt == 1:
+                pos_read -= bl
+            elif bl < match_len_min:
+                pos_read -= bl
+            else:
+                cigar_new = cigar[:icig] + [(0, bl - trim_pad)]
+                pos_read -= trim_pad
+
+                # Set new read
+                qual = read.qual[:pos_read]
+                seq = read.seq[:pos_read]
+                read.seq = seq
+                read.qual = qual
+                read.cigar = cigar_new
+
+                break
+
+        else:
+            if throw:
+                raise ValueError('Read too short to be trimmed from right')
+            else:
+                return True
+
+    if not throw:
+        return False
+
+
+def fix_read_pair(reads):
+    '''Fix read pair and insert properties'''
+    i_fwd = reads[0].is_reverse
+    i_rev = not i_fwd
+
+    read_fwd = reads[i_fwd]
+    read_rev = reads[i_rev]
+
+    # Mate position
+    read_rev.mpos = read_fwd.pos
+    read_fwd.mpos = read_rev.pos
+
+    # Insert size
+    isize = (read_rev.pos - read_fwd.pos +
+             sum(bl for (bt, bl) in read_rev.cigar if bt in (0, 2)))
+    read_fwd.isize = isize
+    read_rev.isize = -isize
+
+
+def trim_short_cigars_pair(reads, **kwargs):
+    '''Trim short cigars from both reads of a pair and fix isize'''
+    for read in reads:
+        trim_short_cigars(read, **kwargs)
+    fix_read_pair(reads)
+
+
 def convert_sam_to_bam(bamfilename, samfilename=None):
     '''Convert SAM file to BAM file format'''
     import pysam

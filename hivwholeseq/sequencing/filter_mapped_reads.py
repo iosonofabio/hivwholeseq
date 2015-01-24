@@ -213,15 +213,19 @@ def check_overhanging_reads(reads, refl):
     return skip
 
 
-def trim_bad_cigar(reads, match_len_min=match_len_min,
-                   trim_left=trim_bad_cigars, trim_right=trim_bad_cigars,
+# FIXME: use trim_short_cigars_pair, it's simpler and more robust
+def trim_bad_cigar(reads,
+                   match_len_min=match_len_min,
+                   trim_left=trim_bad_cigars,
+                   trim_right=trim_bad_cigars,
                    cons=None):
-    '''Trim away bad CIGARs from the sides'''
+    '''Trim away short CIGARs from both edges, they are likely mapping artifacts'''
 
     for read in reads:
         # Get good CIGARs
         (good_cigars, first_good_cigar, last_good_cigar) = \
-                get_ind_good_cigars(read.cigar, match_len_min=match_len_min,
+                get_ind_good_cigars(read.cigar,
+                                    match_len_min=match_len_min,
                                     full_output=True)
 
         # If no good CIGARs, give up
@@ -256,7 +260,7 @@ def trim_bad_cigar(reads, match_len_min=match_len_min,
             read.pos = start_ref
             read.cigar = cigar    
 
-    # Mate pair stuff and insert size
+    # Mate position
     reads[0].mpos = reads[1].pos
     reads[1].mpos = reads[0].pos
 
@@ -265,7 +269,7 @@ def trim_bad_cigar(reads, match_len_min=match_len_min,
     i_rev = not i_fwd
     isize = reads[i_rev].pos + sum(bl for (bt, bl) in reads[i_rev].cigar
                                    if bt in (0, 2)) - reads[i_fwd].pos
-    
+
     # Trash pair if the insert size is negative (complete cross-overhang)
     #               ----->
     #   <------
