@@ -95,12 +95,21 @@ def filter_read_pair(reads,
         return 'bad_cigar'
 
     # Check the reads are still long enough after trimming
-    if (len(read1.seq) < 100) or (len(read2.seq) < 100):
+    if (len(read1.seq) < 100):
+        if VERBOSE >= 2:
+            print 'Read too short:', read1.qname, len(read1.seq)
         return 'tiny'
     
+    if (len(read2.seq) < 100):
+        if VERBOSE >= 2:
+            print 'Read too short:', read2.qname, len(read2.seq)
+        return 'tiny'
+
     # NOTE: cross-overhang and similar stuff should never happen, because we
     # filter only insert sizes > 400 after premapping. Nonetheless...
     if readf.isize < 300:
+        if VERBOSE >= 2:
+            print 'Insert too small:', readf.isize
         return 'tiny'
 
     return 'good'
