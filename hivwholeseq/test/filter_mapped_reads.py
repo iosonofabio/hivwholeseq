@@ -16,7 +16,7 @@ import numpy as np
 from copy import deepcopy
 
 from miseq import alphal
-from patients.filter_mapped_reads import filter_read_pair
+from store.filter_mapped_reads import filter_read_pair
 
 from test.utils import Read, fix_pair
 

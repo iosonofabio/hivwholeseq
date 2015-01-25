@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 from hivwholeseq.patients.patients import load_samples_sequenced, SamplePat
 from hivwholeseq.patients.filenames import get_decontaminate_summary_filename, \
         get_crosscontamination_figure_filename
-from hivwholeseq.patients.decontaminate_reads import get_number_reads_summary, refnames
+from hivwholeseq.store.decontaminate_reads import get_number_reads_summary, refnames
 
 
 # Script

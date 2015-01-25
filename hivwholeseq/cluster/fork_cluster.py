@@ -591,7 +591,7 @@ def fork_map_to_initial_reference(samplename, fragment,
     if VERBOSE:
         print 'Forking to the cluster: sample '+samplename+', fragment '+fragment
 
-    JOBSCRIPT = JOBDIR+'patients/map_to_initial_reference.py'
+    JOBSCRIPT = JOBDIR+'store/map_to_initial_reference.py'
     cluster_time = ['23:59:59', '0:59:59']
     vmem = '8G'
 
@@ -625,40 +625,6 @@ def fork_map_to_initial_reference(samplename, fragment,
     return sp.check_output(call_list)
 
 
-def fork_paste_mapped_chunks_to_initial_reference(pname, samplename, fragment,
-                                                  VERBOSE=0, filter_reads=False,
-                                                  summary=True):
-    '''Fork to the cluster for each sample and fragment'''
-    if VERBOSE:
-        print 'Forking to the cluster: patient '+pname+', sample '+\
-                samplename+', fragment '+fragment
-
-    JOBSCRIPT = JOBDIR+'patients/paste_mapped_chunks.py'
-    cluster_time = '0:59:59'
-    vmem = '8G'
-
-    call_list = ['qsub','-cwd',
-                 '-b', 'y',
-                 '-S', '/bin/bash',
-                 '-o', JOBLOGOUT,
-                 '-e', JOBLOGERR,
-                 '-N', 'pc '+samplename+' '+fragment,
-                 '-l', 'h_rt='+cluster_time,
-                 '-l', 'h_vmem='+vmem,
-                 JOBSCRIPT,
-                 '--patient', pname,
-                 '--samples', samplename,
-                 '--fragments', fragment,
-                 '--verbose', VERBOSE,
-                ]
-    if not summary:
-        call_list.append('--no-summary')
-    call_list = map(str, call_list)
-    if VERBOSE:
-        print ' '.join(call_list)
-    return sp.check_output(call_list)
-
-
 def fork_filter_mapped_init(samplename, fragment,
                             VERBOSE=0, n_pairs=-1,
                             PCR=1,
@@ -667,7 +633,7 @@ def fork_filter_mapped_init(samplename, fragment,
     if VERBOSE:
         print 'Forking to the cluster: sample '+samplename+', fragment '+fragment
 
-    JOBSCRIPT = JOBDIR+'patients/filter_mapped_reads.py'
+    JOBSCRIPT = JOBDIR+'store/filter_mapped_reads.py'
     cluster_time = '23:59:59'
     vmem = '8G'
 
@@ -700,7 +666,7 @@ def fork_build_consensus_patient(samplename_pat, fragment, VERBOSE=0, PCR=1,
     if VERBOSE:
         print 'Forking to the cluster: '+samplename_pat+', fragment '+fragment
 
-    JOBSCRIPT = JOBDIR+'patients/build_consensus.py'
+    JOBSCRIPT = JOBDIR+'store/build_consensus.py'
     cluster_time = '0:59:59'
     vmem = '2G'
 
@@ -832,7 +798,7 @@ def fork_decontaminate_reads_patient(samplename, fragment, VERBOSE=0, PCR=None,
     if VERBOSE:
         print 'Fork to cluster: sample', samplename, fragment
 
-    JOBSCRIPT = JOBDIR+'patients/decontaminate_reads.py'
+    JOBSCRIPT = JOBDIR+'store/decontaminate_reads.py'
     cluster_time = '71:59:59'
     vmem = '2G'
 

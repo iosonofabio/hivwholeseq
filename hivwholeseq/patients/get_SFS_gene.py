@@ -117,7 +117,7 @@ if __name__ == '__main__':
                     aft_der[:, ai, i] = 0
 
             # Extract gene from reference and allele freq trajectories
-            from hivwholeseq.patients.build_initial_reference import check_genes_consensus
+            from hivwholeseq.store.build_initial_reference import check_genes_consensus
             cons_rec = SeqIO.read(get_initial_reference_filename(pname, fragment), 'fasta')
             conss = str(cons_rec.seq)
             gene_seqs, genes_good, gene_poss = check_genes_consensus(conss, fragment, genes=[gene],

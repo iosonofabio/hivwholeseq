@@ -10,7 +10,7 @@ import argparse
 from Bio import SeqIO
 
 from hivwholeseq.patients.patients import load_patient
-from hivwholeseq.patients.build_genomewide_consensus import merge_fragments
+from hivwholeseq.store.build_genomewide_consensus import merge_fragments
 
 
 
