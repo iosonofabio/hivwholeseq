@@ -13,7 +13,7 @@ from hivwholeseq.argparse_utils import RoiAction
 
 
 # Functions
-def get_fragmented_roi(patient, roi, VERBOSE=0, include_genomewide=False):
+def get_fragmented_roi(refseq, roi, VERBOSE=0, include_genomewide=False):
     '''From a Region Of Interest, get fragment(s), start and end coordinates'''
     def find_fragment(fea_frags, start, end, include_genomewide=False):
         for fea in fea_frags:
@@ -28,7 +28,6 @@ def get_fragmented_roi(patient, roi, VERBOSE=0, include_genomewide=False):
         else:
             return ('genomewide', start, end)
 
-    refseq = patient.get_reference('genomewide', 'gb')
     fea_frags = [fea for fea in refseq.features if fea.type == 'fragment']
     feanames = [fea.id for fea in refseq.features]
 

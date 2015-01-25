@@ -11,7 +11,7 @@ import numpy as np
 from hivwholeseq.generic_utils import mkdirs
 from hivwholeseq.patients.samples import load_samples_sequenced
 from hivwholeseq.paper_figures.filenames import get_figure_folder
-from hivwholeseq.patients.check_allele_frequency_overlap import get_allele_frequency_overlap
+from hivwholeseq.controls.check_allele_frequency_overlap import get_allele_frequency_overlap
 
 from hivwholeseq.paper_figures.plots import plot_allele_frequency_overlap
 

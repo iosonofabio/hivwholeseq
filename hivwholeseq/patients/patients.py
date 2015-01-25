@@ -121,7 +121,8 @@ class Patient(pd.Series):
         from hivwholeseq.patients.get_roi import get_fragmented_roi
         if isinstance(roi, basestring):
             roi = (roi, 0, '+oo')
-        return get_fragmented_roi(self, roi, VERBOSE=VERBOSE, **kwargs)
+        refseq = self.get_reference('genomewide', 'gb')
+        return get_fragmented_roi(refseq, roi, VERBOSE=VERBOSE, **kwargs)
 
 
     def get_reference_filename(self, fragment, format='fasta'):

@@ -66,6 +66,46 @@ class SamplePat(pd.Series):
         self._sequenced_samples = value
 
 
+    def get_fragmented_roi(self, roi, VERBOSE=0, **kwargs):
+        '''Get a region of interest in fragment coordinates'''
+        from hivwholeseq.patients.get_roi import get_fragmented_roi
+        if isinstance(roi, basestring):
+            roi = (roi, 0, '+oo')
+        refseq = self.get_reference('genomewide', 'gb')
+        return get_fragmented_roi(refseq, roi, VERBOSE=VERBOSE, **kwargs)
+
+
+
+    def get_reference_filename(self, fragment, format='fasta'):
+        '''Get filename of the reference for mapping'''
+        from hivwholeseq.patients.filenames import get_initial_reference_filename
+        return get_initial_reference_filename(self.patient, fragment, format)
+
+
+    def get_reference(self, region, format='fasta'):
+        '''Get the reference for a genomic region'''
+        from Bio import SeqIO
+        fragments = ['F'+str(i) for i in xrange(1, 7)] + ['genomewide']
+
+        if region in fragments:
+            fragment = region
+        else:
+            (fragment, start, end) = self.get_fragmented_roi((region, 0, '+oo'),
+                                                             include_genomewide=True)
+
+        refseq = SeqIO.read(self.get_reference_filename(fragment, format=format),
+                            format)
+
+        if format in ('gb', 'genbank'):
+            from hivwholeseq.sequence_utils import correct_genbank_features_load
+            correct_genbank_features_load(refseq)
+
+        if region not in fragments:
+            refseq = refseq[start: end]
+
+        return refseq
+
+
     def get_mapped_filenames(self, fragment, PCR=1):
         '''Get filename(s) of mapped and filtered reads'''
         samples_seq = self.samples_seq
@@ -103,26 +143,22 @@ class SamplePat(pd.Series):
         return SeqIO.read(self.get_consensus_filename(fragment, PCR=PCR), 'fasta')
 
 
-    def get_reference_filename(self, fragment, format='fasta'):
-        '''Get filename of the reference for mapping'''
-        from hivwholeseq.patients.filenames import get_initial_reference_filename
-        return get_initial_reference_filename(self.patient, fragment, format)
+    # TODO: implement this with depth checks
+    #def get_allele_frequencies(self, region, PCR=1, qual_min=30, merge_read_types=True):
+    #    pass
 
 
-    def get_reference(self, fragment, format='fasta'):
-        '''Get the reference for a fragment'''
-        from Bio import SeqIO
-        refseq = SeqIO.read(self.get_reference_filename(fragment, format=format), format)
-        if format in ('gb', 'genbank'):
-            from hivwholeseq.sequence_utils import correct_genbank_features_load
-            correct_genbank_features_load(refseq)
-        return refseq
-
-
-    def get_allele_counts(self, fragment, PCR=1, qual_min=30, merge_read_types=True):
+    def get_allele_counts(self, region, PCR=1, qual_min=30, merge_read_types=True):
         '''Get the allele counts'''
         import numpy as np
+
+        # Fall back on genomewide counts if no single fragment is enough
+        (fragment, start, end) = self.get_fragmented_roi((region, 0, '+oo'),
+                                                         include_genomewide=True)
+
         ac = np.load(self.get_allele_counts_filename(fragment, PCR=PCR, qual_min=qual_min))
+        ac = ac[:, :, start: end]
+
         if merge_read_types:
             ac = ac.sum(axis=0)
         return ac
@@ -136,9 +172,9 @@ class SamplePat(pd.Series):
         return acc
 
 
-    def get_coverage(self, fragment, PCR=1, qual_min=30, merge_read_types=True):
+    def get_coverage(self, region, PCR=1, qual_min=30, merge_read_types=True):
         '''Get the coverage'''
-        ac = self.get_allele_counts(fragment, PCR=PCR, qual_min=qual_min,
+        ac = self.get_allele_counts(region, PCR=PCR, qual_min=qual_min,
                                     merge_read_types=merge_read_types)
         cov = ac.sum(axis=-2)
         return cov
@@ -177,8 +213,6 @@ def load_samples_sequenced(patients=None, include_wrong=False):
 
     sample_table.index = pd.Index(map(str, sample_table.index))
     sample_table.loc[:, 'patient'] = map(str, sample_table.loc[:, 'patient'])
-    # FIXME: the number of molecules to PCR depends on the number of
-    # fragments for that particular experiment... integrate Lina's table!
     # Note: this refers to the TOTAL # of templates, i.e. the factor 2x for
     # the two parallel RT-PCR reactions
     sample_table['n templates'] = sample_table['viral load'] * 0.4 / 12 * 2

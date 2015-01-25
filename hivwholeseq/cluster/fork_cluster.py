@@ -698,7 +698,7 @@ def fork_get_allele_counts_patient(samplename, fragment, VERBOSE=0, PCR=1, qual_
     if VERBOSE:
         print 'Forking to the cluster: '+samplename+', fragment '+fragment
 
-    JOBSCRIPT = JOBDIR+'patients/get_allele_counts.py'
+    JOBSCRIPT = JOBDIR+'store/store_allele_counts.py'
     cluster_time = '0:59:59'
     vmem = '2G'
 
@@ -731,7 +731,7 @@ def fork_get_cocounts_patient(samplename, fragment, VERBOSE=0,
     if VERBOSE:
         print 'Forking to the cluster: sample '+samplename+', fragment '+fragment
 
-    JOBSCRIPT = JOBDIR+'patients/get_allele_cocounts.py'
+    JOBSCRIPT = JOBDIR+'store/store_allele_cocounts.py'
     cluster_time = '23:59:59'
     vmem = '8G'
 
@@ -766,7 +766,7 @@ def fork_compress_cocounts_patient(samplename, fragment, VERBOSE=0,
     if VERBOSE:
         print 'Forking to the cluster: sample '+samplename+', fragment '+fragment
 
-    JOBSCRIPT = JOBDIR+'patients/compress_allele_cocounts.py'
+    JOBSCRIPT = JOBDIR+'store/compress_allele_cocounts.py'
     cluster_time = '23:59:59'
     vmem = '8G'
 
