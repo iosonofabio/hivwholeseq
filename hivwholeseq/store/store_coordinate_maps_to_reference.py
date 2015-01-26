@@ -22,6 +22,44 @@ from hivwholeseq.patients.filenames import get_initial_reference_filename, \
 
 
 
+# Function
+def build_coordinate_map(refseq, patseq, VERBOSE=0, **kwargs):
+    '''Build the coordinate map
+    
+    Parameters
+      **kwargs: passed to alignment function (e.g. alignment penalties)
+    '''
+    from seqanpy import align_overlap
+    (score, ali1, ali2) = align_overlap(refseq, patseq, **kwargs)
+    patseq_start = len(ali2) - len(ali2.lstrip('-'))
+    patseq_end = len(ali2.rstrip('-'))
+
+    if VERBOSE >= 3:
+        from hivwholeseq.sequence_utils import pretty_print_pairwise_ali
+        pretty_print_pairwise_ali([ali1[patseq_start: patseq_end],
+                                   ali2[patseq_start: patseq_end]],
+                                  name1=refseq.name, name2=patseq.name)
+
+    # Bijective map
+    mapbi = []
+    pos_ref = patseq_start
+    pos_ini = 0
+    for col in xrange(patseq_start, patseq_end):
+        nuc_ref = ali1[col]
+        nuc_ini = ali2[col]
+        if (nuc_ref != '-') and (nuc_ini != '-'):
+            mapbi.append((pos_ref, pos_ini))
+            pos_ref += 1
+            pos_ini += 1
+        elif (nuc_ref != '-'):
+            pos_ref += 1
+        elif (nuc_ini != '-'):
+            pos_ini += 1
+
+    return mapbi
+
+
+
 # Script
 if __name__ == '__main__':
 
@@ -69,6 +107,18 @@ if __name__ == '__main__':
             if VERBOSE >= 1:
                 print pname, region
 
-            coomap = patient.get_map_coordinates_reference(region,
-                                                           refname=refname)
+            refseq = load_custom_reference(refname)
+            patseq = patient.get_reference(region)
+
+            mapco = build_coordinate_map(refseq, patseq, VERBOSE=VERBOSE)
+
+            maps_coord[(region, pname)] = mapco 
+
+            if save_to_file:
+                out_fn = get_coordinate_map_filename(pname, region, refname=refname)
+                np.savetxt(out_fn, np.array(mapco, int), fmt='%d',
+                           delimiter='\t',
+                           header=refname+'\t'+pname+'_'+region)
+                if VERBOSE:
+                    print 'Saved to file:', pname, region
 
