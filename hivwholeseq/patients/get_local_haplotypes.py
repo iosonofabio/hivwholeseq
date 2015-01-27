@@ -243,8 +243,6 @@ if __name__ == '__main__':
                         help='Region of interest (e.g. F1 300 350)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-4]')
-    parser.add_argument('--PCR1', type=int, default=1,
-                        help='Take only PCR1 samples [0=off, 1=where both available, 2=always]')
     parser.add_argument('--maxreads', type=int, default=-1,
                         help='Number of reads analyzed per sample')
     parser.add_argument('--plot', action='store_true',
@@ -258,22 +256,16 @@ if __name__ == '__main__':
     pname = args.patient
     roi = args.roi
     VERBOSE = args.verbose
-    use_PCR1 = args.PCR1
     maxreads = args.maxreads
     use_plot = args.plot
     save_path = args.save
     countmin = args.countmin
 
-    (fragment, start, end) = roi
-
     patient = load_patient(pname)
     patient.discard_nonsequenced_samples()
-    refseq = patient.get_reference(fragment)
-    refroi = ''.join(refseq[start: end])
-    # TODO: some more work if the fragment is "genomewide" or "HXB2" or so
 
     if VERBOSE >= 1:
-        print patient.name, fragment, start, end
+        print patient.name, roi
 
     ind = []
     haplocs = []
@@ -282,15 +274,14 @@ if __name__ == '__main__':
         if VERBOSE >= 1:
             print t, sample.name
 
-        bamfilename = sample.get_mapped_filtered_filename(fragment, PCR=1)
-        if not os.path.isfile(bamfilename):
-            continue
-
         if VERBOSE >= 2:
             print 'Get local haplotypes'
-        haplo = sample.get_local_haplotypes(fragment, start, end,
-                                            VERBOSE=VERBOSE,
-                                            maxreads=maxreads)
+        try:
+            haplo = sample.get_local_haplotypes(roi,
+                                                VERBOSE=VERBOSE,
+                                                maxreads=maxreads)
+        except IOError:
+            continue
 
         if VERBOSE >= 2:
             print 'Cluster haplotypes'

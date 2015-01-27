@@ -17,7 +17,7 @@ from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.sequence_utils import align_muscle
 from hivwholeseq.tree_utils import build_tree_fasttree
 from hivwholeseq.argparse_utils import RoiAction
-from hivwholeseq.store.get_tree_consensi import annotate_tree
+from hivwholeseq.store.store_tree_consensi import annotate_tree
 from hivwholeseq.utils.nehercook.ancestral import ancestral_sequences
 from hivwholeseq.tree_utils import tree_to_json
 from hivwholeseq.generic_utils import write_json

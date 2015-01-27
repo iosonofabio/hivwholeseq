@@ -28,7 +28,7 @@ from hivwholeseq.one_site_statistics import (get_entropy,
     get_allele_frequencies_alignment)
 from hivwholeseq.multipatient.get_shared_alleles_trajectories import (
     get_shared_allele_frequencies, get_patient_indices)
-from hivwholeseq.multipatient.explore_entropy_patsubtype import (
+from hivwholeseq.analysis.explore_entropy_patsubtype import (
     get_subtype_reference_alignment, get_ali_entropy)
 
 
