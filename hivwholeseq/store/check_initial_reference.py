@@ -1071,20 +1071,15 @@ if __name__ == '__main__':
 
     patients = load_patients()
     if pnames is not None:
-        patients = patients.loc[patients.index.isin(pnames)]
+        patients = patients.loc[pnames]
 
     for pname, patient in patients.iterrows():
         patient = Patient(patient)
 
-        if VERBOSE:
+        if VERBOSE >= 1:
             print 'Patient:', patient.name
 
         patient.discard_nonsequenced_samples()
-
-        # Check whether patient has at least three time points, else ignore
-        if patient.samples.shape[0] < 2:
-            print 'WARNING: patient has less than two samples sequenced. Skipping.'
-            continue
 
         for fragment in fragments:
             if VERBOSE >= 1:

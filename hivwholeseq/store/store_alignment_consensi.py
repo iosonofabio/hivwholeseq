@@ -1,163 +1,120 @@
 # vim: fdm=marker
 '''
 author:     Fabio Zanini
-date:       25/10/13
-content:    Collect and align all consensi from a patient.
+date:       11/09/14
+content:    Grab all consensi from a patient and align them.
 '''
 # Modules
+import sys
 import os
 import argparse
-from Bio import SeqIO
-from Bio import AlignIO
+from operator import attrgetter
+import numpy as np
+from Bio import SeqIO, AlignIO
 
-from hivwholeseq.sequencing.samples import samples as samples_seq
-from hivwholeseq.datasets import MiSeq_runs
-from hivwholeseq.sequencing.filenames import get_merged_consensus_filename, get_consensus_filename
-from hivwholeseq.patients.filenames import get_consensi_alignment_genomewide_filename, \
-        get_consensi_alignment_filename
-from hivwholeseq.patients.patients import patients, get_patient
+from hivwholeseq.generic_utils import mkdirs
+from hivwholeseq.patients.patients import load_patients, Patient, SamplePat
+from hivwholeseq.tree_utils import build_tree_fasttree
 from hivwholeseq.mapping_utils import align_muscle
 
 
 
 # Functions
-def make_output_folders(pname, VERBOSE=0):
-    '''Make the patient folder and similia'''
-    from hivwholeseq.generic_utils import mkdirs
-    from hivwholeseq.patients.filenames import get_foldername
-    mkdirs(get_foldername(pname))
-    if VERBOSE >= 1:
-        print 'Folder created:', get_foldername(pname)
+def trim_to_refseq(seq, refseq):
+    '''Trim sequence to a reference sequence'''
+    from seqanpy import align_overlap
 
+    (score, ali1, ali2) = align_overlap(seq, refseq, score_gapopen=-20)
+    start = len(ali2) - len(ali2.lstrip('-'))
+    end = len(ali2.rstrip('-'))
 
-def get_consensi_frag(patient, fragment, VERBOSE=0):
-    '''Collect all consensi for a single fragment'''
-    consensi = []
-    for (index, sample) in patient.sample_table.iterrows():
-        seq_run = sample['run']
-        adaID = sample['adaID']
-        date = sample['date']
-
-        dataset = MiSeq_runs[seq_run]
-        data_folder = dataset['folder']
-
-        input_filename = get_consensus_filename(data_folder, adaID, fragment)
-        if os.path.isfile(input_filename):
-            seq = SeqIO.read(input_filename, 'fasta')
-            seq.description = ', '.join([seq.id, seq.description])
-            seq.id = seq.name = sample['name']+'_'+date
-
-            consensi.append(seq)
-
-    return consensi
-
-
-def get_consensi_genomewide(patient, VERBOSE=0):
-    '''Collect the consensi'''
-    # FIXME: assume all fragments are there for now (no patchy stuff yet)
-    fragments = ['F'+str(i) for i in xrange(1, 7)]
-    consensi = []
-
-    for (index, sample) in patient.sample_table.iterrows():
-        seq_run = sample['run']
-        adaID = sample['adaID']
-        date = sample['date']
-
-        dataset = MiSeq_runs[seq_run]
-        data_folder = dataset['folder']
-
-        input_filename = get_merged_consensus_filename(data_folder, adaID, fragments)
-        if os.path.isfile(input_filename):
-            seq = SeqIO.read(input_filename, 'fasta')
-            seq.description = ', '.join([seq.id, seq.description])
-            seq.id = seq.name = sample['name']+'_'+date
-
-            consensi.append(seq)
-
-    return consensi
-
-
-def align_consensi(consensi, VERBOSE=0):
-    '''Align with muscle and sort'''
-    from Bio.Align import MultipleSeqAlignment as MSA
-
-    ali = align_muscle(*consensi)
-
-    ali_sorted = []
-    for cons in consensi:
-        for row in ali:
-            if row.id == cons.id:
-                ali_sorted.append(row)
-                break
-
-    ali_sorted = MSA(ali_sorted)
-    return ali_sorted
+    return seq[start: end]
 
 
 
 # Script
 if __name__ == '__main__':
 
-
-    # Parse input args
-    parser = argparse.ArgumentParser(description='Align consensi from all time points')
-    parser.add_argument('--patients', default=None, nargs='*',
+    parser = argparse.ArgumentParser(description='Align consensi',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
+    parser.add_argument('--patients', nargs='+', default=['all'],
                         help='Patients to analyze')
-    parser.add_argument('--fragments', nargs='*',
-                        help='Fragment to map (e.g. F1 F6)')
+    parser.add_argument('--regions', nargs='*',
+                        help='Regions to analyze (e.g. V3 F6)')
     parser.add_argument('--verbose', type=int, default=0,
-                        help='Verbosity level [0-3]')
+                        help='Verbosity level [0-4]')
+    parser.add_argument('--save', action='store_true',
+                        help='Save alignment to file')
 
     args = parser.parse_args()
     pnames = args.patients
-    fragments = args.fragments
+    regions = args.regions
     VERBOSE = args.verbose
+    use_save = args.save
 
-    if pnames is None:
-        pnames = [p.id for p in patients]
+    patients = load_patients()
+    if pnames != ['all']:
+        patients = patients.iloc[patients.index.isin(pnames)]
 
-    for pname in pnames:
-        if VERBOSE >= 1:
-            print pname,
+    for pname, patient in patients.iterrows():
+        patient = Patient(patient)
+        patient.discard_nonsequenced_samples()
 
-        # Get patient and the sequenced samples
-        patient = get_patient(pname)
+        if regions is None:
+            refseq_gw = patient.get_reference('genomewide', 'gb')
+            regionspat = map(attrgetter('id'), refseq_gw.features) + ['genomewide']
+        else:
+            regionspat = regions
 
-        make_output_folders(pname)
+        for region in regionspat:
+            if VERBOSE >= 1:
+                print pname, region
+                if VERBOSE == 1:
+                    print ''
 
-        # If the script is called with no fragment, iterate over all
-        if not fragments:
-            fragments = ['F'+str(i) for i in xrange(1, 7)] + ['genomewide']
-        if VERBOSE >= 3:
-            print 'fragments', fragments
+            # FIXME: tat and rev are messed up still!
+            refseq = patient.get_reference(region)
+            refseq.id = 'reference_'+refseq.id
+            refseq.name = 'reference_'+refseq.name
+            refseq.description = 'reference '+refseq.description
+            seqs = [refseq]
 
-        # Collect and align fragment by fragment
-        for fragment in fragments:
-            if fragment == 'genomewide':
-                continue
+            (fragment, start, stop) = patient.get_fragmented_roi(region, VERBOSE=0,
+                                                                 include_genomewide=True)
+
+            for i, (samplename, sample) in enumerate(patient.samples.iterrows()):
+                if VERBOSE >= 2:
+                    print samplename,
+
+                sample = SamplePat(sample)
+                fn = sample.get_consensus_filename(fragment)
+                if os.path.isfile(fn):
+                    cons_seq = SeqIO.read(fn, 'fasta')
+                    cons_seq.id = str(patient.times[i])+'_'+cons_seq.id
+                    cons_seq.name = cons_seq.id
+                    cons_reg = trim_to_refseq(cons_seq, refseq)
+                    seqs.append(cons_reg)
+                    if VERBOSE >= 2:
+                        print 'OK'
+
+                else:
+                    if VERBOSE >= 2:
+                        print 'MISS'
+                    continue
+
+                    
             if VERBOSE >= 2:
-                print fragment,
-            consensi = get_consensi_frag(patient, fragment, VERBOSE=VERBOSE)
-            if len(consensi) < 2:
-                continue
-
-            ali = align_consensi(consensi)
-            output_filename = get_consensi_alignment_filename(pname, fragment)
-            AlignIO.write(ali, output_filename, 'fasta')
-        if (VERBOSE >= 2) and ('genomewide' not in fragments):
-            print
-
-        # Collect and align genome wide consensi
-        if 'genomewide' in fragments:
+                print 'Align',
+            ali = align_muscle(*seqs, sort=True)
             if VERBOSE >= 2:
-                print 'genomewide'
-            consensi = get_consensi_genomewide(patient, VERBOSE=VERBOSE)
-            if len(consensi) < 2:
-                continue
-        
-            # Align them
-            ali = align_consensi(consensi)
-        
-            # Write alignment
-            output_filename = get_consensi_alignment_genomewide_filename(pname)
-            AlignIO.write(ali, output_filename, 'fasta')
+                print 'OK'
+
+
+            if use_save:
+                if VERBOSE >= 2:
+                    print 'Save',
+                fn_out = patient.get_consensi_alignment_filename(region)
+                mkdirs(os.path.dirname(fn_out))
+                AlignIO.write(ali, fn_out, 'fasta')
+                if VERBOSE >= 2:
+                    print 'OK'
