@@ -48,12 +48,15 @@ if __name__ == '__main__':
                         help='Subtype of the alignment')
     parser.add_argument('--reference', default='HXB2',
                         help='Reference of the alignment')
+    parser.add_argument('--type', default='nuc',
+                        help='nuc/aa nucleic or amino acid seqs')
 
     args = parser.parse_args()
     regions = args.regions
     VERBOSE = args.verbose
     subtype = args.subtype
     refname = args.reference
+    alitype = args.type
 
 
     alis = {}
@@ -65,6 +68,7 @@ if __name__ == '__main__':
             print 'Get alignment'
         ali = get_subtype_reference_alignment(region, subtype=subtype,
                                               refname=refname,
-                                                  VERBOSE=VERBOSE)
+                                              type=alitype,
+                                              VERBOSE=VERBOSE)
         alis[region] = ali
 

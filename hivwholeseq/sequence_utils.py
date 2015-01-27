@@ -6,7 +6,20 @@ content:    Support module with sequence utility functions which for some reason
             are missing from Biopython.
 '''
 # Modules
+from numpy import array
 from hivwholeseq.genome_info import genes as genes_all
+
+
+# Globals
+# Alphabet of nucleotides
+alphas = 'ACGT-N'
+alphal = list(alphas)
+alpha = array(alphal, 'S1')
+
+# Alphabet of amino acids
+alphaas = 'ACDEFGHIKLMNPQRSTVWY*-X'
+alphaal = list(alphaas)
+alphaa = array(alphaal, 'S1')
 
 
 

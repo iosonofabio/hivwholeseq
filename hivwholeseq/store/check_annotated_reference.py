@@ -50,6 +50,7 @@ def check_protein(fea, seqgw, VERBOSE=0, delta_pos=2.5):
         raise ValueError('The sequence of '+fea.id+' looks different from HXB2')
 
 
+
 # Script
 if __name__ == '__main__':
 

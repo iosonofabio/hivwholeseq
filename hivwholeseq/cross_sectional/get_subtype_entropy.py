@@ -9,7 +9,7 @@ import os
 import argparse
 import numpy as np
 
-from hivwholeseq.miseq import alpha
+from hivwholeseq.sequence_utils import alpha, alphaa
 from hivwholeseq.one_site_statistics import get_entropy
 from hivwholeseq.cross_sectional.filenames import (
     get_subtype_reference_alignment_filename,
@@ -20,11 +20,15 @@ from hivwholeseq.cross_sectional.get_subtype_reference_alignment import get_subt
 
 # Functions
 def get_ali_entropy(ali, positions=None, alpha=alpha[:5], VERBOSE=0):
-    '''Get entropy of alignment at some positions'''
+    '''Get entropy of alignment at some positions
+    
+    Parameters:
+       - alpha: alphabet for the sequences, defaults to ACGT.
+    '''
     if positions is None:
         positions = np.arange(len(ali[0]))
 
-    afs = np.zeros((5, len(positions)))
+    afs = np.zeros((len(alpha), len(positions)))
     for i, pos in enumerate(positions):
         af = np.zeros(len(alpha))
         col = np.fromstring(ali[:, pos], 'S1')
@@ -68,6 +72,8 @@ if __name__ == '__main__':
                         help='Subtype of the alignment')
     parser.add_argument('--reference', default='HXB2',
                         help='Reference of the alignment')
+    parser.add_argument('--type', default='nuc',
+                        help='nuc/aa nucleic or amino acid seqs')
     parser.add_argument('--save', action='store_true',
                         help='Save to file')
 
@@ -76,6 +82,7 @@ if __name__ == '__main__':
     VERBOSE = args.verbose
     subtype = args.subtype
     refname = args.reference
+    alitype = args.type
     use_save = args.save
 
 
@@ -90,17 +97,24 @@ if __name__ == '__main__':
                 print 'Get alignment'
             ali = get_subtype_reference_alignment(region, subtype=subtype,
                                                   refname=refname,
+                                                  type=alitype,
                                                   VERBOSE=VERBOSE)
 
             if VERBOSE >= 2:
                 print 'Compute entropy'
-            S = get_ali_entropy(ali, VERBOSE=VERBOSE)
+            if alitype == 'nuc':
+                alphabet = alpha[:4]
+            else:
+                alphabet = alphaa[:-3]
+
+            S = get_ali_entropy(ali, alpha=alphabet, VERBOSE=VERBOSE)
 
             if VERBOSE >= 2:
                 print 'Store to file'
             fn_out = get_subtype_reference_alignment_entropy_filename(region,
                                                                       subtype=subtype,
                                                                       refname=refname,
+                                                                      type=alitype,
                                                                       VERBOSE=VERBOSE)
             S.dump(fn_out)
 
@@ -110,6 +124,7 @@ if __name__ == '__main__':
             S = get_subtype_reference_alignment_entropy(region,
                                                         subtype=subtype,
                                                         refname=refname,
+                                                        type=alitype,
                                                         VERBOSE=VERBOSE)
 
         Ss[region] = S
