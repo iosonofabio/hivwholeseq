@@ -666,7 +666,7 @@ def fork_build_consensus_patient(samplename_pat, fragment, VERBOSE=0, PCR=1,
     if VERBOSE:
         print 'Forking to the cluster: '+samplename_pat+', fragment '+fragment
 
-    JOBSCRIPT = JOBDIR+'store/build_consensus.py'
+    JOBSCRIPT = JOBDIR+'store/store_consensus.py'
     cluster_time = '0:59:59'
     vmem = '2G'
 

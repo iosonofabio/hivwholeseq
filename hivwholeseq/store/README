@@ -1,13 +1,23 @@
 PIPELINE FOR HIV MISEQ SEQUENCING DATA: PATIENTS
 -------------------------------------------------------------------------------
-LAST UPDATE: Aug 2014.
+LAST UPDATE: Jan 2015.
 
-SINGLE-PATIENT ANALYSIS
+SINGLE-PATIENT DATA ANALYSIS
 -------------------------------------------------------------------------------
 The second step of the analysis maps all the reads onto a patient-specific
 reference, in order to get a single frame of reference for population genetics
-observables. The analysis is made of substeps:
+observables.
 
+A few control scripts are available to monitor the status of the analysis:
+- check_patients.py
+- check_samples.py
+
+
+The analysis is made of substeps:
+
+-------------------------------------------------------------------------------
+1 MAKE A REFERENCE
+-------------------------------------------------------------------------------
 1. Build a reference for each patient, using the consensus of the initial time
    point if possible, otherwise something similar. The reference must be good:
    all genes in place and in frame, complete coverage of the sequenced regions
@@ -21,28 +31,57 @@ observables. The analysis is made of substeps:
 
 CHECKPOINT: check initial reference for genes and length (check_initial_reference.py).
 
-3. Map the reads onto that reference, merge various repetitions of the sequencing,
-   and filter away unmapped and similia (map_to_initial_reference.py, filter_mapped_reads.py)
+3. The genomewide reference gets annotated.
 
-4. Build allele counts per patient sample (get_allele_counts.py)
+4. If needed, references for the single fragments can be extracted back from the
+   genomewide one (to fill F5a, low coverage regions, etc.)
 
-5. Build allele frequency trajectories using various criteria for PCR1/PCR2, low
-   coverage samples, et similia.
+5. Make coordinate maps to references, e.g. HXB2 (store_coordinate_maps_to_reference.py)
 
-6. Study linkage (TODO).
+6. Align all references from different patients to check they are consistent
+   (store_alignment_references.py).
 
 
-CROSS-SECTIONAL ANALYSIS
 -------------------------------------------------------------------------------
-Comparisons across patient are useful as controls for contamination and sample
-swaps, but also to study genetic diversity:
+2 MAP AND CLEAN THE READS
+-------------------------------------------------------------------------------
+1. Map the reads onto the reference, fragment by fragment (map_to_initial_reference.py).
 
-1. Collect and align consensi from all samples, and build a phylogenetic tree.
-   Repetitions of the same sample should agree completely, then ladder-like
-   intrapatient clustering is expected, then subtype clustering, then star-like
-   phylogeny.
+2. merge various repetitions of the sequencing and filter away unmapped and similia
+   (filter_mapped_reads.py)
 
-2. Create coordinate transformation maps between patient references in order to
-   identify loci from one patient to the other.
+3. decontaminate reads using all sample and reference consensi (decontaminate_reads.py)
 
-3. Compare local haplotypes across patients and time.
+
+-------------------------------------------------------------------------------
+3 CONSENSI
+-------------------------------------------------------------------------------
+1. Build consensus of each sample (store_consensus.py)
+
+2. Make a genomewide consensus for all samples that allow it (store_consensus_genomewide.py)
+
+3. Align consensi from all patients to make trees (store_alignment_consensi.py)
+
+4. Build trees of the consensi (store_tree_consensi.py)
+
+
+-------------------------------------------------------------------------------
+4 ALLELE COUNTS/COCOUNTS
+-------------------------------------------------------------------------------
+1. Extract allele counts for each sample (store_allele_counts.py)
+
+2. Extract allele cocounts for each sample, for linkage (store_allele_cocounts.py)
+
+3. Estimate sequencing depth of each fragment and sample from the allele counts
+   (estimate_ntemplates.py).
+
+4. Merge allele counts into genomewide matrices, paying attention to sequencing depth
+   (store_allele_counts_genomewide.py).
+
+
+-------------------------------------------------------------------------------
+5 HAPLOTYPES
+-------------------------------------------------------------------------------
+1. Extract local haplotypes and frequencies from all patients and regions (store_haplotypes.py)
+
+2. Build trees of the local haplotypes (store_tree_local.py)

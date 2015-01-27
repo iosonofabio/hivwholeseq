@@ -195,7 +195,7 @@ def annotate_sequence_genes(seq_rec, fragment='genomewide', genes=genes_all,
     '''Annotate sequence with genes, checking their consistency'''
     from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
 
-    from hivwholeseq.store.build_initial_reference import check_genes_consensus as cgc
+    from hivwholeseq.store.store_initial_reference import check_genes_consensus as cgc
     (gene_seqs, genes_good, gene_poss) = cgc(''.join(seq_rec), fragment, genes=genes,
                                              max_end_slippage=max_end_slippage,
                                              VERBOSE=VERBOSE)

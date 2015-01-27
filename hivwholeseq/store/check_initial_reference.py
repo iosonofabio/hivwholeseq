@@ -1123,15 +1123,9 @@ if __name__ == '__main__':
                 frag_spec = tmp
             else:
                 if fragment == 'F3':
-                    if pname in ('20529', ):
-                        frag_spec = 'F3ao'
-                    else:
-                        frag_spec = 'F3bo'
+                    frag_spec = 'F3bo'
                 elif fragment == 'F5':
-                    if pname in ('20097', '9669'):
-                        frag_spec = 'F5bo'
-                    else:
-                        frag_spec = 'F5ao'
+                    frag_spec = 'F5ao'
                 else:
                     frag_spec = fragment+'o'
 
