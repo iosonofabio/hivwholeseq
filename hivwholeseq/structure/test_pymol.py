@@ -7,6 +7,7 @@ content:    Get PDB of a structure.
 # Modules
 import os
 import argparse
+import numpy as np
 from Bio.PDB import PDBParser
 
 from hivwholeseq.structure.filenames import get_PDB_filename
@@ -39,10 +40,25 @@ if __name__ == '__main__':
         print 'Get structure PDB'
     fn_pdb = get_PDB_filename(region, VERBOSE=VERBOSE)
 
+    # Get subtype entropy
+    from hivwholeseq.cross_sectional.get_subtype_entropy import (
+        get_subtype_reference_alignment_entropy)
+    S = get_subtype_reference_alignment_entropy(region, subtype='B',
+                                                refname='HXB2',
+                                                type='aa')
+
+    #S = np.log(S + 1e-2)
+    vdws = 0.1 + 3.0 * (S - S.min()) / (S.max() - S.min())
 
     # NOTE: pymol_manager is to be used as a script, not a module
     # (there are all kinds of race conditions)
 
     import ipymol
     mol=ipymol.MolViewer()
-    mol.server.do('fetch 3odu; as cartoon; bg white; png /home/fabio/Desktop/test.png')
+    mol.server.do('load '+fn_pdb+';')
+    mol.server.do('zoom; as cartoon; show spheres, chain A; hide spheres, resn HOH')
+    for pos, vdw in enumerate(vdws):
+        #mol.server.do('alter resi '+str(pos+1)+', vdw='+str(vdw)+';')
+        #mol.server.do('color '+'blue'+', resi '+str(pos+1)+';')
+    mol.server.do('rebuild;')
+    mol.server.do('bg white; png /home/fabio/Desktop/'+region+'.png')
