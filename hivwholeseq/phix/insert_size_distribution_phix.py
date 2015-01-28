@@ -12,7 +12,7 @@ import numpy as np
 
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.sequencing.filenames import get_mapped_phix_filename
-from hivwholeseq.mapping_utils import pair_generator, convert_sam_to_bam
+from hivwholeseq.utils.mapping import pair_generator, convert_sam_to_bam
 
 
 

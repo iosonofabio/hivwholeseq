@@ -23,7 +23,7 @@ from hivwholeseq.patients.patients import load_patient
 from hivwholeseq.patients.filenames import get_mapped_to_initial_filename, \
         get_initial_reference_filename
 from hivwholeseq.reference import load_HXB2
-from hivwholeseq.mapping_utils import pair_generator
+from hivwholeseq.utils.mapping import pair_generator
 
 
 

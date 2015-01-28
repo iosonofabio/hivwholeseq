@@ -22,7 +22,7 @@ from Bio.Alphabet.IUPAC import ambiguous_dna
 from Bio import AlignIO
 
 from hivwholeseq.sequencing.samples import load_sequencing_run, SampleSeq
-from hivwholeseq.mapping_utils import align_muscle
+from hivwholeseq.utils.mapping import align_muscle
 from hivwholeseq.sequencing.filenames import get_divided_filename, \
         get_premapped_filename, \
         get_reference_premap_filename, \
@@ -31,7 +31,7 @@ from hivwholeseq.sequencing.filenames import get_divided_filename, \
         get_build_consensus_summary_filename, \
         get_reference_consensus_ali_filename
 from hivwholeseq.cluster.fork_cluster import fork_build_consensus as fork_self
-from hivwholeseq.sequence_utils import build_local_consensus
+from hivwholeseq.utils.sequence import build_local_consensus
 
 
 
@@ -52,7 +52,7 @@ def build_consensus(bamfilename, len_reference, VERBOSE=0,
     from Bio.SeqRecord import SeqRecord
     from Bio.Alphabet.IUPAC import ambiguous_dna
     
-    from hivwholeseq.mapping_utils import align_muscle
+    from hivwholeseq.utils.mapping import align_muscle
     # Three steps:
     # 1. collect reads uniformly across the fragment
     # 2. make local consensi

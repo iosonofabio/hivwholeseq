@@ -12,7 +12,7 @@ import numpy as np
 from Bio import AlignIO
 
 from hivwholeseq.patients.patients import load_patients, Patient
-from hivwholeseq.sequence_utils import align_muscle
+from hivwholeseq.utils.sequence import align_muscle
 from hivwholeseq.patients.filenames import get_reference_alignment_filename
 
 

@@ -13,7 +13,7 @@ import datetime
 from hivwholeseq.patients.patients import load_patients, load_patient, Patient, \
         SamplePat
 from hivwholeseq.patients.filenames import get_decontaminate_summary_filename
-from hivwholeseq.generic_utils import modification_date
+from hivwholeseq.utils.generic import modification_date
 
 
 # Globals
@@ -25,7 +25,7 @@ cell_len = 7
 def check_reference_overlap(p, VERBOSE=0):
     '''Check whether the reference from the various fragments overlap correctly'''
     from seqanpy import align_ladder
-    from hivwholeseq.sequence_utils import pretty_print_pairwise_ali
+    from hivwholeseq.utils.sequence import pretty_print_pairwise_ali
 
     fragments = ['F'+str(i+1) for i in xrange(6)]
     title = 'Overlaps'
@@ -103,7 +103,7 @@ def pretty_print_info(p, title, name, method, name_requisite=None, mod_dates={},
     '''Pretty printer for patient pipeline info'''
     import os, sys
     from hivwholeseq.patients.samples import SamplePat
-    from hivwholeseq.mapping_utils import get_number_reads
+    from hivwholeseq.utils.mapping import get_number_reads
 
     # NOTE: this function is used to check both entire patients and single samples
     if isinstance(p, SamplePat):

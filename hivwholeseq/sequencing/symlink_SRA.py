@@ -18,7 +18,7 @@ from hivwholeseq.sequencing.filenames import get_seqrun_foldername
 # Functions
 def make_output_folders(data_folder, adaIDs, VERBOSE=0):
     '''Make output folders for symlinking'''
-    from hivwholeseq.generic_utils import mkdirs
+    from hivwholeseq.utils.generic import mkdirs
     mkdirs(data_folder)
     if VERBOSE >= 1:
         print 'Folder created:', data_folder

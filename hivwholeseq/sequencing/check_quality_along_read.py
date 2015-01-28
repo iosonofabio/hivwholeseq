@@ -20,7 +20,7 @@ import pysam
 from hivwholeseq.sequencing.filenames import get_read_filenames
 from hivwholeseq.sequencing.adapter_info import adapters_illumina, foldername_adapter
 from hivwholeseq.cluster.fork_cluster import fork_quality_along_read as fork_self
-from hivwholeseq.mapping_utils import extract_mapped_reads_subsample_open
+from hivwholeseq.utils.mapping import extract_mapped_reads_subsample_open
 from hivwholeseq.sequencing.samples import load_sequencing_run
 
 
@@ -131,7 +131,7 @@ def plot_quality_along_reads(data_folder, adaID, title, quality, VERBOSE=0, save
     fig.suptitle(title, fontsize=20)
 
     if savefig:
-        from hivwholeseq.generic_utils import mkdirs
+        from hivwholeseq.utils.generic import mkdirs
         from hivwholeseq.sequencing.filenames import get_figure_folder, \
                 get_quality_along_reads_filename
         fig_folder = get_figure_folder(data_folder, adaID)
@@ -172,7 +172,7 @@ def plot_cuts_quality_along_reads(data_folder, adaID, quality, title='',
         fig.suptitle(title, fontsize=20)
 
     if savefig:
-        from hivwholeseq.generic_utils import mkdirs
+        from hivwholeseq.utils.generic import mkdirs
         if savefig == True:
             from hivwholeseq.sequencing.filenames import get_figure_folder, \
                     get_quality_along_reads_filename

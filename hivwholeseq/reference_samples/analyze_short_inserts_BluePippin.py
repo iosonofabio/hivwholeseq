@@ -14,7 +14,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pysam
 
-from hivwholeseq.mapping_utils import pair_generator
+from hivwholeseq.utils.mapping import pair_generator
 from hivwholeseq.sequencing.filenames import get_divided_filenames
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.sequencing.samples import samples

@@ -24,7 +24,7 @@ from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.patients.filenames import get_mapped_to_initial_filename, \
         get_initial_consensus_filename
 from hivwholeseq.reference import load_HXB2
-from hivwholeseq.mapping_utils import pair_generator
+from hivwholeseq.utils.mapping import pair_generator
 
 
 

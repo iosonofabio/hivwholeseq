@@ -9,7 +9,7 @@ from Bio import SeqIO, AlignIO
 
 from hivwholeseq.sequencing.filenames import get_HXB2_entire, get_NL43_entire, get_F10_entire, \
         get_HXB2_fragmented, get_NL43_fragmented, get_F10_fragmented
-from hivwholeseq.sequence_utils import correct_genbank_features_load, \
+from hivwholeseq.utils.sequence import correct_genbank_features_load, \
         correct_genbank_features_save
 from hivwholeseq.filenames import get_custom_reference_filename, \
         get_custom_alignment_filename

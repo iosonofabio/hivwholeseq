@@ -8,7 +8,7 @@ content:    Get genomic region of interest from a number of possible inputs.
 import argparse
 from hivwholeseq.patients.patients import load_patient
 from hivwholeseq.patients.samples import SamplePat
-from hivwholeseq.argparse_utils import RoiAction
+from hivwholeseq.utils.argparse import RoiAction
 
 
 

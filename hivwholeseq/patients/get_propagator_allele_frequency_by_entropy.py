@@ -18,7 +18,7 @@ from hivwholeseq.reference import load_custom_reference, load_custom_alignment
 from hivwholeseq.patients.patients import load_patients, filter_patients_n_times, Patient
 from hivwholeseq.patients.filenames import get_initial_reference_filename
 from hivwholeseq.patients.one_site_statistics import get_allele_count_trajectories
-from hivwholeseq import plot_utils
+from hivwholeseq.utils.import plot
 from hivwholeseq.patients.propagator_allele_frequency import Propagator, \
         plot_propagator_theory
 from hivwholeseq.patients.plot_SFS_by_entropy import get_coordinate_map

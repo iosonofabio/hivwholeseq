@@ -14,8 +14,8 @@ import seaborn as sns
 from Bio import Phylo
 
 from hivwholeseq.patients.patients import load_patient
-from hivwholeseq.sequence_utils import align_muscle
-from hivwholeseq.tree_utils import build_tree_fasttree
+from hivwholeseq.utils.sequence import align_muscle
+from hivwholeseq.utils.tree import build_tree_fasttree
 
 
 

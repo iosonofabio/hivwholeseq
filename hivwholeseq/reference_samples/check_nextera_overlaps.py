@@ -16,7 +16,7 @@ from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.sequencing.filenames import get_allele_frequencies_filename
 from hivwholeseq.sequencing.check_overlaps import get_overlapping_fragments, \
         get_overlap
-from hivwholeseq.mapping_utils import align_muscle
+from hivwholeseq.utils.mapping import align_muscle
 
 import Tkinter as tk
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg as FigureCanvas

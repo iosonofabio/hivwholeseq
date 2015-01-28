@@ -10,7 +10,7 @@ import os
 import sys
 import numpy as np
 
-from hivwholeseq.generic_utils import mkdirs
+from hivwholeseq.utils.generic import mkdirs
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.website.filenames import get_viral_load_filename, get_cell_count_filename
 

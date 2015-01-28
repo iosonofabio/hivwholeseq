@@ -27,8 +27,8 @@ def quality_score_along_reads_mapped(read_len, bamfilename,
                                      insertsize_range=[400, 1000],
                                      maxreads=-1, VERBOSE=0):
     '''Calculate the quality score along the reads'''
-    from hivwholeseq.mapping_utils import trim_read_pair_crossoverhangs as trim_coh
-    from hivwholeseq.mapping_utils import pair_generator
+    from hivwholeseq.utils.mapping import trim_read_pair_crossoverhangs as trim_coh
+    from hivwholeseq.utils.mapping import pair_generator
 
     quality = [[[] for j in xrange(read_len)] for i in xrange(2)]
 

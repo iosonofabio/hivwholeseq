@@ -12,13 +12,13 @@ from operator import attrgetter
 import numpy as np
 from Bio import SeqIO, AlignIO
 
-from hivwholeseq.generic_utils import mkdirs
+from hivwholeseq.utils.generic import mkdirs
 from hivwholeseq.sequencing.samples import SampleSeq
 from hivwholeseq.patients.patients import load_patients, Patient, SamplePat
-from hivwholeseq.tree_utils import build_tree_fasttree
+from hivwholeseq.utils.tree import build_tree_fasttree
 from hivwholeseq.utils.nehercook.ancestral import ancestral_sequences
-from hivwholeseq.tree_utils import tree_to_json
-from hivwholeseq.generic_utils import write_json
+from hivwholeseq.utils.tree import tree_to_json
+from hivwholeseq.utils.generic import write_json
 
 
 
@@ -31,7 +31,7 @@ regionsprot = ['PR', 'RT']
 def annotate_tree(patient, tree, VERBOSE=0,
                   fields=('DSI', 'muts', 'VL', 'ntemplates', 'CD4')):
     '''Annotate a tree with info on the nodes'''
-    from hivwholeseq.tree_utils import add_mutations_tree
+    from hivwholeseq.utils.tree import add_mutations_tree
 
     for node in tree.get_terminals():
         label = node.name

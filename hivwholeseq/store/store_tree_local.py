@@ -14,13 +14,13 @@ import matplotlib.pyplot as plt
 from Bio import Phylo
 
 from hivwholeseq.patients.patients import load_patients, Patient
-from hivwholeseq.sequence_utils import align_muscle
-from hivwholeseq.tree_utils import build_tree_fasttree
-from hivwholeseq.argparse_utils import RoiAction
+from hivwholeseq.utils.sequence import align_muscle
+from hivwholeseq.utils.tree import build_tree_fasttree
+from hivwholeseq.utils.argparse import RoiAction
 from hivwholeseq.store.get_tree_consensi import annotate_tree
 from hivwholeseq.utils.nehercook.ancestral import ancestral_sequences
-from hivwholeseq.tree_utils import tree_to_json
-from hivwholeseq.generic_utils import write_json
+from hivwholeseq.utils.tree import tree_to_json
+from hivwholeseq.utils.generic import write_json
 
 
 

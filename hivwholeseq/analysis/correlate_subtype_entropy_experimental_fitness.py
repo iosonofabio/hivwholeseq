@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 
 from hivwholeseq.miseq import alpha
 from hivwholeseq.reference import load_custom_reference
-from hivwholeseq.sequence_utils import get_coordinates_genomic_region
+from hivwholeseq.utils.sequence import get_coordinates_genomic_region
 from hivwholeseq.patients.explore_patconserved_subtype import get_subtype_reference_alignment, get_ali_entropy
 from hivwholeseq.reference_samples.mutational_profiling_NL43 import load_table
 

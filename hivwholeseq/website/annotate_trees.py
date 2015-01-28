@@ -7,8 +7,8 @@ content:    Jsonification and annotation of trees.
 # Modules
 import os
 
-from hivwholeseq.tree_utils import tree_to_json
-from hivwholeseq.generic_utils import read_json, write_json
+from hivwholeseq.utils.tree import tree_to_json
+from hivwholeseq.utils.generic import read_json, write_json
 
 
 

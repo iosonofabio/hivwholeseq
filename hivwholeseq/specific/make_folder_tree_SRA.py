@@ -12,7 +12,7 @@ from itertools import izip
 import argparse
 import subprocess as sp
 
-from hivwholeseq.generic_utils import mkdirs
+from hivwholeseq.utils.generic import mkdirs
 from hivwholeseq.datasets import MiSeq_runs
 
 

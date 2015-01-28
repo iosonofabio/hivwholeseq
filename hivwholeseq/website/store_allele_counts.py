@@ -10,7 +10,7 @@ import sys
 import numpy as np
 
 from hivwholeseq.miseq import alphal
-from hivwholeseq.generic_utils import mkdirs
+from hivwholeseq.utils.generic import mkdirs
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.website.filenames import get_allele_count_trajectories_filename as get_fn_out
 from hivwholeseq.website.filenames import get_coverage_filename

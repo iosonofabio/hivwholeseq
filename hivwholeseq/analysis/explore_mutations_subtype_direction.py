@@ -16,9 +16,9 @@ import matplotlib.pyplot as plt
 
 from hivwholeseq.miseq import alpha, alphal
 from hivwholeseq.patients.patients import load_patients, Patient
-from hivwholeseq.sequence_utils import translate_with_gaps
+from hivwholeseq.utils.sequence import translate_with_gaps
 from hivwholeseq.multipatient.explore_codon_usage_patsubtype import get_degenerate_dict
-import hivwholeseq.plot_utils
+import hivwholeseq.utils.plot
 from hivwholeseq.multipatient.explore_entropy_patsubtype import (
     get_subtype_reference_alignment, get_ali_entropy)
 from hivwholeseq.cross_sectional.get_subtype_entropy import (

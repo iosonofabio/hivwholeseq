@@ -16,8 +16,8 @@ from matplotlib import cm
 import matplotlib.pyplot as plt
 
 from hivwholeseq.patients.patients import load_patient
-from hivwholeseq.argparse_utils import RoiAction
-from hivwholeseq.sequence_utils import build_msa_haplotypes as build_msa
+from hivwholeseq.utils.argparse import RoiAction
+from hivwholeseq.utils.sequence import build_msa_haplotypes as build_msa
 
 
 
@@ -25,7 +25,7 @@ from hivwholeseq.sequence_utils import build_msa_haplotypes as build_msa
 def plot_haplotype_frequencies(times, hft, figax=None, title='',
                                picker=None):
     '''Plot haplotype frequencies'''
-    import hivwholeseq.plot_utils
+    import hivwholeseq.utils.plot
     from matplotlib import cm
     import matplotlib.pyplot as plt
 

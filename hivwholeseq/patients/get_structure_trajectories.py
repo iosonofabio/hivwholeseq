@@ -14,7 +14,7 @@ from Bio import SeqIO, AlignIO
 from seqanpy import align_global
 
 from hivwholeseq.patients.patients import load_patient
-from hivwholeseq.sequence_utils import pretty_print_pairwise_ali
+from hivwholeseq.utils.sequence import pretty_print_pairwise_ali
 
 
 
@@ -56,7 +56,7 @@ def predict_RNA_structure(seq, label='seq', maxstructs=1, VERBOSE=0):
     '''Predict RNA secondary structures using RNAstructure'''
     import os
     import subprocess as sp
-    from hivwholeseq.generic_utils import mkdirs
+    from hivwholeseq.utils.generic import mkdirs
     from Bio import SeqIO
     from Bio.Seq import Seq
     from Bio.SeqRecord import SeqRecord

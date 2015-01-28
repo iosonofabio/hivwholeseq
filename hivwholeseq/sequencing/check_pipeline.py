@@ -12,12 +12,12 @@ from itertools import izip
 import argparse
 from Bio import SeqIO
 
-from hivwholeseq.generic_utils import getchar
+from hivwholeseq.utils.generic import getchar
 from hivwholeseq.sequencing.samples import SampleSeq, load_sequencing_run
 from hivwholeseq.patients.patients import load_samples_sequenced as lssp
 from hivwholeseq.patients.patients import SamplePat
 from hivwholeseq.sequencing.samples import load_samples_sequenced as lss
-from hivwholeseq.mapping_utils import get_number_reads
+from hivwholeseq.utils.mapping import get_number_reads
 from hivwholeseq.cluster.fork_cluster import fork_check_pipeline as fork_self
 
 
@@ -51,7 +51,7 @@ def check_status(sample, step, detail=1):
                     for fr in sample.regions_generic]
         elif step == 'mapped_filtered':
             # Check whether the mapped filtered is older than the mapped_initial
-            from hivwholeseq.generic_utils import modification_date
+            from hivwholeseq.utils.generic import modification_date
             out = []
             for fr in sample.regions_generic:
                 fn_mi = sample.get_mapped_to_initial_filename(fr)

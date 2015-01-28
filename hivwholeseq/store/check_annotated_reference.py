@@ -40,7 +40,7 @@ def check_protein(fea, seqgw, VERBOSE=0, delta_pos=2.5):
     from seqanpy import align_global
     (score, alis, alir) = align_global(seq, ref, score_gapopen=-20)
     if VERBOSE >= 3:
-        from hivwholeseq.sequence_utils import pretty_print_pairwise_ali
+        from hivwholeseq.utils.sequence import pretty_print_pairwise_ali
         pretty_print_pairwise_ali((alir, alis), name1='HXB2', name2='seq',
                                   width=100)
 

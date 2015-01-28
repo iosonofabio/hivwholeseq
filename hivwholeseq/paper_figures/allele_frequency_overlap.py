@@ -8,7 +8,7 @@ content:    Plot allele frequencies in overlap of consecutive fragments.
 import os
 import numpy as np
 
-from hivwholeseq.generic_utils import mkdirs
+from hivwholeseq.utils.generic import mkdirs
 from hivwholeseq.patients.samples import load_samples_sequenced
 from hivwholeseq.paper_figures.filenames import get_figure_folder
 from hivwholeseq.controls.check_allele_frequency_overlap import get_allele_frequency_overlap

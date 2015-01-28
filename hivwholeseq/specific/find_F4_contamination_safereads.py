@@ -15,8 +15,8 @@ from seqanpy import align_global, align_local
 
 from hivwholeseq.reference import load_custom_reference
 from hivwholeseq.sequencing.samples import load_samples_sequenced, SampleSeq
-from hivwholeseq.sequence_utils import pretty_print_pairwise_ali
-from hivwholeseq.generic_utils import getchar
+from hivwholeseq.utils.sequence import pretty_print_pairwise_ali
+from hivwholeseq.utils.generic import getchar
 from hivwholeseq.patients.patients import load_samples_sequenced as lssp
 from hivwholeseq.patients.patients import SamplePat
 
@@ -36,7 +36,7 @@ def fish_original(bamfilename, bamfilename_out,
     import pysam
     from seqanpy import align_overlap
 
-    from hivwholeseq.mapping_utils import pair_generator
+    from hivwholeseq.utils.mapping import pair_generator
 
     if 'score_match' in kwargs:
         score_match = kwargs['score_match']

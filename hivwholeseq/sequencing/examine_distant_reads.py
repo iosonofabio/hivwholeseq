@@ -20,8 +20,8 @@ from hivwholeseq.sequencing.filenames import get_filter_mapped_summary_filename,
         get_mapped_filename
 from hivwholeseq.sequencing.samples import SampleSeq, load_samples_sequenced
 from hivwholeseq.patients.filenames import get_consensi_alignment_filename
-from hivwholeseq.generic_utils import getchar
-from hivwholeseq.sequence_utils import pretty_print_pairwise_ali
+from hivwholeseq.utils.generic import getchar
+from hivwholeseq.utils.sequence import pretty_print_pairwise_ali
 
 
 
@@ -32,7 +32,7 @@ def fish_distant_reads(bamfilename, ref,
     '''Fish distant reads from the trash'''
     import numpy as np
 
-    from hivwholeseq.mapping_utils import pair_generator, reads_to_seqrecord
+    from hivwholeseq.utils.mapping import pair_generator, reads_to_seqrecord
     from hivwholeseq.sequencing.filter_mapped_reads import check_overhanging_reads, \
             get_distance_from_consensus
 

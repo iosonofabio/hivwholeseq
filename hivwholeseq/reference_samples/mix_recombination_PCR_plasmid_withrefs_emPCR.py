@@ -22,7 +22,7 @@ from hivwholeseq.sequencing.filenames import get_consensus_filename, \
         get_allele_frequencies_filename, \
         get_mapped_filename, \
         get_read_filenames
-from hivwholeseq.mapping_utils import align_muscle, pair_generator
+from hivwholeseq.utils.mapping import align_muscle, pair_generator
 from hivwholeseq.sequencing.adapter_info import foldername_adapter
 
 

@@ -32,7 +32,7 @@ from hivwholeseq.sequencing.filenames import get_custom_reference_filename, \
         get_reference_premap_index_filename, get_reference_premap_hash_filename,\
         get_coverage_figure_filename, get_insert_size_distribution_cumulative_filename,\
         get_insert_size_distribution_filename
-from hivwholeseq.mapping_utils import stampy_bin, convert_sam_to_bam, convert_bam_to_sam
+from hivwholeseq.utils.mapping import stampy_bin, convert_sam_to_bam, convert_bam_to_sam
 from hivwholeseq.cluster.fork_cluster import fork_premap as fork_self
 from hivwholeseq.clean_temp_files import remove_premapped_tempfiles
 
@@ -42,7 +42,7 @@ from hivwholeseq.clean_temp_files import remove_premapped_tempfiles
 # Functions
 def make_output_folders(data_folder, adaID, VERBOSE=0, summary=True):
     '''Make output folders'''
-    from hivwholeseq.generic_utils import mkdirs
+    from hivwholeseq.utils.generic import mkdirs
     outfiles = [get_premapped_filename(data_folder, adaID)]
     if summary:
         outfiles.append(get_coverage_figure_filename(data_folder, adaID, 'premapped'))
@@ -115,7 +115,7 @@ def make_reference(data_folder, adaID, fragments, refname, VERBOSE=0, summary=Tr
         smat = np.array(seq)
 
         # Get all possible primers from ambiguous nucleotides and get the best match
-        from hivwholeseq.sequence_utils import expand_ambiguous_seq as eas
+        from hivwholeseq.utils.sequence import expand_ambiguous_seq as eas
         pr_fwd_mat = np.array(map(list, eas(pr_fwd)), 'S1')
         n_matches_fwd = [(smat[i: i + len(pr_fwd)] == pr_fwd_mat).sum(axis=1).max()
                          for i in xrange(len(seq) - len(pr_fwd))]
@@ -432,7 +432,7 @@ def report_coverage(data_folder, adaID, VERBOSE=0, summary=True):
     ax.set_xlim(-20, len(refseq) + 20)
     plt.tight_layout()
 
-    from hivwholeseq.generic_utils import mkdirs
+    from hivwholeseq.utils.generic import mkdirs
     from hivwholeseq.sequencing.filenames import get_figure_folder
     mkdirs(get_figure_folder(data_folder, adaID))
     plt.savefig(get_coverage_figure_filename(data_folder, adaID, 'premapped'))

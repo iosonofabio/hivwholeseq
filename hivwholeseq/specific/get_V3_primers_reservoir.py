@@ -10,7 +10,7 @@ import numpy as np
 from seqanpy import align_overlap
 
 from hivwholeseq.patients.patients import load_patients, Patient
-from hivwholeseq.sequence_utils import reduce_ambiguous_seqs
+from hivwholeseq.utils.sequence import reduce_ambiguous_seqs
 
 
 # Globals

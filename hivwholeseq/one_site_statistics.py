@@ -14,8 +14,8 @@ from Bio.SeqRecord import SeqRecord
 from Bio.Alphabet.IUPAC import ambiguous_dna
 
 from hivwholeseq.miseq import alpha, read_types
-from hivwholeseq.mapping_utils import get_ind_good_cigars
-from hivwholeseq.mapping_utils import align_muscle
+from hivwholeseq.utils.mapping import get_ind_good_cigars
+from hivwholeseq.utils.mapping import align_muscle
 
 
 # Functions
@@ -144,7 +144,7 @@ def get_allele_counts_insertions_from_file_unfiltered(bamfilename, length, qual_
     with pysam.Samfile(bamfilename, 'rb') as bamfile:
 
         if maxreads != -1:
-            from hivwholeseq.mapping_utils import extract_mapped_reads_subsample_open
+            from hivwholeseq.utils.mapping import extract_mapped_reads_subsample_open
             read_iter = extract_mapped_reads_subsample_open(bamfile, maxreads,
                                                             VERBOSE=VERBOSE,
                                                             pairs=False)
@@ -537,7 +537,7 @@ def build_consensus_from_mapped_reads(bamfilename, maxreads=2000, block_len=100,
     
     This method exploits local linkage information to get frameshifts right.
     '''
-    from hivwholeseq.mapping_utils import extract_mapped_reads_subsample_object
+    from hivwholeseq.utils.mapping import extract_mapped_reads_subsample_object
 
     if VERBOSE >= 1:
         print 'Building consensus from mapped reads:', bamfilename

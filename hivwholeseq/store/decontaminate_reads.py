@@ -16,7 +16,7 @@ from Bio import SeqIO
 from hivwholeseq.patients.patients import load_samples_sequenced as lssp
 from hivwholeseq.patients.patients import SamplePat
 from hivwholeseq.reference import load_custom_reference
-from hivwholeseq.sequence_utils import pretty_print_pairwise_ali
+from hivwholeseq.utils.sequence import pretty_print_pairwise_ali
 from hivwholeseq.patients.filenames import get_decontaminate_summary_filename
 from hivwholeseq.cluster.fork_cluster import fork_decontaminate_reads_patient as fork_self
 
@@ -62,7 +62,7 @@ def get_number_reads_summary(fn, details=False):
 def check_already_decontaminated(sample, fragment, PCR):
     '''Check from the summary and output file whether decontamination has been done'''
     import os
-    from hivwholeseq.mapping_utils import get_number_reads
+    from hivwholeseq.utils.mapping import get_number_reads
 
     if (fragment == 'F4') and (sample.name in maj_contnames):
         return True
@@ -121,7 +121,7 @@ def filter_contamination(bamfilename, bamfilename_out, contseqs, samplename, VER
     from operator import itemgetter
     from seqanpy import align_overlap
 
-    from hivwholeseq.mapping_utils import pair_generator, get_number_reads
+    from hivwholeseq.utils.mapping import pair_generator, get_number_reads
 
     if 'score_match' in kwargs:
         score_match = kwargs['score_match']

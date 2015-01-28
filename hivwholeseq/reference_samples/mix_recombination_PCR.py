@@ -26,7 +26,7 @@ from hivwholeseq.miseq import alphal
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.sequencing.filenames import get_consensus_filename, get_mapped_filename, \
         get_allele_counts_filename, get_coverage_filename
-from hivwholeseq.mapping_utils import align_muscle, pair_generator
+from hivwholeseq.utils.mapping import align_muscle, pair_generator
 from hivwholeseq.sequencing.minor_allele_frequency import filter_nus
 from hivwholeseq.sequencing.coverage_tuples import get_coverage_tuples
 

@@ -13,7 +13,7 @@ from matplotlib import cm
 import matplotlib.pyplot as plt
 
 from hivwholeseq.patients.patients import load_patients, Patient
-from hivwholeseq.sequence_utils import align_muscle
+from hivwholeseq.utils.sequence import align_muscle
 
 
 

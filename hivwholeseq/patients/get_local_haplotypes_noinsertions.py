@@ -18,7 +18,7 @@ import numpy as np
 from Bio import SeqIO
 
 from hivwholeseq.patients.patients import load_patient
-from hivwholeseq.argparse_utils import RoiAction
+from hivwholeseq.utils.argparse import RoiAction
 
 
 
@@ -27,8 +27,8 @@ def get_local_block(bamfilename, start, end, VERBOSE=0, maxreads=-1, refroi=None
     '''Extract reads fully covering the region, discarding insertions'''
     import sys
     import pysam
-    from hivwholeseq.mapping_utils import pair_generator
-    from hivwholeseq.mapping_utils import extract_mapped_reads_subsample_open
+    from hivwholeseq.utils.mapping import pair_generator
+    from hivwholeseq.utils.mapping import extract_mapped_reads_subsample_open
 
     with pysam.Samfile(bamfilename, 'rb') as bamfile:
         block = []

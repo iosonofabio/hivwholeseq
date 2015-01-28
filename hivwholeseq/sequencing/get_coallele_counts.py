@@ -19,7 +19,7 @@ from hivwholeseq.sequencing.adapter_info import load_adapter_table
 from hivwholeseq.miseq import alpha, alphal, read_pair_types
 from hivwholeseq.sequencing.filenames import get_mapped_filename, get_allele_counts_filename, \
         get_coallele_counts_filename, get_consensus_filename
-from hivwholeseq.mapping_utils import pair_generator
+from hivwholeseq.utils.mapping import pair_generator
 from hivwholeseq.sequencing.get_allele_counts import get_allele_counts
 from hivwholeseq.cluster.fork_cluster import fork_get_coallele_counts as fork_self
 

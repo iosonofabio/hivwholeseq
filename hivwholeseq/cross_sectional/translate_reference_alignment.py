@@ -8,7 +8,7 @@ content:    Translate a reference alignment into amino acids.
 import argparse
 from Bio import AlignIO
 
-from hivwholeseq.sequence_utils import translate_alignment
+from hivwholeseq.utils.sequence import translate_alignment
 from hivwholeseq.cross_sectional.get_subtype_reference_alignment import (
     get_subtype_reference_alignment)
 from hivwholeseq.cross_sectional.filenames import get_subtype_reference_alignment_filename

@@ -157,7 +157,7 @@ def add_mutations_tree(tree, translate=False,
     '''
     import numpy as np
     from Bio.Seq import translate as tran
-    from hivwholeseq.tree_utils import find_parent
+    from hivwholeseq.utils.tree import find_parent
 
     # NOTE: the root has no mutations by definition
     for node in tree.get_terminals() + tree.get_nonterminals():

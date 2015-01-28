@@ -26,7 +26,7 @@ from hivwholeseq.sequencing.filter_mapped_reads import plot_distance_histogram, 
 from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_mapped_to_initial_filename, get_filter_mapped_init_summary_filename, \
         get_mapped_filtered_filename
-from hivwholeseq.mapping_utils import convert_sam_to_bam, pair_generator
+from hivwholeseq.utils.mapping import convert_sam_to_bam, pair_generator
 from hivwholeseq.cluster.fork_cluster import fork_filter_mapped_init as fork_self
 
 
@@ -41,7 +41,7 @@ def filter_read_pair(reads,
                      trim_bad_cigars=3,
                      VERBOSE=0):
     '''Filter read pair'''
-    from hivwholeseq.mapping_utils import trim_short_cigars_pair
+    from hivwholeseq.utils.mapping import trim_short_cigars_pair
 
     (read1, read2) = reads
 

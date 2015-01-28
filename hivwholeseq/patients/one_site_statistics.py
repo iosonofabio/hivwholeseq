@@ -114,7 +114,7 @@ def plot_allele_frequency_trajectories(times, nus, title='', VERBOSE=0,
                                        ntemplates=None, figax=None, offset=True):
     '''Plot the allele frequency trajectories from a patient'''
     if logit:
-        import hivwholeseq.plot_utils
+        import hivwholeseq.utils.plot
     import matplotlib.pyplot as plt
     from matplotlib import cm
     import numpy as np

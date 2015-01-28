@@ -185,7 +185,7 @@ if __name__ == '__main__':
         np.savez(fn_out, **d_out)
 
     if use_plot:
-        from hivwholeseq import plot_utils
+        from hivwholeseq.utils.import plot
         from matplotlib import cm
         import matplotlib.pyplot as plt
 

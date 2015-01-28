@@ -35,7 +35,7 @@ def build_coordinate_map(refseq, patseq, VERBOSE=0, **kwargs):
     patseq_end = len(ali2.rstrip('-'))
 
     if VERBOSE >= 3:
-        from hivwholeseq.sequence_utils import pretty_print_pairwise_ali
+        from hivwholeseq.utils.sequence import pretty_print_pairwise_ali
         pretty_print_pairwise_ali([ali1[patseq_start: patseq_end],
                                    ali2[patseq_start: patseq_end]],
                                   name1=refseq.name, name2=patseq.name)

@@ -12,7 +12,7 @@ from itertools import izip
 import pysam
 
 from hivwholeseq.miseq import alpha, alphal
-from hivwholeseq.mapping_utils import pair_generator
+from hivwholeseq.utils.mapping import pair_generator
 
 
 
@@ -44,7 +44,7 @@ def get_coallele_counts_from_file(bamfilename, length, qual_min=30,
     posall = np.zeros(1000, dtype=[('pos', int), ('aind', int)])
 
     if VERBOSE >= 2:
-        from hivwholeseq.mapping_utils import get_number_reads
+        from hivwholeseq.utils.mapping import get_number_reads
         print 'Scanning read pairs ('+str(get_number_reads(bamfilename) // 2)+')'
 
     # NOTE: the reads should already be filtered of unmapped stuff at this point

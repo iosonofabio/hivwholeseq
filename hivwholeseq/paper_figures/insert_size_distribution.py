@@ -8,7 +8,7 @@ content:    Plot the quality along the read pair.
 import os
 import numpy as np
 
-from hivwholeseq.generic_utils import mkdirs
+from hivwholeseq.utils.generic import mkdirs
 from hivwholeseq.sequencing.samples import load_sequencing_run, SampleSeq
 from hivwholeseq.paper_figures.filenames import get_figure_folder
 

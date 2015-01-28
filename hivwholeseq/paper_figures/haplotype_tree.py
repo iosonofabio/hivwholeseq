@@ -8,11 +8,11 @@ content:    Plot the quality along the read pair.
 import os
 import numpy as np
 
-from hivwholeseq.generic_utils import mkdirs
+from hivwholeseq.utils.generic import mkdirs
 from hivwholeseq.patients.patients import load_patient
 from hivwholeseq.paper_figures.filenames import get_figure_folder
-from hivwholeseq.sequence_utils import align_muscle
-from hivwholeseq.tree_utils import build_tree_fasttree
+from hivwholeseq.utils.sequence import align_muscle
+from hivwholeseq.utils.tree import build_tree_fasttree
 from hivwholeseq.paper_figures.plots import plot_haplotype_tree_example
 
 

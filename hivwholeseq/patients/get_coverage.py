@@ -10,7 +10,7 @@ import numpy as np
 from matplotlib import cm
 import matplotlib.pyplot as plt
 
-from hivwholeseq.generic_utils import mkdirs
+from hivwholeseq.utils.generic import mkdirs
 from hivwholeseq.patients.samples import load_samples_sequenced as lssp
 from hivwholeseq.patients.samples import SamplePat
 from hivwholeseq.patients.filenames import get_allele_count_trajectories_filename, \

@@ -13,7 +13,7 @@ import numpy as np
 from Bio import SeqIO, AlignIO
 
 from hivwholeseq.miseq import alpha
-from hivwholeseq.mapping_utils import align_muscle
+from hivwholeseq.utils.mapping import align_muscle
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_mapped_to_initial_filename, get_allele_frequency_trajectories_filename, \

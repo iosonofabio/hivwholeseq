@@ -146,7 +146,7 @@ class Patient(pd.Series):
                             format)
 
         if format in ('gb', 'genbank'):
-            from hivwholeseq.sequence_utils import correct_genbank_features_load
+            from hivwholeseq.utils.sequence import correct_genbank_features_load
             correct_genbank_features_load(refseq)
 
         if region not in fragments:

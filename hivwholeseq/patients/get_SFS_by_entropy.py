@@ -166,7 +166,7 @@ if __name__ == '__main__':
             sfs_bsc[(N, alpha)] = sfs_bsc[(N, alpha)][ind] / sfs_bsc[(N, alpha)][ind[0]] * hists[1, ind[0]]
     
     if use_plot:
-        from hivwholeseq import plot_utils
+        from hivwholeseq.utils.import plot
         from matplotlib import cm
         import matplotlib.pyplot as plt
 

@@ -20,7 +20,7 @@ from hivwholeseq.sequencing.filenames import get_premapped_filename, get_referen
 from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file_unfiltered
 from hivwholeseq.sequencing.primer_info import primers_coordinates_HXB2_inner as pcis_HXB2
 from hivwholeseq.sequencing.primer_info import primers_coordinates_HXB2_outer as pcos_HXB2
-from hivwholeseq.mapping_utils import get_number_reads
+from hivwholeseq.utils.mapping import get_number_reads
 
 from hivwholeseq.sequencing.samples import load_sequencing_run, SampleSeq
 from hivwholeseq.sequencing.samples import load_samples_sequenced as lss

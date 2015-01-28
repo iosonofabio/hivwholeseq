@@ -29,11 +29,11 @@ from hivwholeseq.sequencing.samples import load_sample_sequenced
 from hivwholeseq.sequencing.filenames import get_consensus_filename, get_mapped_filename, \
         get_allele_counts_filename, get_coverage_filename
 from hivwholeseq.reference import load_custom_reference
-from hivwholeseq.mapping_utils import align_muscle, pair_generator
+from hivwholeseq.utils.mapping import align_muscle, pair_generator
 from hivwholeseq.sequencing.minor_allele_frequency import filter_nus
-from hivwholeseq.sequence_utils import expand_ambiguous_seq
+from hivwholeseq.utils.sequence import expand_ambiguous_seq
 from hivwholeseq.sequencing.filenames import get_allele_frequencies_filename
-import hivwholeseq.plot_utils
+import hivwholeseq.utils.plot
 
 
 
@@ -62,7 +62,7 @@ def get_alignment(samples, fragment, VERBOSE=0):
         ali = AlignIO.read(ali_fn, 'fasta')
 
     else:
-        from hivwholeseq.mapping_utils import align_muscle
+        from hivwholeseq.utils.mapping import align_muscle
         sample = samples[0]
         samplerefs = samples[1:3]
         ali = align_muscle(sample.get_consensus(fragment),
@@ -100,7 +100,7 @@ def transform_coordinates_fromali(coo, smat):
 def get_cocounts(bamfilename, ind_poly, maxreads=1000, VERBOSE=0, qual_min=30):
     '''Get the cocounts from the reads'''
     from collections import defaultdict, Counter
-    from hivwholeseq.mapping_utils import pair_generator
+    from hivwholeseq.utils.mapping import pair_generator
 
     # The main data structure is a nested dictionary with the site pair as
     # first key, the allele pair as nested key

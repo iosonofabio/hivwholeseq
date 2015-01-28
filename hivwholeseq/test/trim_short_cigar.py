@@ -16,7 +16,7 @@ import numpy as np
 from copy import deepcopy
 
 from hivwholeseq.miseq import alphal
-from hivwholeseq.mapping_utils import trim_short_cigars, trim_short_cigars_pair
+from hivwholeseq.utils.mapping import trim_short_cigars, trim_short_cigars_pair
 from hivwholeseq.test.utils import Read, fix_pair
 
 

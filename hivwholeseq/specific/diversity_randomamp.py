@@ -15,7 +15,7 @@ from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_fi
 from hivwholeseq.sequencing.samples import load_sample_sequenced
 from hivwholeseq.miseq import alpha
 from hivwholeseq.sequencing.primer_info import find_fragment
-from hivwholeseq.sequence_utils import pretty_print_pairwise_ali
+from hivwholeseq.utils.sequence import pretty_print_pairwise_ali
 
 from seqanpy import align_overlap
 

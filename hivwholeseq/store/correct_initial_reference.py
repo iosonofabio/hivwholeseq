@@ -185,7 +185,7 @@ if __name__ == '__main__':
 
             if VERBOSE >= 2:
                 from seqanpy import align_global
-                from hivwholeseq.sequence_utils import pretty_print_pairwise_ali
+                from hivwholeseq.utils.sequence import pretty_print_pairwise_ali
                 (score, ali1, ali2) = align_global(ref, seq, score_gapopen=-20)
                 pretty_print_pairwise_ali((ali1, ali2),
                                           name1='Old ref', name2='New ref',

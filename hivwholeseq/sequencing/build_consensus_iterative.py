@@ -30,7 +30,7 @@ from Bio.SeqRecord import SeqRecord
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.sequencing.adapter_info import load_adapter_table, foldername_adapter
 from hivwholeseq.miseq import alpha, read_types
-from hivwholeseq.mapping_utils import stampy_bin, subsrate, convert_sam_to_bam,\
+from hivwholeseq.utils.mapping import stampy_bin, subsrate, convert_sam_to_bam,\
         pair_generator, align_muscle
 from hivwholeseq.sequencing.filenames import get_HXB2_fragmented, \
         get_HXB2_index_file, get_HXB2_hash_file, get_consensus_filename, \
@@ -62,7 +62,7 @@ qual_min = 30
 # Functions
 def make_output_folders(data_folder, adaID, VERBOSE=0):
     '''Make output folders for the script'''
-    from hivwholeseq.generic_utils import mkdirs
+    from hivwholeseq.utils.generic import mkdirs
     dirname = data_folder+foldername_adapter(adaID)+'map_iter/'
     mkdirs(dirname)
     if VERBOSE:
@@ -122,7 +122,7 @@ def get_mapped_filename(data_folder, adaID, fragment, n_iter, type='bam'):
 def extract_reads_subsample(data_folder, adaID, fragment, n_reads, VERBOSE=0,
                             summary=True):
     '''Extract a subsample of reads from the initial sample premapped'''
-    from hivwholeseq.mapping_utils import extract_mapped_reads_subsample
+    from hivwholeseq.utils.mapping import extract_mapped_reads_subsample
 
     input_filename = get_divided_filename(data_folder, adaID, fragment, type='bam')
     output_filename = get_mapped_filename(data_folder, adaID, fragment, n_iter=1, type='bam')

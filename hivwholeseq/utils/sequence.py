@@ -330,7 +330,7 @@ def build_local_consensus(seqs, VERBOSE=0, store_allele_counts=False, full_cover
 
     import numpy as np
     from hivwholeseq.miseq import alpha
-    from hivwholeseq.mapping_utils import align_muscle
+    from hivwholeseq.utils.mapping import align_muscle
 
     ali = np.array(align_muscle(*seqs, sort=True), 'S1', ndmin=2)
     if full_cover:
@@ -383,7 +383,7 @@ def build_msa_haplotypes(haploc, VERBOSE=0, label=''):
                       description='')
             for i, (seq, count) in enumerate(haploc.most_common())]
 
-    from hivwholeseq.mapping_utils import align_muscle
+    from hivwholeseq.utils.mapping import align_muscle
     ali = align_muscle(*seqs, sort=True)
 
     return ali

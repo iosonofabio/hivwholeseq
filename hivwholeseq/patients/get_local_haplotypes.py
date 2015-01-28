@@ -15,8 +15,8 @@ import numpy as np
 from Bio import SeqIO, AlignIO
 
 from hivwholeseq.patients.patients import load_patient
-from hivwholeseq.argparse_utils import RoiAction
-from hivwholeseq.sequence_utils import build_msa_haplotypes as build_msa
+from hivwholeseq.utils.argparse import RoiAction
+from hivwholeseq.utils.sequence import build_msa_haplotypes as build_msa
 
 
 
@@ -122,8 +122,8 @@ def get_local_haplotypes(bamfilename, start, end, VERBOSE=0, maxreads=-1):
     '''Extract reads fully covering the region, discarding insertions'''
     import sys
     import pysam
-    from hivwholeseq.mapping_utils import pair_generator
-    from hivwholeseq.mapping_utils import extract_mapped_reads_subsample_open
+    from hivwholeseq.utils.mapping import pair_generator
+    from hivwholeseq.utils.mapping import extract_mapped_reads_subsample_open
 
     from collections import Counter
     haplotypes = Counter()
@@ -190,7 +190,7 @@ def get_local_haplotypes(bamfilename, start, end, VERBOSE=0, maxreads=-1):
 def plot_haplotype_frequencies(times, hft, figax=None, title='',
                                picker=None):
     '''Plot haplotype frequencies'''
-    import hivwholeseq.plot_utils
+    import hivwholeseq.utils.plot
     from matplotlib import cm
     import matplotlib.pyplot as plt
 

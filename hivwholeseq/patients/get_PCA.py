@@ -19,8 +19,8 @@ import matplotlib.pyplot as plt
 from hivwholeseq.miseq import alpha
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.patients.samples import SamplePat
-from hivwholeseq.argparse_utils import RoiAction
-import hivwholeseq.plot_utils
+from hivwholeseq.utils.argparse import RoiAction
+import hivwholeseq.utils.plot
 
 
 
@@ -37,7 +37,7 @@ def build_msa(htseqs, VERBOSE=0):
                       name='#'+str(i))
             for i, seq in enumerate(htseqs)]
 
-    from hivwholeseq.mapping_utils import align_muscle
+    from hivwholeseq.utils.mapping import align_muscle
     ali = align_muscle(*seqs, sort=True)
 
     return ali

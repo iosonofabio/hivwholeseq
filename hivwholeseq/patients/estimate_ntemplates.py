@@ -13,7 +13,7 @@ from collections import defaultdict
 import numpy as np
 from matplotlib import cm
 import matplotlib.pyplot as plt
-import hivwholeseq.plot_utils
+import hivwholeseq.utils.plot
 
 from hivwholeseq.miseq import alpha
 from hivwholeseq.patients.samples import load_samples_sequenced, SamplePat
@@ -31,7 +31,7 @@ def align_fragments(c1, c2, VERBOSE=0):
     '''Align subsequence fragments'''
     import numpy as np
     from seqanpy import align_ladder
-    from hivwholeseq.sequence_utils import pretty_print_pairwise_ali
+    from hivwholeseq.utils.sequence import pretty_print_pairwise_ali
     (score, a1, a2) = align_ladder(c1, c2, score_gapopen=-20)
     start2 = len(a2) - len(a2.lstrip('-'))
     end1 = len(a1.rstrip('-'))

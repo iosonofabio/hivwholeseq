@@ -13,7 +13,7 @@ from Bio import AlignIO
 from hivwholeseq.cross_sectional.filenames import (
     get_raw_LANL_sequences_filename,
     get_subtype_reference_alignment_filename)
-from hivwholeseq.sequence_utils import align_codon_pairwise
+from hivwholeseq.utils.sequence import align_codon_pairwise
 
 
 # Globals
@@ -27,7 +27,7 @@ def align_to_reference(seq, refstr, VERBOSE=0, codon_align=False):
     from Bio.Seq import Seq
     from Bio.SeqRecord import SeqRecord
     from seqanpy import align_overlap
-    from hivwholeseq.sequence_utils import pretty_print_pairwise_ali
+    from hivwholeseq.utils.sequence import pretty_print_pairwise_ali
 
     seqstr = ''.join(seq).upper()
 

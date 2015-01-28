@@ -17,7 +17,7 @@ import subprocess as sp
 
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.sequencing.adapter_info import load_adapter_table, foldername_adapter
-from hivwholeseq.mapping_utils import stampy_bin, subsrate, bwa_bin, convert_sam_to_bam, \
+from hivwholeseq.utils.mapping import stampy_bin, subsrate, bwa_bin, convert_sam_to_bam, \
         convert_bam_to_sam, get_number_reads, get_number_reads_open ,pair_generator
 from hivwholeseq.sequencing.filenames import get_consensus_filename, get_mapped_filename,\
         get_read_filenames, get_divided_filename, get_map_summary_filename

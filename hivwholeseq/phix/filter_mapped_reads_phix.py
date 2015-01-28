@@ -18,7 +18,7 @@ from Bio import SeqIO
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.sequencing.adapter_info import load_adapter_table
 from hivwholeseq.sequencing.filenames import get_mapped_phix_filename
-from hivwholeseq.mapping_utils import get_ind_good_cigars, convert_sam_to_bam,\
+from hivwholeseq.utils.mapping import get_ind_good_cigars, convert_sam_to_bam,\
         pair_generator, get_range_good_cigars
 from hivwholeseq.sequencing.primer_info import primers_inner
 

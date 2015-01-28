@@ -12,10 +12,10 @@ from operator import attrgetter
 import numpy as np
 from Bio import SeqIO, AlignIO
 
-from hivwholeseq.generic_utils import mkdirs
+from hivwholeseq.utils.generic import mkdirs
 from hivwholeseq.patients.patients import load_patients, Patient, SamplePat
-from hivwholeseq.tree_utils import build_tree_fasttree
-from hivwholeseq.mapping_utils import align_muscle
+from hivwholeseq.utils.tree import build_tree_fasttree
+from hivwholeseq.utils.mapping import align_muscle
 
 
 

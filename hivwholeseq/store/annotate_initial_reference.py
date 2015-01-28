@@ -13,7 +13,7 @@ from Bio import SeqIO
 from Bio.Alphabet.IUPAC import ambiguous_dna
 
 from hivwholeseq.patients.patients import load_patients, Patient
-from hivwholeseq.sequence_utils import correct_genbank_features_save
+from hivwholeseq.utils.sequence import correct_genbank_features_save
 
 
 

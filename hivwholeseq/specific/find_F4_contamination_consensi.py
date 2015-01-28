@@ -15,8 +15,8 @@ from seqanpy import align_global, align_local
 
 from hivwholeseq.reference import load_custom_reference
 from hivwholeseq.sequencing.samples import load_samples_sequenced, SampleSeq
-from hivwholeseq.sequence_utils import pretty_print_pairwise_ali
-from hivwholeseq.generic_utils import getchar
+from hivwholeseq.utils.sequence import pretty_print_pairwise_ali
+from hivwholeseq.utils.generic import getchar
 
 
 # Scripts

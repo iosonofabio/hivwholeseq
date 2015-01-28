@@ -8,7 +8,7 @@ content:    Get PDB of a structure.
 import argparse
 from Bio.PDB import PDBParser
 
-from hivwholeseq.structure_utils import get_chainseq
+from hivwholeseq.utils.structure import get_chainseq
 
 
 

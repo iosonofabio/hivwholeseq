@@ -18,7 +18,7 @@ from Bio import SeqIO
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.sequencing.adapter_info import load_adapter_table
 from hivwholeseq.sequencing.filenames import get_last_reference, get_last_mapped
-from hivwholeseq.mapping_utils import get_ind_good_cigars, pair_generator
+from hivwholeseq.utils.mapping import get_ind_good_cigars, pair_generator
 from hivwholeseq.cluster.fork_cluster import fork_extract_mutations as fork_self
 
 

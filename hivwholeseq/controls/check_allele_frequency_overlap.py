@@ -13,7 +13,7 @@ import numpy as np
 from matplotlib import cm
 import matplotlib.pyplot as plt
 
-import hivwholeseq.plot_utils
+import hivwholeseq.utils.plot
 from hivwholeseq.patients.samples import load_samples_sequenced as lssp
 from hivwholeseq.patients.samples import SamplePat
 

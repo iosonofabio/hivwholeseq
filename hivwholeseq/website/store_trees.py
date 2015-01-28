@@ -12,12 +12,12 @@ import shutil
 import sys
 from operator import attrgetter
 
-from hivwholeseq.generic_utils import mkdirs
+from hivwholeseq.utils.generic import mkdirs
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.patients.filenames import get_consensi_tree_filename as gfn_in
 from hivwholeseq.website.filenames import get_consensi_tree_filename as gfn_out
-from hivwholeseq.tree_utils import tree_to_json
-from hivwholeseq.generic_utils import write_json
+from hivwholeseq.utils.tree import tree_to_json
+from hivwholeseq.utils.generic import write_json
 from hivwholeseq.reference import load_custom_reference
 
 

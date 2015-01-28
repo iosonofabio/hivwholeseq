@@ -29,7 +29,7 @@ from hivwholeseq.cluster.fork_cluster import fork_demultiplex as fork_self
 # Functions
 def make_output_folders(data_folder, adapters_designed, VERBOSE=0, summary=True):
     '''Make output folders for all adapters and unclassified (e.g. PhiX)'''
-    from hivwholeseq.generic_utils import mkdirs
+    from hivwholeseq.utils.generic import mkdirs
 
     # Make folders for the samples
     for (adaID, s) in adapters_designed:

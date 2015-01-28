@@ -11,7 +11,7 @@ import datetime
 from hivwholeseq.patients.patients import load_samples_sequenced, Patient, \
         SamplePat
 from hivwholeseq.patients.filenames import get_mapped_filtered_filename
-from hivwholeseq.generic_utils import modification_date
+from hivwholeseq.utils.generic import modification_date
 from hivwholeseq.store.check_patients import (
     pretty_print_info, pretty_print_info_genomewide)
 

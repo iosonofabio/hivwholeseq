@@ -67,7 +67,7 @@ def merge_allele_counts(ref_genomewide, acs, VERBOSE=0):
             pos_ref += 1
 
         if VERBOSE >= 3:
-            from hivwholeseq.sequence_utils import pretty_print_pairwise_ali
+            from hivwholeseq.utils.sequence import pretty_print_pairwise_ali
             cons = alpha[ac.sum(axis=0).argmax(axis=0)]
             pretty_print_pairwise_ali((ali1[fr_start: fr_end],
                                        cons[fr_start: fr_end]),

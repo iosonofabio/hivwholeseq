@@ -14,7 +14,7 @@ from hivwholeseq.sequencing.samples import load_sequencing_run
 from hivwholeseq.sequencing.filenames import get_mapped_filename, get_premapped_filename, \
         get_insert_size_distribution_cumulative_filename, \
         get_insert_size_distribution_filename
-from hivwholeseq.mapping_utils import pair_generator, convert_sam_to_bam
+from hivwholeseq.utils.mapping import pair_generator, convert_sam_to_bam
 
 
 
@@ -103,7 +103,7 @@ def plot_cumulative_histogram(data_folder, adaID, fragment, insert_sizes,
         output_filename = get_insert_size_distribution_cumulative_filename(data_folder,
                                                                            adaID,
                                                                            fragment)
-        from hivwholeseq.generic_utils import mkdirs
+        from hivwholeseq.utils.generic import mkdirs
         from hivwholeseq.sequencing.filenames import get_figure_folder
         mkdirs(get_figure_folder(data_folder, adaID))
         fig.savefig(output_filename)
@@ -136,7 +136,7 @@ def plot_histogram(data_folder, adaID, fragment, h,
         output_filename = get_insert_size_distribution_filename(data_folder, adaID,
                                                                 fragment)
 
-        from hivwholeseq.generic_utils import mkdirs
+        from hivwholeseq.utils.generic import mkdirs
         from hivwholeseq.sequencing.filenames import get_figure_folder
         mkdirs(get_figure_folder(data_folder, adaID))
         plt.savefig(output_filename)

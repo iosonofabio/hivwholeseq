@@ -58,7 +58,7 @@ def add_SHAPE_to_seqrecord(seqrecord, VERBOSE=0):
 
     (score, ali1, ali2) = align_overlap(seqs, seqrecord)
     if VERBOSE >= 3:
-        from hivwholeseq.sequence_utils import pretty_print_pairwise_ali
+        from hivwholeseq.utils.sequence import pretty_print_pairwise_ali
         pretty_print_pairwise_ali([ali1, ali2], width=100,
                                   name1='SHAPE',
                                   name2=seqrecord.name)
@@ -87,7 +87,7 @@ if __name__ == '__main__':
     seqs, shape = load_SHAPE()
 
     from seqanpy import align_overlap
-    from hivwholeseq.sequence_utils import pretty_print_pairwise_ali
+    from hivwholeseq.utils.sequence import pretty_print_pairwise_ali
     (score, ali1, ali2) = align_overlap(refs, seqs)
     pretty_print_pairwise_ali([ali1, ali2], name1='NL4-3', name2='SHAPE', width=100)
     if score == len(ali2.replace('-', '')) * 3:

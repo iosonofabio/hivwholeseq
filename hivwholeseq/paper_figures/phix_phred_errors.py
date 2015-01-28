@@ -7,7 +7,7 @@ content:    Plot the quality along the read pair.
 # Modules
 import os
 
-from hivwholeseq.generic_utils import mkdirs
+from hivwholeseq.utils.generic import mkdirs
 from hivwholeseq.sequencing.samples import load_sequencing_run
 from hivwholeseq.paper_figures.filenames import get_figure_folder
 

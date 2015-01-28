@@ -10,10 +10,10 @@ import os
 import sys
 from Bio import AlignIO
 
-from hivwholeseq.generic_utils import mkdirs
+from hivwholeseq.utils.generic import mkdirs
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.website.filenames import get_consensi_alignment_filename
-from hivwholeseq.sequence_utils import correct_genbank_features_save
+from hivwholeseq.utils.sequence import correct_genbank_features_save
 
 
 

@@ -48,7 +48,7 @@ def merge_sequences(seqs, skip_initial=30, accept_gaps=False, VERBOSE=0):
         ov2 = ali2[start2 + skip_initial: end1 - skip_initial]
 
         if VERBOSE >= 2:
-            from hivwholeseq.sequence_utils import pretty_print_pairwise_ali
+            from hivwholeseq.utils.sequence import pretty_print_pairwise_ali
             pretty_print_pairwise_ali((ov1, ov2), width=100,
                                       name1='seq1', name2='seq2')
 

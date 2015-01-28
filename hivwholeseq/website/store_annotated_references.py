@@ -10,10 +10,10 @@ import os
 import sys
 from Bio import SeqIO
 
-from hivwholeseq.generic_utils import mkdirs
+from hivwholeseq.utils.generic import mkdirs
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.website.filenames import get_patient_reference_filename
-from hivwholeseq.sequence_utils import correct_genbank_features_save
+from hivwholeseq.utils.sequence import correct_genbank_features_save
 from hivwholeseq.reference import load_custom_reference
 
 

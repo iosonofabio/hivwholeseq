@@ -13,7 +13,7 @@ from collections import defaultdict
 import numpy as np
 from matplotlib import cm
 import matplotlib.pyplot as plt
-import hivwholeseq.plot_utils
+import hivwholeseq.utils.plot
 
 from hivwholeseq.miseq import alpha
 from hivwholeseq.patients.patients import load_patients, Patient

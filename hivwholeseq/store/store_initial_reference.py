@@ -25,7 +25,7 @@ from Bio.Alphabet.IUPAC import ambiguous_dna, unambiguous_dna
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
-from hivwholeseq.generic_utils import mkdirs
+from hivwholeseq.utils.generic import mkdirs
 from hivwholeseq.sequencing.samples import SampleSeq
 from hivwholeseq.patients.patients import load_patient
 from hivwholeseq.patients.samples import load_sample_sequenced, SamplePat
@@ -39,21 +39,21 @@ from hivwholeseq.one_site_statistics import \
         build_consensus_from_allele_counts_insertions as build_consensus
 from hivwholeseq.reference import load_custom_reference
 from hivwholeseq.annotate_genomewide_consensus import extract_feature
-from hivwholeseq.mapping_utils import align_muscle
-from hivwholeseq.sequence_utils import pretty_print_pairwise_ali
+from hivwholeseq.utils.mapping import align_muscle
+from hivwholeseq.utils.sequence import pretty_print_pairwise_ali
 from hivwholeseq.sequencing.filenames import get_mapped_filename
 from hivwholeseq.one_site_statistics import build_consensus_from_mapped_reads
 from hivwholeseq.genome_info import locate_gene, gene_edges
 from hivwholeseq.genome_info import genes as genes_all
 from hivwholeseq.sequencing.primer_info import fragments_genes
-from hivwholeseq.sequence_utils import merge_sequences
+from hivwholeseq.utils.sequence import merge_sequences
 
 
 
 # Functions
 def complement_consensus_PCR2(cons_rec, patient, fragment, samplen, VERBOSE=0):
     '''Complement consensus from PCR2 with wings from later PCR1 sample'''
-    from hivwholeseq.sequence_utils import find_seed_imperfect, rfind_seed_imperfect
+    from hivwholeseq.utils.sequence import find_seed_imperfect, rfind_seed_imperfect
 
     found = False
     for _, sampletmp in patient.samples.iloc[samplen + 1:].iterrows():

@@ -17,7 +17,7 @@ from Bio import SeqIO
 from hivwholeseq.sequencing.samples import load_samples_sequenced, SampleSeq
 from hivwholeseq.sequencing.filenames import get_consensus_filename, get_mapped_filename, \
         get_filter_mapped_summary_filename, get_mapped_suspicious_filename
-from hivwholeseq.mapping_utils import get_ind_good_cigars, convert_sam_to_bam,\
+from hivwholeseq.utils.mapping import get_ind_good_cigars, convert_sam_to_bam,\
         pair_generator, get_range_good_cigars
 from hivwholeseq.cluster.fork_cluster import fork_filter_mapped as fork_self
 from seqanpy import align_overlap

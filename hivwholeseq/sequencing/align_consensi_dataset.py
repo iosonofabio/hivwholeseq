@@ -16,7 +16,7 @@ from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.sequencing.filenames import get_consensus_filename, get_merged_consensus_filename, \
         get_consensi_alignment_dataset_filename
 from hivwholeseq.sequencing.samples import samples
-from hivwholeseq.mapping_utils import align_muscle
+from hivwholeseq.utils.mapping import align_muscle
 
 
 

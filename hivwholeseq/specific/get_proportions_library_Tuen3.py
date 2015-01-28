@@ -9,7 +9,7 @@ content:    The run Tuen3 was a 14 plex. We want to resequence the same with
 from itertools import izip
 
 from hivwholeseq.datasets import MiSeq_runs
-from hivwholeseq.mapping_utils import get_number_mapped_reads
+from hivwholeseq.utils.mapping import get_number_mapped_reads
 from hivwholeseq.sequencing.filenames import get_premapped_filename
 
 

@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from hivwholeseq.sequencing.check_distance_mapped_consensus import get_distance_histogram, plot_distance_histogram
 from hivwholeseq.patients.samples import load_samples_sequenced, SamplePat
 from hivwholeseq.sequencing.samples import SampleSeq
-from hivwholeseq.generic_utils import mkdirs
+from hivwholeseq.utils.generic import mkdirs
 
 
 

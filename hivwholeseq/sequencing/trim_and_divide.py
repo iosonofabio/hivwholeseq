@@ -27,12 +27,12 @@ from hivwholeseq.sequencing.primer_info import primers_inner, primers_outer
 from hivwholeseq.sequencing.filenames import get_HXB2_entire, get_premapped_filename, \
         get_divided_filenames, get_divide_summary_filename, \
         get_reference_premap_filename
-from hivwholeseq.mapping_utils import pair_generator, convert_sam_to_bam
-from hivwholeseq.mapping_utils import test_read_pair_integrity as test_integrity
-from hivwholeseq.mapping_utils import test_read_pair_crossoverhang as test_coh
-from hivwholeseq.mapping_utils import main_block_read_pair_low_quality as main_block_low_quality
-from hivwholeseq.mapping_utils import trim_read_pair_low_quality as trim_low_quality
-from hivwholeseq.mapping_utils import trim_read_pair_crossoverhangs as trim_coh
+from hivwholeseq.utils.mapping import pair_generator, convert_sam_to_bam
+from hivwholeseq.utils.mapping import test_read_pair_integrity as test_integrity
+from hivwholeseq.utils.mapping import test_read_pair_crossoverhang as test_coh
+from hivwholeseq.utils.mapping import main_block_read_pair_low_quality as main_block_low_quality
+from hivwholeseq.utils.mapping import trim_read_pair_low_quality as trim_low_quality
+from hivwholeseq.utils.mapping import trim_read_pair_crossoverhangs as trim_coh
 from hivwholeseq.cluster.fork_cluster import fork_trim_and_divide as fork_self
 
 from hivwholeseq.sequencing.samples import load_sequencing_run
@@ -41,7 +41,7 @@ from hivwholeseq.sequencing.samples import load_sequencing_run
 # Functions
 def make_output_folders(data_folder, adaID, VERBOSE=0):
     '''Make output folders'''
-    from hivwholeseq.generic_utils import mkdirs
+    from hivwholeseq.utils.generic import mkdirs
     output_filename = get_divided_filenames(data_folder, adaID, fragments=['F1'])[0]
     dirname = os.path.dirname(output_filename)
     mkdirs(dirname)
@@ -81,7 +81,7 @@ def write_fragment_positions(data_folder, adaID, fragments, frags_pos):
 def get_primer_positions(smat, fragments, type='both'):
     '''Get the primer positions for fwd, rev, or both primers'''
     from hivwholeseq.sequencing.primer_info import primers_PCR
-    from hivwholeseq.sequence_utils import expand_ambiguous_seq as eas
+    from hivwholeseq.utils.sequence import expand_ambiguous_seq as eas
 
     # j controls the direction: j = 0 --> FWD, j = 1 --> REV
     types = {'fwd': [0], 'rev': [1], 'both': [0, 1]}
@@ -508,7 +508,7 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, fragments,
 
     # Get all possible unambiguous primers for the unwanted outer primers
     from hivwholeseq.sequencing.primer_info import primers_PCR
-    from hivwholeseq.sequence_utils import expand_ambiguous_seq as eas
+    from hivwholeseq.utils.sequence import expand_ambiguous_seq as eas
     primers_out_seq = {'fwd': [np.array(map(list, eas(primers_PCR[fr][0])),
                                         'S1', ndmin=2)
                                for fr in primers_out['fwd']],

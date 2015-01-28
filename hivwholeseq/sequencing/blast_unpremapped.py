@@ -15,7 +15,7 @@ from Bio.SeqRecord import SeqRecord
 from Bio.Blast import NCBIWWW, NCBIXML
 
 from hivwholeseq.sequencing.filenames import get_premapped_filename
-from hivwholeseq.mapping_utils import pair_generator, reads_to_seqrecord
+from hivwholeseq.utils.mapping import pair_generator, reads_to_seqrecord
 
 from hivwholeseq.sequencing.samples import load_sequencing_run
 

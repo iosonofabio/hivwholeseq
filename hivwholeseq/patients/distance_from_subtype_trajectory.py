@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 
 from hivwholeseq.miseq import alphal
 from hivwholeseq.patients.patients import load_patients, Patient
-from hivwholeseq.argparse_utils import RoiAction
+from hivwholeseq.utils.argparse import RoiAction
 from hivwholeseq.reference import load_custom_reference, load_custom_alignment
 
 

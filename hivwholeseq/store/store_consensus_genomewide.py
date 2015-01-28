@@ -29,7 +29,7 @@ def merge_fragments(sequences, name='', VERBOSE=0):
     from Bio.Alphabet.IUPAC import ambiguous_dna
     from seqanpy import align_ladder
 
-    from hivwholeseq.sequence_utils import pretty_print_pairwise_ali
+    from hivwholeseq.utils.sequence import pretty_print_pairwise_ali
 
     consensus = []
     seq_old = ''.join(sequences['F1'])

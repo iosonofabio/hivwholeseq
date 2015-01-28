@@ -130,7 +130,7 @@ def join_block_to_consensus(consensus, cons_block, VERBOSE=0, deltamax=60):
     (score, ali1, ali2) = align_ladder(consensus, cons_block, score_gapopen=-10)
 
     if VERBOSE >= 3:
-        from hivwholeseq.sequence_utils import pretty_print_pairwise_ali
+        from hivwholeseq.utils.sequence import pretty_print_pairwise_ali
         pretty_print_pairwise_ali([ali1, ali2], name1='consensus', name2='new block')
 
     # In very rare occasions (coverage holes), the second sequence is actually
@@ -166,13 +166,13 @@ def build_consensus(bamfilename, len_reference, VERBOSE=0,
     from Bio.Alphabet.IUPAC import ambiguous_dna
 
     from hivwholeseq.miseq import alpha
-    from hivwholeseq.mapping_utils import pair_generator
-    from hivwholeseq.sequence_utils import build_local_consensus
+    from hivwholeseq.utils.mapping import pair_generator
+    from hivwholeseq.utils.sequence import build_local_consensus
     
     with pysam.Samfile(bamfilename, 'rb') as bamfile:
 
         if VERBOSE >= 3:
-            from hivwholeseq.mapping_utils import get_number_reads_open
+            from hivwholeseq.utils.mapping import get_number_reads_open
             print 'The bamfile has', get_number_reads_open(bamfile), 'reads.'
 
         # Get first block covered, even if partially, and record where each read started

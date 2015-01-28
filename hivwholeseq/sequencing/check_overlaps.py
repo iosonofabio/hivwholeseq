@@ -35,7 +35,7 @@ def get_overlapping_fragments(fragments):
 
 def get_overlap(data_folder, adaID, frag1, frag2, VERBOSE=0):
     '''Find the overlap coordinates for the two fragments'''
-    from hivwholeseq.mapping_utils import align_muscle
+    from hivwholeseq.utils.mapping import align_muscle
 
     seq1 = SeqIO.read(get_consensus_filename(data_folder, adaID, frag1), 'fasta')
     seq2 = SeqIO.read(get_consensus_filename(data_folder, adaID, frag2), 'fasta')

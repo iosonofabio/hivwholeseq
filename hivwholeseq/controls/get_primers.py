@@ -23,7 +23,7 @@ from hivwholeseq.patients.filenames import get_initial_reference_filename, \
 from hivwholeseq.patients.patients import load_patient, SamplePat
 from hivwholeseq.patients.samples import load_sample_sequenced
 from hivwholeseq.sequencing.primer_info import primers_outer, find_primer_seq
-from hivwholeseq.sequence_utils import expand_ambiguous_seq
+from hivwholeseq.utils.sequence import expand_ambiguous_seq
 
 
 

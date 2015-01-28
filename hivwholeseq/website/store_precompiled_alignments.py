@@ -15,13 +15,13 @@ import StringIO
 from Bio import AlignIO
 from Bio import Phylo
 
-from hivwholeseq.generic_utils import mkdirs
+from hivwholeseq.utils.generic import mkdirs
 from hivwholeseq.patients.patients import load_patients, Patient
-from hivwholeseq.sequence_utils import build_msa_haplotypes as build_msa
+from hivwholeseq.utils.sequence import build_msa_haplotypes as build_msa
 from hivwholeseq.website.filenames import get_precompiled_alignments_filename
 from hivwholeseq.cluster.fork_cluster import fork_store_haplotypes_website as fork_self
-from hivwholeseq.sequence_utils import align_muscle
-from hivwholeseq.tree_utils import build_tree_fasttree
+from hivwholeseq.utils.sequence import align_muscle
+from hivwholeseq.utils.tree import build_tree_fasttree
 from hivwholeseq.store.store_tree_local import get_region_count_trajectories
 from hivwholeseq.patients.filenames import get_consensi_tree_filename as gfn_in
 from hivwholeseq.website.filenames import get_consensi_tree_filename as gfn_out

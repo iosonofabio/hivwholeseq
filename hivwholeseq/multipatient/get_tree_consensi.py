@@ -20,14 +20,14 @@ from Bio import Phylo
 
 from hivwholeseq.patients.patients import load_patients, SamplePat
 from hivwholeseq.patients.patients import load_samples_sequenced as lssp
-from hivwholeseq.mapping_utils import align_muscle
+from hivwholeseq.utils.mapping import align_muscle
 from hivwholeseq.patients.filenames import get_consensi_alignment_filename, \
         get_consensi_tree_filename
-from hivwholeseq.tree_utils import build_tree_fasttree
+from hivwholeseq.utils.tree import build_tree_fasttree
 from hivwholeseq.reference import load_custom_reference
 from hivwholeseq.utils.nehercook.ancestral import ancestral_sequences
-from hivwholeseq.tree_utils import tree_to_json
-from hivwholeseq.generic_utils import write_json
+from hivwholeseq.utils.tree import tree_to_json
+from hivwholeseq.utils.generic import write_json
 
 
 
@@ -110,7 +110,7 @@ def add_ancestral_subtype(tree, VERBOSE=0):
 
 def annotate_tree(tree, annotations, VERBOSE=0):
     '''Annotate tree'''
-    from hivwholeseq.tree_utils import add_mutations_tree
+    from hivwholeseq.utils.tree import add_mutations_tree
 
     for leaf in tree.get_terminals():
         name = leaf.name

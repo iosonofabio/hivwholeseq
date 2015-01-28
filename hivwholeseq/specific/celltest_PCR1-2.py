@@ -33,7 +33,7 @@ if __name__ == '__main__':
     tot1 = sum(h1.values())
     tot2 = sum(h2.values())
 
-    import hivwholeseq.plot_utils
+    import hivwholeseq.utils.plot
     import matplotlib.pyplot as plt
     fig, ax = plt.subplots()
     for seq in seqs_set:

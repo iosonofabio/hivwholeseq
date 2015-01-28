@@ -17,7 +17,7 @@ from hivwholeseq.sequencing.adapter_info import load_adapter_table
 from hivwholeseq.miseq import read_types
 from hivwholeseq.sequencing.filenames import get_consensus_filename, get_mapped_filename, \
         get_coverage_filename
-from hivwholeseq.mapping_utils import convert_sam_to_bam, pair_generator
+from hivwholeseq.utils.mapping import convert_sam_to_bam, pair_generator
 
 
 

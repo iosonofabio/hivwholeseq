@@ -12,7 +12,7 @@ import sys
 import numpy as np
 
 
-from hivwholeseq.generic_utils import mkdirs
+from hivwholeseq.utils.generic import mkdirs
 from hivwholeseq.website.filenames import get_reads_filename, get_timeline_filename
 from hivwholeseq.patients.patients import load_patients, Patient
 
@@ -31,7 +31,7 @@ def copy_or_symlink_reads(fn_in, fn_out, maxsize=20e6):
     if os.stat(fn_in).st_size <= maxsize:
         os.symlink(fn_in, fn_out)
     else:
-        from hivwholeseq.mapping_utils import extract_mapped_reads_subsample
+        from hivwholeseq.utils.mapping import extract_mapped_reads_subsample
         extract_mapped_reads_subsample(fn_in, fn_out, 50000, VERBOSE=2)
 
 
