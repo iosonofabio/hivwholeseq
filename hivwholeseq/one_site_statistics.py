@@ -112,6 +112,8 @@ def get_allele_counts_aa_read(read, start, end, counts_out, qual_min=30,
     pos_read = 0
     for ic, (bt, bl) in enumerate(read.cigar):
         if bt == 1:
+            if VERBOSE >= 3:
+                print ic, (bt, bl)
             pos_read += bl
             continue
 
@@ -136,26 +138,30 @@ def get_allele_counts_aa_read(read, start, end, counts_out, qual_min=30,
             # Cut block to full codons from the left
             # NOTE: modulo works for negative numbers in Python
             startb = (start - pos_ref) % 3
-        
 
         # Cut block to full codons from the right
-        endb = pos_ref + bl
+        endb = bl
         endb -= (endb - startb) % 3
         lb = endb - startb
 
         # If the block is less than one amino acid, skip
         if lb < 3:
-            pos_ref += bl
             if bt == 0:
                 pos_read += bl
+            pos_ref += bl
 
             # Check we are not beyond the end
             if pos_ref > end - 2:
                 return
 
+            continue
+
         # Get output amino acid coordinates for the block
         start_pr = ((pos_ref + startb) - start) // 3
-        end_pr = start_pr + ((endb - startb) // 3)
+        end_pr = start_pr + (lb // 3)
+
+        if VERBOSE >= 3:
+            print ic, (bt, bl), startb, endb, lb, pos_ref, start_pr, end_pr
 
         if bt == 2:
             # We assume gaps is at the second-last position
@@ -170,9 +176,14 @@ def get_allele_counts_aa_read(read, start, end, counts_out, qual_min=30,
             seqb = seq[pos_read + startb: pos_read + endb]
             aab = np.fromstring(translate(''.join(seqb)), 'S1')
 
+            if VERBOSE >= 4:
+                seqcb = np.array(map(''.join, seqb.reshape((lb //3, 3))), 'S3')
+
             for j, a in enumerate(alphaa):
                 posa = ((aab == a) & (qualb >= qual_min)).nonzero()[0]
                 if len(posa):
+                    if VERBOSE >= 4:
+                        print j, a, posa, seqcb[posa]
                     counts_out[j, start_pr + posa] += 1
 
             pos_read += bl

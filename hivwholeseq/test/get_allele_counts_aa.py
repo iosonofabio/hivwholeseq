@@ -26,8 +26,7 @@ from hivwholeseq.test.utils import Read
 # Tests
 class MatchOnly(unittest.TestCase):
     def setUp(self):
-        self.read = Read('AAAGGGTTTCCC', pos=1,
-                         qname='matchonly')
+        self.read = Read('AAAGGGTTTCCC', pos=1)
 
 
     def test(self):
@@ -45,11 +44,138 @@ class MatchOnly(unittest.TestCase):
         # Call the function
         get_allele_counts_aa_read(self.read, 1, 90, counts)
 
-        print counts_check
+        # Equality test (they are ints)
+        np.testing.assert_array_equal(counts, counts_check)
+
+
+
+class Insert1(unittest.TestCase):
+    def setUp(self):
+        read = Read('AAAGGGTTTCCC', pos=1)
+        read.cigar = [(0, 3), (1, 3), (0, 6)]
+        self.read = read
+
+
+    def test(self):
+        '''Test allele counts from read with an in-frame insertion'''
+        counts = np.zeros((len(alphaal), (len(self.read.seq) // 3) + 3), int)
+
+        # Expected result
+        from Bio.Data.CodonTable import standard_dna_table
+        t = standard_dna_table.forward_table
+        counts_check = counts.copy()
+        for pos in xrange(len(self.read.seq) // 3):
+            if 1 <= pos < 2:
+                continue
+            elif pos >= 2:
+                posc = pos - 1
+            else:
+                posc = pos
+            
+            aa = alphaal.index(t[self.read.seq[3 * pos: 3 * (pos + 1)]])
+            counts_check[aa, posc] += 1
+
+        # Call the function
+        get_allele_counts_aa_read(self.read, 1, 90, counts)
 
         # Equality test (they are ints)
         np.testing.assert_array_equal(counts, counts_check)
 
+
+class Insert2(unittest.TestCase):
+    def setUp(self):
+        read = Read('AAAGGGTTTCCC', pos=1)
+        read.cigar = [(0, 3), (1, 2), (0, 7)]
+        self.read = read
+
+
+    def test1(self):
+        '''Test allele counts from read with an out-of-frame insertion'''
+        counts = np.zeros((len(alphaal), (len(self.read.seq) // 3) + 3), int)
+
+        # Expected result
+        from Bio.Data.CodonTable import standard_dna_table
+        t = standard_dna_table.forward_table
+        counts_check = counts.copy()
+        codons = ['AAA', 'GTT', 'TCC']
+        for posc, codon in enumerate(codons):
+            aa = alphaal.index(t[codon])
+            counts_check[aa, posc] += 1
+
+        # Call the function
+        get_allele_counts_aa_read(self.read, 1, 90, counts)
+
+        # Equality test (they are ints)
+        np.testing.assert_array_equal(counts, counts_check)
+
+
+    def test2(self):
+        '''Test allele counts from read with an out-of-frame insertion
+        
+        In addition, the protein starts out-of-frame with the read.
+
+          A A A G T T T C C C
+        0 1 2 3 4 5 6 7 8 9 0
+        \___/ \___/ \___/ \__
+          0     1     2     3
+
+                     TTC
+        '''
+        counts = np.zeros((len(alphaal), (len(self.read.seq) // 3) + 3), int)
+
+        # Expected result
+        from Bio.Data.CodonTable import standard_dna_table
+        t = standard_dna_table.forward_table
+        counts_check = counts.copy()
+        codons = [(2, 'TTC')]
+        for posc, codon in codons:
+            aa = alphaal.index(t[codon])
+            counts_check[aa, posc] += 1
+
+        # Call the function
+        get_allele_counts_aa_read(self.read, 0, 90, counts)
+
+        # Equality test (they are ints)
+        np.testing.assert_array_equal(counts, counts_check)
+
+
+class Indel1(unittest.TestCase):
+    def setUp(self):
+        read = Read('AAAGGGTTTCCC', pos=1)
+        read.cigar = [(0, 2), (1, 2), (2, 5), (0, 8)]
+        self.read = read
+
+
+    def test(self):
+        '''Test allele counts from read with indels
+        
+          A A - - - - - G G T T T C C C
+        0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6
+        \___/ \___/ \___/ \___/ \___/ \__
+          0     1     2     3     4     5
+
+               ---         GTT   TCC
+        
+        '''
+        counts = np.zeros((len(alphaal), (len(self.read.seq) // 3) + 3), int)
+
+        # Expected result
+        from Bio.Data.CodonTable import standard_dna_table
+        t = standard_dna_table.forward_table
+        counts_check = counts.copy()
+        codons = [(1, '---'), (3, 'GTT'), (4, 'TCC')]
+        for posc, codon in codons:
+            if codon == '---':
+                aa = alphaal.index('-')
+            else:
+                aa = alphaal.index(t[codon])
+            counts_check[aa, posc] += 1
+
+        # Call the function
+        get_allele_counts_aa_read(self.read, 0, 90, counts)
+
+        # Equality test (they are ints)
+        np.testing.assert_array_equal(counts, counts_check)
 
 
 
