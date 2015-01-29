@@ -12,7 +12,8 @@ from hivwholeseq.cross_sectional.get_subtype_entropy import (
     get_subtype_reference_alignment_entropy)
 from hivwholeseq.structure.get_PDB import get_PDB
 from hivwholeseq.structure.filenames import get_PDB_filename
-from hivwholeseq.structure_utils import get_chainseq
+from hivwholeseq.utils.structure import get_chainseq
+from hivwholeseq.utils import ipymol
 
 
 # Functions
@@ -69,17 +70,10 @@ if __name__ == '__main__':
     # NOTE: pymol_manager is to be used as a script, not a module
     # (there are all kinds of race conditions)
 
-    ## Plot with different radii based on entropy
-    #vdws = 0.1 + 3.0 * (S - S.min()) / (S.max() - S.min())
-    #import ipymol
-    #mol=ipymol.MolViewer()
-    #mol.server.do('load '+fn_pdb+';')
-    #mol.server.do('zoom; as cartoon; show spheres, chain A; hide spheres, resn HOH')
-    #for pos, vdw in enumerate(vdws):
-    #    mol.server.do('alter resi '+str(pos+1)+', vdw='+str(vdw)+';')
-    #    #mol.server.do('color '+'blue'+', resi '+str(pos+1)+';')
-    #mol.server.do('rebuild;')
-    #mol.server.do('bg white; png /home/fabio/Desktop/'+region+'.png')
+    # Output parameters
+    #folder_out = '/home/fabio/Desktop/'
+    folder_out = '/home/fabio/university/phd/talks/IGIM_2015/figures/'
+    fn_out = folder_out+region+'_subtype.png'
 
     # Plot with different colors based on entropy
     x = np.log10(S + 1e-5)
@@ -90,12 +84,16 @@ if __name__ == '__main__':
     # NOTE: pymol_manager is to be used as a script, not a module
     # (there are all kinds of race conditions)
 
-    import ipymol
     mol=ipymol.MolViewer()
-    mol.server.do('load '+fn_pdb+';')
-    mol.server.do('zoom center, 20; as cartoon;')
+    cmd = ('delete all; ' +
+           'load '+fn_pdb+'; ' +
+           'center; ' +
+           'zoom center, 20; as cartoon; ')
+    if VERBOSE >= 2:
+        print cmd
+    mol.server.do(cmd)
     for pos, Spos in enumerate(S):
         mol.server.do('alter resi '+str(pos+1)+', b='+str(color_levels[pos])+';')
     mol.server.do('rebuild;')
     mol.server.do('spectrum b, rainbow, minimum=0, maximum=100;')
-    mol.server.do('bg white; png /home/fabio/Desktop/'+region+'.png')
+    mol.server.do('bg white; png '+fn_out)

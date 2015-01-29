@@ -27,9 +27,9 @@ from hivwholeseq.sequencing.samples import load_sample_sequenced
 from hivwholeseq.sequencing.filenames import get_consensus_filename, get_mapped_filename, \
         get_allele_counts_filename, get_coverage_filename
 from hivwholeseq.reference import load_custom_reference
-from hivwholeseq.mapping_utils import align_muscle, pair_generator
+from hivwholeseq.utils.mapping import align_muscle, pair_generator
 from hivwholeseq.sequencing.minor_allele_frequency import filter_nus
-from hivwholeseq.sequence_utils import expand_ambiguous_seq
+from hivwholeseq.utils.sequence import expand_ambiguous_seq
 from hivwholeseq.sequencing.filenames import get_allele_frequencies_filename
 
 

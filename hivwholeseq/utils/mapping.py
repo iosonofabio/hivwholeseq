@@ -5,7 +5,7 @@ date:       22/08/13
 content:    Settings of stampy used by our mapping scripts.
 '''
 # Modules
-from .sequence_utils import align_muscle
+from .sequence import align_muscle
 
 # Globals
 from hivwholeseq.sequencing.filenames import stampy_bin, bwa_bin, spades_bin

@@ -13,15 +13,14 @@ import numpy as np
 from hivwholeseq.patients.patients import load_patient
 from hivwholeseq.structure.get_PDB import get_PDB
 from hivwholeseq.structure.filenames import get_PDB_filename
-from hivwholeseq.structure_utils import get_chainseq
+from hivwholeseq.utils.structure import get_chainseq
 from hivwholeseq.one_site_statistics import get_entropy
+from hivwholeseq.utils import ipymol
 
 
 
 # Globals
-times = [('early', 1),
-         ('midway', -5),
-         ('late', -1)]
+
 
 
 # Functions
@@ -50,45 +49,59 @@ if __name__ == '__main__':
     VERBOSE = args.verbose
     use_plot = args.plot
     
+    # NOTE: pymol_manager is to be used as a script, not a module
+    # (there are all kinds of race conditions)
+
+    if VERBOSE >= 1:
+        print 'Get structure PDB filename'
+    fn_pdb = get_PDB_filename(region, VERBOSE=VERBOSE)
+
+    if VERBOSE >= 1:
+        print 'Get structure PDB'
+    pdb = get_PDB(region, VERBOSE=VERBOSE)
+
+    # Note: PR is a dimer
+    ch = list(pdb.get_chains())[0]
+
+    # Note: they often put drugs after the proteins in the same PDB chain
+    seq = get_chainseq(ch).rstrip('X')
+
+    if VERBOSE >= 1:
+        print 'Load protein into pymol'
+    mol=ipymol.MolViewer()
+    cmd = ('delete all; ' +
+           'load '+fn_pdb+'; ' +
+           'center; ' +
+           'zoom center, 20; as cartoon; ')
+    if VERBOSE >= 2:
+        print cmd
+    mol.server.do(cmd)
+
+    # Go to the patient
     patient = load_patient(pname)
     
     if VERBOSE >= 1:
         print 'Get allele frequencies'
     aft, ind = patient.get_allele_frequency_trajectories(region, cov_min=100)
 
-    for ii, (tlabel, i) in enumerate(times, 1):
+    for it, af in enumerate(aft):
+        if VERBOSE >= 1:
+            print 'Time point n.'+str(it+1)
+
         if VERBOSE >= 1:
             print 'Get entropy'
-        # FIXME: take only last time point for now
-        af = aft[i]
         # FIXME: We have nucleotides and want amino acids, but ok for now
         Snuc = get_entropy(af)
-        S = Snuc.reshape((Snuc.shape[0] // 3, 3)).mean(axis=1)
-
-
-        if VERBOSE >= 1:
-            print 'Get structure PDB filename'
-        fn_pdb = get_PDB_filename(region, VERBOSE=VERBOSE)
-
-        # Get subtype entropy
-        if VERBOSE >= 1:
-            print 'Get structure PDB'
-        pdb = get_PDB(region, VERBOSE=VERBOSE)
-
-        # Note: PR is a dimer
-        ch = list(pdb.get_chains())[0]
-
-        # Note: they often put drugs after the proteins in the same PDB chain
-        seq = get_chainseq(ch).rstrip('X')
-
+        S = Snuc.reshape((Snuc.shape[0] // 3, 3)).min(axis=1)
 
         # Check for length
         if len(seq) != len(S):
             raise ValueError('Entropy and structure not aligned')
         
-
-        # NOTE: pymol_manager is to be used as a script, not a module
-        # (there are all kinds of race conditions)
+        # Output parameters
+        #folder_out = '/home/fabio/Desktop/'
+        folder_out = '/home/fabio/university/phd/talks/IGIM_2015/figures/animations/'
+        fn_out = folder_out+region+'/'+pname+'_'+'{:d}'.format(it)+'.png'
 
         ## Plot with different radii based on entropy
         #vdws = 0.1 + 3.0 * (S - S.min()) / (S.max() - S.min())
@@ -108,15 +121,15 @@ if __name__ == '__main__':
         xmin = -5
         color_levels = 100 * (x - xmin) / (xmax - xmin)
 
-        # NOTE: pymol_manager is to be used as a script, not a module
-        # (there are all kinds of race conditions)
-
-        import ipymol
-        mol=ipymol.MolViewer()
-        mol.server.do('load '+fn_pdb+';')
-        mol.server.do('zoom center, 20; as cartoon;')
         for pos, Spos in enumerate(S):
-            mol.server.do('alter resi '+str(pos+1)+', b='+str(color_levels[pos])+';')
-        mol.server.do('rebuild;')
-        mol.server.do('spectrum b, rainbow, minimum=0, maximum=100;')
-        mol.server.do('bg white; png /home/fabio/Desktop/'+region+'_'+pname+'_'+str(ii)+tlabel+'.png')
+            cmd = 'alter resi '+str(pos+1)+', b='+str(color_levels[pos])+'; '
+            if VERBOSE >= 2:
+                print cmd
+            mol.server.do(cmd)
+        cmd = ('rebuild; ' +
+                'spectrum b, rainbow, minimum=0, maximum=100; ' +
+                'bg white; png '+fn_out+'; ')
+        if VERBOSE >= 2:
+            print cmd
+        mol.server.do(cmd)
+

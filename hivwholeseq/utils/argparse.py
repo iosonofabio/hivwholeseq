@@ -5,12 +5,13 @@ date:       11/10/14
 content:    Support module for parsing input arguments
 '''
 # Modules
-import argparse
+from __future__ import absolute_import
+from argparse import Action
 
 
 
 # Classes
-class RoiAction(argparse.Action):
+class RoiAction(Action):
     '''Argparse action for a genomic region of interest'''
 
     def __init__(self, option_strings, dest, nargs=None, **kwargs):
@@ -41,7 +42,7 @@ class RoiAction(argparse.Action):
         setattr(namespace, self.dest, roi)
 
 
-class RoisAction(argparse.Action):
+class RoisAction(Action):
     '''Argparse action for genomic regions of interest'''
 
     def __init__(self, option_strings, dest, nargs=None, **kwargs):

@@ -53,12 +53,12 @@ if __name__ == '__main__':
     # NOTE: pymol_manager is to be used as a script, not a module
     # (there are all kinds of race conditions)
 
-    import ipymol
+    from hivwholeseq.utils import ipymol
     mol=ipymol.MolViewer()
     mol.server.do('load '+fn_pdb+';')
     mol.server.do('zoom; as cartoon; show spheres, chain A; hide spheres, resn HOH')
     for pos, vdw in enumerate(vdws):
-        #mol.server.do('alter resi '+str(pos+1)+', vdw='+str(vdw)+';')
+        mol.server.do('alter resi '+str(pos+1)+', vdw='+str(vdw)+';')
         #mol.server.do('color '+'blue'+', resi '+str(pos+1)+';')
     mol.server.do('rebuild;')
     mol.server.do('bg white; png /home/fabio/Desktop/'+region+'.png')

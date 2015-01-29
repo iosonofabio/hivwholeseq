@@ -22,7 +22,7 @@ def get_coallele_counts_from_file(bamfilename, length, qual_min=30,
                                   maxreads=-1, VERBOSE=0,
                                   use_tests=False):
     '''Get counts of join occurence of two alleles'''
-    from mapping_utils import test_read_pair_exotic_cigars, \
+   .utils.from mapping import test_read_pair_exotic_cigars, \
             test_read_pair_exceed_reference
 
     if VERBOSE >= 1:
