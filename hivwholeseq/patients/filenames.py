@@ -138,9 +138,13 @@ def get_consensi_alignment_genomewide_filename(pname):
     return filename
 
 
-def get_allele_counts_filename(pname, samplename_pat, fragment, PCR=1, qual_min=30):
+def get_allele_counts_filename(pname, samplename_pat, fragment, PCR=1, qual_min=30,
+                               type='nuc'):
     '''Get the filename of the allele counts for a patient sample'''
-    filename = 'allele_counts_'+fragment+'_qual'+str(qual_min)+'+'+'.npy'
+    filename = 'allele_counts_'
+    if type != 'nuc':
+        filename = filename+type+'_'
+    filename = filename+fragment+'_qual'+str(qual_min)+'+'+'.npy'
     filename = get_sample_foldername(pname, samplename_pat, PCR=PCR)+filename
     return filename
 

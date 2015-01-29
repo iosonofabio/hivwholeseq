@@ -7,7 +7,9 @@ content:    Test suite for allele counts calls from the reads.
 # Modules
 # NOTE: in theory this is not necessary?
 import os, sys
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__),
+                                                os.pardir,
+                                                os.pardir)))
 
 
 import unittest
@@ -15,10 +17,10 @@ from collections import defaultdict, Counter
 import numpy as np
 from copy import deepcopy
 
-from miseq import alphal
-from store.filter_mapped_reads import filter_read_pair
+from hivwholeseq.utils.sequence import alphaal
+from hivwholeseq.store.filter_mapped_reads import filter_read_pair
 
-from test.utils import Read, fix_pair
+from hivwholeseq.test.utils import Read, fix_pair
 
 
 # Tests

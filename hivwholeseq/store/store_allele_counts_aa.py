@@ -16,8 +16,53 @@ from hivwholeseq.patients.samples import load_samples_sequenced as lssp
 from hivwholeseq.patients.samples import SamplePat
 from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_mapped_filtered_filename, get_allele_counts_filename
-from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file as gac
-from hivwholeseq.cluster.fork_cluster import fork_get_allele_counts_patient as fork_self 
+#from hivwholeseq.one_site_statistics import get_allele_counts_aa_from_file as gac
+from hivwholeseq.cluster.fork_cluster import fork_get_allele_counts_aa_patient as fork_self 
+
+
+
+# Functions
+def gac(bamfilename, start, end, qual_min=30, maxreads=-1, VERBOSE=0):
+    '''Get allele counts for amino acids in a protein'''
+    from hivwholeseq.utils.sequence improt alphaa
+
+    if (end - start) % 3:
+        raise ValueError('The selected region length is not a multiple of 3')
+
+    # Prepare output structures
+    length = (end - start) // 3
+    counts = np.zeros((len(read_types), len(alphaa), length), int)
+
+    # Open BAM file
+    # Note: the reads should already be filtered of unmapped stuff at this point
+    with pysam.Samfile(bamfilename, 'rb') as bamfile:
+
+        # Iterate over single reads
+        #NOTE: we miss a few corner cases, but it's better than trying to merge
+        # reads in a pair, which is itself brittle
+        for i, read in enumerate(bamfile):
+
+            # Max number of reads
+            if i == maxreads:
+                if VERBOSE >= 2:
+                    print 'Max reads reached:', maxreads
+                break
+        
+            # Print output
+            if (VERBOSE >= 3) and (not ((i +1) % 10000)):
+                print (i+1)
+        
+            # Divide by read 1/2 and forward/reverse
+            js = 2 * read.is_read2 + read.is_reverse
+
+            get_allele_counts_aa_read(read,
+                                      start, end,
+                                      counts[js],
+                                      qual_min=qual_min,
+                                      VERBOSE=VERBOSE)
+
+    return counts
+
 
 
 
@@ -25,15 +70,15 @@ from hivwholeseq.cluster.fork_cluster import fork_get_allele_counts_patient as f
 if __name__ == '__main__':
 
     # Parse input args
-    parser = argparse.ArgumentParser(description='Get allele counts',
+    parser = argparse.ArgumentParser(description='Get allele counts of amino acids',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     pats_or_samples = parser.add_mutually_exclusive_group(required=True)
     pats_or_samples.add_argument('--patients', nargs='+',
                                  help='Patient to analyze')
     pats_or_samples.add_argument('--samples', nargs='+',
                                  help='Samples to analyze (e.g. VL98-1253 VK03-4298)')
-    parser.add_argument('--regions', nargs='+',
-                        help='Fragments to analyze (e.g. F1 F6)')
+    parser.add_argument('--proteins', nargs='+', required=True,
+                        help='Proteins to analyze (e.g. PR IN)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-4]')
     parser.add_argument('--save', action='store_true',
@@ -52,7 +97,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     pnames = args.patients
     samplenames = args.samples
-    fragments = args.fragments
+    proteins = args.proteins
     submit = args.submit
     VERBOSE = args.verbose
     save_to_file = args.save
@@ -72,56 +117,51 @@ if __name__ == '__main__':
     if VERBOSE >= 2:
         print 'samples', samples.index.tolist()
 
-    if not fragments:
-        fragments = ['F'+str(i) for i in xrange(1, 7)]
-    if VERBOSE >= 3:
-        print 'fragments', fragments
-
     counts_all = []
-    for fragment in fragments:
+    for protein in proteins:
         counts = []
         for samplename, sample in samples.iterrows():
             if submit:
-                fork_self(samplename, fragment, VERBOSE=VERBOSE, qual_min=qual_min)
+                fork_self(samplename, protein, VERBOSE=VERBOSE, qual_min=qual_min)
                 continue
 
             if VERBOSE >= 1:
-                print fragment, samplename
+                print protein, samplename
 
             sample = SamplePat(sample)
-            pname = sample.patient
-            refseq = SeqIO.read(get_initial_reference_filename(pname, fragment), 'fasta')
 
-            fn_out = sample.get_allele_counts_filename(fragment, PCR=PCR, qual_min=qual_min)
-            fn = sample.get_mapped_filtered_filename(fragment, PCR=PCR, decontaminated=True) #FIXME
+            # NOTE: we should look codon by codon, incredible
+            (fragment, start, end) = sample.get_fragmented_roi((protein, 0, '+oo'),
+                                                               include_genomewide=True)
             
-            # If --save, recalculate and save
+            refseq = sample.get_reference(protein)
+
+            fn_out = sample.get_allele_counts_filename(fragment, PCR=PCR,
+                                                       qual_min=qual_min,
+                                                       type='aa')
+            fn = sample.get_mapped_filtered_filename(fragment, PCR=PCR,
+                                                     decontaminated=True) #FIXME
+            
+            if not os.path.isfile(fn):
+                if VERBOSE >= 2:
+                    print 'SKIP'
+                continue
+                
+            if VERBOSE >= 2:
+                print 'Get allele counts'
+            (count, inserts) = gac(fn, len(refseq),
+                                   qual_min=qual_min,
+                                   VERBOSE=VERBOSE)
+            counts.append(count)
+
             if save_to_file:
-                if os.path.isfile(fn):
-                    (count, inserts) = gac(fn, len(refseq),
-                                            qual_min=qual_min,
-                                            VERBOSE=VERBOSE)
-
-                    count.dump(fn_out)
-
-                    if VERBOSE >= 2:
-                        print 'Allele counts saved:', samplename, fragment
-
-                    counts.append(count)
-
-            # If not --save, try to load from file and recalculate as a fallback
-            elif os.path.isfile(fn_out):
-                count = np.load(fn_out)
-                counts.append(count)
-
-            elif os.path.isfile(fn):
-                (count, inserts) = gac(fn, len(refseq),
-                                        qual_min=qual_min,
-                                        VERBOSE=VERBOSE)
-                counts.append(count)
-
+                if VERBOSE >= 2:
+                    print 'Save allele counts:', samplename, protein
+                count.dump(fn_out)
 
             if use_plot:
+                if VERBOSE >= 2:
+                    print 'Plot'
                 cou = count.sum(axis=0)
                 x = np.tile(np.arange(cou.shape[1]), (cou.shape[0], 1))
                 color = np.tile(np.arange(cou.shape[0]), (cou.shape[1], 1)).T

@@ -13,9 +13,10 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from Bio.Alphabet.IUPAC import ambiguous_dna
 
-from hivwholeseq.miseq import alpha, read_types
-from hivwholeseq.utils.mapping import get_ind_good_cigars
-from hivwholeseq.utils.mapping import align_muscle
+from .utils.sequence import alpha, alphaa
+from .miseq import read_types
+from .utils.mapping import get_ind_good_cigars
+from .utils.mapping import align_muscle
 
 
 # Functions
@@ -82,6 +83,108 @@ def get_allele_counts_read(read, counts_out, inserts_out,
         # Other types of cigar?
         else:
             raise ValueError('CIGAR type '+str(block_type)+' not recognized')
+
+
+def get_allele_counts_aa_read(read, start, end, counts_out, qual_min=30,
+                              VERBOSE=0):
+    '''Get allele counts as amino acids from a single read.
+
+    NOTE: It is assumed that (end - start) has a length of a multiple of 3.
+    This function does not check for it again.
+
+    Parameters:
+       counts_out (ndarray, alphabet x protein length): output data structure for counts
+    '''
+    from Bio.Seq import translate
+
+    # Read CIGARs (they should be clean by now)
+    seq = np.fromstring(read.seq, 'S1')
+    qual = np.fromstring(read.qual, np.int8) - 33
+    pos = read.pos
+    pos_end = pos + sum(bl for (bt, bl) in read.cigar if bt in (0, 2))
+
+    # If the read does not cover, skip
+    if (pos > end - 2) or (pos_end < start):
+        return
+
+    # Iterate over CIGARs
+    pos_ref = pos
+    pos_read = 0
+    for ic, (bt, bl) in enumerate(read.cigar):
+        if bt == 1:
+            pos_read += bl
+            continue
+
+        # 1. we have not reached the start, just move on
+        if pos_ref + bl < start:
+            pos_ref += bl
+            if bt == 0:
+                pos_read += bl
+
+            # Check we are not beyond the end
+            if pos_ref > end - 2:
+                return
+
+            continue
+
+        # 2. we enter the protein now
+        if pos_ref <= start:
+            startb = start - pos_ref
+
+        # 3. we are already in the protein
+        else:
+            # Cut block to full codons from the left
+            # NOTE: modulo works for negative numbers in Python
+            startb = (start - pos_ref) % 3
+        
+
+        # Cut block to full codons from the right
+        endb = pos_ref + bl
+        endb -= (endb - startb) % 3
+        lb = endb - startb
+
+        # If the block is less than one amino acid, skip
+        if lb < 3:
+            pos_ref += bl
+            if bt == 0:
+                pos_read += bl
+
+            # Check we are not beyond the end
+            if pos_ref > end - 2:
+                return
+
+        # Get output amino acid coordinates for the block
+        start_pr = ((pos_ref + startb) - start) // 3
+        end_pr = start_pr + ((endb - startb) // 3)
+
+        if bt == 2:
+            # We assume gaps is at the second-last position
+            counts_out[-2, start_pr: end_pr] += 1
+
+        else:
+            # Ask for minimal quality at all three codon positions
+            qualb = (qual[pos_read + startb: pos_read + endb]
+                     .reshape((lb // 3, 3))
+                     .min(axis=1))
+
+            seqb = seq[pos_read + startb: pos_read + endb]
+            aab = np.fromstring(translate(''.join(seqb)), 'S1')
+
+            for j, a in enumerate(alphaa):
+                posa = ((aab == a) & (qualb >= qual_min)).nonzero()[0]
+                if len(posa):
+                    counts_out[j, start_pr + posa] += 1
+
+            pos_read += bl
+
+        pos_ref += bl
+
+        # Check we are not beyond the end
+        if pos_ref > end - 2:
+            return
+
+
+
 
 
 def get_allele_counts_insertions_from_file(bamfilename, length, qual_min=30,
