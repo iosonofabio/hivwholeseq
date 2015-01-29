@@ -140,7 +140,7 @@ def get_allele_counts_aa_read(read, start, end, counts_out, qual_min=30,
             startb = (start - pos_ref) % 3
 
         # Cut block to full codons from the right
-        endb = bl
+        endb = min(bl, end - pos_ref)
         endb -= (endb - startb) % 3
         lb = endb - startb
 
@@ -195,9 +195,6 @@ def get_allele_counts_aa_read(read, start, end, counts_out, qual_min=30,
             return
 
 
-
-
-
 def get_allele_counts_insertions_from_file(bamfilename, length, qual_min=30,
                                            maxreads=-1, VERBOSE=0):
     '''Get the allele counts and insertions'''
@@ -236,6 +233,47 @@ def get_allele_counts_insertions_from_file(bamfilename, length, qual_min=30,
                                    VERBOSE=VERBOSE)
 
     return (counts, inserts)
+
+
+def get_allele_counts_aa_from_file(bamfilename, start, end, qual_min=30,
+                                   maxreads=-1, VERBOSE=0):
+    '''Get allele counts for amino acids in a protein'''
+    if (end - start) % 3:
+        raise ValueError('The selected region length is not a multiple of 3')
+
+    # Prepare output structures
+    length = (end - start) // 3
+    counts = np.zeros((len(read_types), len(alphaa), length), int)
+
+    # Open BAM file
+    # Note: the reads should already be filtered of unmapped stuff at this point
+    with pysam.Samfile(bamfilename, 'rb') as bamfile:
+
+        # Iterate over single reads
+        #NOTE: we miss a few corner cases, but it's better than trying to merge
+        # reads in a pair, which is itself brittle
+        for i, read in enumerate(bamfile):
+
+            # Max number of reads
+            if i == maxreads:
+                if VERBOSE >= 2:
+                    print 'Max reads reached:', maxreads
+                break
+        
+            # Print output
+            if (VERBOSE >= 2) and (not ((i +1) % 10000)):
+                print (i+1)
+        
+            # Divide by read 1/2 and forward/reverse
+            js = 2 * read.is_read2 + read.is_reverse
+
+            get_allele_counts_aa_read(read,
+                                      start, end,
+                                      counts[js],
+                                      qual_min=qual_min,
+                                      VERBOSE=VERBOSE)
+
+    return counts
 
 
 def get_allele_counts_insertions_from_file_unfiltered(bamfilename, length, qual_min=30,

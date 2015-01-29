@@ -256,13 +256,13 @@ class Patient(pd.Series):
         return af
 
 
-    def get_coverage_trajectories(self, region, use_PCR1=1):
+    def get_coverage_trajectories(self, region, **kwargs):
         '''Get coverage as a function of time'''
-        (act, ind) = self.get_allele_count_trajectories(region, use_PCR1=use_PCR1)
+        (act, ind) = self.get_allele_count_trajectories(region, **kwargs)
         return (act.sum(axis=1), ind)
 
 
-    def get_allele_frequency_trajectories(self, region, use_PCR1=1, cov_min=1,
+    def get_allele_frequency_trajectories(self, region, cov_min=1,
                                           depth_min=None, **kwargs):
         '''Get the allele frequency trajectories from files
         
@@ -275,9 +275,7 @@ class Patient(pd.Series):
             to 1%.
           **kwargs: passed down to the get_allele_count_trajectories method.
         '''
-        (act, ind) = self.get_allele_count_trajectories(region,
-                                                        use_PCR1=use_PCR1,
-                                                        **kwargs)
+        (act, ind) = self.get_allele_count_trajectories(region, **kwargs)
         if depth_min is not None:
             indd = np.array(self.n_templates[ind] >= depth_min)
             act = act[indd]
@@ -301,7 +299,44 @@ class Patient(pd.Series):
         return (aft, ind)
 
 
-    def get_allele_count_trajectories(self, region, use_PCR1=2, safe=False, **kwargs):
+    def get_allele_frequency_trajectories_aa(self, protein, cov_min=1,
+                                             depth_min=None, **kwargs):
+        '''Get the allele frequency trajectories from files
+        
+        Args:
+          region (str): region to study, a fragment or a genomic feature (e.g. V3)
+          cov_min (int): minimal coverage accepted, anything lower are masked.
+          depth_min (float): minimal depth, both by sequencing and template numbers.
+            Time points with less templates are excluded, and positions are masked.
+            For convenience depth is defined > 1, e.g. 100 takes frequencies down
+            to 1%.
+          **kwargs: passed down to the get_allele_count_trajectories method.
+        '''
+        (act, ind) = self.get_allele_count_trajectories_aa(protein, **kwargs)
+        if depth_min is not None:
+            indd = np.array(self.n_templates[ind] >= depth_min)
+            act = act[indd]
+            ind = ind[indd]
+            cov_min = max(cov_min, depth_min)
+
+        covt = act.sum(axis=1)
+        mask = np.zeros_like(act, bool)
+        mask.swapaxes(0, 1)[:] = covt < cov_min
+
+        # NOTE: the hard mask is necessary to avoid unmasking part of the alphabet
+        # at a certain site: the mask is site-wise, not allele-wise
+        aft = np.ma.array((1.0 * act.swapaxes(0, 1) / covt).swapaxes(0, 1),
+                          mask=mask,
+                          hard_mask=True,
+                          fill_value=0)
+
+        aft[(aft < 1e-4)] = 0
+        # NOTE: we'd need to renormalize, but it's a small effect
+
+        return (aft, ind)
+
+
+    def get_allele_count_trajectories(self, region, safe=False, **kwargs):
         '''Get the allele count trajectories from files
         
         Args:
@@ -318,7 +353,7 @@ class Patient(pd.Series):
                                                          include_genomewide=True)
         (sns, act) = get_allele_count_trajectories(self.name, self.samples.index,
                                                    fragment,
-                                                   use_PCR1=use_PCR1, **kwargs)
+                                                   use_PCR1=2, **kwargs)
         # Select genomic region
         act = act[:, :, start: end]
 
@@ -341,6 +376,44 @@ class Patient(pd.Series):
 
 
         return (act, ind)
+
+
+    def get_allele_count_trajectories_aa(self, protein, safe=False, **kwargs):
+        '''Get the allele count trajectories from files
+        
+        Args:
+          region (str): region to study, a fragment or a genomic feature (e.g. V3)
+          **kwargs: passed down to the function (VERBOSE, etc.).
+
+        Note: the genomewide counts are currently saved to file.
+        '''
+        from operator import itemgetter
+        from .one_site_statistics import get_allele_count_trajectories_aa
+
+        (sns, act) = get_allele_count_trajectories_aa(self.name, self.samples.index,
+                                                      protein, **kwargs)
+
+        # Select time points
+        ind = np.array([i for i, (_, sample) in enumerate(self.samples.iterrows())
+                        if sample.name in map(itemgetter(0), sns)], int)
+
+        # If safe, take only samples tagged with 'OK'
+        if safe:
+            (fragment, start, end) = self.get_fragmented_roi(protein, VERBOSE=VERBOSE)
+            ind_safe = np.zeros(len(ind), bool)
+            for ii, i in enumerate(ind):
+                sample = self.samples.iloc[i]
+                from .get_roi import get_fragments_covered
+                frags = get_fragments_covered(self, (fragment, start, end))
+                ind_safe[ii] = all(getattr(sample, fr).upper() == 'OK'
+                                   for fr in frags)
+
+            act = act[ind_safe]
+            ind = ind[ind_safe]
+
+
+        return (act, ind)
+
 
 
     def get_mapped_filtered_filename(self, samplename, fragment, PCR=1):

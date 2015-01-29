@@ -164,6 +164,17 @@ class SamplePat(pd.Series):
         return ac
 
 
+    def get_allele_counts_aa(self, protein, PCR=1, qual_min=30, merge_read_types=True):
+        '''Get the amino acid allele counts'''
+        import numpy as np
+        ac = np.load(self.get_allele_counts_filename(protein, PCR=PCR,
+                                                     qual_min=qual_min,
+                                                     type='aa'))
+        if merge_read_types:
+            ac = ac.sum(axis=0)
+        return ac
+
+
     def get_allele_cocounts(self, fragment, PCR=1, qual_min=30):
         '''Get the allele cocounts'''
         import numpy as np

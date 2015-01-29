@@ -13,7 +13,7 @@ from operator import itemgetter
 import numpy as np
 from Bio import SeqIO
 
-from hivwholeseq.miseq import alpha
+from hivwholeseq.utils.sequence import alphaa
 from hivwholeseq.patients.patients import load_patient
 from hivwholeseq.patients.one_site_statistics import \
         plot_allele_frequency_trajectories as plot_aft
@@ -30,8 +30,8 @@ if __name__ == '__main__':
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     parser.add_argument('--patient', required=True,
                         help='Patient to analyze')
-    parser.add_argument('--regions', nargs='*',
-                        help='Regions to analyze (e.g. F1 genomewide V3)')
+    parser.add_argument('--proteins', nargs='+', required=True,
+                        help='Proteins to analyze (e.g. PR IN)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-4]')
     parser.add_argument('--plot', nargs='?', default=None, const='2D',
@@ -47,7 +47,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     pname = args.patient
-    regions = args.regions
+    proteins = args.proteins
     VERBOSE = args.verbose
     plot = args.plot
     use_logit = args.logit
@@ -58,19 +58,14 @@ if __name__ == '__main__':
     patient = load_patient(pname)
     patient.discard_nonsequenced_samples()
 
-    if not regions:
-        regions = ['F'+str(i) for i in xrange(1, 7)]
-    if VERBOSE >= 2:
-        print 'regions', regions
-
-    for region in regions:
+    for protein in proteins:
         if VERBOSE >= 1:
-            print region
+            print pname, protein
 
-        (aft, ind) = patient.get_allele_frequency_trajectories(region,
-                                                               cov_min=cov_min,
-                                                               depth_min=depth_min,
-                                                               VERBOSE=VERBOSE)
+        (aft, ind) = patient.get_allele_frequency_trajectories_aa(protein,
+                                                                  cov_min=cov_min,
+                                                                  depth_min=depth_min,
+                                                                  VERBOSE=VERBOSE)
         times = patient.times[ind]
         ntemplates = patient.n_templates[ind]
 
@@ -79,7 +74,7 @@ if __name__ == '__main__':
 
             if plot in ('2D', '2d', ''):
                 (fig, ax) = plot_aft(times, aft,
-                                     title='Patient '+pname+', '+region,
+                                     title='Patient '+pname+', '+protein,
                                      VERBOSE=VERBOSE,
                                      ntemplates=ntemplates,
                                      logit=use_logit,
@@ -87,7 +82,7 @@ if __name__ == '__main__':
 
             elif plot in ('3D', '3d'):
                 (fig, ax) = plot_aft_3d(times, aft,
-                                        title='Patient '+pname+', '+region,
+                                        title='Patient '+pname+', '+protein,
                                         VERBOSE=VERBOSE,
                                         logit=use_logit,
                                         ntemplates=ntemplates,

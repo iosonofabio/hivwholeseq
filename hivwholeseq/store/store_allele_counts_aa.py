@@ -16,52 +16,12 @@ from hivwholeseq.patients.samples import load_samples_sequenced as lssp
 from hivwholeseq.patients.samples import SamplePat
 from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_mapped_filtered_filename, get_allele_counts_filename
-#from hivwholeseq.one_site_statistics import get_allele_counts_aa_from_file as gac
+from hivwholeseq.one_site_statistics import get_allele_counts_aa_from_file as gac
 from hivwholeseq.cluster.fork_cluster import fork_get_allele_counts_aa_patient as fork_self 
 
 
 
 # Functions
-def gac(bamfilename, start, end, qual_min=30, maxreads=-1, VERBOSE=0):
-    '''Get allele counts for amino acids in a protein'''
-    from hivwholeseq.utils.sequence improt alphaa
-
-    if (end - start) % 3:
-        raise ValueError('The selected region length is not a multiple of 3')
-
-    # Prepare output structures
-    length = (end - start) // 3
-    counts = np.zeros((len(read_types), len(alphaa), length), int)
-
-    # Open BAM file
-    # Note: the reads should already be filtered of unmapped stuff at this point
-    with pysam.Samfile(bamfilename, 'rb') as bamfile:
-
-        # Iterate over single reads
-        #NOTE: we miss a few corner cases, but it's better than trying to merge
-        # reads in a pair, which is itself brittle
-        for i, read in enumerate(bamfile):
-
-            # Max number of reads
-            if i == maxreads:
-                if VERBOSE >= 2:
-                    print 'Max reads reached:', maxreads
-                break
-        
-            # Print output
-            if (VERBOSE >= 3) and (not ((i +1) % 10000)):
-                print (i+1)
-        
-            # Divide by read 1/2 and forward/reverse
-            js = 2 * read.is_read2 + read.is_reverse
-
-            get_allele_counts_aa_read(read,
-                                      start, end,
-                                      counts[js],
-                                      qual_min=qual_min,
-                                      VERBOSE=VERBOSE)
-
-    return counts
 
 
 
@@ -136,7 +96,7 @@ if __name__ == '__main__':
             
             refseq = sample.get_reference(protein)
 
-            fn_out = sample.get_allele_counts_filename(fragment, PCR=PCR,
+            fn_out = sample.get_allele_counts_filename(protein, PCR=PCR,
                                                        qual_min=qual_min,
                                                        type='aa')
             fn = sample.get_mapped_filtered_filename(fragment, PCR=PCR,
@@ -148,10 +108,8 @@ if __name__ == '__main__':
                 continue
                 
             if VERBOSE >= 2:
-                print 'Get allele counts'
-            (count, inserts) = gac(fn, len(refseq),
-                                   qual_min=qual_min,
-                                   VERBOSE=VERBOSE)
+                print 'Get allele counts for amino acids'
+            count = gac(fn, start, end, qual_min=qual_min, VERBOSE=VERBOSE)
             counts.append(count)
 
             if save_to_file:
@@ -176,6 +134,7 @@ if __name__ == '__main__':
                 ax.set_yscale('log')
                 ax.grid(True)
                 ax.set_title(samplename)
+
 
     if use_plot:
         plt.ion()

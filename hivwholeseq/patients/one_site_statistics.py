@@ -25,7 +25,6 @@ def get_allele_count_trajectories(pname, samplenames, fragment, use_PCR1=1,
 
     from hivwholeseq.patients.filenames import get_initial_reference_filename, \
             get_allele_counts_filename
-    from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file
 
     refseq = SeqIO.read(get_initial_reference_filename(pname, fragment), 'fasta')
     fns = []
@@ -67,6 +66,37 @@ def get_allele_count_trajectories(pname, samplenames, fragment, use_PCR1=1,
         act[i] = np.load(fn).sum(axis=0)
 
     return (samplenames_out, act)
+
+
+def get_allele_count_trajectories_aa(pname, samplenames, protein, VERBOSE=0):
+    '''Get allele counts for a single patient sample
+    
+    NOTE: we use only PCR1.
+    '''
+    if VERBOSE >= 1:
+        print 'Getting allele counts aa:', pname, protein
+
+    from hivwholeseq.patients.filenames import get_allele_counts_filename
+
+    fns = []
+    samplenames_out = []
+    for samplename_pat in samplenames:
+
+        fn = get_allele_counts_filename(pname, samplename_pat, protein, type='aa')
+        if os.path.isfile(fn):
+            fns.append(fn)
+            samplenames_out.append((samplename_pat, 1))
+            if VERBOSE >= 3:
+                print samplename_pat, 1
+
+    act = []
+    for i, fn in enumerate(fns):
+        # Average directly over read types?
+        act.append(np.load(fn).sum(axis=0))
+    act = np.array(act)
+
+    return (samplenames_out, act)
+
 
 
 def get_allele_frequency_trajectories(pname, samples, fragment, qual_min=30, VERBOSE=0):
