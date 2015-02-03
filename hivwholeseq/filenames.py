@@ -20,7 +20,7 @@ if os.path.isdir('/media/FZ_MPI/HIV_Sweden/'):
     stampy_bin = '/usr/bin/stampy'
 elif os.path.isdir('/var/www/hivwholeweb/'):
     root_data_folder = '/var/www/hivwholeweb/app/hiv/static/data/'
-elif os.path.isdir('/home/fabio/'):
+elif os.path.isdir('/home/fabio/') and (not os.path.isdir('/ebio/ag-neher/share/data')):
     root_data_folder = '/home/fabio/university/phd/sequencing/data/'
 else:
     root_data_folder = '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/'

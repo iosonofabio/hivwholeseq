@@ -36,8 +36,8 @@ if __name__ == '__main__':
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     parser.add_argument('--patient', required=True,
                         help='Patient to analyze')
-    parser.add_argument('--region', required=True,
-                        help='Region to analyze (e.g. p17)')
+    parser.add_argument('--protein', required=True,
+                        help='Protein to analyze (e.g. p17)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-4]')
     parser.add_argument('--plot', nargs='?', default=None, const='2D',
@@ -45,7 +45,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     pname = args.patient
-    region = args.region
+    protein = args.protein
     VERBOSE = args.verbose
     use_plot = args.plot
     
@@ -54,11 +54,11 @@ if __name__ == '__main__':
 
     if VERBOSE >= 1:
         print 'Get structure PDB filename'
-    fn_pdb = get_PDB_filename(region, VERBOSE=VERBOSE)
+    fn_pdb = get_PDB_filename(protein, VERBOSE=VERBOSE)
 
     if VERBOSE >= 1:
         print 'Get structure PDB'
-    pdb = get_PDB(region, VERBOSE=VERBOSE)
+    pdb = get_PDB(protein, VERBOSE=VERBOSE)
 
     # Note: PR is a dimer
     ch = list(pdb.get_chains())[0]
@@ -81,8 +81,11 @@ if __name__ == '__main__':
     patient = load_patient(pname)
     
     if VERBOSE >= 1:
-        print 'Get allele frequencies'
-    aft, ind = patient.get_allele_frequency_trajectories(region, cov_min=100)
+        print 'Get allele frequencies of amino acids'
+    aft, ind = patient.get_allele_frequency_trajectories_aa(protein, cov_min=100,
+                                                            depth_min=50)
+
+    Ss = []
 
     for it, af in enumerate(aft):
         if VERBOSE >= 1:
@@ -90,9 +93,8 @@ if __name__ == '__main__':
 
         if VERBOSE >= 1:
             print 'Get entropy'
-        # FIXME: We have nucleotides and want amino acids, but ok for now
-        Snuc = get_entropy(af)
-        S = Snuc.reshape((Snuc.shape[0] // 3, 3)).min(axis=1)
+        S = get_entropy(af)
+        Ss.append(S)
 
         # Check for length
         if len(seq) != len(S):
@@ -101,7 +103,7 @@ if __name__ == '__main__':
         # Output parameters
         #folder_out = '/home/fabio/Desktop/'
         folder_out = '/home/fabio/university/phd/talks/IGIM_2015/figures/animations/'
-        fn_out = folder_out+region+'/'+pname+'_'+'{:d}'.format(it)+'.png'
+        fn_out = folder_out+protein+'/'+pname+'_'+'{:d}'.format(it)+'.png'
 
         ## Plot with different radii based on entropy
         #vdws = 0.1 + 3.0 * (S - S.min()) / (S.max() - S.min())
@@ -113,7 +115,7 @@ if __name__ == '__main__':
         #    mol.server.do('alter resi '+str(pos+1)+', vdw='+str(vdw)+';')
         #    #mol.server.do('color '+'blue'+', resi '+str(pos+1)+';')
         #mol.server.do('rebuild;')
-        #mol.server.do('bg white; png /home/fabio/Desktop/'+region+'.png')
+        #mol.server.do('bg white; png /home/fabio/Desktop/'+protein+'.png')
 
         # Plot with different colors based on entropy
         x = np.log10(S + 1e-5)
@@ -132,4 +134,6 @@ if __name__ == '__main__':
         if VERBOSE >= 2:
             print cmd
         mol.server.do(cmd)
+
+    Ss = np.array(Ss)
 

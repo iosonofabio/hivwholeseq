@@ -22,7 +22,6 @@ from hivwholeseq.patients.filenames import get_ntemplates_by_fragment_filename
 
 # Globals
 fragments = ['F'+str(i) for i in xrange(1, 7)]
-overlaps = zip(fragments[:-1], fragments[1:])
 
 
 
@@ -75,6 +74,136 @@ def get_chain_indices_nonnan(arr):
         groups.append(group)
 
     return map(set, groups)
+
+
+def plot_template_estimate(data, samplename, figaxs=None):
+    '''Plots for the estimate of template numbers'''
+
+    if figaxs is not None:
+        fig, axs = figaxs
+    else:
+        fig, axs = plt.subplots(1, 2, figsize=(13, 8))
+    
+    ax = axs[0]
+    xmin = 1e-3
+    xpl = np.linspace(xmin, 1 - xmin, 1000)
+
+    # Plot diagonal
+    ax.plot(xpl, xpl, lw=1.5, color='k')
+
+    # Plot max discrepancy curve, x (1 - x) / var, given by two samples, when
+    # x = (x1 + x2) / 2
+    # var = ((x1 - x2) / 2)**2
+    ypl = xpl * (1 - xpl) / ((xpl >= 0.5) - xpl)**2
+    axs[1].plot(xpl, ypl, lw=1.5, color='k')
+
+    for (samplename_p, fr1, fr2), (af1, af2) in data['af'].iteritems():
+        if samplename_p != samplename:
+            continue
+
+        color = cm.jet(1.0 * int(fr1[1]) / 5)
+
+        ax = axs[0]
+        ax.scatter(af1, af2,
+                   color=color,
+                   label='-'.join((fr1, fr2)))
+
+        # Plot the noise variance
+        n = data['n'][(samplename, fr1, fr2)]
+        std = np.sqrt(xpl * (1 - xpl) / n)
+
+        y1 = xpl + std
+        y2 = xpl - std
+        ax.plot(xpl, y1, color=color, lw=1)
+        ax.plot(xpl, y2, color=color, lw=1)
+
+        # Plot the variances
+        ax = axs[1]
+        ax.scatter(data['mean'][(samplename, fr1, fr2)],
+                   data['n_all'][(samplename, fr1, fr2)],
+                   color=color)
+        n = data['n'][(samplename, fr1, fr2)]
+        if not np.isnan(n):
+            ax.plot(xpl, [n] * len(xpl), lw=1.5, ls='-',
+                    alpha=0.5,
+                            color=color)
+
+            ax = axs[0]
+            ax.grid(True)
+            ax.set_xscale('logit')
+            ax.set_yscale('logit')
+            ax.set_xlim(xmin, 1 - xmin)
+            ax.set_ylim(xmin, 1 - xmin)
+            ax.set_xlabel('leading fragment')
+            ax.set_ylabel('trailing fragment')
+            ax.set_title(samplename)
+
+            ax = axs[1]
+            ax.grid(True)
+            ax.set_xlabel('Average frequency')
+            ax.set_ylabel('x (1 - x) / var(x)')
+            ax.set_xscale('logit')
+            ax.set_yscale('log')
+            ax.set_xlim(xmin, 1 - xmin)
+            ax.set_ylim(ymin=1)
+
+            plt.tight_layout()
+
+
+def assign_templates(ns, samplenames):
+    '''Assign template numbers to fragments from the overlaps'''
+    from collections import defaultdict
+    import numpy as np
+
+    overlaps = zip(fragments[:-1], fragments[1:])
+
+    ns = defaultdict(lambda: np.nan, ns)
+
+    M = np.ma.masked_all((len(samplenames), len(fragments)), int)
+    for isa, samplename in enumerate(samplenames):
+        n_ov = [ns[(samplename, fr1, fr2)] for (fr1, fr2) in overlaps]
+        n_ov = np.array(n_ov)
+
+        # FIXME: for now take a hierarchical approach, but we
+        # could exploit granularity of the SFS (10 templates don't produce
+        # frequencies of 0.01 reliably)
+
+        # FIXME: we should provide error bars, because we often rely on few sites
+
+        # Group into chains (because we have some nans i.e. missing data)
+        ind_grs = get_chain_indices_nonnan(n_ov)
+        for ind_gr in ind_grs:
+            
+            # Singletons are not very useful: both fragments have only that
+            # single overlap (either because on the other side there is a 
+            # nan, or nothing ( <-F1 and F6-> ).
+            if len(ind_gr) == 1:
+                ind_gr = ind_gr.pop()
+                M[isa, ind_gr: ind_gr + 2] = n_ov[ind_gr]
+                continue
+
+            # Chains are better. If a fragment has 1+ overlaps with high n,
+            # it should have high n itself, so we resolve degeneracy this way:
+            # the highest n propagates left and right, and the other fragments
+            # are assigned what's left
+            # NOTE: this is kind of a strict rule, maybe we'd like to average a bit
+            i_frags_left = set(ind_gr) | set([max(ind_gr) + 1])
+            i_max = max(ind_gr, key=n_ov.__getitem__)
+
+            # First two fragments
+            M[isa, i_max: i_max + 2] = n_ov[i_max]
+            i_frags_left.remove(i_max)
+            i_frags_left.remove(i_max + 1)
+
+            # The other fragments
+            while (i_frags_left):
+                i_frag = i_frags_left.pop()
+                if i_frag < i_max:
+                    M[isa, i_frag] = n_ov[i_frag]
+                else:
+                    M[isa, i_frag] = n_ov[i_frag - 1]
+
+    return M
 
 
 
@@ -147,9 +276,9 @@ if __name__ == '__main__':
             af2 = 1.0 * ao2 / ao2.sum(axis=0)
 
             # Filter only polymorphic sites
-            afmin = 5e-3
+            afmin = 3e-3
             indfm = (af1 >= afmin) & (af1 <= 1 - afmin) & (af2 >= afmin) & (af2 <= 1 - afmin)
-            nsites = indfm.sum()
+            nsites = len(np.unique(indfm.nonzero()[1]))
             if VERBOSE >= 2:
                 print 'Number of doubly polymorphic sites:', nsites
 
@@ -161,12 +290,18 @@ if __name__ == '__main__':
             # for the frequency var(k/n) = x (1 - x) / n
             n_all = mea * (1 - mea) / var
             
-            # NOTE: in practice, this has a huge error because some points are
-            # exactly on the diagonal, so we average the inverse and also take
-            # the medians as alternatives
-            n = 1.0 / (1.0 / n_all).mean()
-            ninv = n_all.mean()
-            nmed = np.median(n_all)
+            # NOTE: pseudocounts that come from the F4 dilution estimate, so we
+            # only listen to the data if there is enough data points to listen to
+            len_pseudo = 1
+            n_pseudo = sample.get_n_templates_dilutions()
+            n_allp = np.concatenate([n_all, ([n_pseudo] * len_pseudo)])
+
+            # NOTE: the estimate of n has a bad distribution because some points are
+            # exactly on the diagonal, so we average the inverse (which is well
+            # behaved) and also take the medians as alternatives
+            n = 1.0 / (1.0 / n_allp).mean()
+            ninv = n_allp.mean()
+            nmed = np.median(n_allp)
             if VERBOSE >= 2:
                 print fr1, fr2, n, ninv, nmed
 
@@ -179,116 +314,25 @@ if __name__ == '__main__':
             data['ninv'][key] = ninv
             data['nmed'][key] = nmed
 
-        if use_plot:
-            fig, axs = plt.subplots(1, 2, figsize=(13, 8))
-            ax = axs[0]
-            xmin = 1e-3
-            xpl = np.linspace(xmin, 1 - xmin, 1000)
-            ax.plot(xpl, xpl, lw=1.5, color='k')
 
-            for (fr1, fr2), (af1, af2) in data['af'].iteritems():
-                color = cm.jet(1.0 * int(fr1[1]) / 5)
+    if use_plot:
 
-                ax = axs[0]
-                ax.scatter(af1, af2,
-                           color=color,
-                           label='-'.join((fr1, fr2)))
-
-                # Plot the noise variance
-                n = data['n'][(fr1, fr2)]
-                std = np.sqrt(xpl * (1 - xpl) / n)
-
-                y1 = xpl + std
-                y2 = xpl - std
-                ax.plot(xpl, y1, color=color, lw=1)
-                ax.plot(xpl, y2, color=color, lw=1)
-
-                # Plot the variances
-                ax = axs[1]
-                ax.scatter(data['mean'][(fr1, fr2)], data['n_all'][(fr1, fr2)],
-                           color=color)
-                n = data['n'][(fr1, fr2)]
-                if not np.isnan(n):
-                    ax.plot(xpl, [n] * len(xpl), lw=1.5, ls='-',
-                            alpha=0.5,
-                            color=color)
-
-            ax = axs[0]
-            ax.grid(True)
-            ax.set_xscale('logit')
-            ax.set_yscale('logit')
-            ax.set_xlim(xmin, 1 - xmin)
-            ax.set_ylim(xmin, 1 - xmin)
-            ax.set_xlabel('leading fragment')
-            ax.set_ylabel('trailing fragment')
-            ax.set_title(samplename)
-
-            ax = axs[1]
-            ax.grid(True)
-            ax.set_xlabel('Average frequency')
-            ax.set_ylabel('x (1 - x) / var(x)')
-            ax.set_xscale('logit')
-            ax.set_yscale('log')
-            ax.set_xlim(xmin, 1 - xmin)
-            ax.set_ylim(ymin=1)
-
-
-            plt.tight_layout()
+        for samplename in samples.index:
+            plot_template_estimate(data, samplename, figaxs=None)
 
     if use_plot:
         plt.ion()
         plt.show()
 
 
+    if VERBOSE >= 2:
+        print 'Assign template numbers overlaps -> fragments'
+    M = assign_templates(data['n'], samples.index)
+
     if use_save:
         if VERBOSE >= 1:
             print 'Save results'
 
-        M = np.ma.masked_all((samples.shape[0], 6), int)
-        for isa, (samplename, sample) in enumerate(samples.iterrows()):
-            n_ov = [data['n'][(samplename, fr1, fr2)]
-                    if (samplename, fr1, fr2) in data['n'] else np.nan
-                    for (fr1, fr2) in overlaps]
-            n_ov = np.array(n_ov)
-
-            # FIXME: for now take a hierarchical approach, but we
-            # could exploit granularity of the SFS (10 templates don't produce
-            # frequencies of 0.01 reliably)
-
-            # Group into chains (because we have some nans i.e. missing data)
-            ind_grs = get_chain_indices_nonnan(n_ov)
-            for ind_gr in ind_grs:
-                
-                # Singletons are not very useful: both fragments have only that
-                # single overlap (either because on the other side there is a 
-                # nan, or nothing ( <-F1 and F6-> ).
-                if len(ind_gr) == 1:
-                    ind_gr = ind_gr.pop()
-                    M[isa, ind_gr: ind_gr + 2] = n_ov[ind_gr]
-                    continue
-
-                # Chains are better. If a fragment has 1+ overlaps with high n,
-                # it should have high n itself, so we resolve degeneracy this way:
-                # the highest n propagates left and right, and the other fragments
-                # are assigned what's left
-                # NOTE: this is kind of a strict rule, maybe we'd like to average a bit
-                i_frags_left = set(ind_gr) | set([max(ind_gr) + 1])
-                i_max = max(ind_gr, key=n_ov.__getitem__)
-
-                # First two fragments
-                M[isa, i_max: i_max + 2] = n_ov[i_max]
-                i_frags_left.remove(i_max)
-                i_frags_left.remove(i_max + 1)
-
-                # The other fragments
-                while (i_frags_left):
-                    i_frag = i_frags_left.pop()
-                    if i_frag < i_max:
-                        M[isa, i_frag] = n_ov[i_frag]
-                    else:
-                        M[isa, i_frag] = n_ov[i_frag - 1]
-
-        # Write output
         fn_out = get_ntemplates_by_fragment_filename()
         with open(fn_out, 'w') as f:
             sep = '\t'
