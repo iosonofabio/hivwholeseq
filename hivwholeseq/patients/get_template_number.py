@@ -32,7 +32,7 @@ def estimate_ntemplates_Poisson(dilution):
     '''Estimate number of templates from dilution info'''
     if np.isscalar(dilution):
         return np.nan
-    
+
     #TODO: finish this!
     if (dilution[1] == 1) and (dilution[2] == 2):
         return np.log(2) * dilution[0]
@@ -53,10 +53,17 @@ def estimate_ntemplates_Poisson(dilution):
 
 
 def get_template_number(dilstr):
-    '''Get the Poisson estimate for template numbers from dilutions'''
+    '''Get the Poisson estimate for template numbers from dilutions
+    
+    NOTE: for each fragment, we have TWO PCR reactions in parallel, but the
+          dilution series quantified the number of templates in EACH reaction,
+          so we multiply by two at the end of this function.
+
+          For instance, if we get 1:1000 (1/2), the Poisson estimate is 6500,
+          hence the number of templates is 13000 (it's actually an additional
+          layer of stochasticity, but the average over it is the same).
+    '''
     dilution = get_dilution(dilstr)
-    # NOTE: for each fragment, we have TWO PCR reactions in parallel, but the
-    # dilution series is based on ONE only (i.e. 1/12 of the 400 ul)
     n_templates =  2 * estimate_ntemplates_Poisson(dilution)
 
     return n_templates

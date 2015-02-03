@@ -124,9 +124,16 @@ def plot_template_estimate(data, samplename, figaxs=None):
                    color=color)
         n = data['n'][(samplename, fr1, fr2)]
         if not np.isnan(n):
-            ax.plot(xpl, [n] * len(xpl), lw=1.5, ls='-',
+            if data['nsites'][(samplename, fr1, fr2)] > 0:
+                ls = '-'
+            else:
+                ls = '--'
+
+            ax.plot(xpl, [n] * len(xpl),
+                    lw=1.5,
+                    ls=ls,
                     alpha=0.5,
-                            color=color)
+                    color=color)
 
             ax = axs[0]
             ax.grid(True)
@@ -150,7 +157,7 @@ def plot_template_estimate(data, samplename, figaxs=None):
             plt.tight_layout()
 
 
-def assign_templates(ns, samplenames):
+def assign_templates(ns, nsites, npseudos, samplenames):
     '''Assign template numbers to fragments from the overlaps'''
     from collections import defaultdict
     import numpy as np
@@ -158,17 +165,19 @@ def assign_templates(ns, samplenames):
     overlaps = zip(fragments[:-1], fragments[1:])
 
     ns = defaultdict(lambda: np.nan, ns)
+    nsites = defaultdict(int, nsites)
 
     M = np.ma.masked_all((len(samplenames), len(fragments)), int)
     for isa, samplename in enumerate(samplenames):
-        n_ov = [ns[(samplename, fr1, fr2)] for (fr1, fr2) in overlaps]
-        n_ov = np.array(n_ov)
+        n_ov = np.array([ns[(samplename, fr1, fr2)] for (fr1, fr2) in overlaps])
+        nsite_ov = np.array([nsites[(samplename, fr1, fr2)] for (fr1, fr2) in overlaps])
 
         # FIXME: for now take a hierarchical approach, but we
         # could exploit granularity of the SFS (10 templates don't produce
         # frequencies of 0.01 reliably)
 
-        # FIXME: we should provide error bars, because we often rely on few sites
+        # Keep track of which overlap contributes to which fragment
+        ind_fr_ov_track = {}
 
         # Group into chains (because we have some nans i.e. missing data)
         ind_grs = get_chain_indices_nonnan(n_ov)
@@ -180,6 +189,8 @@ def assign_templates(ns, samplenames):
             if len(ind_gr) == 1:
                 ind_gr = ind_gr.pop()
                 M[isa, ind_gr: ind_gr + 2] = n_ov[ind_gr]
+                ind_fr_ov_track[ind_gr] = ind_gr
+                ind_fr_ov_track[ind_gr + 1] = ind_gr
                 continue
 
             # Chains are better. If a fragment has 1+ overlaps with high n,
@@ -187,21 +198,88 @@ def assign_templates(ns, samplenames):
             # the highest n propagates left and right, and the other fragments
             # are assigned what's left
             # NOTE: this is kind of a strict rule, maybe we'd like to average a bit
-            i_frags_left = set(ind_gr) | set([max(ind_gr) + 1])
-            i_max = max(ind_gr, key=n_ov.__getitem__)
+            i_frags_remain = set(ind_gr) | set([max(ind_gr) + 1])
+
+            # Weigh the evidence with the number of informative sites, to cope
+            # with high estimates from pseudocounts. Because a binary decision is made,
+            # it is ok to use sharp criteria, so we require at least 3 informative
+            # sites to consider the fragment
+            inds_candidate = [i for i in ind_gr if nsite_ov[i] >= 3]
+            if not len(inds_candidate):
+                # These are early samples with no diversity, trust the dilutions,
+                # what can you do?
+                inds_candidate = [i for i in ind_gr if nsite_ov[i] >= 1]
+                if not len(inds_candidate):
+                    inds_candidate = ind_gr
+            
+            i_max = max(inds_candidate, key=n_ov.__getitem__)
 
             # First two fragments
             M[isa, i_max: i_max + 2] = n_ov[i_max]
-            i_frags_left.remove(i_max)
-            i_frags_left.remove(i_max + 1)
+            i_frags_remain.remove(i_max)
+            i_frags_remain.remove(i_max + 1)
+            ind_fr_ov_track[i_max] = i_max
+            ind_fr_ov_track[i_max + 1] = i_max
 
             # The other fragments
-            while (i_frags_left):
-                i_frag = i_frags_left.pop()
+            while (i_frags_remain):
+                i_frag = i_frags_remain.pop()
                 if i_frag < i_max:
-                    M[isa, i_frag] = n_ov[i_frag]
+                    i_ov = i_frag
                 else:
-                    M[isa, i_frag] = n_ov[i_frag - 1]
+                    i_ov = i_frag - 1
+                
+                M[isa, i_frag] = n_ov[i_ov]
+                ind_fr_ov_track[i_frag] = i_ov
+
+
+        # We need a cap for both missing fragments (because they have no overlaps,
+        # e.g. lone F6) and purely pseudocount based ones (F6 with conserved F5-F6)
+        needs_cap = M[isa].mask.any()
+        if not needs_cap:
+            for i_frag, i_ov in ind_fr_ov_track.iteritems():
+                if nsite_ov[i_ov] == 0:
+                    needs_cap = True
+                    break
+
+        if not needs_cap:
+            continue
+
+        # If an estimate is based purely on pseudocounts, take the min of itself
+        # and the highest non-pseudo
+        has_dilution = False
+        if (samplename in npseudos) and (not np.isnan(npseudos[samplename])):
+            npseudo = npseudos[samplename]
+            has_dilution = True
+
+        has_nonpseudo = False
+        for i_frag, i_ov in ind_fr_ov_track.iteritems():
+            if nsite_ov[i_ov] > 0:
+                has_nonpseudo = True
+                break
+
+        if has_nonpseudo:
+            nmax_nonpseudo = max([M[isa, i_frag]
+                                  for i_frag, i_ov in ind_fr_ov_track.iteritems()
+                                  if nsite_ov[i_ov] > 0])
+
+        if has_dilution and has_nonpseudo:
+            ncap = min(npseudo, nmax_nonpseudo)
+        elif has_dilution:
+            ncap = npseudo
+        elif has_nonpseudo:
+            ncap = nmax_nonpseudo
+        else:
+            continue
+
+        for i_frag in xrange(6):
+            if M.mask[isa, i_frag]:
+                M[isa, i_frag] = ncap
+                continue
+
+            i_ov = ind_fr_ov_track[i_frag]
+            if nsite_ov[i_ov] == 0:
+                M[isa, i_frag] = ncap
 
     return M
 
@@ -279,8 +357,6 @@ if __name__ == '__main__':
             afmin = 3e-3
             indfm = (af1 >= afmin) & (af1 <= 1 - afmin) & (af2 >= afmin) & (af2 <= 1 - afmin)
             nsites = len(np.unique(indfm.nonzero()[1]))
-            if VERBOSE >= 2:
-                print 'Number of doubly polymorphic sites:', nsites
 
             # Estimate the template number
             mea = 0.5 * (af1[indfm] + af2[indfm])
@@ -295,6 +371,9 @@ if __name__ == '__main__':
             len_pseudo = 1
             n_pseudo = sample.get_n_templates_dilutions()
             n_allp = np.concatenate([n_all, ([n_pseudo] * len_pseudo)])
+
+            if VERBOSE >= 2:
+                print 'Number of doubly polymorphic sites:', nsites, 'n_pseudo:', n_pseudo
 
             # NOTE: the estimate of n has a bad distribution because some points are
             # exactly on the diagonal, so we average the inverse (which is well
@@ -313,7 +392,8 @@ if __name__ == '__main__':
             data['n'][key] = n
             data['ninv'][key] = ninv
             data['nmed'][key] = nmed
-
+            data['nsites'][key] = nsites
+            data['npseudo'][samplename] = n_pseudo
 
     if use_plot:
 
@@ -327,7 +407,7 @@ if __name__ == '__main__':
 
     if VERBOSE >= 2:
         print 'Assign template numbers overlaps -> fragments'
-    M = assign_templates(data['n'], samples.index)
+    M = assign_templates(data['n'], data['nsites'], data['npseudo'], samples.index)
 
     if use_save:
         if VERBOSE >= 1:
@@ -341,7 +421,7 @@ if __name__ == '__main__':
                 row = [samplename]
                 for n in M[isa]:
                     if np.ma.is_masked(n):
-                        row.append('n.a.')
+                        row.append('NaN')
                     else:
                         row.append(str(n))
                 f.write(sep.join(row)+'\n')
