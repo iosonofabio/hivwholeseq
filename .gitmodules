@@ -3,4 +3,4 @@
 	url = olt:/ebio/ag-neher/share/users/rneher/nehercook
 [submodule "hivwholeseq/theory/betatree"]
 	path = hivwholeseq/theory/betatree
-	url = https://github.com/iosonofabio/betatree.git
+	url = git@github.com:iosonofabio/betatree.git
