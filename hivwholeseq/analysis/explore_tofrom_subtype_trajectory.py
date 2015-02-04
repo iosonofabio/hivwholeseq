@@ -17,83 +17,28 @@ from hivwholeseq.miseq import alphal
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.utils.argparse import RoiAction
 from hivwholeseq.reference import load_custom_reference, load_custom_alignment
+from hivwholeseq.cross_sectional.get_subtype_entropy import (
+    get_subtype_reference_alignment)
+
+
+# Globals
+refname = 'HXB2'
 
 
 
 # Functions
-def get_alignment_roi(refseq, positions, VERBOSE=0):
-    '''Get the alignment corresponding to the coordinates specified
-    
-    Alignments are much more solid if done gene-by-gene.
-    '''
-    refname = refseq.name
-    start = positions.min()
-    end = positions.max() + 1
-
-    # Check all genes
-    for fea in refseq.features:
-        feaname = fea.id
-
-        if VERBOSE >= 3:
-            print 'Trying', feaname,
-
-        # Check for overlap with our roi (assume only one is good)
-        # FIXME: deal with exons
-        if feaname in ('tat', 'rev'):
-            if VERBOSE >= 3:
-                print 'not implemented'
-            continue
-
-        fea_start = fea.location.nofuzzy_start
-        fea_end = fea.location.nofuzzy_end
-        # Full coverage
-        if (fea_start <= start) and (fea_end >= end):
-            ali = load_custom_alignment('HIV1_FLT_2011_'+feaname+'_DNA_subB')
-
-            if VERBOSE >= 3:
-                print 'gotcha!'
-
-            break
-
-        if VERBOSE >= 3:
-            print 'not good.'
-
-
-        # TODO: implement partial coverage and missing files
-
-    else:
-        raise ValueError('No appropriate genes found for this ROI.')
-
-    # Delete alignment columns that are absent from the chosen reference 
-    # the reference must be part of the ali
-    for seq in ali:
-        if refname in seq.id:
-            break
-    else:
-        raise ValueError('Reference not found in the alignment')
-
-    seqm = np.array(seq, 'S1')
-    ind_nongap = (seqm != '-').nonzero()[0]
-    mapcoref = np.vstack([fea_start + np.arange(len(ind_nongap)),
-                          ind_nongap]).T
-
-    mapcoref = mapcoref[positions - fea_start]
-
-    alim = np.array(ali, 'S1')[:, mapcoref[:, 1]]
-
-    return alim
 
 
 
 # Script
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(description='Distance btw patient and subtype',
+    parser = argparse.ArgumentParser(description='Mutations away from/towards subtype',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     parser.add_argument('--patients', nargs='+',
                         help='Patients to analyze')
-    parser.add_argument('--roi', action=RoiAction, required=True,
-                        help='Region of Interest (e.g. F1 100 200)')
+    parser.add_argument('--regions', nargs='+', required=True,
+                        help='Genomic regions (e.g. V3 IN)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-4]')
     parser.add_argument('--plot', action='store_true',
@@ -101,7 +46,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     pnames = args.patients
-    roi = args.roi
+    regions = args.regions
     VERBOSE = args.verbose
     use_plot = args.plot
 
@@ -109,13 +54,20 @@ if __name__ == '__main__':
     if pnames is not None:
         patients = patients.loc[pnames]
     
-    refname = 'HXB2'
-    refseq = load_custom_reference(refname, 'gb')
-    refseq.name = refname
-    refm = np.array(refseq)
 
-    (fragment, roi_start, roi_end) = roi
-    ali = None
+    for region in regions:
+
+        # Load HXB2
+        refseq = load_custom_reference(refname, 'gb', region=region)
+        refseq.name = refname
+        refm = np.array(refseq)
+
+        # Load subtype alignment
+        ali = get_subtype_reference_alignment(region)
+
+    # FIXME
+    sys.exit()
+
 
     plot_data = defaultdict(list)
     for pname, patient in patients.iterrows():

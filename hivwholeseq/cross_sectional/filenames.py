@@ -16,34 +16,46 @@ def get_subtype_reference_alignment_filename(region, subtype='B',
                                              VERBOSE=0):
     '''Get the filename of a subtype reference alignment'''
     tree_ali_foldername = reference_folder+'alignments/pairwise_to_'+refname+'/'
-    ali_fn = tree_ali_foldername+region+'.'+subtype+'.'+type+'.aligned.fasta'
+    fn = tree_ali_foldername+region+'.'+subtype+'.'+type+'.aligned.fasta'
     if VERBOSE >= 3:
-        print 'Alignment file:', ali_fn
-    return ali_fn
+        print 'Alignment file:', fn
+    return fn
+
+
+def get_subtype_reference_alignment_allele_frequencies_filename(region, subtype='B',
+                                                                refname='HXB2',
+                                                                type='nuc',
+                                                                VERBOSE=0):
+    '''Get the filename of a subtype reference alignment allele frequencies'''
+    tree_ali_foldername = reference_folder+'alignments/pairwise_to_'+refname+'/'
+    fn = tree_ali_foldername+region+'.'+subtype+'.'+type+'.aligned_afs.npy'
+    if VERBOSE >= 3:
+        print 'Afs file:', fn
+    return fn
 
 
 def get_subtype_reference_alignment_entropy_filename(region, subtype='B',
                                                      refname='HXB2',
                                                      type='nuc',
                                                      VERBOSE=0):
-    '''Get the filename of a subtype reference alignment'''
+    '''Get the filename of a subtype reference alignment entropy'''
     tree_ali_foldername = reference_folder+'alignments/pairwise_to_'+refname+'/'
-    ali_fn = tree_ali_foldername+region+'.'+subtype+'.'+type+'.aligned_entropy.npy'
+    fn = tree_ali_foldername+region+'.'+subtype+'.'+type+'.aligned_entropy.npy'
     if VERBOSE >= 3:
-        print 'Entropy file:', ali_fn
-    return ali_fn
+        print 'Entropy file:', fn
+    return fn
 
 
 def get_subtype_reference_alignment_entropy_syn_filename(region, subtype='B',
                                                      refname='HXB2',
                                                      type='nuc',
                                                      VERBOSE=0):
-    '''Get the filename of a subtype reference alignment'''
+    '''Get the filename of a subtype reference alignment syn entropy'''
     tree_ali_foldername = reference_folder+'alignments/pairwise_to_'+refname+'/'
-    ali_fn = tree_ali_foldername+region+'.'+subtype+'.'+type+'.aligned_entropy_syn.pickle'
+    fn = tree_ali_foldername+region+'.'+subtype+'.'+type+'.aligned_entropy_syn.pickle'
     if VERBOSE >= 3:
-        print 'Entropy file:', ali_fn
-    return ali_fn
+        print 'Entropy file:', fn
+    return fn
 
 
 def get_raw_LANL_sequences_filename(region):
