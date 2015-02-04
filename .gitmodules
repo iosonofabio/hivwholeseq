@@ -1,3 +1,6 @@
 [submodule "hivwholeseq/utils/nehercook"]
 	path = hivwholeseq/utils/nehercook
 	url = olt:/ebio/ag-neher/share/users/rneher/nehercook
+[submodule "hivwholeseq/theory/betatree"]
+	path = hivwholeseq/theory/betatree
+	url = https://github.com/iosonofabio/betatree.git
