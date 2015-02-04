@@ -13,12 +13,12 @@ import numpy as np
 from matplotlib import cm
 import matplotlib.pyplot as plt
 
-from hivwholeseq.miseq import alphal
+from hivwholeseq.miseq import alphal, alpha
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.utils.argparse import RoiAction
 from hivwholeseq.reference import load_custom_reference, load_custom_alignment
-from hivwholeseq.cross_sectional.get_subtype_entropy import (
-    get_subtype_reference_alignment)
+from hivwholeseq.cross_sectional.get_subtype_allele_frequencies import (
+    get_subtype_reference_alignment_allele_frequencies)
 
 
 # Globals
@@ -27,6 +27,23 @@ refname = 'HXB2'
 
 
 # Functions
+def trim_comap(comap, ref1, ref2, VERBOSE=0):
+    '''Trim comap to relevant region'''
+    from seqanpy import align_overlap
+
+    (score, ali1, ali2) = align_overlap(ref1, ref2, score_gapopen=-20)
+    start = len(ali2) - len(ali2.lstrip('-'))
+    end = len(ali2.rstrip('-'))
+
+    if VERBOSE >= 3:
+        from hivwholeseq.utils.sequence import pretty_print_pairwise_ali
+        pretty_print_pairwise_ali((ali1, ali2), width=100, name1='pat', name2='ali')
+
+    ind = (comap[:, 1] >= start) & (comap[:, 1] < end)
+    comap = comap[ind]
+    comap[:, 0] -= start
+
+    return comap
 
 
 
@@ -56,88 +73,50 @@ if __name__ == '__main__':
     
 
     for region in regions:
+        if VERBOSE >= 1:
+            print region
 
         # Load HXB2
-        refseq = load_custom_reference(refname, 'gb', region=region)
+        refseq = load_custom_reference(refname, 'gb')
         refseq.name = refname
         refm = np.array(refseq)
 
         # Load subtype alignment
-        ali = get_subtype_reference_alignment(region)
-
-    # FIXME
-    sys.exit()
+        afs = get_subtype_reference_alignment_allele_frequencies(region)
 
 
-    plot_data = defaultdict(list)
-    for pname, patient in patients.iterrows():
-        patient = Patient(patient)
+        for pname, patient in patients.iterrows():
+            patient = Patient(patient)
 
-        if VERBOSE >= 1:
-            print pname
+            if VERBOSE >= 1:
+                print region, pname
 
-        # Find fragment start in reference
-        from hivwholeseq.genome_info import find_region_edges
-        patseq = patient.get_reference(fragment)
-        edges = [str(patseq.seq[:20]), str(patseq.seq[-20:])]
-        (frag_start, frag_end) = find_region_edges(refm, edges)
+            comap = patient.get_map_coordinates_reference(region,
+                                                          refname=(refname, region))
+
+            aft, ind = patient.get_allele_frequency_trajectories(region)
+            
+            # Sometimes the alignment is trimmed
+            comap = trim_comap(comap, alpha[aft[0].argmax(axis=0)], alpha[afs.argmax(axis=0)],
+                               VERBOSE=VERBOSE)
+
+            afsp = afs[:, comap[:, 0]]
+            aft = aft[:, :, comap[:, 1]]
+
+            # First, check the fraction of sites for which initial consensus = subtype consensus
+            consi = aft[0].argmax(axis=0)
+            conss = afsp.argmax(axis=0)
+            print 'Fraction of sites at which patient initial consensus agrees with subtype:',
+            print '{:2.0%}'.format((consi == conss).mean())
+
+            # Check at the end
+            consf = aft[-1].argmax(axis=0)
+            print 'Fraction of sites at which patient final consensus agrees with subtype:',
+            print '{:2.0%}'.format((consf == conss).mean())
+
+            # FIXME
+            sys.exit()
 
 
-        mapco = patient.get_map_coordinates_reference(fragment, refname=refname,
-                                                      roi=roi[1:])
 
-        # Patient afts
-        (aft, ind) = patient.get_allele_frequency_trajectories(fragment)
-        aft = aft[:, :4, mapco[:, 1]]
-
-        # Subtype B MSA and afs
-        ali = get_alignment_roi(refseq,
-                                mapco[:, 0],
-                                VERBOSE=VERBOSE)
-        af = np.vstack([(ali == alpha).mean(axis=0) for alpha in alphal[:4]])
-
-        # FIXME: do better at gaps
-
-        # Calculate distance, e.g. Kullback-Leilbler divergence: it is not symmetric
-        # but neither is our data
-        divKL = (af * np.log((af + 1e-6) / (aft + 1e-6))).sum(axis=1).sum(axis=1)
-        divKLinv = (aft * np.log((aft + 1e-6) / (af + 1e-6))).sum(axis=1).sum(axis=1)
-
-        times = patient.times[ind]
-
-        plot_data['divKL'].append((pname, times, divKL))
-        plot_data['divKLinv'].append((pname, times, divKL))
-
-    if use_plot:
-        # div KL
-        fig, ax = plt.subplots()
-        ax.set_xlabel('Time from infection [days]')
-        ax.set_ylabel('$D_{KL}($subtype B$ || $patient$)$', fontsize=18)
-        
-        for i, (pname, x, y) in enumerate(plot_data['divKL']):
-            ax.plot(x, y, lw=2, label=pname,
-                    color=cm.jet(1.0 * i / len(plot_data['divKL'])))
-        
-        ax.legend(loc=1, title='Patient:', fontsize=12)
-        ax.set_title(' '.join(map(str, roi)))
-        ax.grid(True)
-        plt.tight_layout()
-
-        # div KL inverse
-        fig, ax = plt.subplots()
-        ax.set_xlabel('Time from infection [days]')
-        ax.set_ylabel('$D_{KL}($patient$ || $subtype B$)$', fontsize=18)
-        
-        for i, (pname, x, y) in enumerate(plot_data['divKLinv']):
-            ax.plot(x, y, lw=2, label=pname,
-                    color=cm.jet(1.0 * i / len(plot_data['divKLinv'])))
-        
-        ax.legend(loc=1, title='Patient:')
-        ax.set_title(' '.join(map(str, roi)))
-        ax.grid(True)
-        plt.tight_layout()
-
-        
-        plt.ion()
-        plt.show()
 

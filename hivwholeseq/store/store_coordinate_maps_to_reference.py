@@ -23,14 +23,15 @@ from hivwholeseq.patients.filenames import get_initial_reference_filename, \
 
 
 # Function
-def build_coordinate_map(refseq, patseq, VERBOSE=0, **kwargs):
+def build_coordinate_map(refseq, patseq, VERBOSE=0, score_gapopen=-20, **kwargs):
     '''Build the coordinate map
     
     Parameters
       **kwargs: passed to alignment function (e.g. alignment penalties)
     '''
-    from seqanpy import align_overlap
-    (score, ali1, ali2) = align_overlap(refseq, patseq, **kwargs)
+    from seqanpy import align_global
+    (score, ali1, ali2) = align_global(refseq, patseq, score_gapopen=score_gapopen,
+                                       **kwargs)
     patseq_start = len(ali2) - len(ali2.lstrip('-'))
     patseq_end = len(ali2.rstrip('-'))
 
@@ -57,6 +58,17 @@ def build_coordinate_map(refseq, patseq, VERBOSE=0, **kwargs):
             pos_ini += 1
 
     return mapbi
+
+
+def shift_mapco(mapco, refname, region):
+    '''Shift coordinate map to the beginning of the reference sequence'''
+    from hivwholeseq.reference import load_custom_reference
+    refseq = load_custom_reference(refname, format='gb')
+    for feature in refseq.features:
+        if feature.id == region:
+            startref = feature.location.nofuzzy_start
+            mapco[:, 0] += startref
+            break
 
 
 
@@ -107,16 +119,18 @@ if __name__ == '__main__':
             if VERBOSE >= 1:
                 print pname, region
 
-            refseq = load_custom_reference(refname)
+            refseq = load_custom_reference(refname, format='gb', region=region)
             patseq = patient.get_reference(region)
 
             mapco = build_coordinate_map(refseq, patseq, VERBOSE=VERBOSE)
+            mapco = np.array(mapco, int)
+            shift_mapco(mapco, refname, region)
 
             maps_coord[(region, pname)] = mapco 
 
             if save_to_file:
                 out_fn = get_coordinate_map_filename(pname, region, refname=refname)
-                np.savetxt(out_fn, np.array(mapco, int), fmt='%d',
+                np.savetxt(out_fn, mapco, fmt='%d',
                            delimiter='\t',
                            header=refname+'\t'+pname+'_'+region)
                 if VERBOSE:

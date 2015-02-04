@@ -102,9 +102,9 @@ if __name__ == '__main__':
             if VERBOSE >= 2:
                 print 'Compute allele frequencies'
             if alitype == 'nuc':
-                alphabet = alpha[:4]
+                alphabet = alpha
             else:
-                alphabet = alphaa[:-3]
+                alphabet = alphaa
 
             afs = get_ali_allele_frequencies(ali, alpha=alphabet, VERBOSE=VERBOSE)
 

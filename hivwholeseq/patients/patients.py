@@ -459,9 +459,14 @@ class Patient(pd.Series):
 
     def get_map_coordinates_reference(self, roi, refname='HXB2'):
         '''Get the map of coordinate to some external reference
+
+        Parameters:
+          refname (string or (string, string)): name of the reference or pair with
+            both the reference name and the region name. The latter version shifts
+            the reference coordinate with respect to the region start
         
         Returns:
-          mapco (2D int array): the first column are the positions in the reference,
+          comap (2D int array): the first column are the positions in the reference,
             the second column the position in the patient initial reference. 
         '''
         if isinstance(roi, basestring):
@@ -469,8 +474,23 @@ class Patient(pd.Series):
         else:
             region = roi[0]
 
+        if not isinstance(refname, basestring):
+            refregion = refname[1]
+            refname = refname[0]
+        else:
+            refregion = None
+
         fn = self.get_map_coordinates_reference_filename(region, refname=refname)
         mapco = np.loadtxt(fn, dtype=int)
+
+        if refregion is not None:
+            from ..reference import load_custom_reference
+            refseq = load_custom_reference(refname, 'gb')
+            for feature in refseq.features:
+                if feature.id == refregion:
+                    startref = feature.location.nofuzzy_start
+                    mapco[:, 0] -= startref
+                    break
 
         if isinstance(roi, basestring):
             return mapco
