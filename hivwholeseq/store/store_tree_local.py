@@ -2,7 +2,7 @@
 '''
 author:     Fabio Zanini
 date:       11/12/14
-content:    Check the V3 alignment in p4/15313, as it looks weird.
+content:    Store phylogenetic tree of local haplotypes/consensi.
 '''
 # Modules
 import os
@@ -217,7 +217,7 @@ if __name__ == '__main__':
             tree = patient.get_local_tree(region)
 
         else:
-            if VERBOSE >= 1:
+            if VERBOSE >= 2:
                 print 'Get haplotypes'
             try:
                 region = roi[0]
@@ -242,11 +242,11 @@ if __name__ == '__main__':
 
             times = patient.times[ind]
 
-            if VERBOSE >= 1:
+            if VERBOSE >= 2:
                 print 'Align sequences'
             ali = align_muscle(*seqs, sort=True)
 
-            if VERBOSE >= 1:
+            if VERBOSE >= 2:
                 print 'Build local tree'
             tree = build_tree_fasttree(ali, VERBOSE=VERBOSE)
 
@@ -257,6 +257,8 @@ if __name__ == '__main__':
             a.calc_ancestral_sequences()
             a.cleanup_tree()
 
+            if VERBOSE >= 2:
+                print 'Duplicate tree leaves'
             expand_duplicates_annotate_tree(tree, htf, times,
                                             map(''.join, ali),
                                             minfreq=0.01)

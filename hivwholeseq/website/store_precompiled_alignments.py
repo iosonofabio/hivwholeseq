@@ -121,7 +121,6 @@ if __name__ == '__main__':
         for region in regions:
             print patient.code, patient.name, region
 
-            # Compute alignments
             print 'Get haplotypes'
             haplos = patient.get_local_haplotype_trajectories(region, 0, '+oo',
                                                               filters='nosingletons')

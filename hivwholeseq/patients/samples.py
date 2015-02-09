@@ -206,6 +206,15 @@ class SamplePat(pd.Series):
                 hnames = [hname for hname in haplo.iterkeys() if 'N' in hname]
                 for hname in hnames:
                     del haplo[hname]
+
+            if any('mincount=' in ft for ft in filters):
+                for ft in filters:
+                    if 'mincount=' in ft:
+                        break
+                cmin = int(ft[len('mincount='):])
+                hnames = [hname for hname, c in haplo.iteritems() if c < cmin]
+                for hname in hnames:
+                    del haplo[hname]
             
             if 'nosingletons' in filters:
                 hnames = [hname for hname, c in haplo.iteritems() if c <= 1]

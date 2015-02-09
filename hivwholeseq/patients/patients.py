@@ -529,7 +529,7 @@ class Patient(pd.Series):
         return (haplos, ind)
 
 
-    def get_local_haplotype_count_trajectories(self, fragment, start, end, VERBOSE=0,
+    def get_local_haplotype_count_trajectories(self, fragment, start=0, end='+oo', VERBOSE=0,
                                                **kwargs):
         '''Get trajectories of local haplotypes counts'''
         (haplos, ind) = self.get_local_haplotype_trajectories(fragment,
@@ -550,10 +550,21 @@ class Patient(pd.Series):
         return (hct.T, ind, seqs_set)
 
     
-    def get_region_count_trajectories(self, region, VERBOSE=0, **kwargs):
-        '''Get trajectories of local haplotypes in a precompiled region'''
-        from .get_tree_local import get_region_count_trajectories
-        return get_region_count_trajectories(self, region, VERBOSE=VERBOSE)
+    def get_haplotype_count_trajectory_filename(self, region):
+        '''Get filename of the haplotype trajectory in a genomic region'''
+        from .filenames import get_haplotype_count_trajectory_filename
+        return get_haplotype_count_trajectory_filename(self.name, region)
+
+
+    def get_haplotype_count_trajectory(self, region, aligned=True):
+        '''Get precompiled haplotype trajectory in a genomic region'''
+        import numpy as np
+        data = np.load(self.get_haplotype_count_trajectory_filename(region))
+        if aligned:
+            return (data['hct'], data['ind'], data['ali'])
+        else:
+            return (data['hct'], data['ind'], data['seqs'])
+
 
 
 
