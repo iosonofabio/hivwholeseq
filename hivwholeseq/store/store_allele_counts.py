@@ -32,7 +32,7 @@ if __name__ == '__main__':
                                  help='Patient to analyze')
     pats_or_samples.add_argument('--samples', nargs='+',
                                  help='Samples to analyze (e.g. VL98-1253 VK03-4298)')
-    parser.add_argument('--regions', nargs='+',
+    parser.add_argument('--fragments', nargs='+',
                         help='Fragments to analyze (e.g. F1 F6)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-4]')

@@ -10,6 +10,7 @@ import os, sys
 import argparse
 from collections import defaultdict
 import numpy as np
+import pandas as pd
 from matplotlib import cm
 import matplotlib.pyplot as plt
 
@@ -23,6 +24,7 @@ from hivwholeseq.cross_sectional.get_subtype_allele_frequencies import (
 
 # Globals
 refname = 'HXB2'
+Sbins = [0, 0.05, 0.2, 0.5, 2]
 
 
 
@@ -58,7 +60,7 @@ if __name__ == '__main__':
                         help='Genomic regions (e.g. V3 IN)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-4]')
-    parser.add_argument('--plot', action='store_true',
+    parser.add_argument('--plot', type=int, default=0,
                         help='Plot results')
 
     args = parser.parse_args()
@@ -72,6 +74,7 @@ if __name__ == '__main__':
         patients = patients.loc[pnames]
     
 
+    data = []
     for region in regions:
         if VERBOSE >= 1:
             print region
@@ -103,6 +106,10 @@ if __name__ == '__main__':
             afsp = afs[:, comap[:, 0]]
             aft = aft[:, :, comap[:, 1]]
 
+            # NOTE: ignore gaps for now
+            afsp = afsp[:4]
+            aft = aft[:, :4]
+
             # First, check the fraction of sites for which initial consensus = subtype consensus
             consi = aft[0].argmax(axis=0)
             conss = afsp.argmax(axis=0)
@@ -114,9 +121,121 @@ if __name__ == '__main__':
             print 'Fraction of sites at which patient final consensus agrees with subtype:',
             print '{:2.0%}'.format((consf == conss).mean())
 
-            # FIXME
-            sys.exit()
+            # Classify mutations in away/towards
+            mclass = np.ma.masked_all(afsp.shape, 'S5')
+            for ia in xrange(mclass.shape[0]):
+                # From B
+                ipos = (consi != ia) & (consi == conss)
+                mclass[ia, ipos] = 'fromB'
+
+                # To B
+                ipos = (consi != ia) & (conss == ia)
+                mclass[ia, ipos] = 'toB'
+
+            aft_fromB = aft[:, mclass == 'fromB']
+            aft_toB = aft[:, mclass == 'toB']
+
+            if use_plot >= 2:
+                fig, ax = plt.subplots()
+
+                ax.plot(patient.times[ind], aft_fromB.mean(axis=1),
+                        lw=2,
+                        label='fromB')
+                ax.plot(patient.times[ind], aft_toB.mean(axis=1),
+                        lw=2,
+                        label='toB')
+
+                ax.set_xlabel('Time [days from infection]')
+                ax.set_ylabel('Allele frequency')
+
+                ax.grid(True)
+                ax.legend(loc=2, fontsize=12)
+                ax.set_title(pname+', '+region)
+                
+                plt.tight_layout()
+
+            
+            # Classify by entropy in the subtype
+            from hivwholeseq.one_site_statistics import get_entropy
+            S = get_entropy(afsp)
+
+            # Add to global data structure
+            for key in ('fromB', 'toB'):
+                for ibin in xrange(len(Sbins) - 1):
+                    pos = (S >= Sbins[ibin]) & (S < Sbins[ibin + 1])
+                    posM = np.tile(pos, (afsp.shape[0], 1))
+                    posM &= mclass == key
+
+                    for it, t in enumerate(patient.times[ind]):
+                        for ia, pos in zip(*(posM.nonzero())):
+
+                            data.append((region, pname, key, ibin, ia, pos, t, aft[it, ia, pos]))
 
 
 
+    data = pd.DataFrame(data=data,
+                        columns=('region', 'patient', 'mclass', 'ibin', 'inuc', 'pos', 'time', 'af'))
+
+
+    if use_plot:
+        fig, ax = plt.subplots()
+        marker = {'fromB': 'o', 'toB': 's'}
+        ls = {'fromB': '--', 'toB': '-'}
+        for key in ('toB', 'fromB'):
+            for ibin in xrange(len(Sbins) - 1):
+                color = cm.jet(1.0 * ibin / (len(Sbins) - 1))
+                datum = (data.loc[(data['mclass'] == key) & (data['ibin'] == ibin)]
+                         .loc[:, ['time', 'af']]
+                         .groupby('time')
+                         .mean())['af']
+
+                x = np.array(datum.index)
+                y = np.array(datum)
+
+                # Multiply the fromB by 3, because entropy mostly refer to a 2 state model
+                if key == 'fromB':
+                    y *= 3
+
+                ax.scatter(x, y,
+                           s=40,
+                           lw=2,
+                           marker=marker[key],
+                           color=color,
+                           label=key+', S e ['+str(Sbins[ibin])+', '+str(Sbins[ibin+1])+']')
+
+                xfit = np.linspace(0, x.max(), 1000)
+
+                # Fit linear increase
+                m = np.dot(x, y) / np.dot(x, x)
+                yfit = m * xfit
+                
+                # Fit exponential saturation
+                from scipy.optimize import curve_fit
+                fun = lambda x, l, u: l * (1 - np.exp(- u * x))
+                l, u = curve_fit(fun, x, y, p0=(0.01, 0.001))[0]
+                yfit = fun(xfit, l, u)
+
+                ax.plot(xfit, yfit,
+                        ls=ls[key],
+                        lw=2,
+                        alpha=0.5,
+                        color=color)
+
+
+        ax.set_xlabel('Time [days from infection]')
+        ax.set_ylabel('Allele frequency')
+
+        ax.grid(True)
+        #ax.legend(loc=2, fontsize=12)
+        ax.set_yscale('log')
+        ax.set_ylim(1e-4, 1)
+
+        if len(regions) == 1:
+            ax.set_title(region)
+        
+        plt.tight_layout()
+
+    if use_plot:
+        plt.ion()
+        plt.show()
 

@@ -39,7 +39,8 @@ def align_muscle(*seqs, **kwargs):
         from Bio.SeqRecord import SeqRecord
         from Bio.Alphabet import single_letter_alphabet
         seqs = [SeqRecord(Seq(s, single_letter_alphabet),
-                          id='seq'+str(i+1), name='seq'+str(i+1),
+                          id='seq'+str(i+1),
+                          name='seq'+str(i+1),
                           description='seq'+str(i+1))
                 for i, s in enumerate(seqs)]
 

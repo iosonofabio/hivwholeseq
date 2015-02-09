@@ -50,7 +50,9 @@ CHECKPOINT: check initial reference for genes and length (check_initial_referenc
 2. merge various repetitions of the sequencing and filter away unmapped and similia
    (filter_mapped_reads.py)
 
-3. decontaminate reads using all sample and reference consensi (decontaminate_reads.py)
+(3. need to build raw consensus here)
+
+4. decontaminate reads using all sample and reference consensi (decontaminate_reads.py)
 
 
 -------------------------------------------------------------------------------
