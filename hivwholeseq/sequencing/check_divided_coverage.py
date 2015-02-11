@@ -106,7 +106,7 @@ def check_division(data_folder, adaID, fragment, seq_run, qual_min=35,
 if __name__ == '__main__':
 
     # Parse input args
-    parser = argparse.ArgumentParser(description='Check consensus',
+    parser = argparse.ArgumentParser(description='Check coverage of divided reads',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     runs_or_samples = parser.add_mutually_exclusive_group(required=True)
     runs_or_samples.add_argument('--runs', nargs='+',

@@ -89,8 +89,12 @@ def annotate_sequence(seqrecord, additional_edges={}, VERBOSE=0):
                     pos_edge = find_region_edges(smat, edges)
 
                 # Cut the primers for some features
-                if (None not in pos_edge) and name in ['V3']:
+                if (None not in pos_edge) and name in ['V1', 'V3', 'V4', 'V5']:
                     pos_edge[0] += len(edges[0])
+                    pos_edge[1] -= len(edges[1])
+
+                # Cut only the right primer for V2
+                if (None not in pos_edge) and name in ['V2']:
                     pos_edge[1] -= len(edges[1])
 
                 if pos_edge[0] is None:

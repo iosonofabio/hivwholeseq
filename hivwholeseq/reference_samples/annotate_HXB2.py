@@ -43,7 +43,12 @@ coordinates = {'gene': {'gag': [(789, 2292)],
                                  "LTR3'": [(9085, 9719)],
                                  'RRE': None,
                                 },
-               'other': {'V3': None,
+               'other': {'V1': [(6614, 6692)],
+                         'V2': [(6692, 6812)],
+                         # For V3 Jan wants a specific chunk
+                         'V3': None,
+                         'V4': [(7376, 7478)],
+                         'V5': [(7601, 7634)],
                          'psi': None,
                          'env peptide': None},
               }

@@ -60,11 +60,27 @@ RNA_structure_edges = {'RRE': RRE_edges,
 # Edges of other regions
 env_peptide_edges = ['ATGAGAGTGAAGGAGAA', 'GCTCCTTGGGATGTTGATGATCTGTAGTGCT']
 psi_element = ['CTCGGCTTGCT', 'AGCGGAGGCTAG']
+# V1, V3, V4, and V5 actually start INSIDE these primers
+V1_edges = ['AANCCATGTGTAAAANTAACNCCACTNTGTGTNANTTTANAN',
+            'TGCTCTTTCAATNTCANCNCANNNNTAANA']
 V3_edges = ['ACAATGYACACATGGAATTARGCCA', rc('AGAAAAATTCYCCTCYACAATTAAA')]
+V4_edges = ['TTGTAANGCACANTTTTAATTGTGGAGGGGAATTTTTCTAC',
+            'AGAATAANACAAATTNTAAACANGTGGCAGNAAGTAGGA']
+V5_edges = ['ATCAAATATTACAGGGNTNNTAACAAGAGATGGNGGN', 'GNAGGAGGANATATGANGGANAATTGGAGAAGT']
+# V2 is particular: from the left it starts right there, from the right it ends
+# INSIDE this primer
+V2_edges = ['TGCTCTTTCAATNTCANCNCANNNNTAANA',
+            'AANACCTCANTCATTACACANGCNTGTCCAAANNTATCCTTTGANCCAATTCC']
+
 
 other_edges = {'env peptide': env_peptide_edges,
                'psi': psi_element,
-               'V3': V3_edges}
+               'V1': V1_edges,
+               'V2': V2_edges,
+               'V3': V3_edges,
+               'V5': V5_edges,
+               'V4': V4_edges,
+              }
 
 
 # All edges

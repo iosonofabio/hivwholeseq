@@ -7,7 +7,7 @@ content:    Module containing basic paths for the whole analysis.
 # Modules
 import os
 
-import hivwholeseq
+import hivwholeseq as self
 
 
 # Globals
@@ -31,7 +31,7 @@ else:
 
 reference_folder = root_data_folder+'reference/'
 theory_folder = root_data_folder+'theory/'
-table_folder = hivwholeseq.__path__[0] + '/tables/'
+table_folder = self.__path__[0] + '/tables/'
 table_filename = table_folder+'HIV_reservoir_all.xlsx'
 
 
