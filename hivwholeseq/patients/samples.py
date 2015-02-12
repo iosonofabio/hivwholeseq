@@ -226,7 +226,7 @@ class SamplePat(pd.Series):
 
 
 # Functions
-def load_samples_sequenced(patients=None, include_wrong=False):
+def load_samples_sequenced(patients=None, include_wrong=False, include_cell=False):
     '''Load patient samples sequenced from general table'''
     sample_table = pd.read_excel(table_filename, 'Samples timeline sequenced',
                                  index_col=0)
@@ -240,6 +240,9 @@ def load_samples_sequenced(patients=None, include_wrong=False):
     if not include_wrong:
         sample_table = sample_table.loc[sample_table.loc[:, 'wrong'] != 'x']
         del sample_table['wrong']
+
+    if not include_cell:
+        sample_table = sample_table.loc[sample_table.loc[:, 'sample type'] == 'RNA']
 
     if patients is not None:
         sample_table = sample_table.loc[sample_table.loc[:, 'patient'].isin(patients)]

@@ -34,6 +34,7 @@ def trim_comap(comap, ref1, ref2, VERBOSE=0):
     from seqanpy import align_overlap
 
     (score, ali1, ali2) = align_overlap(ref1, ref2, score_gapopen=-20)
+    # Start/end of subtype alignment
     start = len(ali2) - len(ali2.lstrip('-'))
     end = len(ali2.rstrip('-'))
 
@@ -41,7 +42,8 @@ def trim_comap(comap, ref1, ref2, VERBOSE=0):
         from hivwholeseq.utils.sequence import pretty_print_pairwise_ali
         pretty_print_pairwise_ali((ali1, ali2), width=100, name1='pat', name2='ali')
 
-    ind = (comap[:, 1] >= start) & (comap[:, 1] < end)
+    #FIXME: is this correct?
+    ind = (comap[:, 0] >= start) & (comap[:, 0] < end)
     comap = comap[ind]
     comap[:, 0] -= start
 
@@ -169,16 +171,21 @@ if __name__ == '__main__':
                     for it, t in enumerate(patient.times[ind]):
                         for ia, pos in zip(*(posM.nonzero())):
 
-                            data.append((region, pname, key, ibin, ia, pos, t, aft[it, ia, pos]))
+                            # Skip masked alleles
+                            if aft.mask[it, ia, pos]:
+                                continue
+
+                            af = aft[it, ia, pos]
+                            data.append((region, pname, key, ibin, ia, pos, t, af))
 
 
 
-    data = pd.DataFrame(data=data,
+    data = pd.DataFrame.from_records(data=data,
                         columns=('region', 'patient', 'mclass', 'ibin', 'inuc', 'pos', 'time', 'af'))
 
 
     if use_plot:
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=(10, 7))
         marker = {'fromB': 'o', 'toB': 's'}
         ls = {'fromB': '--', 'toB': '-'}
         for key in ('toB', 'fromB'):
@@ -197,11 +204,12 @@ if __name__ == '__main__':
                     y *= 3
 
                 ax.scatter(x, y,
-                           s=40,
+                           s=10,
                            lw=2,
                            marker=marker[key],
                            color=color,
-                           label=key+', S e ['+str(Sbins[ibin])+', '+str(Sbins[ibin+1])+']')
+                           label=key+', S e ['+str(Sbins[ibin])+', '+str(Sbins[ibin+1])+']',
+                          )
 
                 xfit = np.linspace(0, x.max(), 1000)
 
@@ -211,14 +219,28 @@ if __name__ == '__main__':
                 
                 # Fit exponential saturation
                 from scipy.optimize import curve_fit
-                fun = lambda x, l, u: l * (1 - np.exp(- u * x))
-                l, u = curve_fit(fun, x, y, p0=(0.01, 0.001))[0]
-                yfit = fun(xfit, l, u)
+                fun = lambda x, l, u: l * (1 - np.exp(- u/l * x))
+                try:
+                    l, u = curve_fit(fun, x, y, p0=(y[-1], 1e-5))[0]
+                except RuntimeError:
+                    continue
 
+                # Constrain the fit to a maximal frequency of 1
+                if l > 1:
+                    l = 1
+                    fun_red = lambda x, u: 1 - np.exp(- u * x)
+                    try:
+                        u = curve_fit(fun_red, x, y, p0=(1e-5,))[0][0]
+                    except RuntimeError:
+                        continue
+
+                yfit = fun(xfit, l, u)
                 ax.plot(xfit, yfit,
                         ls=ls[key],
                         lw=2,
                         alpha=0.5,
+                        label=('l = '+'{:2.0e}'.format(l)+', '+
+                               'u = '+'{:2.0e}'.format(u)+''),
                         color=color)
 
 
@@ -226,16 +248,23 @@ if __name__ == '__main__':
         ax.set_ylabel('Allele frequency')
 
         ax.grid(True)
-        #ax.legend(loc=2, fontsize=12)
         ax.set_yscale('log')
         ax.set_ylim(1e-4, 1)
 
         if len(regions) == 1:
             ax.set_title(region)
         
-        plt.tight_layout()
+        ax.set_title(',\n'.join(map(' '.join, (np.sort(np.array(patients.code)), regions))), fontsize=12)
 
-    if use_plot:
+        # Shrink current axis by 20%
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+        
+        # Put a legend to the right of the current axis
+        ax.legend(loc='center left', fontsize=12, bbox_to_anchor=(1, 0.5))
+
+        plt.tight_layout(rect=(0, 0, 0.75, 1))
+
         plt.ion()
         plt.show()
 

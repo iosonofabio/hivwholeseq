@@ -19,9 +19,11 @@ class Patient(pd.Series):
 
     def __init__(self, *args, **kwargs):
         '''Initialize a patient with all his samples'''
+        include_cell = kwargs.pop('include_cell', False)
+
         super(Patient, self).__init__(*args, **kwargs)
         from hivwholeseq.patients.samples import load_samples_sequenced
-        samples = load_samples_sequenced(patients=[self.name])
+        samples = load_samples_sequenced(patients=[self.name], include_cell=include_cell)
         self.samples = samples
 
 
