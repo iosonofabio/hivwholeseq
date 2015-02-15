@@ -19,21 +19,22 @@ def build_tree_fasttree(filename_or_ali, rootname=None, VERBOSE=0):
     from Bio import Phylo
     import numpy as np
 
+    from ..filenames import fasttree_bin
+
     if isinstance(filename_or_ali, basestring):
         filename = filename_or_ali
     else:
+        from Bio import AlignIO
         ali = filename_or_ali
         tmp_folder = os.getenv('HOME')+'/tmp/'
         filename = tmp_folder+'tmp_fasttree_'+str(np.random.randint(1000000000))+'.fasta'
-        from Bio import AlignIO
-        with open(filename, 'w') as outfile:
-            AlignIO.write(ali, outfile, 'fasta')
+        AlignIO.write(ali, filename, 'fasta')
 
     try:
         if VERBOSE >= 3:
-            output = sp.check_output(['fasttree', '-nt', filename])
+            output = sp.check_output([fasttree_bin, '-nt', filename])
         else:
-            output = sp.check_output(['fasttree', '-nt', filename], stderr=sp.STDOUT)
+            output = sp.check_output([fasttree_bin, '-nt', filename], stderr=sp.STDOUT)
         tree_string = output.split('\n')[-2]
 
         tree = Phylo.read(StringIO.StringIO(tree_string), 'newick')

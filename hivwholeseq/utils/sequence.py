@@ -459,3 +459,27 @@ def get_subalignment(ali, ind):
     '''
     from Bio.Align import MultipleSeqAlignment
     return MultipleSeqAlignment([ali._records[i] for i in ind], ali._alphabet)
+
+
+def convert_alim_to_biopython(alim, seqtype='DNA'):
+    '''Convert numpy matrix to biopython alignment'''
+    from Bio.Align import MultipleSeqAlignment as MSA
+    from Bio.Seq import Seq
+    from Bio.SeqRecord import SeqRecord
+    from Bio.Alphabet.IUPAC import ambiguous_dna, ambiguous_rna, extended_protein
+
+    if seqtype.upper() == 'DNA':
+        alpha = ambiguous_dna
+    elif seqtype.upper() == 'RNA':
+        alpha = ambiguous_rna
+    else:
+        alpha = protein
+        
+    ali = MSA([SeqRecord(Seq(''.join(row), alpha),
+                         id='seq'+str(i),
+                         name='seq'+str(i),
+                         description='')
+               for i, row in enumerate(alim)])
+
+    return ali
+

@@ -75,7 +75,8 @@ def align_to_reference(seq, refstr, VERBOSE=0, codon_align=False):
     return rec
 
 
-def build_reference_alignments(region, refname, VERBOSE=0,
+def build_reference_alignments(region, refname,
+                               VERBOSE=0,
                                subtypes=['B', 'C', 'A', 'AE', 'F1', 'D', 'O', 'H'],
                                codon_align=False,
                               ):
@@ -83,7 +84,6 @@ def build_reference_alignments(region, refname, VERBOSE=0,
     from hivwholeseq.reference import load_custom_reference
     from Bio import SeqIO
     from Bio.Align import MultipleSeqAlignment
-
 
     ref = load_custom_reference(refname, region=region)
     refstr = ''.join(ref)
@@ -105,6 +105,9 @@ def build_reference_alignments(region, refname, VERBOSE=0,
 
         if subtype not in subtypes:
             continue
+
+        if VERBOSE >= 3:
+            print subtype
 
         try:
             rec = align_to_reference(seq, refstr, VERBOSE=VERBOSE,
@@ -151,6 +154,8 @@ if __name__ == '__main__':
                                       VERBOSE=VERBOSE)
 
     for subtype, ali in alis.iteritems():
+        if VERBOSE >= 1:
+            print subtype
         fn = get_subtype_reference_alignment_filename(region, subtype=subtype,
                                                       refname=refname,
                                                       VERBOSE=VERBOSE)

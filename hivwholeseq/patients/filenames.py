@@ -117,6 +117,16 @@ def get_consensi_alignment_filename(pname, region, format='fasta'):
     return filename
 
 
+def get_haplotype_alignment_filename(pname, region, format='fasta'):
+    '''Get the filename of the MSA of haplotypes in a genomic region, with duplicates
+    
+    NOTE: this alignment mirrors the sequences in the phylogenetic tree.
+    '''
+    filename = 'haplotype_alignment_'+region+'.'+format
+    filename = get_foldername(pname)+'alignments/'+filename
+    return filename
+
+
 def get_consensi_tree_filename(pname, fragment, format='newick'):
     '''Get the filename of the consensus tree'''
     filename = 'consensi_tree_'+fragment+'.'+format
@@ -265,7 +275,6 @@ def get_ntemplates_by_fragment_filename(format='tsv'):
     filename = 'n_templates_by_fragment.'+format
     return table_folder+filename
     
-
 
 
 # FIGURES

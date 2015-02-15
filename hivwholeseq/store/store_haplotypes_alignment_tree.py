@@ -12,12 +12,13 @@ import numpy as np
 from matplotlib import cm
 import matplotlib.pyplot as plt
 from Bio import Phylo
+from Bio import AlignIO
 
 from hivwholeseq.patients.patients import load_patients, Patient
-from hivwholeseq.utils.sequence import align_muscle
+from hivwholeseq.utils.sequence import align_muscle, convert_alim_to_biopython
 from hivwholeseq.utils.tree import build_tree_fasttree
 from hivwholeseq.utils.argparse import RoiAction
-from hivwholeseq.store.get_tree_consensi import annotate_tree
+from hivwholeseq.store.store_tree_consensi import annotate_tree
 from hivwholeseq.utils.nehercook.ancestral import ancestral_sequences
 from hivwholeseq.utils.tree import tree_to_json
 from hivwholeseq.utils.generic import write_json
@@ -163,6 +164,21 @@ def annotate_tree_for_plot(tree, minfreq=0.02):
         node.color = get_color(node)
 
 
+def extract_alignment(tree, VERBOSE=0):
+    '''Extract aligned sequences from phylogenetic tree, including duplicates'''
+    from Bio.Align import MultipleSeqAlignment as MSA
+    from Bio.Seq import Seq
+    from Bio.SeqRecord import SeqRecord
+    from Bio.Alphabet.IUPAC import ambiguous_dna
+
+    ali = MSA([SeqRecord(Seq(leaf.sequence, ambiguous_dna),
+                         id='days_'+leaf.name+'_frequency_'+'{:2.0%}'.format(leaf.frequency),
+                         name='days_'+leaf.name+'_frequency_'+'{:2.0%}'.format(leaf.frequency),
+                         description='')
+               for leaf in tree.get_terminals()])
+    return ali
+
+
 
 # Script
 if __name__ == '__main__':
@@ -172,8 +188,8 @@ if __name__ == '__main__':
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     parser.add_argument('--patients', nargs='+',
                         help='Patients to analyze')
-    parser.add_argument('--roi', required=True, action=RoiAction,
-                        help='Region of interest (e.g. F1 300 350 or V3 0 +oo)')
+    parser.add_argument('--region', required=True,
+                        help='Genomic region (e.g. IN or V3)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-4]')
     parser.add_argument('--maxreads', type=int, default=-1,
@@ -187,7 +203,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     pnames = args.patients
-    roi = args.roi
+    region = args.region
     VERBOSE = args.verbose
     maxreads = args.maxreads
     use_plot = args.plot
@@ -204,94 +220,88 @@ if __name__ == '__main__':
         if VERBOSE >= 1:
             print pname
     
-        if (not use_save) and os.path.isfile(patient.get_local_tree_filename(roi[0], format='json')):
-            if VERBOSE >= 2:
-                print 'Get tree'
-            region = roi[0]
-            tree = patient.get_local_tree(region)
+        if VERBOSE >= 2:
+            print 'Get haplotypes'
 
-        elif (not use_save) and os.path.isfile(patient.get_local_tree_filename(' '.join(map(str, roi)), format='json')):
-            if VERBOSE >= 2:
-                print 'Get tree'
-            region = ' '.join(map(str, roi))
-            tree = patient.get_local_tree(region)
+        (hct, ind, alim) =patient.get_haplotype_count_trajectory(region, aligned=True)
+        
+        hct = hct.T
+        htf = 1.0 * hct / hct.sum(axis=0)
 
-        else:
-            if VERBOSE >= 2:
-                print 'Get haplotypes'
-            try:
-                region = roi[0]
-                (hct, ind, seqs) = get_region_count_trajectories(patient, region,
-                                                                 VERBOSE=VERBOSE)
-            except IOError:
-                region = ' '.join(map(str, roi))
-                (hct, ind, seqs) = patient.get_local_haplotype_count_trajectories(*roi,
-                                                                                  VERBOSE=VERBOSE)
+        # Exclude too rare haplos
+        indseq = (htf >= freqmin).any(axis=1)
+        alim = alim[indseq]
+        htf = htf[indseq]
+
+        # Get initial top haplo
+        iseq0 = htf[:, 0].argmax()
+
+        times = patient.times[ind]
+
+        ali = convert_alim_to_biopython(alim)
+
+        #if VERBOSE >= 2:
+        #    print 'Align sequences'
+        #ali = align_muscle(*seqs, sort=True)
+
+        if VERBOSE >= 2:
+            print 'Build local tree'
+        tree = build_tree_fasttree(ali, VERBOSE=VERBOSE)
+
+        if VERBOSE >= 2:
+            print 'Infer ancestral sequences'
+        a = ancestral_sequences(tree, ali, alphabet='ACGT-N', copy_tree=False,
+                                attrname='sequence', seqtype='str')
+        a.calc_ancestral_sequences()
+        a.cleanup_tree()
+
+        if VERBOSE >= 2:
+            print 'Duplicate tree leaves and annotate with ALIGNED sequences'
+        expand_duplicates_annotate_tree(tree, htf, times,
+                                        map(''.join, ali),
+                                        minfreq=0.01)
+        
+        # FIXME: for the amino acid mutations, we must make sure that we are
+        # codon aligned (with codon_align). The problem is that sometimes
+        # V3 has gaps of 1-2 nucleotides... at frequency 10%?!
+        # NOTE: this might be due to compensating indels right outside V3,
+        # as seen in cross-sectional alignments
+        if VERBOSE >= 2:
+            print 'Annotate tree'
+        annotate_tree(patient, tree, VERBOSE=VERBOSE)
             
-            hct = hct.T
-            htf = 1.0 * hct / hct.sum(axis=0)
+        if VERBOSE >= 2:
+            print 'Ladderize tree'
+        tree.ladderize()
 
-            # Exclude too rare haplos
-            indseq = (htf >= freqmin).any(axis=1)
-            seqs = seqs[indseq]
-            htf = htf[indseq]
-
-            # Get initial top haplo
-            iseq0 = htf[:, 0].argmax()
-            seq0 = seqs[iseq0]
-
-            times = patient.times[ind]
-
+        if use_save:
             if VERBOSE >= 2:
-                print 'Align sequences'
-            ali = align_muscle(*seqs, sort=True)
+                print 'Save tree (JSON)'
+            fn = patient.get_local_tree_filename(region, format='json')
+            tree_json = tree_to_json(tree.root,
+                                     fields=('DSI', 'sequence',
+                                             'muts',
+                                             'VL', 'CD4',
+                                             'frequency',
+                                             'confidence'),
+                                    )
+            write_json(tree_json, fn)
 
-            if VERBOSE >= 2:
-                print 'Build local tree'
-            tree = build_tree_fasttree(ali, VERBOSE=VERBOSE)
+        if VERBOSE >= 2:
+            print 'Extract alignment from tree (so with duplicates)'
+        ali_tree = extract_alignment(tree, VERBOSE=VERBOSE)
 
+        if use_save:
             if VERBOSE >= 2:
-                print 'Infer ancestral sequences'
-            a = ancestral_sequences(tree, ali, alphabet='ACGT-N', copy_tree=False,
-                                    attrname='sequence', seqtype='str')
-            a.calc_ancestral_sequences()
-            a.cleanup_tree()
+                print 'Save alignment from tree'
+            fn = patient.get_haplotype_alignment_filename(region, format='fasta')
+            AlignIO.write(ali_tree, fn, 'fasta')
 
-            if VERBOSE >= 2:
-                print 'Duplicate tree leaves'
-            expand_duplicates_annotate_tree(tree, htf, times,
-                                            map(''.join, ali),
-                                            minfreq=0.01)
-            
-            # FIXME: for the amino acid mutations, we must make sure that we are
-            # codon aligned (with codon_align). The problem is that sometimes
-            # V3 has gaps of 1-2 nucleotides... at frequency 10%?!
-            if VERBOSE >= 2:
-                print 'Annotate tree'
-            annotate_tree(patient, tree, VERBOSE=VERBOSE)
-                
-            if VERBOSE >= 2:
-                print 'Ladderize tree'
-            tree.ladderize()
-
-            if use_save:
-                if VERBOSE >= 2:
-                    print 'Save tree (JSON)'
-                fn = patient.get_local_tree_filename(region, format='json')
-                tree_json = tree_to_json(tree.root,
-                                         fields=('DSI', 'sequence',
-                                                 'muts',
-                                                 'VL', 'CD4',
-                                                 'frequency',
-                                                 'confidence'),
-                                        )
-                write_json(tree_json, fn)
 
         if use_plot:
-
             annotate_tree_for_plot(tree, minfreq=0.1)
 
-            if VERBOSE >= 1:
+            if VERBOSE >= 2:
                 print 'Plot'
             fig, ax = plt.subplots()
             ax.set_title(patient.code+', '+region)

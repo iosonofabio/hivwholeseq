@@ -24,11 +24,17 @@ elif os.path.isdir('/home/fabio/') and (not os.path.isdir('/ebio/ag-neher/share/
     root_data_folder = '/home/fabio/university/phd/sequencing/data/'
 else:
     root_data_folder = '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/'
+    fasttree_bin = 'fasttree'
     stampy_bin = '/ebio/ag-neher/share/programs/bundles/stampy-1.0.22/stampy.py'
     spades_bin = '/ebio/ag-neher/share/programs/bundles/SPAdes-2.5.0-Linux/bin/spades.py'
     bwa_bin = '/ebio/ag-neher/share/programs/bin/bwa'
 
+if os.path.isdir('/home/fabio/'):
+    fasttree_bin = 'FastTree'
+else:
+    fasttree_bin = 'fasttree'
 
+tmp_folder = root_data_folder+'tmp/'
 reference_folder = root_data_folder+'reference/'
 theory_folder = root_data_folder+'theory/'
 table_folder = self.__path__[0] + '/tables/'

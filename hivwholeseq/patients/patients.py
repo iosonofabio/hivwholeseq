@@ -568,6 +568,11 @@ class Patient(pd.Series):
             return (data['hct'], data['ind'], data['seqs'])
 
 
+    def get_haplotype_alignment_filename(self, region, format='fasta'):
+        '''Get filename of the alignment of haplotypes in a genomic region'''
+        from .filenames import get_haplotype_alignment_filename
+        return get_haplotype_alignment_filename(self.name, region, format=format)
+
 
 
 # Functions

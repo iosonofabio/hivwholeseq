@@ -75,6 +75,7 @@ if __name__ == '__main__':
             # Filter out tiny-frequency variants
             hft = (1.0 * hct.T / hct.sum(axis=1)).T
             ind_seqs = (hft > freqmin).any(axis=0)
+            hct = hct[:, ind_seqs]
             hft = hft[:, ind_seqs]
             seqs = seqs[ind_seqs]
 

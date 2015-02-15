@@ -24,7 +24,7 @@ if [ "$use_submit" = --submit ]; then
  JOBLOGOUT="$HIVWHOLESEQFOLDER/cluster/logout"
  JOBLOGERR="$HIVWHOLESEQFOLDER/cluster/logerr"
  JOBSCRIPT="$HIVWHOLESEQFOLDER/specific/hla/optitype_preprocess.sh"
- VMEM=8G
+ VMEM=10G
  RT=23:59:59
  qsub -cwd -b y -S '/bin/bash' -o $JOBLOGOUT -e $JOBLOGERR -N hla$pname -pe parallel "$NCORES" -l h_rt=$RT -l h_vmem=$VMEM $JOBSCRIPT $pname --run $NCORES
  exit 0

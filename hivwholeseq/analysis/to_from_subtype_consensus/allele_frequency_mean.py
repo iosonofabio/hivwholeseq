@@ -16,7 +16,6 @@ import matplotlib.pyplot as plt
 
 from hivwholeseq.miseq import alphal, alpha
 from hivwholeseq.patients.patients import load_patients, Patient
-from hivwholeseq.utils.argparse import RoiAction
 from hivwholeseq.reference import load_custom_reference, load_custom_alignment
 from hivwholeseq.cross_sectional.get_subtype_allele_frequencies import (
     get_subtype_reference_alignment_allele_frequencies)
