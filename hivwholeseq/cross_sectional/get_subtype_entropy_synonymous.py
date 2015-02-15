@@ -23,7 +23,7 @@ from hivwholeseq.cross_sectional.get_subtype_reference_alignment import get_subt
 def get_ali_entropy_syn(alim, positions=None, alpha=alpha[:5], VERBOSE=0):
     '''Get entropy of alignment at some positions'''
     from collections import defaultdict
-    from Bio.Seq import translate
+    from hivwholeseq.utils.sequence import translate_with_gaps as translate
 
     if len(ali[0]) % 3:
         raise ValueError('The alignment length is not a multiple of 3')

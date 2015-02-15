@@ -34,23 +34,6 @@ from hivwholeseq.analysis.explore_entropy_patsubtype import (
 
 
 # Functions
-def get_degenerate_dict():
-    '''Get dictionary of degeneracies'''
-    from collections import Counter
-    from Bio.Data.CodonTable import standard_dna_table
-
-    return dict(Counter(standard_dna_table.forward_table.itervalues()))
-
-
-def get_codon_back_table():
-    '''Get a complete back codon table'''
-    from collections import defaultdict
-    from Bio.Data.CodonTable import standard_dna_table
-    
-    table = defaultdict(list)
-    for codon, aa in standard_dna_table.forward_table.iteritems():
-        table[aa].append(codon)
-    return dict(table)
 
 
 

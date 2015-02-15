@@ -212,7 +212,7 @@ class Patient(pd.Series):
 
 
     @staticmethod
-    def get_initial_consensus_noinsertions(aft, VERBOSE=0):
+    def get_initial_consensus_noinsertions(aft, VERBOSE=0, return_ind=False):
         '''Make initial consensus from allele frequencies, keep coordinates and masked
         
         Args:
@@ -222,6 +222,8 @@ class Patient(pd.Series):
           np.ndarray: initial consensus, augmented with later time points at masked
           positions, with Ns if never covered
         '''
+        from ..utils.sequence import alpha
+
         af0 = aft[0]
         # Fill the masked positions with N...
         cons_ind = af0.argmax(axis=0)
@@ -229,13 +231,20 @@ class Patient(pd.Series):
     
         # ...then look in later time points
         if aft.shape[0] == 1:
-            return cons_ind
+            if return_ind:
+                return cons_ind
+            else:
+                return alpha[cons_ind]
+
         for af_later in aft[1:]:
             cons_ind_later = af_later.argmax(axis=0)
             cons_ind_later[af_later[0].mask] = 5
             ind_Ns = (cons_ind == 5) & (cons_ind_later != 5)
             cons_ind[ind_Ns] = cons_ind_later[ind_Ns]
-        return cons_ind
+        if return_ind:
+            return cons_ind
+        else:
+            return alpha[cons_ind]
 
 
     def get_initial_allele_counts(self, fragment):

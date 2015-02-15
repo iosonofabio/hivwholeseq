@@ -7,6 +7,7 @@ content:    Study divergence at conserved/non- synonymous sites in different
 '''
 # Modules
 import os
+import sys
 import argparse
 from itertools import izip
 from collections import defaultdict
@@ -18,10 +19,39 @@ import matplotlib.pyplot as plt
 from hivwholeseq.miseq import alpha, alphal
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.utils.sequence import translate_with_gaps
-from hivwholeseq.multipatient.explore_codon_usage_patsubtype import get_degenerate_dict
+from hivwholeseq.utils.sequence import get_degeneracy_dict
 import hivwholeseq.utils.plot
-from hivwholeseq.multipatient.explore_entropy_patsubtype import (
-    get_subtype_reference_alignment, get_ali_entropy)
+from hivwholeseq.cross_sectional.get_subtype_entropy_synonymous import \
+    get_subtype_reference_alignment_entropy_syn
+from hivwholeseq.cross_sectional.get_subtype_consensus import \
+    get_subtype_reference_alignment_consensus
+from hivwholeseq.patients.one_site_statistics import get_codons_n_polymorphic
+
+
+
+# Functions
+def translate_masked(cons):
+    '''Translate a DNA sequence with Ns and weird gaps'''
+    if len(cons) % 3:
+        raise ValueError('The length of the DNA sequence is not a multiple of 3')
+
+    from Bio.Seq import translate
+
+    codons = cons.reshape((len(cons)//3, 3))
+
+    # Mask codons that have 1 or 2 gaps, or any N
+    mask_gaps = np.array((codons == '-').sum(axis=1) % 3, bool)
+    mask_N = (codons == 'N').sum(axis=1) != 0
+
+    prot = np.ma.empty(len(mask_gaps), 'S1')
+    prot.mask = mask_gaps | mask_N
+
+    for i, (m, codon) in enumerate(izip(prot.mask, codons)):
+        if not m:
+            prot[i] = translate(''.join(codon))
+
+    return prot
+
 
 
 # Script
@@ -46,10 +76,9 @@ if __name__ == '__main__':
     VERBOSE = args.verbose
     plot = args.plot
 
-    degenerate_dict = get_degenerate_dict()
+    degeneracy = get_degeneracy_dict()
 
-    data = defaultdict(list)
-
+    data = []
     patients = load_patients()
     if pnames is not None:
         patients = patients.loc[pnames]
@@ -58,18 +87,21 @@ if __name__ == '__main__':
         if VERBOSE >= 1:
             print region
 
-        # FIXME
-#        if VERBOSE >= 2:
-#            print 'Get subtype B reference sequence alignment to HXB2 of', region
-#        ali_sub = get_subtype_reference_alignment(region, VERBOSE=VERBOSE)
-#
-#        if VERBOSE >= 2:
-#            print 'Get entropy in subtype alignment'
-#
-        #Ssub = get_ali_entropy(ali_sub, VERBOSE=VERBOSE)
-        Ssub = np.zeros(10000)
+        if VERBOSE >= 2:
+            print 'Get subtype consensus'
+        conssub = get_subtype_reference_alignment_consensus(region, VERBOSE=VERBOSE)
+
+
+        if VERBOSE >= 2:
+            print 'Get subtype entropy'
+        Ssub = get_subtype_reference_alignment_entropy_syn(region, VERBOSE=VERBOSE)
+
+        # NOTE: Ssub is indexed by AMINO ACID, conssub by NUCLEOTIDE
 
         for ipat, (pname, patient) in enumerate(patients.iterrows()):
+            pcode = patient.code
+            if VERBOSE >= 2:
+                print pname, pcode
 
             patient = Patient(patient)
             aft, ind = patient.get_allele_frequency_trajectories(region,
@@ -77,231 +109,144 @@ if __name__ == '__main__':
                                                                  depth_min=300,
                                                                  VERBOSE=VERBOSE)
             if len(ind) == 0:
+                if VERBOSE >= 2:
+                    print 'Skip'
                 continue
-
-            coomap = patient.get_map_coordinates_reference(region)
-            # Shift HXB2 coordinates to alignment (region)
-            # FIXME: this assumes we have the first position, should be fine for most cases
-            coomap[:, 0] -= coomap[0, 0]
-            coomap = dict(coomap[:, ::-1])
 
             times = patient.times[ind]
 
-            icons = patient.get_initial_consensus_noinsertions(aft, VERBOSE=VERBOSE)
-            cons = alpha[icons]
-            
-            if ('N' in cons) or ('-' in cons):
-                continue
+            if VERBOSE >= 2:
+                print 'Get coordinate map'
+            coomap = patient.get_map_coordinates_reference(region, refname=('HXB2', region))
 
-            prot = translate_with_gaps(cons)
-
-            # Trim the stop codon if still there (why? why?)
-            if prot[-1] == '*':
-                icons = icons[:-3]
-                cons = cons[:-3]
-                prot = prot[:-1]
-                aft = aft[:, :, :-3]
+            icons = patient.get_initial_consensus_noinsertions(aft, VERBOSE=VERBOSE,
+                                                               return_ind=True)
+            consm = alpha[icons]
+            protm = translate_masked(consm)
 
             # Premature stops in the initial consensus???
-            if '*' in prot:
-                continue
+            if '*' in protm:
+                # Trim the stop codon if still there (why? why?)
+                if protm[-1] == '*':
+                    if VERBOSE >= 2:
+                        print 'Ends with a stop, trim it'
+                    icons = icons[:-3]
+                    consm = consm[:-3]
+                    protm = protm[:-1]
+                    aft = aft[:, :, :-3]
+                    coomap = coomap[:, coomap[:, 1] < len(consm)]
 
-            prot_deg = np.array(map(degenerate_dict.get, prot), int)
-            # NOTE: all 4-fold degenerate codons have all and only 3rd positions
+                else:
+                    continue
+
+            # Get the map as a dictionary from patient to subtype
+            coomapd = dict(coomap[:, ::-1])
+
+            # Get only sites that are conserved or with only one site per codon changing
+            ind_poly, pos_poly = get_codons_n_polymorphic(aft, icons, n=[0, 1], VERBOSE=VERBOSE)
+
+            # NOTE: all 4-fold degenerate codons have all and only 3rd positions,
+            # so they are easy to score, we ignore the rest for now
+            prot_deg = np.array(map(degeneracy.get, protm), int)
             ind_4fold = (prot_deg == 4).nonzero()[0]
-            ind_4fold_3rd = ind_4fold * 3 + 2
 
-            # Exclude sites in which the other two sites change (sweeps or so)
-            ind_good = ((aft[:, icons[ind_4fold_3rd - 2], ind_4fold_3rd - 2].min(axis=0) > 0.95) &
-                        (aft[:, icons[ind_4fold_3rd - 1], ind_4fold_3rd - 1].min(axis=0) > 0.95))
-            ind_4fold = ind_4fold[ind_good]
-            ind_4fold_3rd = ind_4fold * 3 + 2
 
-            aft4 = aft[:, :, ind_4fold_3rd]
+            # Get only polymorphic codons that are also 4fold degenerate,
+            # in which the 1st and 2nd positions are conserved
+            inds = [ip for ip, pp in izip(ind_poly, pos_poly)
+                    if (ip in ind_4fold) and (0 not in pp) and (1 not in pp)]
+
             # FIXME: deal better with depth (should be there already, I guess)
-            aft4[aft4 < 3e-3] = 0
+            aft[aft < 2e-3] = 0
 
-            # Stratify by transitions/transversions
-            for pos, aft4pos in enumerate(aft4.swapaxes(0, 2)):
+            for pos in inds:
+                if VERBOSE >= 3:
+                    print pos
+
+                # Only look at third position, so 
+                pos_dna = pos * 3 + 2
+
+                pos_sub = coomapd[pos]
+                Ssubpos = Ssub[pos][protm[pos]]
+
+                aft_pos = aft[:, :, pos_dna]
 
                 # Get only non-masked time points
-                indpost = -aft4pos[0].mask
+                indpost = -aft_pos[:, 0].mask
                 if indpost.sum() == 0:
                     continue
                 timespos = times[indpost]
-                aft4pos = aft4pos[:, indpost]
+                aft_pos = aft_pos[indpost]
 
-                posdna = ind_4fold_3rd[pos]
-                anc = cons[posdna]
-                ianc = icons[posdna]
-
-                # Skip if the site is already polymorphic at the start
-                if aft4pos[ianc, 0] < 0.95:
+                # Discard of the initial time point is already polymorphic
+                aft_anc = aft_pos[:, icons[pos_dna]]
+                if aft_anc[0] < 0.9:
                     continue
 
-                Ssubpos = Ssub[coomap[posdna]]
-
-                afkey = {'ts': [], 'tv': []}
-                for inuc, af in enumerate(aft4pos[:4]):
-                    nuc = alpha[inuc]
-                    if nuc == anc:
+                # Iterate over the three derived nucleotides
+                for inuc, aft_der in enumerate(aft_pos.T[:4]):
+                    if inuc == icons[pos_dna]:
                         continue
 
-                    if frozenset(nuc+anc) in (frozenset('CT'), frozenset('AG')):
-                        key = 'ts'
-                    else:
-                        key = 'tv'
-                    afkey[key].append(af)
+                    anc = consm[pos_dna]
+                    der = alpha[inuc]
+                    mut = anc+'->'+der
 
-                # Get time points one by one
-                for it, time in enumerate(timespos):
-                    afts = afkey['ts'][0][it]
-                    aftv = sorted([afkey['tv'][0][it], afkey['tv'][1][it]], reverse=True)
-
-                    # Only take data points for which we see at least one mutations
-                    if any(map(lambda x: x > 0, (afts, aftv[0]))):
-                        data['af'].append((region, pname, time, anc, Ssubpos,
-                                           afts, aftv[0], aftv[1]))
-
-                # Get the whole trajectory for plots against time
-                data['aft'].extend([(region, pname, time, anc, Ssubpos,
-                                     afkey['ts'][0][it],
-                                     afkey['tv'][0][it],
-                                     afkey['tv'][1][it],
-                                     )
-                                    for it, time in enumerate(timespos)])
+                    for it, time in enumerate(timespos):
+                        af = aft_der[it]
+                        data.append((region, pcode,
+                                     anc, der, mut,
+                                     Ssubpos,
+                                     time, af))
 
 
-    data['af'] = pd.DataFrame(data=data['af'],
-                              columns=['Region', 'Patient', 'Time', 'Anc', 'S subtype',
-                                       'ts', 'tv1', 'tv2'])
-    data['aft'] = pd.DataFrame(data=data['aft'],
-                              columns=['Region', 'Patient', 'Time', 'Anc', 'S subtype',
-                                       'ts', 'tv1', 'tv2'])
+    data = pd.DataFrame(data=data, columns=('region', 'pcode',
+                                            'anc', 'der', 'mut',
+                                            'S',
+                                            'time', 'af'))
 
-    # Print some basic output
-    ts = np.array(data['af']['ts'])
-    tv = np.array(data['af']['tv1'])
-    print 'Only transition:', '{:1.0%}'.format(((ts > 0) & (tv == 0)).mean())
-    print 'Only transversion:', '{:1.0%}'.format(((tv > 0) & (ts == 0)).mean())
-    print 'Both:', '{:1.0%}'.format(((tv > 0) & (ts > 0)).mean())
 
     if plot:
-        if pnames is not None:
-            title = ' + '.join(pnames)+', '+' + '.join(regions)
-        else:
-            title = ' + '.join(regions)
 
-        #fig, ax = plt.subplots()
-        #ax.set_title(title)
-        #ax.scatter(tv, ts)
-        #ax.plot([1e-3, 1], [1e-3, 1], lw=1, c='k', ls='--')
+        muts = list(np.unique(data.loc[:, 'mut']))
 
-        #indfit = (tv < 1e-2) & (ts < 1e-2) & (tv > 2e-3) & (ts > 2e-3)
-        #tvfit = tv[indfit]
-        #tsfit = ts[indfit]
-        #m = np.inner(tvfit, tsfit) / np.inner(tvfit, tvfit)
-        #ax.plot([1e-3, 1], [m * 1e-3, m], lw=1.5, c='k',
-        #        label='Fit: m = '+'{:1.1f}'.format(m))
+        Sbins = [(0, 0.1), (0.1, 2)]
+        Sbin = Sbins[-1]
+        datap = (data
+                 .loc[(data.loc[:, 'S'] > Sbin[0]) & (data.loc[:, 'S'] <= Sbin[1])]
+                 .loc[:, ['mut', 'time', 'af']]
+                 .groupby(['mut', 'time'])
+                 .mean()
+                 .loc[:, 'af']
+                 .unstack('time'))
 
+        fits = {}
 
-        #ax.grid(True)
-        #ax.set_xlabel('Frequency highest transversion')
-        #ax.set_ylabel('Frequency transition')
-        #ax.set_xscale('log')
-        #ax.set_yscale('log')
-        #ax.set_xlim(1e-3, 1)
-        #ax.set_ylim(1e-3, 1)
-        #plt.tight_layout()
-
-
-        ts = np.array(data['aft']['ts'])
-        tv = np.concatenate([np.array(data['aft']['tv1']),
-                             np.array(data['aft']['tv2'])])
-        times_ts = np.array(data['aft']['Time'])
-        times_tv = np.tile(times_ts, 2)
-        xs = {'ts': times_ts, 'tv': times_tv}
-        ys = {'ts': ts, 'tv': tv}
-        colors = {'ts': 'b', 'tv': 'g'}
-
-        ## Plot by scatter
-        #fig, ax = plt.subplots()
-        #ax.set_title(title)
-        #for key in ('ts', 'tv'):
-        #    x = xs[key]
-        #    y = ys[key]
-        #    ax.scatter(x, y, c=colors[key])
-
-        #    # Linear LS fit
-        #    m = np.inner(x, y) / np.inner(x, x)
-        #    ax.plot([x.min(), x.max()], [m * x.min(), m * x.max()],
-        #            color=colors[key], label=key+' '+'{:1.1e}'.format(m)+' changes/day')
-
-        #ax.legend(loc=2, fontsize=10)
-        #ax.set_xlabel('Time [days from infection]')
-        #ax.set_ylabel('Allele frequency')
-        #ax.set_yscale('log')
-        #ax.set_ylim(1e-3, 1)
-        #plt.tight_layout()
-
-        # Plot the mean only
         fig, ax = plt.subplots()
-        ax.set_title(title)
-        for key in ('ts', 'tv'):
-            x = xs[key]
-            y = ys[key]
-            xunique = sorted(set(x))
-            ymean = [y[x == xuniquei].mean() for xuniquei in xunique]
-            ax.plot(xunique, ymean, lw=2, c=colors[key])
+        for mut, datum in datap.iterrows():
+            x = np.array(datum.index)
+            y = np.array(datum)
 
-            # Linear LS fit
-            m = np.inner(x, y) / np.inner(x, x)
-            xfit = np.linspace(x.min(), x.max(), 1000)
-            ax.plot(xfit, m * xfit,
-                    ls='--',
-                    color=colors[key], label=key+' '+'{:1.1e}'.format(m)+' changes/day')
+            # Get rid of masked stuff (this happens if we miss data in the means)
+            ind = -(np.isnan(x) | np.isnan(y))
+            x = x[ind]
+            y = y[ind]
 
-        ax.grid(True)
-        ax.legend(loc=2, fontsize=10)
-        ax.set_xlabel('Time [days from infection]')
+            color = cm.jet(1.0 * muts.index(mut) / len(muts))
+            ax.scatter(x, y, color=color, label=mut)
+
+            # Linear fit
+            m = np.dot(y, x) / np.dot(x, x)
+            fits[mut] = m
+            xfit = np.linspace(0, 3000)
+            ax.plot(xfit, m * xfit, color=color, lw=1.5, alpha=0.5)
+
+        ax.set_xlabel('Time')
         ax.set_ylabel('Allele frequency')
-        ax.set_yscale('log')
         ax.set_ylim(1e-4, 1)
-        plt.tight_layout()
-
-
-        ## Plot as a function of time, divided by subtype entropy
-        #Ssub_ts = np.array(data['aft']['S subtype'])
-        #Ssub_tv = np.tile(Ssub_ts, 2)
-        #Ssubs = {'ts': Ssub_ts, 'tv': Ssub_tv}
-
-        #fig, ax = plt.subplots()
-        #ax.set_title(title)
-        #Ssubbins = [[0, 0.05], [0.2, 2]]
-        #markers = ['o', 'd']
-        #for key in ('ts', 'tv'):
-        #    xk = xs[key]
-        #    yk = ys[key]
-        #    for ibin, Ssubbin in enumerate(Ssubbins):
-        #        indSsub = (Ssubs[key] > Ssubbin[0]) & (Ssubs[key] <= Ssubbin[1])
-        #        x = xk[indSsub]
-        #        y = yk[indSsub]
-        #        ax.scatter(x, y, c=colors[key], marker=markers[ibin])
-
-        #        # Linear LS fit
-        #        m = np.inner(x, y) / np.inner(x, x)
-        #        ax.plot([x.min(), x.max()], [m * x.min(), m * x.max()],
-        #                color=colors[key],
-        #                label=key+' '+'{:1.1e}'.format(m)+' changes/day, Ssub e '+str(Ssubbin))
-
-        #ax.legend(loc=2, fontsize=10)
-        #ax.set_xlabel('Time [days from infection]')
-        #ax.set_ylabel('Allele frequency')
-        #ax.set_yscale('log')
-        #ax.set_ylim(1e-3, 1)
-        #plt.tight_layout()
-
-
+        ax.set_yscale('log')
+        ax.grid(True)
+        ax.legend(loc='upper left', fontsize=10, ncol=2)
 
         plt.ion()
         plt.show()
