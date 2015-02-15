@@ -553,3 +553,84 @@ def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
         plt.tight_layout(rect=(0, 0, 0.98, 1))
         plt.ion()
         plt.show()
+
+
+def plot_substitution_rate(data,
+                           title='',
+                           VERBOSE=0, savefig=False):
+    '''Plot the substitution rates'''
+
+    if VERBOSE:
+        print 'Plot substitution rates'
+    
+    # Sort patient codes
+    pcodes = sorted(set(data['pcode']))
+
+    # Resort regions based on average substitution rate
+    regions = (data[['region', 'rate']]
+               .groupby('region')
+               .mean()
+               .sort('rate')
+               .index
+               .tolist())
+
+    xfun = lambda region, pcode: regions.index(region) + 0.05 * pcodes.index(pcode)
+    cfun = lambda pcode: cm.jet(1.0 * pcodes.index(pcode) / len(pcodes))
+
+    fig, ax = plt.subplots(figsize=(2 * len(regions), 4))
+
+    for pcode in pcodes:
+        datum = (data
+                 .loc[data['pcode'] == pcode]
+                 .set_index('region', drop=False)
+                 .loc[regions])
+
+        y = datum['rate']
+        x = map(lambda x: xfun(*x[1]), datum[['region', 'pcode']].iterrows())
+        color = cfun(pcode)
+
+        ax.scatter(x, y, color=color, s=90, label=pcode)
+        if len(regions) > 1:
+            ax.plot(x, y, color=color, lw=1, alpha=0.4)
+
+    ylim = (0.5 * data['rate'].min(), 1.5 * data['rate'].max())
+    xticksminor = [xfun(region, pcodes[len(pcodes) //2]) for region in regions]
+    xticksmajor = [xt - 0.5 for xt in xticksminor] + [xticksminor[-1] + 0.5]
+    xticklabels = regions
+    xlim = (xticksminor[0] - 0.04 * (xticksminor[-1] - xticksminor[0]),
+            xticksminor[0] + 1.04 * (xticksminor[-1] - xticksminor[0]))
+
+
+    ax.set_ylim(*ylim)
+    ax.set_xlim(*xlim)
+    ax.set_xticks(xticksmajor)
+    ax.set_xticklabels([])
+    ax.set_xticks(xticksminor, minor=True)
+    ax.set_xticklabels(xticklabels, fontsize=14, minor=True)
+    ax.set_yticklabels(ax.get_yticklabels(), fontsize=14)
+    ax.grid(True)
+    ax.set_yscale('log')
+
+    ax.set_xlabel('Genomic region', fontsize=14)
+    ax.set_ylabel('Substitution rate\n[changes / year / site]', labelpad=10, fontsize=14)
+    ax.legend(loc='lower right', title='Patients', ncol=len(pcodes) // 3,
+              fontsize=14)
+
+    if title:
+        fig.suptitle(title)
+
+    if savefig:
+        fig_filename = savefig
+        fig_folder = os.path.dirname(fig_filename)
+
+        mkdirs(fig_folder)
+        plt.tight_layout(rect=(0, 0, 0.98, 1))
+        fig.savefig(fig_filename)
+        plt.close(fig)
+
+    else:
+        plt.tight_layout(rect=(0, 0, 0.98, 1))
+        plt.ion()
+        plt.show()
+
+
