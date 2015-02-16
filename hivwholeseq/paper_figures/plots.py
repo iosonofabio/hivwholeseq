@@ -501,7 +501,10 @@ def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
         htf = datum['htf']
 
         assign_color(tree, attrname=color_by)
-        labels = [leaf.name[:-3] for leaf in tree.get_terminals()]
+        labels = ['{:>8s}'.format('{:>4s}'.format(leaf.name.split()[0])+' '+
+                   '{:>2d}'.format(int(float(leaf.name.split()[1]) / 30.5))+
+                  'm')
+                  for leaf in tree.get_terminals()]
         depths = tree.depths()
         maxdepth = max(depths.itervalues())
 
@@ -564,7 +567,7 @@ def plot_substitution_rate(data,
         print 'Plot substitution rates'
     
     # Sort patient codes
-    pcodes = sorted(set(data['pcode']))
+    pcodes = sorted(set(data['pcode']), key=lambda x: int(x[1:]))
 
     # Resort regions based on average substitution rate
     regions = (data[['region', 'rate']]
@@ -633,4 +636,112 @@ def plot_substitution_rate(data,
         plt.ion()
         plt.show()
 
+
+def plot_mutation_rate(data,
+                       title='', savefig=False,
+                       VERBOSE=0):
+    '''Plot mutation rate estimate'''
+    plt.ioff()
+
+    if VERBOSE:
+        print 'Plot mutation rate'
+
+    sns.set_style('dark')
+
+    from ..utils.sequence import alphal
+
+    fits = data['fits']
+    data = data['data']
+
+    muts = list(np.unique(data.loc[:, 'mut']))
+
+    Sbins = [(0, 0.1), (0.1, 2)]
+    Sbin = Sbins[-1]
+    datap = (data
+             .loc[(data.loc[:, 'S'] > Sbin[0]) & (data.loc[:, 'S'] <= Sbin[1])]
+             .loc[:, ['mut', 'time', 'af']]
+             .groupby(['mut', 'time'])
+             .mean()
+             .loc[:, 'af']
+             .unstack('time'))
+
+
+    fig, (ax, ax2, ax3) = plt.subplots(1, 3, figsize=(12, 5),
+                                       gridspec_kw={'width_ratios': [10, 12, 0.8]})
+
+    for mut, datum in datap.iterrows():
+        x = np.array(datum.index) / 30.5
+        y = np.array(datum)
+
+        # Get rid of masked stuff (this happens if we miss data in the means)
+        ind = -(np.isnan(x) | np.isnan(y))
+        x = x[ind]
+        y = y[ind]
+
+        color = cm.jet(1.0 * muts.index(mut) / len(muts))
+        ax.scatter(x, y, color=color, label=mut)
+
+        m = fits.loc[mut] * 30.5
+        xfit = np.linspace(0, 100)
+        ax.plot(xfit, m * xfit, color=color, lw=1.5, alpha=0.5)
+
+    ax.set_xlabel('Time from infection [months]')
+    ax.set_ylabel('Allele frequency')
+    ax.set_ylim(1e-4, 1)
+    ax.set_yscale('log')
+    ax.grid(True)
+    ax.legend(loc='upper left', fontsize=10, ncol=2)
+
+    # Plot the mutation rate matrix
+    mu = np.ma.masked_all((4, 4))
+    for mut, fit in fits.iteritems():
+        n1 = mut[0]
+        n2 = mut[-1]
+        # The mutation rate we want per generation (2 days)
+        mu[alphal.index(n1), alphal.index(n2)] = fit * 2
+
+    # Plot the log10 for better dynamic range
+    vmin = np.floor(np.log10(mu.min()))
+    vmax = np.ceil(np.log10(mu.max()))
+    h = ax2.imshow(np.log10(mu),
+                   interpolation='nearest',
+                   cmap=cm.jet,
+                   vmin=vmin, vmax=vmax)
+    
+    ax2.set_xticks(np.arange(4) + 0.0)
+    ax2.set_yticks(np.arange(4) + 0.0)
+    ax2.set_xticklabels(alphal[:4])
+    ax2.set_yticklabels(alphal[:4])
+    ax2.set_xlabel('to')
+    ax2.set_ylabel('from')
+
+    cticks = np.arange(vmin, vmax+1)
+
+    from matplotlib.ticker import Formatter
+    class LogTickFormatter(Formatter):
+        def __call__(self, x, pos=None):
+            '''Transform the logs into their 10**'''
+            return '$10^{'+'{:1.0f}'.format(x)+'}$'
+
+    cb = plt.colorbar(h, cax=ax3, ticks=cticks, format=LogTickFormatter())
+    cb.set_label('Mutation rate\n[changes / generation]', rotation=90, labelpad=-100)
+
+    plt.tight_layout(w_pad=0.05)
+
+    if title:
+        fig.suptitle(title)
+
+    if savefig:
+        fig_filename = savefig
+        fig_folder = os.path.dirname(fig_filename)
+
+        mkdirs(fig_folder)
+        plt.tight_layout(rect=(0, 0, 0.98, 1))
+        fig.savefig(fig_filename)
+        plt.close(fig)
+
+    else:
+        plt.tight_layout(rect=(0, 0, 0.98, 1))
+        plt.ion()
+        plt.show()
 

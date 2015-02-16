@@ -78,57 +78,61 @@ if __name__ == '__main__':
     fn_data = fn_data + 'substitution_rates.pickle'
 
 
-    patients = load_patients()
-    if pnames is not None:
-        patients = patients.loc[pnames]
-    pcodes = patients.code.tolist()
+    if not os.path.isfile(fn_data):
+        patients = load_patients()
+        if pnames is not None:
+            patients = patients.loc[pnames]
+        pcodes = patients.code.tolist()
 
-    data = []
-    for pname, patient in patients.iterrows():
-        patient = Patient(patient)
-        patient.discard_nonsequenced_samples()
+        data = []
+        for pname, patient in patients.iterrows():
+            patient = Patient(patient)
+            patient.discard_nonsequenced_samples()
 
-        for ifr, region in enumerate(regions):
-            if VERBOSE >= 1:
-                print pname, patient.code, region
+            for ifr, region in enumerate(regions):
+                if VERBOSE >= 1:
+                    print pname, patient.code, region
 
-            try:
-                dg, ind = patient.get_divergence(region, cov_min=10)
-            except ValueError:
-                continue
-            times = patient.times[ind]
+                try:
+                    dg, ind = patient.get_divergence(region, cov_min=10)
+                except ValueError:
+                    continue
+                times = patient.times[ind]
 
-            data.append({'pcode': patient.code, 'region': region, 'dg': dg, 't': times})
+                data.append({'pcode': patient.code, 'region': region, 'dg': dg, 't': times})
 
-    if VERBOSE >= 1:
-        print 'Fit slopes'
+        if VERBOSE >= 1:
+            print 'Fit slopes'
 
-    for d in data:
-        pcode = d['pcode']
-        region = d['region']
-        dg = d['dg']
-        times = d['t']
+        for d in data:
+            pcode = d['pcode']
+            region = d['region']
+            dg = d['dg']
+            times = d['t']
 
-        r = np.linalg.lstsq(times[:, np.newaxis], dg)[0][0]
-        d['r'] = r
+            r = np.linalg.lstsq(times[:, np.newaxis], dg)[0][0]
+            d['r'] = r
 
 
-    if VERBOSE >= 1:
-        print 'Prepare data for plot'
+        if VERBOSE >= 1:
+            print 'Prepare data for plot'
 
-    datap = pd.DataFrame([{'pcode': d['pcode'],
-                           'region': d['region'],
-                           'rate': d['r'] * 365.24}
-                          for d in data])
+        datap = pd.DataFrame([{'pcode': d['pcode'],
+                               'region': d['region'],
+                               'rate': d['r'] * 365.24}
+                              for d in data])
 
-    if VERBOSE >= 1:
-        print 'Save data for plot to pickle'
-    datap.to_pickle(fn_data)
+        if VERBOSE >= 1:
+            print 'Save data for plot to pickle'
+        datap.to_pickle(fn_data)
 
-    if VERBOSE >= 1:
-        print 'Plot'
-    # Plot divergence and the fit
-    plot_divergence_fit(data, VERBOSE=VERBOSE)
+        if VERBOSE >= 1:
+            print 'Plot'
+        # Plot divergence and the fit
+        plot_divergence_fit(data, VERBOSE=VERBOSE)
+
+    else:
+        datap = pd.read_pickle(fn_data)
 
     # Plot just the slope
     filename = foldername+'substitution_rates'
