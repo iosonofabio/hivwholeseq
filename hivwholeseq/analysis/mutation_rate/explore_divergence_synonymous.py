@@ -112,7 +112,7 @@ def collect_data_mutation_rate(regions, pnames, VERBOSE=0):
 
             # Premature stops in the initial consensus???
             if '*' in protm:
-                # Trim the stop codon if still there (why? why?)
+                # Trim the stop codon if still there (some proteins are also end of translation)
                 if protm[-1] == '*':
                     if VERBOSE >= 2:
                         print 'Ends with a stop, trim it'
@@ -152,17 +152,17 @@ def collect_data_mutation_rate(regions, pnames, VERBOSE=0):
                     print pos
 
                 # Only look at third position, so 
-                pos_dna = pos * 3 + 2
+                posdna = pos * 3 + 2
 
                 # Get the entropy
-                if pos not in coomapd:
+                if posdna not in coomapd:
                     continue
-                pos_sub = coomapd[pos]
+                pos_sub = coomapd[posdna]
                 if (pos_sub not in Ssub) or (protm[pos] not in Ssub[pos_sub]):
                     continue
                 Ssubpos = Ssub[pos_sub][protm[pos]]
 
-                aft_pos = aft[:, :, pos_dna]
+                aft_pos = aft[:, :, posdna]
 
                 # Get only non-masked time points
                 indpost = -aft_pos[:, 0].mask
@@ -171,17 +171,17 @@ def collect_data_mutation_rate(regions, pnames, VERBOSE=0):
                 timespos = times[indpost]
                 aft_pos = aft_pos[indpost]
 
-                # Discard of the initial time point is already polymorphic
-                aft_anc = aft_pos[:, icons[pos_dna]]
+                # Discard if the initial time point is already polymorphic
+                aft_anc = aft_pos[:, icons[posdna]]
                 if aft_anc[0] < 0.9:
                     continue
 
                 # Iterate over the three derived nucleotides
                 for inuc, aft_der in enumerate(aft_pos.T[:4]):
-                    if inuc == icons[pos_dna]:
+                    if inuc == icons[posdna]:
                         continue
 
-                    anc = consm[pos_dna]
+                    anc = consm[posdna]
                     der = alpha[inuc]
                     mut = anc+'->'+der
 
