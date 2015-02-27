@@ -184,8 +184,8 @@ class Patient(pd.Series):
         if format == 'json':
             fn = self.get_consensi_tree_filename(region, format='json')
             if os.path.isfile(fn):
-                from ..generic_utils import read_json
-                from ..tree_utils import tree_from_json
+                from ..utils.generic import read_json
+                from ..utils.tree import tree_from_json
                 return tree_from_json(read_json(fn))
 
         fn = self.get_consensi_tree_filename(region, format='newick')
@@ -206,8 +206,8 @@ class Patient(pd.Series):
 
         fn = self.get_local_tree_filename(region, format='json')
         if os.path.isfile(fn):
-            from ..generic_utils import read_json
-            from ..tree_utils import tree_from_json
+            from ..utils.generic import read_json
+            from ..utils.tree import tree_from_json
             return tree_from_json(read_json(fn))
 
 

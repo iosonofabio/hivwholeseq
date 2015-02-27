@@ -19,7 +19,7 @@ from hivwholeseq.utils.tree import build_tree_fasttree
 from hivwholeseq.utils.argparse import RoiAction
 from hivwholeseq.store.store_tree_consensi import annotate_tree
 from hivwholeseq.utils.nehercook.ancestral import ancestral_sequences
-from hivwholeseq.utils.tree import tree_to_json
+from hivwholeseq.utils.tree import tree_to_json, filter_rare_leaves
 from hivwholeseq.utils.generic import write_json
 
 
@@ -79,64 +79,6 @@ def get_region_count_trajectories(patient, region, VERBOSE=0, countmin=5):
     return (hct.T, ind, seqs_set)
 
 
-def expand_duplicates_annotate_tree(tree, htf, times, seqs, minfreq=0.01):
-    '''Annotate tree with days and colors'''
-    from operator import attrgetter
-    from Bio.Phylo.BaseTree import Clade
-
-    # Reroot
-    iseqroot = htf[:, 0].argmax()
-    for leaf in tree.get_terminals():
-        iseq = int(leaf.name[3:]) - 1
-        if iseq == iseqroot:
-            break
-    else:
-        raise ValueError('Not able to reroot!')
-    tree.root_with_outgroup(leaf)
-
-    # Expand duplicates (same sequence but different time points)
-    leaves = tree.get_terminals()
-    for leaf in leaves:
-        iseq = int(leaf.name[3:]) - 1
-        seq = seqs[iseq]
-        ht = htf[iseq]
-
-        # Check how many copies of the leaf we need
-        indseq = set((ht > minfreq).nonzero()[0])
-        indseq.add(ht.argmax())
-        indseq = sorted(indseq)
-
-        # One copy only, just rename
-        if len(indseq) == 1:
-            it = indseq[0]
-            h = ht[it]
-            t = '{:1.1f}'.format(times[it])
-
-            leaf.name = str(t)+'_'+seq
-            leaf.frequency = h
-            leaf.sequence = seq
-            leaf.DSI = t
-
-            continue
-
-        # Several copy, transform into internal node and append subtree
-        for it in indseq:
-            h = ht[it]
-            t = '{:1.1f}'.format(times[it])
-
-            name = str(t)+'_'+seq
-            newleaf = Clade(branch_length=1e-4, name=name)
-            newleaf.frequency = h
-            newleaf.sequence = seq
-            newleaf.DSI = t
-
-            leaf.clades.append(newleaf)
-
-        leaf.name = None
-        leaf.confidence = 1.0
-        leaf.sequence = seq
-
-
 def annotate_tree_for_plot(tree, minfreq=0.02):
     '''Add annotations for plotting'''
     from matplotlib import cm
@@ -180,10 +122,8 @@ if __name__ == '__main__':
                         help='Number of reads analyzed per sample')
     parser.add_argument('--plot', action='store_true',
                         help='Plot local haplotype trajectories')
-    parser.add_argument('--freqmin', type=int, default=0.01,
+    parser.add_argument('--freqmin', type=float, default=0.01,
                         help='Minimal frequency to keep the haplotype')
-    parser.add_argument('--save', action='store_true',
-                        help='Save alignment to file')
 
     args = parser.parse_args()
     pnames = args.patients
@@ -192,7 +132,6 @@ if __name__ == '__main__':
     maxreads = args.maxreads
     use_plot = args.plot
     freqmin = args.freqmin
-    use_save = args.save
 
     patients = load_patients()
     if pnames is not None:
@@ -204,89 +143,31 @@ if __name__ == '__main__':
         if VERBOSE >= 1:
             print pname
     
-        if (not use_save) and os.path.isfile(patient.get_local_tree_filename(roi[0], format='json')):
+        if os.path.isfile(patient.get_local_tree_filename(roi[0], format='json')):
             if VERBOSE >= 2:
                 print 'Get tree'
             region = roi[0]
             tree = patient.get_local_tree(region)
 
-        elif (not use_save) and os.path.isfile(patient.get_local_tree_filename(' '.join(map(str, roi)), format='json')):
+        elif os.path.isfile(patient.get_local_tree_filename(' '.join(map(str, roi)), format='json')):
             if VERBOSE >= 2:
                 print 'Get tree'
             region = ' '.join(map(str, roi))
             tree = patient.get_local_tree(region)
 
         else:
-            if VERBOSE >= 1:
-                print 'Get haplotypes'
-            try:
-                region = roi[0]
-                (hct, ind, seqs) = get_region_count_trajectories(patient, region,
-                                                                 VERBOSE=VERBOSE)
-            except IOError:
-                region = ' '.join(map(str, roi))
-                (hct, ind, seqs) = patient.get_local_haplotype_count_trajectories(*roi,
-                                                                                  VERBOSE=VERBOSE)
-            
-            hct = hct.T
-            htf = 1.0 * hct / hct.sum(axis=0)
+            raise IOError('Tree file not found')
 
-            # Exclude too rare haplos
-            indseq = (htf >= freqmin).any(axis=1)
-            seqs = seqs[indseq]
-            htf = htf[indseq]
-
-            # Get initial top haplo
-            iseq0 = htf[:, 0].argmax()
-            seq0 = seqs[iseq0]
-
-            times = patient.times[ind]
-
-            if VERBOSE >= 1:
-                print 'Align sequences'
-            ali = align_muscle(*seqs, sort=True)
-
-            if VERBOSE >= 1:
-                print 'Build local tree'
-            tree = build_tree_fasttree(ali, VERBOSE=VERBOSE)
-
-            if VERBOSE >= 2:
-                print 'Infer ancestral sequences'
-            a = ancestral_sequences(tree, ali, alphabet='ACGT-N', copy_tree=False,
-                                    attrname='sequence', seqtype='str')
-            a.calc_ancestral_sequences()
-            a.cleanup_tree()
-
-            expand_duplicates_annotate_tree(tree, htf, times, map(''.join, ali), minfreq=0.01)
-            
-            # FIXME: for the amino acid mutations, we must make sure that we are
-            # codon aligned (with codon_align). The problem is that sometimes
-            # V3 has gaps of 1-2 nucleotides... at frequency 10%??
-            if VERBOSE >= 2:
-                print 'Annotate tree'
-            annotate_tree(patient, tree, VERBOSE=VERBOSE)
-                
-            if VERBOSE >= 2:
-                print 'Ladderize tree'
-            tree.ladderize()
-
-            if use_save:
-                if VERBOSE >= 2:
-                    print 'Save tree (JSON)'
-                fn = patient.get_local_tree_filename(region, format='json')
-                tree_json = tree_to_json(tree.root,
-                                         fields=('DSI', 'sequence', 'muts',
-                                                 'VL', 'CD4',
-                                                 'frequency',
-                                                 'confidence'),
-                                        )
-                write_json(tree_json, fn)
+        if VERBOSE >= 2:
+            print 'Filter out too rare leaves'
+        filter_rare_leaves(tree, freqmin, VERBOSE=VERBOSE)
 
         if use_plot:
-
+            if VERBOSE >= 2:
+                print 'Annotate tree for plotting'
             annotate_tree_for_plot(tree, minfreq=0.1)
 
-            if VERBOSE >= 1:
+            if VERBOSE >= 2:
                 print 'Plot'
             fig, ax = plt.subplots()
             ax.set_title(patient.code+', '+region)

@@ -466,25 +466,28 @@ def plot_minor_allele_example(data, title='', VERBOSE=0, savefig=False):
 
 
 def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
-                                color_by='age_frac'):
+                                color_by='DSI'):
     '''Plot tree of minor haplotypes in a typical sample'''
     from Bio import Phylo
 
-    def assign_color(tree, cmap='jet', attrname='age_frac'):
+    def assign_color(tree, cmap='jet', attrname='DSI'):
         '''Assign color to leaves based on a colormap'''
         if isinstance(cmap, basestring):
             from matplotlib import cm
             cmap = getattr(cm, cmap)
+
+        attr_max = max(getattr(leaf, attrname) for leaf in tree.get_terminals())
+        def get_color(node):
+            return map(int, np.array(cmap(getattr(node, attrname)/attr_max*0.9)[:-1]) * 255)
     
         for node in tree.get_terminals():
-            attr = getattr(node, attrname)
-            color = [int(255 * c) for c in cmap(1.0 * attr)[:3]]
-            node.color = color
+            node.color = get_color(node)
     
-        for node in tree.get_nonterminals():
-            attr = getattr(node, attrname)
-            color = [int(255 * c) for c in cmap(1.0 * attr)[:3]]
-            node.color = color
+        # For internal nodes, set the attribute (e.g. age) as the arithmetic mean of
+        # the children clades
+        for node in tree.get_nonterminals(order='postorder'):
+            setattr(node, attrname, np.mean([getattr(c, attrname) for c in node.clades]))
+            node.color = get_color(node)
 
 
     plt.ioff()
@@ -498,11 +501,12 @@ def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
 
     for datum in data:
         tree = datum['tree']
-        htf = datum['htf']
+
+        times = sorted(set([leaf.DSI for leaf in tree.get_terminals()]))
 
         assign_color(tree, attrname=color_by)
-        labels = ['{:>8s}'.format('{:>4s}'.format(leaf.name.split()[0])+' '+
-                   '{:>2d}'.format(int(float(leaf.name.split()[1]) / 30.5))+
+        labels = ['{:>8s}'.format('{:>3.0%}'.format(leaf.frequency)+' '+
+                   '{:>2d}'.format(int(float(leaf.DSI) / 30.5))+
                   'm')
                   for leaf in tree.get_terminals()]
         depths = tree.depths()
@@ -513,17 +517,18 @@ def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
         rmax = 250
         data_circles = []
         for il, leaf in enumerate(tree.get_terminals(), 1):
-            iseq = leaf.iseq
-            it = leaf.it
-            r = rmin + (rmax - rmin) * (htf[it, iseq] - 0.015)**(0.5)
+            it = times.index(leaf.DSI)
+            hf = leaf.frequency
+            r = rmin + (rmax - rmin) * (hf - 0.015)**(0.5)
             y = il
             x = depths[leaf]
             c = [tone / 255.0 for tone in leaf.color.to_rgb()]
             data_circles.append((x, y, 2 * r, c))
 
         # Draw the background lines from the dots to the right axis
+        # NOTE: they are drawn first so they stay in the background
         for (x, y, s, c) in data_circles:
-            ax.plot([x, ax.get_xlim()[1]], [y, y], c='darkgrey', alpha=0.5,
+            ax.plot([x, ax.get_xlim()[1]], [y, y], color=c, alpha=0.5,
                     ls='--', dashes=(8, 3), zorder=1)
 
         # Draw the tree

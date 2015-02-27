@@ -180,3 +180,11 @@ def add_mutations_tree(tree, translate=False,
         muts = [pseqm[p]+str(p+1)+nseqm[p] for p in posm]
 
         setattr(node, mutation_attrname, ', '.join(muts))
+
+
+def filter_rare_leaves(tree, freqmin, VERBOSE=0):
+    '''Filter our leaves that are rarer than a threshold'''
+    leaves = [leaf for leaf in tree.get_terminals() if leaf.frequency < freqmin]
+    for leaf in leaves:
+        tree.prune(leaf)
+
