@@ -71,7 +71,7 @@ def collect_data_mutation_rate(regions, pnames, VERBOSE=0):
             print region
 
         if VERBOSE >= 2:
-            print 'Get subtype consensus'
+            print 'Get subtype consensus (for checks only)'
         try:
             conssub = get_subtype_reference_alignment_consensus(region, VERBOSE=VERBOSE)
         except IOError:
@@ -201,14 +201,13 @@ def collect_data_mutation_rate(regions, pnames, VERBOSE=0):
     return data
 
 
-def fit_mutation_rate(data, VERBOSE=0):
-    '''Fit the mutation rate from the data'''
+def fit_mutation_rate_avgsample(data, VERBOSE=0, Smin=0.05):
+    '''Fit the mutation rate from the data, each sample weighs 1'''
     muts = list(np.unique(data.loc[:, 'mut']))
 
-    Sbins = [(0, 0.1), (0.1, 2)]
-    Sbin = Sbins[-1]
+    # Average within time points first
     datap = (data
-             .loc[(data.loc[:, 'S'] > Sbin[0]) & (data.loc[:, 'S'] <= Sbin[1])]
+             .loc[data.loc[:, 'S'] >= Smin]
              .loc[:, ['mut', 'time', 'af']]
              .groupby(['mut', 'time'])
              .mean()
@@ -219,6 +218,29 @@ def fit_mutation_rate(data, VERBOSE=0):
     for mut, datum in datap.iterrows():
         x = np.array(datum.index)
         y = np.array(datum)
+
+        # Get rid of masked stuff (this happens if we miss data in the means)
+        ind = -(np.isnan(x) | np.isnan(y))
+        x = x[ind]
+        y = y[ind]
+
+        # Linear fit
+        m = np.dot(y, x) / np.dot(x, x)
+        fits[mut] = m
+
+    return pd.Series(fits)
+
+
+def fit_mutation_rate(data, VERBOSE=0, Smin=0.05):
+    '''Fit the mutation rate from the data, each observation weighs 1'''
+    muts = list(np.unique(data.loc[:, 'mut']))
+    
+    fits = {}
+    for mut in muts:
+        datum = data.loc[data.loc[:, 'mut'] == mut]
+
+        x = np.array(datum['time'])
+        y = np.array(datum['af'])
 
         # Get rid of masked stuff (this happens if we miss data in the means)
         ind = -(np.isnan(x) | np.isnan(y))

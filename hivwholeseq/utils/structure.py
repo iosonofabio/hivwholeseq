@@ -21,3 +21,20 @@ def get_resname1(res, throw=False):
 def get_chainseq(chain, **kwargs):
     '''Get the sequence of a PDB chain'''
     return ''.join(get_resname1(res, **kwargs) for res in chain.get_residues())
+
+
+def get_distance_matrix(chain, kind='CA'):
+    '''Get distance matrix between residues of a chain'''
+    import numpy as np
+    vs = np.zeros((len(chain), 3))
+    for ir, res in enumerate(chain.get_residues()):
+        if kind in res.child_dict:
+            atom = res.child_dict[kind]
+            vs[ir] = atom.get_vector().get_array()
+
+    ds = np.zeros((len(vs), len(vs)))
+    for ir, v in enumerate(vs):
+        ds[ir] = np.sqrt(((v - vs)**2).sum(axis=1))
+
+    return ds
+

@@ -16,6 +16,7 @@ from hivwholeseq.patients.patients import load_patients, Patient
 
 from hivwholeseq.analysis.mutation_rate.explore_divergence_synonymous import (
     collect_data_mutation_rate, fit_mutation_rate)
+from hivwholeseq.analysis.mutation_rate.comparison_Abram import comparison_Abram2010
 
 from hivwholeseq.paper_figures.filenames import get_figure_folder
 from hivwholeseq.paper_figures.plots import plot_mutation_rate
@@ -37,29 +38,35 @@ if __name__ == '__main__':
     foldername = get_figure_folder(username, 'first')
     fn_data = foldername+'data/'
     mkdirs(fn_data)
-    fn_data = fn_data + 'mutation_rate_data.pickle'
     fn_fits = fn_data + 'mutation_rate.pickle'
+    fn_comp = fn_data + 'mutation_rate_comparison_Abram2010.pickle'
+    fn_data = fn_data + 'mutation_rate_data.pickle'
 
     if (not os.path.isfile(fn_data)) or (not os.path.isfile(fn_fits)):
         data = collect_data_mutation_rate(regions, pnames, VERBOSE=VERBOSE)
-        fits = fit_mutation_rate(data, VERBOSE=VERBOSE)
+        fits = fit_mutation_rate(data, VERBOSE=VERBOSE, Smin=0.1)
+        comp = comparison_Abram2010(fits)
+
 
         if VERBOSE >= 1:
             print 'Save data for plot to pickle'
         data.to_pickle(fn_data)
         fits.to_pickle(fn_fits)
+        comp.to_pickle(fn_comp)
 
     else:
         data = pd.read_pickle(fn_data)
         fits = pd.read_pickle(fn_fits)
+        comp = pd.read_pickle(fn_comp)
 
-    datap = {'data': data, 'fits': fits}
+        
+    datap = {'data': data, 'fits': fits, 'comp': comp}
 
-    filename = foldername+'mutation_rate'
+    filenames = [foldername+'mutation_rate', foldername+'mutation_rate_fits']
     for ext in ['png', 'pdf', 'svg']:
         plot_mutation_rate(datap,
                            VERBOSE=VERBOSE,
-                           savefig=filename+'.'+ext)
+                           savefig=[fn+'.'+ext for fn in filenames])
 
     plot_mutation_rate(datap, VERBOSE=VERBOSE)
 

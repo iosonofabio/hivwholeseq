@@ -671,9 +671,8 @@ def plot_mutation_rate(data,
              .unstack('time'))
 
 
-    fig, (ax, ax2, ax3) = plt.subplots(1, 3, figsize=(12, 5),
-                                       gridspec_kw={'width_ratios': [10, 12, 0.8]})
-
+    # Supplementary figure for the accumulation
+    fig1, ax1 = plt.subplots()
     for mut, datum in datap.iterrows():
         x = np.array(datum.index) / 30.5
         y = np.array(datum)
@@ -684,20 +683,25 @@ def plot_mutation_rate(data,
         y = y[ind]
 
         color = cm.jet(1.0 * muts.index(mut) / len(muts))
-        ax.scatter(x, y, color=color, label=mut)
+        ax1.scatter(x, y, color=color, label=mut)
 
         m = fits.loc[mut] * 30.5
         xfit = np.linspace(0, 100)
-        ax.plot(xfit, m * xfit, color=color, lw=1.5, alpha=0.5)
+        ax1.plot(xfit, m * xfit, color=color, lw=1.5, alpha=0.5)
 
-    ax.set_xlabel('Time from infection [months]')
-    ax.set_ylabel('Allele frequency')
-    ax.set_ylim(1e-4, 1)
-    ax.set_yscale('log')
-    ax.grid(True)
-    ax.legend(loc='upper left', fontsize=10, ncol=2)
+    ax1.set_xlabel('Time from infection [months]')
+    ax1.set_ylabel('Allele frequency')
+    ax1.set_ylim(1e-4, 1)
+    ax1.set_yscale('log')
+    ax1.grid(True)
+    ax1.legend(loc='upper left', fontsize=10, ncol=2)
+
+    plt.tight_layout(rect=(0, 0, 0.98, 1))
 
     # Plot the mutation rate matrix
+    fig2, (ax2, ax3) = plt.subplots(1, 2, figsize=(6, 5),
+                                   gridspec_kw={'width_ratios': [12, 0.8]})
+
     mu = np.ma.masked_all((4, 4))
     for mut, fit in fits.iteritems():
         n1 = mut[0]
@@ -706,7 +710,7 @@ def plot_mutation_rate(data,
         mu[alphal.index(n1), alphal.index(n2)] = fit * 2
 
     # Plot the log10 for better dynamic range
-    vmin = np.floor(np.log10(mu.min()))
+    vmin = max(-10, np.floor(np.log10(mu.min())))
     vmax = np.ceil(np.log10(mu.max()))
     h = ax2.imshow(np.log10(mu),
                    interpolation='nearest',
@@ -734,16 +738,19 @@ def plot_mutation_rate(data,
     plt.tight_layout(w_pad=0.05)
 
     if title:
-        fig.suptitle(title)
+        fig1.suptitle(title)
+        fig2.suptitle(title)
 
     if savefig:
-        fig_filename = savefig
-        fig_folder = os.path.dirname(fig_filename)
+        from itertools import izip
+        for fig, sf in izip((fig1, fig2), savefig):
+            fig_filename = sf
+            fig_folder = os.path.dirname(fig_filename)
 
-        mkdirs(fig_folder)
-        plt.tight_layout(rect=(0, 0, 0.98, 1))
-        fig.savefig(fig_filename)
-        plt.close(fig)
+            mkdirs(fig_folder)
+            plt.tight_layout(rect=(0, 0, 0.98, 1))
+            fig.savefig(fig_filename)
+            plt.close(fig)
 
     else:
         plt.tight_layout(rect=(0, 0, 0.98, 1))

@@ -7,19 +7,14 @@ content:    Get PDB of a structure.
 # Modules
 import argparse
 from Bio.PDB import PDBParser
+import matplotlib.pyplot as plt
 
-from hivwholeseq.utils.structure import get_chainseq
+from hivwholeseq.utils.structure import get_chainseq, get_distance_matrix
+from hivwholeseq.structure.get_PDB import get_PDB
 
 
 
 # Functions
-def get_PDB(region, seqid=None, VERBOSE=0):
-    '''Get a PDB structure from file'''
-    from hivwholeseq.structure.filenames import get_PDB_filename_and_chains
-    fn, chinds = get_PDB_filename_and_chains(region, seqid=seqid, VERBOSE=VERBOSE)
-    pdbp = PDBParser()
-    pdb = pdbp.get_structure(region, fn)
-    return pdb, chinds
 
 
 
@@ -43,11 +38,23 @@ if __name__ == '__main__':
     use_plot = args.plot
 
     if VERBOSE >= 1:
-        print 'Get structure PDB'
+        print 'Get structure PDB and index of chains'
     pdb, chinds = get_PDB(region, VERBOSE=VERBOSE)
 
-    # Note: PR is a dimer
     ch = list(pdb.get_chains())[chinds[0]]
 
     # Note: they often put drugs after the proteins in the same PDB chain
     seq = get_chainseq(ch).rstrip('X')
+
+    ds = get_distance_matrix(ch)
+
+    if use_plot:
+        fig, ax = plt.subplots()
+        h = ax.imshow(ds, interpolation='nearest')
+        cb = plt.colorbar(h)
+
+        ax.set_title(region)
+        cb.set_label('Distance [Angstrom]', rotation=270, labelpad=30)
+
+        plt.ion()
+        plt.show()

@@ -501,3 +501,13 @@ def get_codon_back_table():
         table[aa].append(codon)
     return dict(table)
 
+
+def get_allele_frequencies_from_MSA(alim, alpha=alpha):
+    '''Get allele frequencies from a multiple sequence alignment'''
+    import numpy as np
+    alim = np.asarray(alim)
+    af = np.zeros((len(alpha), alim.shape[1]))
+    for ia, nuc in enumerate(alpha):
+        af[ia] = (alim == nuc).mean(axis=0)
+
+    return af

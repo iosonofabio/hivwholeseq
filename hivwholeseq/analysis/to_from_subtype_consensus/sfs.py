@@ -28,6 +28,32 @@ from hivwholeseq.patients.one_site_statistics import get_codons_n_polymorphic
 
 
 
+# Functions
+def get_sfs(data, bins_af, attrnames=['tbin', 'awayto'], VERBOSE=0):
+    '''Get SFS from data'''
+    datah = data.loc[(data.loc[:, 'afbin'] != -1) &
+                     (data.loc[:, 'afbin'] != len(bins_af) - 1)]
+    datah = (datah
+             .loc[:, attrnames + ['afbin']]
+             .groupby(attrnames + ['afbin'])
+             .size()
+             .unstack('afbin'))
+    # Normalize
+    datah[np.isnan(datah)] = 0
+    datah = (datah.T / datah.sum(axis=1)).T # The sum of counts
+    # (the bin widths)
+    binsw_af = bins_af[1:] - bins_af[:-1]
+    datah /= binsw_af
+
+    # Add pseudocounts
+    vmin = 0.1 * datah[datah > 0].min().min()
+    datah[datah < vmin] = vmin
+
+    return datah
+
+
+
+
 # Script
 if __name__ == '__main__':
 
@@ -185,9 +211,16 @@ if __name__ == '__main__':
         for b in bins_t[1:]:
             data.loc[data.loc[:, 'time'] >= b, 'tbin'] += 1
 
+        # Bin by subtype entropy
+        bins_S = np.array([0, 0.01, 0.05, 0.1, 0.5, 3])
+        binsc_S = 0.5 * (bins_S[1:] + bins_S[:-1])
+        data['Sbin'] = 0
+        for b in bins_S[1:]:
+            data.loc[data.loc[:, 'Ssub'] >= b, 'Sbin'] += 1
+
         # Bin by allele freq
         logistic_fun = lambda x: 1.0 / (1.0 + 10**(-x))
-        bins_af_logit = np.linspace(-2.5, 1.5, 10)
+        bins_af_logit = np.linspace(-2.5, 1.5, 8)
         binsc_af_logit = 0.5 * (bins_af_logit[1:] + bins_af_logit[:-1])
         bins_af = logistic_fun(bins_af_logit)
         binsc_af = logistic_fun(binsc_af_logit)
@@ -196,45 +229,24 @@ if __name__ == '__main__':
         for b in bins_af:
             data.loc[data.loc[:, 'af'] >= b, 'afbin'] += 1
 
-
-        # Mean frequencies
-        datap = (data
-                 .loc[:, ['tbin', 'awayto', 'af']]
-                 .groupby(['awayto', 'tbin'])
-                 .mean())
-        print datap
-
-        # SFS
-        datah = data.loc[(data.loc[:, 'afbin'] != -1) &
-                         (data.loc[:, 'afbin'] != len(bins_af) - 1)]
-        datah = (datah
-                 .loc[:, ['tbin', 'awayto', 'afbin']]
-                 .groupby(['tbin', 'awayto', 'afbin'])
-                 .size()
-                 .unstack('afbin'))
-        # Normalize
-        datah[np.isnan(datah)] = 0
-        datah = (datah.T / datah.sum(axis=1)).T # The sum of counts
-        datah /= binsw_af # The bin widths
-
-        # Add pseudocounts
-        vmin = 0.1 * datah[datah > 0].min().min()
-        datah[datah < vmin] = vmin
-        print datah
-
+        # SFS (time and away/to)
+        datah_t = get_sfs(data, bins_af, attrnames=['tbin', 'awayto'], VERBOSE=VERBOSE)
 
         fig, ax = plt.subplots() 
-        for ik, (keys, arr) in enumerate(datah.iterrows()):
+        for ik, (keys, arr) in enumerate(datah_t.iterrows()):
+            time_window = str(int(binsc_t[keys[0]]))+'m'
+            awayto = keys[1]
+
             x = binsc_af[np.array(arr.index)]
             y = np.array(arr)
+            y *= 1e2 / y[0]
 
             color = cm.jet(1.0 * keys[0] / len(binsc_t))
             if keys[1] == 'away':
                 ls = '--'
             else:
                 ls = '-'
-            time_window = str(int(binsc_t[keys[0]]))+'m'
-            label = time_window+', '+keys[1]
+            label = ', '.join([time_window, awayto])
 
             ax.plot(x, y,
                     ls=ls,
@@ -245,9 +257,50 @@ if __name__ == '__main__':
         ax.set_xlim(bins_af[0], bins_af[-1])
         ax.set_xscale('logit')
         ax.set_yscale('log')
+        ax.set_ylim(ymax=1e4)
         ax.grid(True)
         ax.legend(loc='upper right', ncol=2, fontsize=12, title='Categories')
         ax.set_ylabel('Spectrum [normalized by bin width]')
 
         plt.ion()
         plt.show()
+
+
+        # SFS (entropy and away/to)
+        datah_S = get_sfs(data, bins_af, attrnames=['Sbin', 'awayto'], VERBOSE=VERBOSE)
+
+        fig, ax = plt.subplots() 
+        for ik, (keys, arr) in enumerate(datah_S.iterrows()):
+            iSbin = keys[0]
+            awayto = keys[1]
+
+            x = binsc_af[np.array(arr.index)]
+            y = np.array(arr)
+            y *= 1e2 / y[0]
+
+            color = cm.jet(1.0 * keys[0] / len(binsc_t))
+            if keys[1] == 'away':
+                ls = '--'
+            else:
+                ls = '-'
+            
+            label = ', '.join(['S e ['+str(bins_S[iSbin])+', '+str(bins_S[iSbin+1])+']', awayto])
+
+            ax.plot(x, y,
+                    ls=ls,
+                    lw=2,
+                    color=color, label=label)
+
+        ax.set_xlabel('Allele frequency')
+        ax.set_xlim(bins_af[0], bins_af[-1])
+        ax.set_xscale('logit')
+        ax.set_yscale('log')
+        ax.set_ylim(ymax=1e4)
+        ax.grid(True)
+        ax.legend(loc='upper right', ncol=2, fontsize=12, title='Categories')
+        ax.set_ylabel('Spectrum [normalized by bin width]')
+
+        plt.ion()
+        plt.show()
+
+
