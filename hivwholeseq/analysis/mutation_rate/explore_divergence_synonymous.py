@@ -72,16 +72,11 @@ def collect_data_mutation_rate(regions, pnames, VERBOSE=0):
 
         if VERBOSE >= 2:
             print 'Get subtype consensus (for checks only)'
-        try:
-            conssub = get_subtype_reference_alignment_consensus(region, VERBOSE=VERBOSE)
-        except IOError:
-            if VERBOSE >= 2:
-                print 'Not found. Skip'
+        conssub = get_subtype_reference_alignment_consensus(region, VERBOSE=VERBOSE)
 
         if VERBOSE >= 2:
             print 'Get subtype entropy'
         Ssub = get_subtype_reference_alignment_entropy_syn(region, VERBOSE=VERBOSE)
-
         # NOTE: Ssub is indexed by AMINO ACID, conssub by NUCLEOTIDE
 
         for ipat, (pname, patient) in enumerate(patients.iterrows()):
@@ -96,7 +91,7 @@ def collect_data_mutation_rate(regions, pnames, VERBOSE=0):
                                                                  VERBOSE=VERBOSE)
             if len(ind) == 0:
                 if VERBOSE >= 2:
-                    print 'Skip'
+                    print 'No time points: skip'
                 continue
 
             times = patient.times[ind]
@@ -126,7 +121,8 @@ def collect_data_mutation_rate(regions, pnames, VERBOSE=0):
                     continue
 
             # Get the map as a dictionary from patient to subtype
-            coomapd = dict(coomap[:, ::-1])
+            coomapd = {'pat_to_subtype': dict(coomap[:, ::-1]),
+                       'subtype_to_pat': dict(coomap)}
 
             # Get only sites that are conserved or with only one site per codon changing
             ind_poly, pos_poly = get_codons_n_polymorphic(aft, icons, n=[0, 1], VERBOSE=VERBOSE)
@@ -155,9 +151,9 @@ def collect_data_mutation_rate(regions, pnames, VERBOSE=0):
                 posdna = pos * 3 + 2
 
                 # Get the entropy
-                if posdna not in coomapd:
+                if posdna not in coomapd['pat_to_subtype']:
                     continue
-                pos_sub = coomapd[posdna]
+                pos_sub = coomapd['pat_to_subtype'][posdna]
                 if (pos_sub not in Ssub) or (protm[pos] not in Ssub[pos_sub]):
                     continue
                 Ssubpos = Ssub[pos_sub][protm[pos]]
