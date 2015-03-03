@@ -21,7 +21,7 @@ from hivwholeseq.patients.patients import load_patients, Patient
 # Functions
 def get_divergence(aft):
     '''Get divergence from allele frequency trajectories'''
-    cons_ind = Patient.get_initial_consensus_noinsertions(aft)
+    cons_ind = Patient.get_initial_consensus_noinsertions(aft, return_ind=True)
     dg = 1 - aft[:, cons_ind, np.arange(aft.shape[2])].mean(axis=1)
     return dg
 

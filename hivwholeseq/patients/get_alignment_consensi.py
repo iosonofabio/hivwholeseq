@@ -35,6 +35,7 @@ if __name__ == '__main__':
     if pnames:
         patients = patients.loc[pnames]
 
+    alis = {}
     for pname, patient in patients.iterrows():
         patient = Patient(patient)
         patient.discard_nonsequenced_samples()
@@ -51,3 +52,5 @@ if __name__ == '__main__':
                 print pname, region
 
             ali = patient.get_consensi_alignment(region)
+
+            alis[(region, pname)] = ali
