@@ -33,6 +33,76 @@ from hivwholeseq.analysis.mutation_rate.explore_divergence_synonymous import tra
 
 
 # Functions
+def fit_fitness_cost(x, y, VERBOSE=0, mu=5e-6):
+    '''Fit saturation curve for fitness costs
+    
+    NOTE: as can be seen from the plots below, the fit for l is not very
+    sensitive to mu.
+    '''
+    fun = lambda x, l, u: l * (1 - np.exp(- u/l * x))
+    fun_min = lambda x, l, u: ((y - fun(x, l, u))**2).sum()
+
+    # Minimization poor man's style: we compute the function everywhere
+    # NOTE: I am not retarded. This solution is chosen because it's still cheap
+    # and the right flank of the objective function in l is much steeper than
+    # the left flank, causing some troubles
+    ls = np.logspace(-5, 0)
+    z = np.array([fun_min(x, l, mu) for l in ls])
+    l = ls[z.argmin()]
+
+    # FIXME: if we fix mu, this is useless, but it's ok for now
+    params = (l, mu)
+
+    return (fun, params)
+
+
+def plot_function_minimization(x, y, params):
+    '''Investigate inconsistencies in fits'''
+    fun = lambda x, l, u: l * (1 - np.exp(- u/l * x))
+    fun_min = lambda p: ((y - fun(x, p[0], p[1]))**2).sum()
+
+    p1 = np.logspace(np.log10(params[0]) - 3, np.log10(params[0]) + 3, 10)
+    p2 = np.logspace(np.log10(params[1]) - 3, np.log10(params[1]) + 3, 10)
+
+    p1G = np.tile(p1, (len(p2), 1))
+    p2G = np.tile(p2, (len(p1), 1)).T
+    pG = np.dstack([p1G, p2G])
+    z = np.log(np.array([[fun_min(ppp) for ppp in pp] for pp in pG]))
+
+    fig, ax = plt.subplots()
+    ax.imshow(z, interpolation='nearest')
+
+    ax.set_xlabel('Log l')
+    ax.set_ylabel('Log u')
+
+    plt.ion()
+    plt.show()
+
+def plot_function_minimization_1d(x, y, l, us=[1.2e-6], title=''):
+    '''Investigate inconsistencies in fits'''
+    fun = lambda x, l, u: l * (1 - np.exp(- u/l * x))
+    fun_min = lambda l, u: ((y - fun(x, l, u))**2).sum()
+
+    p1 = np.logspace(np.log10(l) - 3, np.log10(l) + 3, 100)
+    zs = np.log(np.array([[fun_min(pp, u) for pp in p1] for u in us]))
+
+    fig, ax = plt.subplots()
+
+    from itertools import izip
+    for i, (z, u) in enumerate(izip(zs, us)):
+        ax.plot(p1, z, lw=2, color=cm.jet(1.0 * i / len(us)),
+                label='mu = {:1.1e}'.format(u))
+
+    if title:
+        ax.set_title(title)
+    ax.set_xlabel('Saturation frequency ($\mu / s$)')
+    ax.set_xscale('log')
+    ax.grid(True)
+    ax.legend(loc='upper left')
+
+    plt.ion()
+    plt.show()
+
 
 
 
@@ -198,9 +268,7 @@ if __name__ == '__main__':
 
 
     # Fit exponential saturation
-    from scipy.optimize import curve_fit
-    fun = lambda x, l, u: l * (1 - np.exp(- u/l * x))
-    fun_neu = lambda x, u: u * x
+    mu = 5e-6
     fits = []
     dataf = (data
              .loc[data.loc[:, 'Ssub'] < bins_S[-2]]
@@ -215,26 +283,21 @@ if __name__ == '__main__':
         y = y[ind]
 
         try:
-            l, u = curve_fit(fun, x, y, p0=(y[-1], 1e-5))[0]
+            (fun, (l, u)) = fit_fitness_cost(x, y, mu=mu)
+            if VERBOSE >= 3:
+                plot_function_minimization_1d(x, y, l, us=[1e-6, 2e-6, 5e-6, 1e-5],
+                                              title=region+', iSbin = '+str(iSbin))
+
         except RuntimeError:
             continue
 
-        ## If saturation is very high, fit unsaturated
-        #if (l > 0.1) or (u <= 0):
-        #    try:
-        #        l = np.nan
-        #        u = np.dot(x, y) / np.dot(x, x)
-        #    except RuntimeError:
-        #        continue
-
-        fits.append((region, iSbin, l, u))
+        fits.append((region, iSbin, l, u, fun))
 
     fits = pd.DataFrame(data=fits,
-                        columns=['region', 'iSbin', 'l', 'u'])
+                        columns=['region', 'iSbin', 'l', 'u', 'fun'])
     fits['S'] = binsc_S[fits['iSbin']]
     
     # Estimate fitness cost
-    mu = 0.5e-5
     fits['s'] = mu / fits['l']
 
     if plot:
@@ -251,15 +314,11 @@ if __name__ == '__main__':
                 iSbin = fit['iSbin']
                 l = fit['l']
                 u = fit['u']
-                if np.isnan(l):
-                    yfit = fun_neu(xfit, u)
-                    label = ('S e ['+'{:2.2f}'.format(bins_S[iSbin])+', '+'{:2.2f}'.format(bins_S[iSbin+1])+']'+
-                             ', u = '+'{:2.2e}'.format(u))
-                else:
-                    yfit = fun(xfit, l, u)
-                    label = ('S e ['+'{:2.2f}'.format(bins_S[iSbin])+', '+'{:2.2f}'.format(bins_S[iSbin+1])+']'+
-                             ', l = '+'{:2.2e}'.format(l)+
-                             ', u = '+'{:2.2e}'.format(u))
+                fun = fit['fun']
+                yfit = fun(xfit, l, u)
+                label = ('S e ['+'{:2.2f}'.format(bins_S[iSbin])+', '+'{:2.2f}'.format(bins_S[iSbin+1])+']'+
+                         ', s = '+'{:2.2e}'.format(mu / l))
+
                 
                 color = cm.jet(1.0 * iSbin / len(fitsreg))
 
@@ -269,7 +328,8 @@ if __name__ == '__main__':
             ax.set_ylabel('Allele frequency')
             ax.legend(loc='lower right', title='Entropy class', fontsize=10)
             ax.text(0.05, 0.9,
-                    ('f(x) = l * [1 - e^(-ux/l)]'),
+                    ('$f(x) = \mu / s [1 - e^{-sx}]$'),
+                    fontsize=20,
                     horizontalalignment='left',
                     verticalalignment='center',
                     transform=ax.transAxes)
@@ -299,13 +359,7 @@ if __name__ == '__main__':
             ax3.set_ylim(5e-5, 1)
             ax3.set_xscale('log')
             ax3.set_yscale('log')
-            ax3.grid(True)
-            ax3.text(0.05, 0.12,
-                     ('s := mu / l, with mu = 5 x 10^-6'),
-                     horizontalalignment='left',
-                     verticalalignment='center',
-                     transform=ax3.transAxes)
-
+            ax3.grid(True, which='both')
 
             plt.tight_layout(rect=(0, 0, 1, 0.96))
 
