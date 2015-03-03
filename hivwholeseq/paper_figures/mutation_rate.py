@@ -6,6 +6,7 @@ content:    Estimate the mutation rate matrix of HIV in vivo.
 '''
 # Modules
 import os
+import sys
 import numpy as np
 import pandas as pd
 from matplotlib import cm
@@ -14,7 +15,7 @@ import matplotlib.pyplot as plt
 from hivwholeseq.utils.generic import mkdirs
 from hivwholeseq.patients.patients import load_patients, Patient
 
-from hivwholeseq.analysis.mutation_rate.explore_divergence_synonymous import (
+from hivwholeseq.analysis.mutation_rate.mutation_rate import (
     collect_data_mutation_rate, fit_mutation_rate)
 from hivwholeseq.analysis.mutation_rate.comparison_Abram import comparison_Abram2010
 
@@ -59,10 +60,11 @@ if __name__ == '__main__':
         fits = pd.read_pickle(fn_fits)
         comp = pd.read_pickle(fn_comp)
 
-        
     datap = {'data': data, 'fits': fits, 'comp': comp}
 
-    filenames = [foldername+'mutation_rate', foldername+'mutation_rate_fits']
+    filenames = [foldername+'mutation_rate',
+                 foldername+'mutation_rate_fits',
+                 foldername+'mutation_rate_comparison']
     for ext in ['png', 'pdf', 'svg']:
         plot_mutation_rate(datap,
                            VERBOSE=VERBOSE,

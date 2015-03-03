@@ -200,10 +200,6 @@ if __name__ == '__main__':
     regdata = pd.DataFrame(regdata).set_index('name', drop=False)
 
 
-    # Exclude synonymous ones
-    # FIXME: better criterion
-    data = data.loc[data['class'] == 'nonsyn']
-
     if plot:
         fig, ax = plt.subplots()
 
@@ -235,7 +231,8 @@ if __name__ == '__main__':
                              'mut': mut,
                              's': s,
                              't0': t0,
-                             'Ssub': datum.iloc[0]['Ssub']
+                             'Ssub': datum.iloc[0]['Ssub'],
+                             'class': datum.iloc[0]['class'],
                             })
 
                 label=(', '.join(map(str, (region, pcode, pos_sub, mut)))+
@@ -276,16 +273,27 @@ if __name__ == '__main__':
         ax.plot(sh, 1.0 - np.linspace(0, 1, len(sh)), color='k',
                 lw=2, label='all sweeps')
 
-        # Plot separately the distributions for low/high entropy sweeps
-        fitslow = fits.loc[fits['Ssub'] < 0.6 * Ssubmed]
-        shlow = np.sort(np.array(fitslow['s']))
-        ax.plot(shlow, 1.0 - np.linspace(0, 1, len(shlow)), color='darkblue',
-                lw=2, label='Ssub < '+'{:2.2f}'.format(0.6 * Ssubmed))
+        # Plot separately the distributions for syn/nonsyn entropy sweeps
+        fitsyn = fits.loc[fits['class'] == 'syn']
+        shsyn = np.sort(np.array(fitsyn['s']))
+        ax.plot(shsyn, 1.0 - np.linspace(0, 1, len(shsyn)), color='green',
+                lw=2, label='syn')
 
-        fitshigh = fits.loc[fits['Ssub'] > 1.4 * Ssubmed]
-        shhigh = np.sort(np.array(fitshigh['s']))
-        ax.plot(shhigh, 1.0 - np.linspace(0, 1, len(shhigh)), color='darkred',
-                lw=2, label='Ssub > '+'{:2.2f}'.format(1.4 * Ssubmed))
+        fitnonsyn = fits.loc[fits['class'] == 'nonsyn']
+        shnonsyn = np.sort(np.array(fitnonsyn['s']))
+        ax.plot(shnonsyn, 1.0 - np.linspace(0, 1, len(shnonsyn)), color='purple',
+                lw=2, label='nonsyn')
+
+        ## Plot separately the distributions for low/high entropy sweeps
+        #fitslow = fits.loc[fits['Ssub'] < 0.6 * Ssubmed]
+        #shlow = np.sort(np.array(fitslow['s']))
+        #ax.plot(shlow, 1.0 - np.linspace(0, 1, len(shlow)), color='darkblue',
+        #        lw=2, label='Ssub < '+'{:2.2f}'.format(0.6 * Ssubmed))
+
+        #fitshigh = fits.loc[fits['Ssub'] > 1.4 * Ssubmed]
+        #shhigh = np.sort(np.array(fitshigh['s']))
+        #ax.plot(shhigh, 1.0 - np.linspace(0, 1, len(shhigh)), color='darkred',
+        #        lw=2, label='Ssub > '+'{:2.2f}'.format(1.4 * Ssubmed))
 
         ax.grid(True)
         ax.set_xscale('log')

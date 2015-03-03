@@ -656,9 +656,13 @@ def plot_mutation_rate(data,
     from ..utils.sequence import alphal
 
     fits = data['fits']
+    comp = data['comp']
     data = data['data']
 
     muts = list(np.unique(data.loc[:, 'mut']))
+
+    # The mutation rate we want per generation (2 days)
+    g_time = 2
 
     Sbins = [(0, 0.1), (0.1, 2)]
     Sbin = Sbins[-1]
@@ -706,8 +710,7 @@ def plot_mutation_rate(data,
     for mut, fit in fits.iteritems():
         n1 = mut[0]
         n2 = mut[-1]
-        # The mutation rate we want per generation (2 days)
-        mu[alphal.index(n1), alphal.index(n2)] = fit * 2
+        mu[alphal.index(n1), alphal.index(n2)] = fit * g_time
 
     # Plot the log10 for better dynamic range
     vmin = max(-10, np.floor(np.log10(mu.min())))
@@ -730,20 +733,39 @@ def plot_mutation_rate(data,
     class LogTickFormatter(Formatter):
         def __call__(self, x, pos=None):
             '''Transform the logs into their 10**'''
-            return '$10^{'+'{:1.0f}'.format(x)+'}$'
+            return '$10^{{{:1.0f}}}$'.format(x)
 
     cb = plt.colorbar(h, cax=ax3, ticks=cticks, format=LogTickFormatter())
     cb.set_label('Mutation rate\n[changes / generation]', rotation=90, labelpad=-100)
 
     plt.tight_layout(w_pad=0.05)
 
+    # Plot the comparison with Abram 2010
+    fig3, ax4 = plt.subplots(figsize=(5, 4))
+    xmin_exp = -7.3
+    xpl = np.logspace(xmin_exp, -4, 1000)
+    ax4.plot(xpl, xpl, color='grey', lw=2)
+    ax4.scatter(comp.loc[:, 'Abram2010'], comp.loc[:, 'new'] * g_time,
+                s=40,
+                c='k', label=comp.index)
+    ax4.set_xlabel('Rate from Abram et al. 2010')
+    ax4.set_ylabel('Rate from longitudinal samples')
+    ax4.set_xscale('log')
+    ax4.set_yscale('log')
+    ax4.set_xlim(10**(xmin_exp), 1e-4)    
+    ax4.set_ylim(10**(xmin_exp), 1e-4)    
+    ax4.grid(True)
+
+    plt.tight_layout()
+
     if title:
         fig1.suptitle(title)
         fig2.suptitle(title)
+        fig3.suptitle(title)
 
     if savefig:
         from itertools import izip
-        for fig, sf in izip((fig1, fig2), savefig):
+        for fig, sf in izip((fig1, fig2, fig3), savefig):
             fig_filename = sf
             fig_folder = os.path.dirname(fig_filename)
 

@@ -329,6 +329,7 @@ def plot_mutation_rate(data, fits, VERBOSE=0):
 # Script
 if __name__ == '__main__':
 
+    # Parse input args
     parser = argparse.ArgumentParser(
         description='Explore conservation levels across patients and subtype',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)    

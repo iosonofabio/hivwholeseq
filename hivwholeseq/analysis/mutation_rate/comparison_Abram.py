@@ -68,6 +68,8 @@ def comparison_Abram2010(mu, VERBOSE=2, title=''):
         if title:
             print title
         print data
+
+    data.rename(columns={0: 'Abram2010', 1: 'new'}, inplace=True)
     return data
 
 
