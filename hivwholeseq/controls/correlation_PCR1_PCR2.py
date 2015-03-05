@@ -32,11 +32,10 @@ from hivwholeseq.two_site_statistics import get_coallele_counts_from_file
 # Script
 if __name__ == '__main__':
 
-    # Parse input args
-    parser = argparse.ArgumentParser(description='Filter mapped reads')
+    parser = argparse.ArgumentParser(description='Correlation PCR1/PCR2')
     parser.add_argument('--patient', required=True,
                         help='Patient to analyze')
-    parser.add_argument('--fragments', nargs='*',
+    parser.add_argument('--fragments', nargs='+',
                         help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')

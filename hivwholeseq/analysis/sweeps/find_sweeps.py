@@ -35,6 +35,60 @@ from hivwholeseq.analysis.mutation_rate.explore_divergence_synonymous import tra
 
 
 # Functions
+def fit_sweeps(data, VERBOSE=0):
+    '''Fitn selective sweeps'''
+    from scipy.optimize import curve_fit
+    fun = lambda x, s, t0: 1.0 / (1.0 + np.exp(-s * (x - t0)))
+    fits = []
+
+    datap = data.groupby(['region', 'pcode', 'possub', 'mut'])
+    for (region, pcode, pos_sub, mut), datum in datap:
+        datum.sort('time', inplace=True)
+
+        x = np.array(datum['time'])
+        y = np.array(datum['af'])
+
+        ind = -(np.isnan(x) | np.isnan(y))
+        x = x[ind]
+        y = y[ind]
+
+        # If we have 2 data points at intermediate frequencies, we can fit
+        # otherwise we have a lower bound
+        freqlim = 0.05
+        n_interm = ((y > freqlim) & (y < (1 - freqlim))).sum()
+        if n_interm < 2:
+            fitkind = '>'
+
+            # Get lower bound
+            t2 = x[y > (1 - freqlim)][0]
+            t1 = x[(x < t2) & (y < freqlim)][-1]
+            t0 = 0.5 * (t1 + t2)
+            dt = 0.5 * (t2 - t1)
+            s = np.log(1.0 / freqlim - 1) / dt
+
+        else:
+            fitkind = '='
+
+            try:
+                tmid = x[(y > 0.5)][0]
+                s, t0 = curve_fit(fun, x, y, p0=(1e-3, tmid))[0]
+
+            except RuntimeError:
+                continue
+
+        fits.append({'region': region,
+                     'pcode': pcode,
+                     'pos_sub': pos_sub,
+                     'mut': mut,
+                     'fitkind': fitkind,
+                     's': s,
+                     't0': t0,
+                     'Ssub': datum.iloc[0]['Ssub'],
+                     'class': datum.iloc[0]['class'],
+                    })
+
+    fits = pd.DataFrame(fits)
+    return fits
 
 
 
@@ -199,14 +253,10 @@ if __name__ == '__main__':
 
     regdata = pd.DataFrame(regdata).set_index('name', drop=False)
 
+    fits = fit_sweeps(data, VERBOSE=VERBOSE)
 
     if plot:
         fig, ax = plt.subplots()
-
-        # Fit sweep
-        from scipy.optimize import curve_fit
-        fun = lambda x, s, t0: 1.0 / (1.0 + np.exp(-s * (x - t0)))
-        fits = []
 
         datap = data.groupby(['region', 'pcode', 'possub', 'mut'])
         for (region, pcode, pos_sub, mut), datum in datap:
@@ -221,26 +271,24 @@ if __name__ == '__main__':
 
             color = cm.jet(1.0 * pos_sub / regdata.loc[region].loc['L'])
 
-            try:
-                tmid = x[(y > 0.5)][0]
-                s, t0 = curve_fit(fun, x, y, p0=(1e-3, tmid))[0]
-
-                fits.append({'region': region,
-                             'pcode': pcode,
-                             'pos_sub': pos_sub,
-                             'mut': mut,
-                             's': s,
-                             't0': t0,
-                             'Ssub': datum.iloc[0]['Ssub'],
-                             'class': datum.iloc[0]['class'],
-                            })
+            # Look for the fit if available
+            fit = fits[((fits['region'] == region) &
+                        (fits['pcode'] == pcode) &
+                        (fits['pos_sub'] == pos_sub) &
+                        (fits['mut'] == mut))]
+            if len(fit):
+                fun = lambda x, s, t0: 1.0 / (1.0 + np.exp(-s * (x - t0)))
+                fit = fit.iloc[0]
+                s = fit['s']
+                t0 = fit['t0']
 
                 label=(', '.join(map(str, (region, pcode, pos_sub, mut)))+
                        ', s = '+'{:2.1e}'.format(s))
                 xfit = np.linspace(0, x.max(), 1000)
                 yfit = fun(xfit, s, t0)
                 ax.plot(xfit, yfit, lw=1.5, color=color, alpha=0.5)
-            except RuntimeError:
+
+            else:
                 label=', '.join(map(str, (region, pcode, pos_sub, mut)))
 
             ax.plot(x, y, color=color, lw=2, label=label)

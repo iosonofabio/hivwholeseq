@@ -24,6 +24,28 @@ alphaa = array(alphaal, 'S1')
 
 
 # Functions
+def align_pairwise(seq1, seq2, method='global', **kwargs):
+    '''Align two sequences pairwise'''
+    from seqanpy import align_global, align_overlap, align_ladder, align_local
+    funcd = {'global': align_global,
+             'overlap': align_overlap,
+             'ladder': align_ladder,
+             'local': align_local,
+            }
+
+    from Bio.Seq import Seq
+    from Bio.SeqRecord import SeqRecord
+    from Bio.Align import MultipleSeqAlignment
+
+    score, ali1, ali2 = funcd[method](seq1, seq2, **kwargs)
+    ali1 = SeqRecord(Seq(ali1, seq1.seq.alphabet), id=seq1.id, name=seq1.name,
+                     description=seq1.description) 
+    ali2 = SeqRecord(Seq(ali2, seq2.seq.alphabet), id=seq2.id, name=seq2.name,
+                     description=seq2.description) 
+    ali = MultipleSeqAlignment([ali1, ali2])
+    return ali
+
+
 def align_muscle(*seqs, **kwargs):
     '''Global alignment of sequences via MUSCLE'''
     import subprocess as sp
