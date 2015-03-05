@@ -351,5 +351,21 @@ if __name__ == '__main__':
         ax.set_ylabel('Fraction of sweeps with s > x')
         ax.legend(loc='lower left')
 
+
+        # Plot correlation between selection coefficient and entropy
+        fig, ax = plt.subplots()
+        x = fits.loc[:, 'Ssub']
+        y = fits.loc[:, 's']
+        ax.scatter(x, y, s=40)
+
+        ax.set_xlabel('Entropy in subtype B [bits]')
+        ax.set_ylabel('Selection coefficient')
+        ax.set_xscale('log')
+        ax.set_yscale('log')
+        ax.set_xlim(1e-3, 3)
+        ax.set_ylim(1e-3, 1e-1)
+        ax.grid(True)
+
+
         plt.ion()
         plt.show()
