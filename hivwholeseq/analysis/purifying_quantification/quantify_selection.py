@@ -104,6 +104,71 @@ def plot_function_minimization_1d(x, y, l, us=[1.2e-6], title=''):
     plt.show()
 
 
+def plot_fits(region, fitsreg, VERBOSE=0):
+    '''Plot the fits for purifying selection'''
+
+    fig, axs = plt.subplots(1, 2, figsize=(13, 6))
+    fig.suptitle(region, fontsize=20)
+
+    # Plot the fits
+    ax = axs[0]
+    xfit = np.logspace(0, 3.5, 1000)
+
+    for _, fit in fitsreg.iterrows():
+        iSbin = fit['iSbin']
+        Smin = fit['Smin']
+        Smax = fit['Smax']
+        l = fit['l']
+        u = fit['u']
+        fun = fit['fun']
+        yfit = fun(xfit, l, u)
+        label = ('S e ['+'{:2.2f}'.format(Smin)+', '+'{:2.2f}'.format(Smax)+']'+
+                 ', s = '+'{:.1G}'.format(mu / l))
+
+        
+        color = cm.jet(1.0 * iSbin / len(fitsreg))
+
+        ax.plot(xfit, yfit, color=color, label=label, lw=2)
+
+    ax.set_xlabel('Time [days from infection]')
+    ax.set_ylabel('Allele frequency')
+    ax.legend(loc='lower right', title='Entropy class', fontsize=10)
+    ax.text(0.05, 0.9,
+            ('$f(t) \, = \, \mu / s \, [1 - e^{-st}]$'),
+            fontsize=20,
+            horizontalalignment='left',
+            verticalalignment='center',
+            transform=ax.transAxes)
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    ax.grid(True)
+
+
+    ## Plot the value at some reasonable time
+    #x0 = 2000
+    #fitsreg['y0'] = fun(x0, fitsreg['l'], fitsreg['u'])
+    #ax2 = axs[1]
+    #ax2.plot(fitsreg['S'], fitsreg['y0'], lw=2, c='k')
+
+    #ax2.set_xlabel('Entropy in subtype [bits]')
+    #ax2.set_ylabel('Fit value at x0 = '+str(x0))
+    #ax2.set_xscale('log')
+    #ax2.set_yscale('log')
+    #ax2.grid(True)
+
+
+    # Plot the estimated fitness value
+    ax3 = axs[1]
+    ax3.plot(fitsreg['S'], fitsreg['s'], lw=2, c='k')
+    ax3.set_xlabel('Entropy in subtype [bits]')
+    ax3.set_ylabel('Fitness cost')
+    ax3.set_ylim(5e-5, 1)
+    ax3.set_xscale('log')
+    ax3.set_yscale('log')
+    ax3.grid(True, which='both')
+
+    plt.tight_layout(rect=(0, 0, 1, 0.96))
+
 
 
 # Script
@@ -296,72 +361,15 @@ if __name__ == '__main__':
     fits = pd.DataFrame(data=fits,
                         columns=['region', 'iSbin', 'l', 'u', 'fun'])
     fits['S'] = binsc_S[fits['iSbin']]
+    fits['Smin'] = bins_S[fits['iSbin']]
+    fits['Smax'] = bins_S[fits['iSbin'] + 1]
     
     # Estimate fitness cost
     fits['s'] = mu / fits['l']
 
     if plot:
         for (region, fitsreg) in fits.groupby('region'):
-
-            fig, axs = plt.subplots(1, 2, figsize=(13, 6))
-            fig.suptitle(region, fontsize=20)
-
-            # Plot the fits
-            ax = axs[0]
-            xfit = np.logspace(0, 3.5, 1000)
-
-            for _, fit in fitsreg.iterrows():
-                iSbin = fit['iSbin']
-                l = fit['l']
-                u = fit['u']
-                fun = fit['fun']
-                yfit = fun(xfit, l, u)
-                label = ('S e ['+'{:2.2f}'.format(bins_S[iSbin])+', '+'{:2.2f}'.format(bins_S[iSbin+1])+']'+
-                         ', s = '+'{:2.2e}'.format(mu / l))
-
-                
-                color = cm.jet(1.0 * iSbin / len(fitsreg))
-
-                ax.plot(xfit, yfit, color=color, label=label, lw=2)
-
-            ax.set_xlabel('Time [days from infection]')
-            ax.set_ylabel('Allele frequency')
-            ax.legend(loc='lower right', title='Entropy class', fontsize=10)
-            ax.text(0.05, 0.9,
-                    ('$f(x) = \mu / s [1 - e^{-sx}]$'),
-                    fontsize=20,
-                    horizontalalignment='left',
-                    verticalalignment='center',
-                    transform=ax.transAxes)
-            ax.set_xscale('log')
-            ax.set_yscale('log')
-            ax.grid(True)
-
-
-            ## Plot the value at some reasonable time
-            #x0 = 2000
-            #fitsreg['y0'] = fun(x0, fitsreg['l'], fitsreg['u'])
-            #ax2 = axs[1]
-            #ax2.plot(fitsreg['S'], fitsreg['y0'], lw=2, c='k')
-
-            #ax2.set_xlabel('Entropy in subtype [bits]')
-            #ax2.set_ylabel('Fit value at x0 = '+str(x0))
-            #ax2.set_xscale('log')
-            #ax2.set_yscale('log')
-            #ax2.grid(True)
-
-
-            # Plot the estimated fitness value
-            ax3 = axs[1]
-            ax3.plot(fitsreg['S'], fitsreg['s'], lw=2, c='k')
-            ax3.set_xlabel('Entropy in subtype [bits]')
-            ax3.set_ylabel('Fitness cost')
-            ax3.set_ylim(5e-5, 1)
-            ax3.set_xscale('log')
-            ax3.set_yscale('log')
-            ax3.grid(True, which='both')
-
-            plt.tight_layout(rect=(0, 0, 1, 0.96))
+            plot_fits(region, fitsreg, VERBOSE=VERBOSE)
 
         plt.ion()
         plt.show()
