@@ -22,7 +22,7 @@ from hivwholeseq.paper_figures.plots import plot_substitution_rate
 
 # Globals
 pnames = ['20097', '15363', '15823', '15376', '20529', '9669', '15241', '15319']
-regions = ['p17', 'PR', 'RT', 'vif', 'V3', 'RRE', 'nef']
+regions = ['psi', 'p17', 'p24', 'PR', 'RT', 'IN', 'vif', 'vpr', 'vpu', 'V3', 'RRE', 'gp41', 'nef']
 
 
 
@@ -138,10 +138,11 @@ if __name__ == '__main__':
     filename = foldername+'substitution_rates'
     for ext in ['png', 'pdf', 'svg']:
         plot_substitution_rate(datap,
+                               regions,
                                VERBOSE=VERBOSE,
                                savefig=filename+'.'+ext)
 
-    plot_substitution_rate(datap, VERBOSE=VERBOSE)
+    plot_substitution_rate(datap, regions, VERBOSE=VERBOSE)
 
     plt.ion()
     plt.show()

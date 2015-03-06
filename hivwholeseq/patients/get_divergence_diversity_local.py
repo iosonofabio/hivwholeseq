@@ -29,7 +29,7 @@ from hivwholeseq.cluster.fork_cluster import fork_get_allele_frequency_trajector
 # Functions
 def get_divergence_diversity_sliding(aft, block_length, VERBOSE=0):
     '''Get local divergence and diversity in a sliding window'''
-    cons_ind = Patient.get_initial_consensus_noinsertions(aft)
+    cons_ind = Patient.get_initial_consensus_noinsertions(aft, return_ind=True)
     aft_nonanc = 1.0 - aft[:, cons_ind, np.arange(aft.shape[2])]
     aft_var = (aft * (1 - aft)).sum(axis=1)
 

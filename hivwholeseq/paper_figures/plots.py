@@ -564,6 +564,7 @@ def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
 
 
 def plot_substitution_rate(data,
+                           regions,
                            title='',
                            VERBOSE=0, savefig=False):
     '''Plot the substitution rates'''
@@ -574,18 +575,10 @@ def plot_substitution_rate(data,
     # Sort patient codes
     pcodes = sorted(set(data['pcode']), key=lambda x: int(x[1:]))
 
-    # Resort regions based on average substitution rate
-    regions = (data[['region', 'rate']]
-               .groupby('region')
-               .mean()
-               .sort('rate')
-               .index
-               .tolist())
-
     xfun = lambda region, pcode: regions.index(region) + 0.05 * pcodes.index(pcode)
     cfun = lambda pcode: cm.jet(1.0 * pcodes.index(pcode) / len(pcodes))
 
-    fig, ax = plt.subplots(figsize=(2 * len(regions), 4))
+    fig, ax = plt.subplots(figsize=(0.75 * len(regions), 5))
 
     for pcode in pcodes:
         datum = (data
@@ -614,15 +607,18 @@ def plot_substitution_rate(data,
     ax.set_xticks(xticksmajor)
     ax.set_xticklabels([])
     ax.set_xticks(xticksminor, minor=True)
-    ax.set_xticklabels(xticklabels, fontsize=14, minor=True)
-    ax.set_yticklabels(ax.get_yticklabels(), fontsize=14)
+    ax.set_xticklabels(xticklabels, fontsize=16, minor=True)
+    ax.set_yticklabels(ax.get_yticklabels(), fontsize=16)
     ax.grid(True)
     ax.set_yscale('log')
 
-    ax.set_xlabel('Genomic region', fontsize=14)
-    ax.set_ylabel('Substitution rate\n[changes / year / site]', labelpad=10, fontsize=14)
-    ax.legend(loc='lower right', title='Patients', ncol=len(pcodes) // 3,
-              fontsize=14)
+    ax.set_xlabel('Genomic region', fontsize=16)
+    ax.set_ylabel('Substitution rate\n[changes / year / site]', labelpad=10, fontsize=16)
+    ax.legend(loc='lower left',
+              title='Patients',
+              ncol=4,
+              fontsize=16,
+              bbox_to_anchor=(0.10, 0.00))
 
     if title:
         fig.suptitle(title)

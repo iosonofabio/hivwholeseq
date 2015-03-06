@@ -21,7 +21,8 @@ from hivwholeseq.patients.patients import load_patients, Patient
 
 # Globals
 pnames = ['20097', '15363', '15823', '15376', '20529', '9669', '15241', '15319']
-regions = ['p17', 'PR', 'RT', 'vif', 'V3', 'RRE', 'nef']
+regions = ['psi', 'p17', 'p24', 'PR', 'RT', 'IN', 'vif', 'vpr', 'vpu', 'V3', 'RRE', 'gp41', 'nef']
+#regions = ['p17', 'PR', 'RT', 'vif', 'V3', 'RRE', 'nef']
 
 
 
@@ -74,18 +75,10 @@ def plot_substitution_rate(data, title='', VERBOSE=0):
     # Sort patient codes
     pcodes = sorted(set(data['pcode']), key=lambda x: int(x[1:]))
 
-    # Resort regions based on average substitution rate
-    regions = (data[['region', 'rate']]
-               .groupby('region')
-               .mean()
-               .sort('rate')
-               .index
-               .tolist())
-
     xfun = lambda region, pcode: regions.index(region) + 0.05 * pcodes.index(pcode)
     cfun = lambda pcode: cm.jet(1.0 * pcodes.index(pcode) / len(pcodes))
 
-    fig, ax = plt.subplots(figsize=(2 * len(regions), 4))
+    fig, ax = plt.subplots(figsize=(0.75 * len(regions), 5))
 
     for pcode in pcodes:
         datum = (data
@@ -121,8 +114,11 @@ def plot_substitution_rate(data, title='', VERBOSE=0):
 
     ax.set_xlabel('Genomic region', fontsize=14)
     ax.set_ylabel('Substitution rate\n[changes / year / site]', labelpad=10, fontsize=14)
-    ax.legend(loc='lower right', title='Patients', ncol=len(pcodes) // 3,
-              fontsize=14)
+    ax.legend(loc='lower left',
+              title='Patients',
+              ncol=4,
+              fontsize=14,
+              bbox_to_anchor=(0.1, 0.00))
 
     if title:
         ax.set_title(title)
