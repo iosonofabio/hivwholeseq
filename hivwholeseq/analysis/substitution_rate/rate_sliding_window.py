@@ -75,9 +75,8 @@ def plot_region_boxes(regions, ax, refname='HXB2', VERBOSE=0):
 
     data = []
     
-    # TODO: we have to assign them different heights
-    y1 = 0
-    height = 10
+    y1 = 5
+    height = 5
     pad = 2
     for feature in refseq.features:
         if feature.id in regions:
@@ -87,8 +86,11 @@ def plot_region_boxes(regions, ax, refname='HXB2', VERBOSE=0):
 
     data = pd.DataFrame(data)
     data.sort('x1', inplace=True)
+    data.index = np.arange(len(data))
     data['height'] = height
-    data['y1'] = y1 + (height + pad) * ((1 + np.arange(len(data))) % 2)
+    data['parity'] = ((1 + np.arange(len(data))) % 2)
+    data['row'] = 'bottom'; data.loc[np.array(data['parity'] == 1), 'row'] = 'top'
+    data['y1'] = y1 + (height + pad) * data['parity']
     data['y2'] = data['y1'] + data['height']
 
     for _, datum in data.iterrows():
@@ -96,13 +98,20 @@ def plot_region_boxes(regions, ax, refname='HXB2', VERBOSE=0):
                       facecolor=[0.9] * 3,
                       edgecolor='k',
                       label=datum['name'])
+        
+        xt = datum['x1'] + 0.5 * datum['width']
+        yt = datum['y1'] + 0.5 * datum['height']
+        if datum['row'] == 'top':
+            yt +=  height + 0
+        else:
+            yt -= height + 3.5
 
         ax.add_patch(r)
-        ax.text(datum['x1'] + 0.5 * datum['width'],
-                datum['y1'] + 0.5 * datum['height'],
+        ax.text(xt, yt,
                 datum['name'],
                 color='k', 
-                fontsize=12, ha='center', va='center')
+                fontsize=16,
+                ha='center')
 
 
 def plot_substitution_rate(data, regions, title='', VERBOSE=0):
@@ -146,7 +155,7 @@ def plot_substitution_rate(data, regions, title='', VERBOSE=0):
         ax.set_title(title)
 
     ax = axs[1]
-    ax.set_ylim(-1, 23)
+    ax.set_ylim(-4, 26)
     ax.set_xlabel('Position in HXB2 [bp]', fontsize=14)
     ax.set_yticks([])
     ax.grid(True, axis='x')

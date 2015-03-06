@@ -478,7 +478,7 @@ def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
 
         attr_max = max(getattr(leaf, attrname) for leaf in tree.get_terminals())
         def get_color(node):
-            return map(int, np.array(cmap(getattr(node, attrname)/attr_max*0.9)[:-1]) * 255)
+            return map(int, np.array(cmap(getattr(node, attrname)/attr_max)[:-1]) * 255)
     
         for node in tree.get_terminals():
             node.color = get_color(node)
@@ -495,7 +495,7 @@ def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
     if VERBOSE:
         print 'Plot haplotype tree of example sample'
 
-    fig, ax = plt.subplots(1, 1, figsize=(9, 9))
+    fig, ax = plt.subplots(1, 1, figsize=(7, 5))
     sns.set_style('white')
     ax.grid(False)
 
@@ -514,37 +514,60 @@ def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
 
         # Collect data for circle plot
         rmin = 5
-        rmax = 250
+        rmax = 150
+        rfun = lambda hf: rmin + (rmax - rmin) * (hf - 0.015)**(0.5)
         data_circles = []
         for il, leaf in enumerate(tree.get_terminals(), 1):
             it = times.index(leaf.DSI)
             hf = leaf.frequency
-            r = rmin + (rmax - rmin) * (hf - 0.015)**(0.5)
+            r = rfun(hf)
             y = il
             x = depths[leaf]
             c = [tone / 255.0 for tone in leaf.color.to_rgb()]
             data_circles.append((x, y, 2 * r, c))
 
-        # Draw the background lines from the dots to the right axis
-        # NOTE: they are drawn first so they stay in the background
-        for (x, y, s, c) in data_circles:
-            ax.plot([x, ax.get_xlim()[1]], [y, y], color=c, alpha=0.5,
-                    ls='--', dashes=(8, 3), zorder=1)
-
         # Draw the tree
         Phylo.draw(tree, show_confidence=False, label_func=lambda x: '', axes=ax,
                    do_show=False)
-        ax.set_yticks(np.arange(1, len(labels) + 1))
-        ax.set_yticklabels(labels)
-        ax.yaxis.tick_right()
+        ax.set_ylim((ax.get_ylim()[0] + 2, -2))
         ax.set_ylabel('')
-        ax.set_xlabel('Genetic distance [changes / site]')
-        
+        ax.set_yticklabels([])
+        for item in ax.get_xticklabels():
+            item.set_fontsize(16)
+        ax.set_xlabel('Genetic distance [changes / site]', fontsize=16, labelpad=10)
+
         # Add circles to the leaves
         (x, y, s, c) = zip(*data_circles)
         ax.scatter(x, y, s=s, c=c, edgecolor='none', zorder=2)
-
         ax.set_xlim(-0.04 * maxdepth, 1.04 * maxdepth)
+
+        # Draw a "legend" for sizes
+        datal = [{'hf': 0.05, 'label': '5%'},
+                 {'hf': 0.20, 'label': '20%'},
+                 {'hf': 1.00, 'label': '100%'}]
+        ax.text(0.98 * maxdepth, 1.3, 'Haplotype frequency:', fontsize=16, ha='right')
+        for idl, datuml in enumerate(datal):
+            r = rfun(datuml['hf'])
+            y = 5 + 3 * idl
+            ax.scatter(0.85 * maxdepth, y, s=r,
+                       facecolor='k',
+                       edgecolor='none')
+            ax.text(0.98 * maxdepth, y + 0.9, datuml['label'], ha='right')
+
+        # Draw legend for times
+        ytext = 0.43 * ax.get_ylim()[0]
+        ax.text(0.01 * maxdepth, ytext, 'Time:', fontsize=16)
+        datal = [{'time': t, 'color': cm.jet(1.0 * t / max(times))} for t in times]
+        for ico, datuml in enumerate(datal):
+            y = ytext + 2.8 + 3 * ico
+            ax.scatter(0.00 * maxdepth, y, s=rfun(0.5),
+                       facecolor=datuml['color'],
+                       edgecolor='none')
+            ax.text(0.19 * maxdepth, y + 0.9,
+                    str(int(datuml['time'] / 30.5))+' months',
+                    ha='right')
+
+    plt.tight_layout(rect=(0, 0, 0.98, 1))
 
     if title:
         fig.suptitle(title)

@@ -35,28 +35,6 @@ from hivwholeseq.analysis.purifying_selection.filenames import get_fitness_cost_
 
 
 # Functions
-def get_map_coordinates_reference(region, alim, refname='HXB2', VERBOSE=0):
-    '''Get coordinate map between reference and a haplotype alignment'''
-    from hivwholeseq.reference import load_custom_reference
-    refseq = load_custom_reference(refname, 'gb')
-    for feature in refseq.features:
-        if feature.id == region:
-            break
-
-    regseq = feature.extract(refseq)
-
-    from hivwholeseq.utils.sequence import get_consensus_from_MSA, align_pairwise
-    consm = get_consensus_from_MSA(alim, alpha=alpha)
-
-    # Align, masking/unmasking gaps as N
-    consm[consm == '-'] = 'N'
-    alipw = np.array(align_pairwise(consm, regseq, method='global', score_gapopen=-20))
-    alipw[0, alipw[0] == 'N'] = '-'
-
-    # Make map
-    coomap = ((alipw != '-').cumsum(axis=1) - 1)[:, (alipw != '-').all(axis=0)]
-
-    return coomap.T
 
 
 
@@ -65,7 +43,7 @@ if __name__ == '__main__':
 
     # Parse input args
     parser = argparse.ArgumentParser(
-        description='Study load by deleterious mutations',
+        description='Study load by deleterious mutations on a hypothetical pop in linkage eq',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     parser.add_argument('--patients', nargs='+',
                         help='Patient to analyze')
@@ -75,12 +53,15 @@ if __name__ == '__main__':
                         help='Verbosity level [0-4]')
     parser.add_argument('--plot', nargs='?', default=None, const='2D',
                         help='Plot results')
+    parser.add_argument('-N', type=int, default=100000,
+                        help='Number of points in the distribution')
 
     args = parser.parse_args()
     pnames = args.patients
     regions = args.regions
     VERBOSE = args.verbose
     plot = args.plot
+    N = args.N
 
     patients = load_patients()
     if pnames is not None:
@@ -94,6 +75,7 @@ if __name__ == '__main__':
         if VERBOSE >= 2:
             print 'Get subtype consensus'
         conssub = get_subtype_reference_alignment_consensus(region, VERBOSE=VERBOSE)
+        conssubm = np.array(conssub)
 
         if VERBOSE >= 2:
             print 'Get subtype entropy'
@@ -103,6 +85,19 @@ if __name__ == '__main__':
             print 'Get fitness costs'
         fn = get_fitness_cost_entropy_filename(region)
         fitness_cost = pd.read_pickle(fn)
+        fitness_cost.set_index('iSbin', drop=False, inplace=True)
+
+        if VERBOSE >= 2:
+            print 'Get entropy bins'
+        iSbin = -np.ones(len(Ssub), int)
+        for _, datum in fitness_cost.iterrows():
+            iSbin[Ssub > datum['Smin']] += 1
+        # Fix extremes
+        iSbin = iSbin.clip(fitness_cost['iSbin'].min(), fitness_cost['iSbin'].max())
+
+        if VERBOSE >= 2:
+            print 'Get fitness array'
+        fitness_cost_arr = np.array(fitness_cost.loc[iSbin, 's'])
 
         for ipat, (pname, patient) in enumerate(patients.iterrows()):
             pcode = patient.code
@@ -111,7 +106,9 @@ if __name__ == '__main__':
 
             patient = Patient(patient)
 
-            hct, ind, alim = patient.get_haplotype_count_trajectory(region)
+            aft, ind = patient.get_allele_frequency_trajectories(region,
+                                                                 cov_min=1000,
+                                                                 depth_min=100)
             if len(ind) == 0:
                 if VERBOSE >= 2:
                     print 'No time points: skip'
@@ -121,10 +118,10 @@ if __name__ == '__main__':
 
             if VERBOSE >= 2:
                 print 'Get coordinate map'
-            coomap = get_map_coordinates_reference(region, alim, VERBOSE=VERBOSE)
+            coomap = patient.get_map_coordinates_reference(region, refname=('HXB2', region))
 
-            consm = alim[hct[0].argmax()]
-            iconsm = np.array(map(alphal.index, consm), int)
+            iconsm = patient.get_initial_consensus_noinsertions(aft, return_ind=True)
+            consm = alpha[iconsm]
             protm = translate_masked(consm)
 
             # Premature stops in the initial consensus???
@@ -142,46 +139,28 @@ if __name__ == '__main__':
                 else:
                     continue
 
-            # Get the map as a dictionary from patient to subtype
-            coomapd = {'pat_to_subtype': dict(coomap[:, ::-1]),
-                       'subtype_to_pat': dict(coomap)}
+            # Get the map as a dictionary from patient to subtype and vice versa
+            coomapd = {'pat_to_subtype': pd.Series(coomap[:, 0], index=coomap[:, 1]),
+                       'subtype_to_pat': pd.Series(coomap[:, 1], index=coomap[:, 0])}
+
+            
+            # Restrict allele frequencies to positions in the map
+            pos_tmp = coomap[:, 0]
+            cons_sub_tmp = conssubm[pos_tmp]
+            icons_sub_tmp = np.array(map(alphal.index, cons_sub_tmp), int)
+            fitness_cost_tmp = fitness_cost_arr[pos_tmp]
+
+            aft_tmp = aft[:, :, coomap[:, 1]]
+            aft_cons_sub = aft_tmp[:, icons_sub_tmp, np.arange(aft_tmp.shape[-1])]
 
 
             if VERBOSE >= 2:
-                print 'Calculating fitness'
-            fitnesses = np.zeros(alim.shape[0])
-            for iseq, seq in enumerate(alim):
-                for pos, nuc in enumerate(seq):
-                    # NOTE: Missing positions?
-                    if pos not in coomapd['pat_to_subtype']:
-                        continue
+                print 'Get hypothetical LE populations and their fitnesses'
+            ran = np.random.rand(N, aft_cons_sub.shape[0], aft_cons_sub.shape[-1])
+            fitness_distr = np.dot((ran > aft_cons_sub), -fitness_cost_tmp).T
 
-                    pos_sub = coomapd['pat_to_subtype'][pos]
-                    nuc_sub = conssub[pos_sub]
-
-                    if nuc != nuc_sub:
-                        Spos = Ssub[pos_sub]
-                        Sclass = (fitness_cost
-                                  .loc[((fitness_cost['Smin'] < Spos) &
-                                        (fitness_cost['Smax'] >= Spos))])
-
-                        # If S is out of bounds, take the boundary value
-                        if not len(Sclass):
-                            if Spos < fitness_cost['Smin'].min():
-                                s = fitness_cost['s'][fitness_cost['S'].argmin()]
-                            else:
-                                s = fitness_cost['s'][fitness_cost['S'].argmax()]
-
-                        else:
-                            s = Sclass.iloc[0].loc['s']
-
-                        fitnesses[iseq] -= s
-
-
-            data.append({'region': region, 'pcode': pcode, 'hct': hct,
-                         'times': times, 'seqs': alim,
-                         'fitness': fitnesses,
-                        })
+            data.append({'pcode': pcode, 'region': region,
+                         'times': times, 'fitness': fitness_distr})
 
     data = pd.DataFrame(data)
 
@@ -189,19 +168,16 @@ if __name__ == '__main__':
         if VERBOSE >= 1:
             print 'Plot'
         for _, datum in data.iterrows():
-            fig, ax = plt.subplots()
-
             region = datum['region']
             pcode = datum['pcode']
             times = datum['times']
-            hct = datum['hct']
-            fitnesses = datum['fitness']
+            fitness = datum['fitness']
 
+            # Plot cumulative
+            fig, ax = plt.subplots()
             for it, time in enumerate(times):
-                hc = hct[it]
                 # Get the absolute value for plotting with log scale
-                fit_t = -np.concatenate([np.repeat(ftn_seq, hc_seq)
-                                         for ftn_seq, hc_seq in izip(fitnesses, hc)])
+                fit_t = -fitness[it]
                 fit_t.sort()
 
                 x = fit_t
@@ -217,6 +193,34 @@ if __name__ == '__main__':
             ax.set_xlim(0, 0.2)
 
             plt.tight_layout()
+
+            # Plot density
+            fig, ax = plt.subplots()
+            bins = np.linspace(0.96 * -fitness.max(), 1.04 * -fitness.min(), 100)
+            binsc = 0.5 * (bins[1:] + bins[:-1])
+            for it, time in enumerate(times):
+                # Get the absolute value for plotting with log scale
+                fit_t = -fitness[it]
+                fit_t = np.histogram(fit_t, bins=bins, density=True)[0]
+
+                x = binsc
+                y = fit_t
+                color = cm.jet(1.0 * it / len(times))
+                ax.plot(x, y, lw=2,
+                        color=color, alpha=0.7,
+                        label=str(int(time))+' days')
+
+            ax.set_xlabel('Fitness cost')
+            ax.set_ylabel('Density')
+            ax.set_title(', '.join([region, pcode]))
+            ax.grid(True)
+            ax.set_xlim(0, 0.2)
+            ax.set_ylim(ymin=-0.04*ax.get_ylim()[1])
+            ax.set_yticklabels([])
+            ax.legend(loc='upper right', title='Time:', fontsize=14)
+
+            plt.tight_layout()
+
 
         plt.ion()
         plt.show()
