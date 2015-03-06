@@ -26,6 +26,7 @@ alphaa = array(alphaal, 'S1')
 # Functions
 def align_pairwise(seq1, seq2, method='global', **kwargs):
     '''Align two sequences pairwise'''
+    import numpy as np
     from seqanpy import align_global, align_overlap, align_ladder, align_local
     funcd = {'global': align_global,
              'overlap': align_overlap,
@@ -36,6 +37,19 @@ def align_pairwise(seq1, seq2, method='global', **kwargs):
     from Bio.Seq import Seq
     from Bio.SeqRecord import SeqRecord
     from Bio.Align import MultipleSeqAlignment
+    from Bio.Alphabet import single_letter_alphabet
+
+    if isinstance(seq1, np.ndarray):
+        seq1 = ''.join(seq1)
+    if isinstance(seq1, basestring):
+        seq1 = SeqRecord(Seq(seq1, single_letter_alphabet), id='seq1', name='seq1',
+                         description='')
+
+    if isinstance(seq2, np.ndarray):
+        seq2 = ''.join(seq2)
+    if isinstance(seq2, basestring):
+        seq2 = SeqRecord(Seq(seq2, single_letter_alphabet), id='seq2', name='seq2',
+                         description='')
 
     score, ali1, ali2 = funcd[method](seq1, seq2, **kwargs)
     ali1 = SeqRecord(Seq(ali1, seq1.seq.alphabet), id=seq1.id, name=seq1.name,
@@ -533,3 +547,13 @@ def get_allele_frequencies_from_MSA(alim, alpha=alpha):
         af[ia] = (alim == nuc).mean(axis=0)
 
     return af
+
+
+def get_consensus_from_MSA(alim, alpha=alpha):
+    '''Get consensus from multiple sequence alignment'''
+    import numpy as np
+    cons = np.zeros(alim.shape[1], 'S1')
+    af = get_allele_frequencies_from_MSA(alim, alpha=alpha)
+    icons = af.argmax(axis=0)
+    cons = alpha[icons]
+    return cons

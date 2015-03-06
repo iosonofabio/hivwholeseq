@@ -26,9 +26,11 @@ from hivwholeseq.cross_sectional.get_subtype_consensus import (
     get_subtype_reference_alignment_consensus)
 from hivwholeseq.patients.one_site_statistics import get_codons_n_polymorphic
 from hivwholeseq.analysis.mutation_rate.explore_divergence_synonymous import translate_masked
+from hivwholeseq.analysis.purifying_selection.filenames import get_fitness_cost_entropy_filename
 
 
 # Globals
+fun = lambda x, l, u: l * (1 - np.exp(- u/l * x))
 
 
 
@@ -39,7 +41,6 @@ def fit_fitness_cost(x, y, VERBOSE=0, mu=5e-6):
     NOTE: as can be seen from the plots below, the fit for l is not very
     sensitive to mu.
     '''
-    fun = lambda x, l, u: l * (1 - np.exp(- u/l * x))
     fun_min = lambda x, l, u: ((y - fun(x, l, u))**2).sum()
 
     # Minimization poor man's style: we compute the function everywhere
@@ -53,12 +54,11 @@ def fit_fitness_cost(x, y, VERBOSE=0, mu=5e-6):
     # FIXME: if we fix mu, this is useless, but it's ok for now
     params = (l, mu)
 
-    return (fun, params)
+    return params
 
 
 def plot_function_minimization(x, y, params):
     '''Investigate inconsistencies in fits'''
-    fun = lambda x, l, u: l * (1 - np.exp(- u/l * x))
     fun_min = lambda p: ((y - fun(x, p[0], p[1]))**2).sum()
 
     p1 = np.logspace(np.log10(params[0]) - 3, np.log10(params[0]) + 3, 10)
@@ -80,7 +80,6 @@ def plot_function_minimization(x, y, params):
 
 def plot_function_minimization_1d(x, y, l, us=[1.2e-6], title=''):
     '''Investigate inconsistencies in fits'''
-    fun = lambda x, l, u: l * (1 - np.exp(- u/l * x))
     fun_min = lambda l, u: ((y - fun(x, l, u))**2).sum()
 
     p1 = np.logspace(np.log10(l) - 3, np.log10(l) + 3, 100)
@@ -120,7 +119,6 @@ def plot_fits(region, fitsreg, VERBOSE=0):
         Smax = fit['Smax']
         l = fit['l']
         u = fit['u']
-        fun = fit['fun']
         yfit = fun(xfit, l, u)
         label = ('S e ['+'{:2.2f}'.format(Smin)+', '+'{:2.2f}'.format(Smax)+']'+
                  ', s = '+'{:.1G}'.format(mu / l))
@@ -348,7 +346,7 @@ if __name__ == '__main__':
         y = y[ind]
 
         try:
-            (fun, (l, u)) = fit_fitness_cost(x, y, mu=mu)
+            (l, u) = fit_fitness_cost(x, y, mu=mu)
             if VERBOSE >= 3:
                 plot_function_minimization_1d(x, y, l, us=[1e-6, 2e-6, 5e-6, 1e-5],
                                               title=region+', iSbin = '+str(iSbin))
@@ -356,16 +354,23 @@ if __name__ == '__main__':
         except RuntimeError:
             continue
 
-        fits.append((region, iSbin, l, u, fun))
+        fits.append((region, iSbin, l, u))
 
     fits = pd.DataFrame(data=fits,
-                        columns=['region', 'iSbin', 'l', 'u', 'fun'])
+                        columns=['region', 'iSbin', 'l', 'u'])
     fits['S'] = binsc_S[fits['iSbin']]
     fits['Smin'] = bins_S[fits['iSbin']]
     fits['Smax'] = bins_S[fits['iSbin'] + 1]
     
     # Estimate fitness cost
     fits['s'] = mu / fits['l']
+
+    # Store fitness cost to file
+    if VERBOSE >= 1:
+        print 'Save to file'
+    for (region, fitsreg) in fits.groupby('region'):
+        fn_out = get_fitness_cost_entropy_filename(region)
+        fitsreg.to_pickle(fn_out)
 
     if plot:
         for (region, fitsreg) in fits.groupby('region'):
