@@ -6,30 +6,26 @@ content:    Quantify purifying selection on different subtype entropy classes.
 '''
 # Modules
 import os
-import argparse
 from itertools import izip
 from collections import defaultdict, Counter
 import numpy as np
 import pandas as pd
+
+# FIXME: move to plots.py
 from matplotlib import cm
 import matplotlib.pyplot as plt
 
-from hivwholeseq.miseq import alpha, alphal
-from hivwholeseq.patients.patients import load_patients, Patient
-from hivwholeseq.utils.sequence import translate_with_gaps
-import hivwholeseq.utils.plot
-from hivwholeseq.analysis.explore_entropy_patsubtype import (
-    get_subtype_reference_alignment, get_ali_entropy)
-from hivwholeseq.cross_sectional.get_subtype_entropy import (
-    get_subtype_reference_alignment_entropy)
-from hivwholeseq.cross_sectional.get_subtype_consensus import (
-    get_subtype_reference_alignment_consensus)
-from hivwholeseq.patients.one_site_statistics import get_codons_n_polymorphic
-from hivwholeseq.analysis.mutation_rate.explore_divergence_synonymous import translate_masked
-from hivwholeseq.analysis.purifying_selection.filenames import get_fitness_cost_entropy_filename
+from hivwholeseq.utils.generic import mkdirs
+from hivwholeseq.paper_figures.filenames import get_figure_folder
+from hivwholeseq.paper_figures.plots import plot_fitness_cost
+
+
 
 
 # Globals
+mu = 5e-6
+pnames = ['20097', '15376', '15823', '15241', '9669', '15319']
+regions = ['p17', 'p24', 'nef', 'PR', 'RT', 'IN', 'vif']
 fun = lambda x, l, u: l * (1 - np.exp(- u/l * x))
 
 
@@ -78,6 +74,7 @@ def plot_function_minimization(x, y, params):
     plt.ion()
     plt.show()
 
+
 def plot_function_minimization_1d(x, y, l, us=[1.2e-6], title=''):
     '''Investigate inconsistencies in fits'''
     fun_min = lambda l, u: ((y - fun(x, l, u))**2).sum()
@@ -103,86 +100,18 @@ def plot_function_minimization_1d(x, y, l, us=[1.2e-6], title=''):
     plt.show()
 
 
-def plot_fits(fits, title='', VERBOSE=0):
-    '''Plot the fits for purifying selection'''
-
-    # Plot the fits, one fig per region
-    for (region, fitsreg) in fits.groupby('region'):
-        fig, ax = plt.subplots(figsize=(6, 6))
-        xfit = np.logspace(0, 3.5, 1000)
-
-        for _, fit in fitsreg.iterrows():
-            iSbin = fit['iSbin']
-            Smin = fit['Smin']
-            Smax = fit['Smax']
-            l = fit['l']
-            u = fit['u']
-            yfit = fun(xfit, l, u)
-            label = ('S e ['+'{:2.2f}'.format(Smin)+', '+'{:2.2f}'.format(Smax)+']'+
-                     ', s = '+'{:.1G}'.format(mu / l))
-
-            
-            color = cm.jet(1.0 * iSbin / len(fitsreg))
-
-            ax.plot(xfit, yfit, color=color, label=label, lw=2)
-
-        ax.set_xlabel('Time [days from infection]')
-        ax.set_ylabel('Allele frequency')
-        ax.legend(loc='lower right', title='Entropy class', fontsize=10)
-        ax.text(0.05, 0.9,
-                ('$f(t) \, = \, \mu / s \, [1 - e^{-st}]$'),
-                fontsize=20,
-                horizontalalignment='left',
-                verticalalignment='center',
-                transform=ax.transAxes)
-        ax.set_xscale('log')
-        ax.set_yscale('log')
-        ax.grid(True)
-
-    # Plot the estimated fitness value, for all regions together
-    fig, ax3 = plt.subplots(figsize=(6, 6))
-    regions = list(set(fits['region']))
-    for (region, fitsreg) in fits.groupby('region'):
-        ax3.plot(fitsreg['S'], fitsreg['s'], lw=2, label=region,
-                 color=cm.jet(1.0 * regions.index(region) / len(regions)),
-                )
-
-    ax3.set_xlabel('Entropy in subtype [bits]')
-    ax3.set_ylabel('Fitness cost')
-    ax3.set_ylim(5e-5, 1)
-    ax3.set_xscale('log')
-    ax3.set_yscale('log')
-    ax3.grid(True, which='both')
-    ax3.legend(loc='lower left', title='Genomic region:', ncol=2)
-
-    if title:
-        ax3.set_title(title, fontsize=20)
-
-    plt.tight_layout()
-
-
-
-# Script
-if __name__ == '__main__':
-
-    # Parse input args
-    parser = argparse.ArgumentParser(
-        description='Study accumulation of minor alleles for different kinds of mutations',
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
-    parser.add_argument('--patients', nargs='+',
-                        help='Patient to analyze')
-    parser.add_argument('--regions', nargs='+', required=True,
-                        help='Regions to analyze (e.g. F1 p17)')
-    parser.add_argument('--verbose', type=int, default=0,
-                        help='Verbosity level [0-4]')
-    parser.add_argument('--plot', nargs='?', default=None, const='2D',
-                        help='Plot results')
-
-    args = parser.parse_args()
-    pnames = args.patients
-    regions = args.regions
-    VERBOSE = args.verbose
-    plot = args.plot
+def fit_purifying(pnames, regions, VERBOSE=0):
+    '''Collect fits for all regions'''
+    from hivwholeseq.miseq import alpha, alphal
+    from hivwholeseq.patients.patients import load_patients, Patient
+    from hivwholeseq.analysis.explore_entropy_patsubtype import (
+        get_subtype_reference_alignment, get_ali_entropy)
+    from hivwholeseq.cross_sectional.get_subtype_entropy import (
+        get_subtype_reference_alignment_entropy)
+    from hivwholeseq.cross_sectional.get_subtype_consensus import (
+        get_subtype_reference_alignment_consensus)
+    from hivwholeseq.patients.one_site_statistics import get_codons_n_polymorphic
+    from hivwholeseq.analysis.mutation_rate.explore_divergence_synonymous import translate_masked
 
     data = []
 
@@ -315,8 +244,9 @@ if __name__ == '__main__':
                                  'Ssub',
                                  'time', 'af'])
 
-    # Bin by subtype entropy
-    bins_S = np.array([0, 0.03, 0.06, 0.1, 0.25, 0.7, 3])
+    # Bin by subtype entropy, using quantiles
+    #bins_S = np.array([0, 0.03, 0.06, 0.1, 0.25, 0.7, 3])
+    bins_S = np.array(data['Ssub'].quantile(q=np.linspace(0, 1, 6)))
     binsc_S = 0.5 * (bins_S[1:] + bins_S[:-1])
     data['Sbin'] = 0
     for b in bins_S[1:]:
@@ -327,7 +257,7 @@ if __name__ == '__main__':
     mu = 5e-6
     fits = []
     dataf = (data
-             .loc[data.loc[:, 'Ssub'] < bins_S[-2]]
+             .loc[data.loc[:, 'Ssub'] < bins_S[-1]]
              .loc[:, ['region', 'Sbin', 'time', 'af']]
              .groupby(['region', 'Sbin']))
     for (region, iSbin), datum in dataf:
@@ -358,16 +288,76 @@ if __name__ == '__main__':
     # Estimate fitness cost
     fits['s'] = mu / fits['l']
 
-    # Store fitness cost to file
-    if VERBOSE >= 1:
-        print 'Save to file'
-    for (region, fitsreg) in fits.groupby('region'):
-        fn_out = get_fitness_cost_entropy_filename(region)
-        fitsreg.to_pickle(fn_out)
+    return fits
 
-    if plot:
-        plot_fits(fits, VERBOSE=VERBOSE)
 
-        plt.ion()
-        plt.show()
+def plot_single_fit(region, fitsreg, title='', VERBOSE=0):
+    '''Plot the fits for purifying selection'''
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+    xfit = np.logspace(0, 3.5, 1000)
+
+    for _, fit in fitsreg.iterrows():
+        iSbin = fit['iSbin']
+        Smin = fit['Smin']
+        Smax = fit['Smax']
+        l = fit['l']
+        u = fit['u']
+        yfit = fun(xfit, l, u)
+        label = ('S e ['+'{:2.2f}'.format(Smin)+', '+'{:2.2f}'.format(Smax)+']'+
+                 ', s = '+'{:.1G}'.format(mu / l))
+
+        
+        color = cm.jet(1.0 * iSbin / len(fitsreg))
+
+        ax.plot(xfit, yfit, color=color, label=label, lw=2)
+
+    ax.set_xlabel('Time [days from infection]')
+    ax.set_ylabel('Allele frequency')
+    ax.legend(loc='lower right', title='Entropy class', fontsize=10)
+    ax.text(0.05, 0.9,
+            ('$f(t) \, = \, \mu / s \, [1 - e^{-st}]$'),
+            fontsize=20,
+            horizontalalignment='left',
+            verticalalignment='center',
+            transform=ax.transAxes)
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    ax.grid(True)
+
+
+
+# Script
+if __name__ == '__main__':
+
+    VERBOSE = 2
+    username = os.path.split(os.getenv('HOME'))[-1]
+    foldername = get_figure_folder(username, 'first')
+    fn_data = foldername+'data/'
+    mkdirs(fn_data)
+    fn_data = fn_data + 'fitness_cost.pickle'
+
+    if not os.path.isfile(fn_data):
+        fits = fit_purifying(pnames, regions, VERBOSE=VERBOSE)
+
+        if VERBOSE >= 1:
+            print 'Save to file'
+        fits.to_pickle(fn_data)
+
+    else:
+        fits = pd.read_pickle(fn_data)
+
+    ## Plot the fits, one fig per region
+    #for (region, fitsreg) in fits.groupby('region'):
+    #    plot_single_fit(region, fitsreg)
+
+    #filename = foldername+'fitness_cost_by_region'
+    #for ext in ['png', 'pdf', 'svg']:
+    #    plot_fitness_cost(fits,
+    #                      VERBOSE=VERBOSE,
+    #                      savefig=filename+'.'+ext)
+
+    plot_fitness_cost(fits, VERBOSE=VERBOSE)
+
+    # TODO: add bootstrap
 

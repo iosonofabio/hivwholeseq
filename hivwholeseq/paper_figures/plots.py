@@ -798,3 +798,44 @@ def plot_mutation_rate(data,
         plt.ion()
         plt.show()
 
+
+def plot_fitness_cost(fits, title='', VERBOSE=0, savefig=False):
+    '''Plot the estimated fitness value, for all regions together'''
+    fig, ax = plt.subplots(figsize=(8, 6))
+    regions = list(set(fits['region']))
+    for (region, fitsreg) in fits.groupby('region'):
+        ax.plot(fitsreg['S'], fitsreg['s'], lw=2, label=region,
+                color=cm.jet(1.0 * regions.index(region) / len(regions)),
+                )
+
+    ax.set_xlabel('Entropy in subtype [bits]', fontsize=16)
+    ax.set_ylabel('Fitness cost', fontsize=16)
+    ax.set_ylim(1e-3, 1)
+    ax.set_xlim(1e-3, 2)
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    for item in ax.get_xticklabels():
+        item.set_fontsize(16)
+    for item in ax.get_yticklabels():
+        item.set_fontsize(16)
+    ax.grid(True, which='both')
+    ax.legend(loc='upper right', title='Genomic region:', ncol=1,
+              fontsize=14)
+
+    if title:
+        ax.set_title(title, fontsize=20)
+
+    plt.tight_layout()
+
+    if savefig:
+        fig_filename = savefig
+        fig_folder = os.path.dirname(fig_filename)
+
+        mkdirs(fig_folder)
+        fig.savefig(fig_filename)
+        plt.close(fig)
+
+    else:
+        plt.ion()
+        plt.show()
+

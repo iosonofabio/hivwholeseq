@@ -32,13 +32,27 @@ from hivwholeseq.analysis.purifying_selection.filenames import get_fitness_cost_
 
 
 # Globals
-pnames = ['20097', '15823', '9669', '20529', '15376', '15241', '15319']
-regions = ['p17']
+pnames = ['20097', '15376', '15823', '15241', '9669', '15319']
+regions = ['p17', 'p24', 'nef', 'PR', 'RT', 'IN', 'vif']
 fun = lambda x, l, u: l * (1 - np.exp(- u/l * x))
 
 
 
 # Functions
+def add_Sbins(data, bins=8, VERBOSE=0):
+    '''Add entropy bins to the data'''
+    #bins_S = np.array([0, 0.03, 0.06, 0.1, 0.25, 0.7, 3])
+    if np.isscalar(bins):
+        bins = np.array(data['Ssub'].quantile(q=np.linspace(0, 1, bins)))
+    
+    binsc = 0.5 * (bins[1:] + bins[:-1])
+
+    data['Sbin'] = -1
+    for b in bins_S:
+        data.loc[data.loc[:, 'Ssub'] >= b, 'Sbin'] += 1
+    data['Sbin'] = data['Sbin'].clip(0, len(binsc) - 1)
+
+    return bins, binsc
 
 
 
@@ -196,64 +210,131 @@ if __name__ == '__main__':
                                  'Ssub',
                                  'time', 'af'])
 
-    # Bin by subtype entropy
-    bins_S = np.array([0, 0.03, 0.06, 0.1, 0.25, 0.7, 2])
-    binsc_S = 0.5 * (bins_S[1:] + bins_S[:-1])
-    data['Sbin'] = 0
-    for b in bins_S[1:]:
-        data.loc[data.loc[:, 'Ssub'] >= b, 'Sbin'] += 1
-
-    sys.exit()
-
-    data['Sbin']
-
-
-    # Fit exponential saturation
-    mu = 5e-6
+    # Fits
     fits = []
-    dataf = (data
-             .loc[data.loc[:, 'Ssub'] < bins_S[-2]]
-             .loc[:, ['region', 'Sbin', 'time', 'af']]
-             .groupby(['region', 'Sbin']))
-    for (region, iSbin), datum in dataf:
-        x = np.array(datum['time'])
-        y = np.array(datum['af'])
+    from scipy.optimize import minimize
+    muts = np.unique(data['mut']).tolist()
+    dataf = data.copy()
+    dataf['mbin'] = map(muts.index, dataf['mut'])
 
-        ind = -(np.isnan(x) | np.isnan(y))
-        x = x[ind]
-        y = y[ind]
+    # Get initial estimate for mu from Abram2010, resorted
+    from hivwholeseq.analysis.mutation_rate.comparison_Abram import get_mu_Abram2010
+    mu0 = get_mu_Abram2010().loc[muts]
 
-        try:
-            (l, u) = fit_fitness_cost(x, y, mu=mu)
-            if VERBOSE >= 3:
-                plot_function_minimization_1d(x, y, l, us=[1e-6, 2e-6, 5e-6, 1e-5],
-                                              title=region+', iSbin = '+str(iSbin))
+    # Get initial estimate for s from our fixed-mu estimate
+    from hivwholeseq.analysis.purifying_selection.filenames import get_fitness_cost_entropy_filename
+    sdata = pd.read_pickle(get_fitness_cost_entropy_filename('p17'))
+    s = sdata['s']
 
-        except RuntimeError:
-            continue
+    # Bin by subtype entropy, taking bins from fitness cost estimate
+    bins = np.insert(np.array(sdata['Smax']), 0, 0)
+    bins_S, binsc_S = add_Sbins(dataf, bins=bins, VERBOSE=VERBOSE)
 
-        fits.append((region, iSbin, l, u))
+    dataf = dataf.loc[:, ['mbin', 'Sbin', 'af', 'time']]
+    p0 = np.concatenate(map(np.array, [mu0, s]))
 
-    fits = pd.DataFrame(data=fits,
-                        columns=['region', 'iSbin', 'l', 'u'])
-    fits['S'] = binsc_S[fits['iSbin']]
-    fits['Smin'] = bins_S[fits['iSbin']]
-    fits['Smax'] = bins_S[fits['iSbin'] + 1]
-    
-    # Estimate fitness cost
-    fits['s'] = mu / fits['l']
+    def fun_min(p):
+        '''p is the parameters vector: #I mut rates + #J selection coefficients'''
+        fun = lambda x, u, s: u / s * (1 - np.exp(- s * x))
 
-    # Store fitness cost to file
-    if VERBOSE >= 1:
-        print 'Save to file'
-    for (region, fitsreg) in fits.groupby('region'):
-        fn_out = get_fitness_cost_entropy_filename(region)
-        fitsreg.to_pickle(fn_out)
+        mu = p[:len(muts)]
+        s = p[len(muts):]
+
+        #res = 0
+        #for (imb, isb), datum in dataf.groupby(['mbin', 'Sbin']):
+        #    res += ((datum['af'] - fun(datum['time'], mu[imb], s[isb]))**2).sum()
+
+        res = sum(((datum['af'] - fun(datum['time'], mu[imb], s[isb]))**2).sum()
+                  for (imb, isb), datum in (dataf.groupby(['mbin', 'Sbin'])))
+
+        return res
+        
+
+    def get_funmin_neighbourhood(fun_min, p0, plot=False, title=''):
+        '''Calculate a few function evaluations for testing'''
+        dynrangeexp = 0.5
+        datap = []
+        for i in xrange(len(p0)):
+            if VERBOSE >= 2:
+                print 'Parameter n.'+str(i+1)
+            x = []
+            y = []
+            for factor in np.logspace(-dynrangeexp, dynrangeexp, 10):
+                p = p0.copy()
+                p[i] *= factor
+
+                x.append(factor)
+                y.append(fun_min(p))
+
+            if i < len(muts):
+                label = muts[i]
+            else:
+                label = 'S ~ {:.1G}'.format(binsc_S[i - len(muts)])
+
+            color = cm.jet(1.0 * i / len(p0))
+
+            datap.append({'x': x, 'y': y, 'label': label, 'color': color})
+
+        # Plot
+        if plot:
+            fig, ax = plt.subplots()
+            for datum in datap:
+                x = datum['x']
+                y = datum['y']
+                label = datum['label']
+                color = datum['color']
+
+                ax.plot(x, y, lw=2, label=label, color=color)
+
+            ax.set_xlabel('Factor change of parameter')
+            ax.set_xscale('log')
+            ax.set_ylabel('Fmin')
+            ax.set_yscale('log')
+            ax.set_xlim(10**(-dynrangeexp), 10**dynrangeexp)
+
+            ax.grid(True)
+            ax.legend(loc='upper center', ncol=3, fontsize=8)
+
+            plt.tight_layout()
+
+        return datap
 
     if plot:
-        for (region, fitsreg) in fits.groupby('region'):
-            plot_fits(region, fitsreg, VERBOSE=VERBOSE)
+        if VERBOSE >= 1:
+            print 'Plot a few function evaluations for testing'
+
+        datap0 = get_funmin_neighbourhood(fun_min, p0, plot=plot)
+
+    if VERBOSE >= 1:
+        print 'Minimize joint objective function'
+    
+    method = 'Powell' # minimize along each parameter at every iteration
+    res = minimize(fun_min, p0, method=method,
+                   options={'disp': True, 'maxiter': 10})
+    print res
+    pmin = res.x
+    
+    if plot:
+        if VERBOSE >= 1:
+            print 'Plot a few function evaluations after minimization'
+
+        datapmin = get_funmin_neighbourhood(fun_min, pmin, plot=plot)
 
         plt.ion()
         plt.show()
+
+
+    # Save results of minimization
+    mu_min = pd.Series(pmin[:len(muts)], index=muts)
+    s_min = pd.DataFrame(pmin[len(muts):], columns=['s'])
+    s_min['Smin'] = sdata['Smin']
+    s_min['Smax'] = sdata['Smax']
+    s_min['S'] = sdata['S']
+
+    from hivwholeseq.analysis.filenames import analysis_data_folder
+    fn_out_mu = analysis_data_folder+'mu_joint.pickle'
+    mu_min.to_pickle(fn_out_mu)
+
+    fn_out_s = analysis_data_folder+'s_joint.pickle'
+    s_min.to_pickle(fn_out_s)
 

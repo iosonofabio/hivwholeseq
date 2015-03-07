@@ -25,13 +25,12 @@ from hivwholeseq.analysis.mutation_rate.explore_divergence_synonymous import (
 
 
 # Functions
-def comparison_Abram2010(mu, VERBOSE=2, title=''):
-    '''Print a comparison with Abram 2010, J. Virol.'''
-    muAbramAv = 1.4e-5
+def get_mu_Abram2010():
+    '''Get the mutation rate matrix from Abram 2010'''
+    muts = [a+'->'+b for a in alpha[:4] for b in alpha[:4] if a != b]
 
-    muAbram = mu.copy()
+    muAbram = pd.Series(np.zeros(len(muts)), index=muts, dtype=float)
     muAbram.name = 'mutation rate Abram 2010'
-    muAbram[:] = 0
 
     # Forward strand
     muAbram['C->A'] += 14
@@ -61,8 +60,16 @@ def comparison_Abram2010(mu, VERBOSE=2, title=''):
     muAbram['C->T'] += 61
     muAbram['G->T'] += 0
 
+    # Normalize
+    muAbramAv = 1.4e-5
     muAbram *= muAbramAv / muAbram.mean()
 
+    return muAbram
+
+
+def comparison_Abram2010(mu, VERBOSE=2, title=''):
+    '''Print a comparison with Abram 2010, J. Virol.'''
+    muAbram = get_mu_Abram2010()
     data = pd.concat([muAbram, mu], axis=1)
     if VERBOSE >= 2:
         if title:

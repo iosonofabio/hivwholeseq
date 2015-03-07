@@ -6,6 +6,7 @@ content:    Quantify purifying selection on different subtype entropy classes.
 '''
 # Modules
 import os
+import sys
 import argparse
 from itertools import izip
 from collections import defaultdict, Counter
@@ -30,6 +31,8 @@ from hivwholeseq.analysis.purifying_selection.filenames import get_fitness_cost_
 
 
 # Globals
+pnames = ['20097', '15376', '15823', '15241', '9669', '15319']
+regions = ['p17', 'p24', 'nef', 'PR', 'RT', 'IN', 'vif']
 fun = lambda x, l, u: l * (1 - np.exp(- u/l * x))
 
 
@@ -103,62 +106,118 @@ def plot_function_minimization_1d(x, y, l, us=[1.2e-6], title=''):
     plt.show()
 
 
-def plot_fits(fits, title='', VERBOSE=0):
+def plot_fits(fitsreg, title='', VERBOSE=0, mu=5e-6):
     '''Plot the fits for purifying selection'''
 
-    # Plot the fits, one fig per region
-    for (region, fitsreg) in fits.groupby('region'):
-        fig, ax = plt.subplots(figsize=(6, 6))
-        xfit = np.logspace(0, 3.5, 1000)
+    fig, axs = plt.subplots(1, 2, figsize=(13, 6))
+    if title:
+        fig.suptitle(title, fontsize=20)
 
-        for _, fit in fitsreg.iterrows():
-            iSbin = fit['iSbin']
-            Smin = fit['Smin']
-            Smax = fit['Smax']
-            l = fit['l']
-            u = fit['u']
-            yfit = fun(xfit, l, u)
-            label = ('S e ['+'{:2.2f}'.format(Smin)+', '+'{:2.2f}'.format(Smax)+']'+
-                     ', s = '+'{:.1G}'.format(mu / l))
+    # Plot the fits
+    ax = axs[0]
+    xfit = np.logspace(0, 3.5, 1000)
 
-            
-            color = cm.jet(1.0 * iSbin / len(fitsreg))
+    for _, fit in fitsreg.iterrows():
+        iSbin = fit['iSbin']
+        Smin = fit['Smin']
+        Smax = fit['Smax']
+        l = fit['l']
+        u = fit['u']
+        yfit = fun(xfit, l, u)
+        label = ('S e ['+'{:.1G}'.format(Smin)+', '+'{:.1G}'.format(Smax)+']'+
+                 ', s = '+'{:.1G}'.format(mu / l))
 
-            ax.plot(xfit, yfit, color=color, label=label, lw=2)
+        
+        color = cm.jet(1.0 * iSbin / len(fitsreg))
 
-        ax.set_xlabel('Time [days from infection]')
-        ax.set_ylabel('Allele frequency')
-        ax.legend(loc='lower right', title='Entropy class', fontsize=10)
-        ax.text(0.05, 0.9,
-                ('$f(t) \, = \, \mu / s \, [1 - e^{-st}]$'),
-                fontsize=20,
-                horizontalalignment='left',
-                verticalalignment='center',
-                transform=ax.transAxes)
-        ax.set_xscale('log')
-        ax.set_yscale('log')
-        ax.grid(True)
+        ax.plot(xfit, yfit, color=color, label=label, lw=2)
 
-    # Plot the estimated fitness value, for all regions together
-    fig, ax3 = plt.subplots(figsize=(6, 6))
-    regions = list(set(fits['region']))
-    for (region, fitsreg) in fits.groupby('region'):
-        ax3.plot(fitsreg['S'], fitsreg['s'], lw=2, label=region,
-                 color=cm.jet(1.0 * regions.index(region) / len(regions)),
-                )
+    ax.set_xlabel('Time [days from infection]')
+    ax.set_ylabel('Allele frequency')
+    ax.legend(loc='lower right', title='Entropy:', fontsize=10,
+              ncol=2)
+    ax.text(0.05, 0.9,
+            ('$f(t) \, = \, \mu / s \, [1 - e^{-st}]$'),
+            fontsize=20,
+            horizontalalignment='left',
+            verticalalignment='center',
+            transform=ax.transAxes)
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    ax.grid(True)
+
+
+    ## Plot the value at some reasonable time
+    #x0 = 2000
+    #fitsreg['y0'] = fun(x0, fitsreg['l'], fitsreg['u'])
+    #ax2 = axs[1]
+    #ax2.plot(fitsreg['S'], fitsreg['y0'], lw=2, c='k')
+
+    #ax2.set_xlabel('Entropy in subtype [bits]')
+    #ax2.set_ylabel('Fit value at x0 = '+str(x0))
+    #ax2.set_xscale('log')
+    #ax2.set_yscale('log')
+    #ax2.grid(True)
+
+
+    # Plot the estimated fitness value
+    ax3 = axs[1]
+    
+    if 'ds' in fitsreg.columns:
+        ax3.errorbar(fitsreg['S'], fitsreg['s'], yerr=fitsreg['ds'], lw=2, c='k')
+    else:
+        ax3.plot(fitsreg['S'], fitsreg['s'], lw=2, c='k')
 
     ax3.set_xlabel('Entropy in subtype [bits]')
     ax3.set_ylabel('Fitness cost')
-    ax3.set_ylim(5e-5, 1)
+    ax3.set_ylim(1e-3, 2e-1)
+    ax3.set_xlim(1e-3, 2)
     ax3.set_xscale('log')
     ax3.set_yscale('log')
     ax3.grid(True, which='both')
-    ax3.legend(loc='lower left', title='Genomic region:', ncol=2)
 
-    if title:
-        ax3.set_title(title, fontsize=20)
+    plt.tight_layout(rect=(0, 0, 1, 0.96))
 
-    plt.tight_layout()
+
+def fit_saturation(data, bins_S, binsc_S, mu, VERBOSE=0):
+    '''Fit saturation curves to the data'''
+    regions = np.unique(data['region'])
+
+    fits = []
+    dataf = (data
+             .loc[data.loc[:, 'Ssub'] < bins_S[-1]]
+             .loc[:, ['Sbin', 'time', 'af']]
+             .groupby('Sbin'))
+    for iSbin, datum in dataf:
+        x = np.array(datum['time'])
+        y = np.array(datum['af'])
+
+        ind = -(np.isnan(x) | np.isnan(y))
+        x = x[ind]
+        y = y[ind]
+
+        try:
+            (l, u) = fit_fitness_cost(x, y, mu=mu)
+            if VERBOSE >= 3:
+                plot_function_minimization_1d(x, y, l, us=[1e-6, 2e-6, 5e-6, 1e-5],
+                                              title=', '.join(regions)+', iSbin = '+str(iSbin))
+
+        except RuntimeError:
+            print 'Fit failed, Sbin = ', iSbin
+            continue
+
+        fits.append((iSbin, l, u))
+
+    fits = pd.DataFrame(data=fits,
+                        columns=['iSbin', 'l', 'u'])
+    fits['S'] = binsc_S[fits['iSbin']]
+    fits['Smin'] = bins_S[fits['iSbin']]
+    fits['Smax'] = bins_S[fits['iSbin'] + 1]
+    
+    # Estimate fitness cost
+    fits['s'] = mu / fits['l']
+
+    return fits
 
 
 
@@ -169,13 +228,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Study accumulation of minor alleles for different kinds of mutations',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
-    parser.add_argument('--patients', nargs='+',
+    parser.add_argument('--patients', nargs='+', default=pnames,
                         help='Patient to analyze')
-    parser.add_argument('--regions', nargs='+', required=True,
-                        help='Regions to analyze (e.g. F1 p17)')
-    parser.add_argument('--verbose', type=int, default=0,
+    parser.add_argument('--regions', nargs='+', default=regions,
+                        help='Regions to analyze (e.g. p17 p24)')
+    parser.add_argument('--verbose', type=int, default=2,
                         help='Verbosity level [0-4]')
-    parser.add_argument('--plot', nargs='?', default=None, const='2D',
+    parser.add_argument('--plot', action='store_true',
                         help='Plot results')
 
     args = parser.parse_args()
@@ -315,58 +374,42 @@ if __name__ == '__main__':
                                  'Ssub',
                                  'time', 'af'])
 
-    # Bin by subtype entropy
-    bins_S = np.array([0, 0.03, 0.06, 0.1, 0.25, 0.7, 3])
+    # Bin by subtype entropy using quantiles
+    #bins_S = np.array([0, 0.03, 0.06, 0.1, 0.25, 0.7, 3])
+    bins_S = np.array(data['Ssub'].quantile(q=np.linspace(0, 1, 8)))
     binsc_S = 0.5 * (bins_S[1:] + bins_S[:-1])
-    data['Sbin'] = 0
-    for b in bins_S[1:]:
+    data['Sbin'] = -1
+    for b in bins_S:
         data.loc[data.loc[:, 'Ssub'] >= b, 'Sbin'] += 1
+    data['Sbin'] = data['Sbin'].clip(0, len(binsc_S))
 
 
     # Fit exponential saturation
     mu = 5e-6
-    fits = []
-    dataf = (data
-             .loc[data.loc[:, 'Ssub'] < bins_S[-2]]
-             .loc[:, ['region', 'Sbin', 'time', 'af']]
-             .groupby(['region', 'Sbin']))
-    for (region, iSbin), datum in dataf:
-        x = np.array(datum['time'])
-        y = np.array(datum['af'])
+    fits = fit_saturation(data, bins_S, binsc_S, mu, VERBOSE=VERBOSE)
 
-        ind = -(np.isnan(x) | np.isnan(y))
-        x = x[ind]
-        y = y[ind]
+    # Bootstrap over patients
+    fits_bs = []
+    for i in xrange(10):
+        if VERBOSE >= 2:
+            print 'Bootstrap n.'+str(i+1)
+        pcodes_bs = np.array(patients.iloc[np.random.randint(len(pnames), size=len(pnames))]['code'])
+        data_bs = pd.concat([data.loc[data['pcode'] == pc] for pc in pcodes_bs])
+        fits_tmp = fit_saturation(data_bs, bins_S, binsc_S, mu, VERBOSE=VERBOSE)
+        fits_tmp['bootstrap'] = i
+        fits_bs.append(fits_tmp)
+    fits_bs = pd.concat(fits_bs)
 
-        try:
-            (l, u) = fit_fitness_cost(x, y, mu=mu)
-            if VERBOSE >= 3:
-                plot_function_minimization_1d(x, y, l, us=[1e-6, 2e-6, 5e-6, 1e-5],
-                                              title=region+', iSbin = '+str(iSbin))
-
-        except RuntimeError:
-            continue
-
-        fits.append((region, iSbin, l, u))
-
-    fits = pd.DataFrame(data=fits,
-                        columns=['region', 'iSbin', 'l', 'u'])
-    fits['S'] = binsc_S[fits['iSbin']]
-    fits['Smin'] = bins_S[fits['iSbin']]
-    fits['Smax'] = bins_S[fits['iSbin'] + 1]
-    
-    # Estimate fitness cost
-    fits['s'] = mu / fits['l']
+    fits['ds'] = fits_bs[['iSbin', 's']].groupby('iSbin').std()['s']
 
     # Store fitness cost to file
     if VERBOSE >= 1:
         print 'Save to file'
-    for (region, fitsreg) in fits.groupby('region'):
-        fn_out = get_fitness_cost_entropy_filename(region)
-        fitsreg.to_pickle(fn_out)
+    fn_out = get_fitness_cost_entropy_filename('all')
+    fits.to_pickle(fn_out)
 
     if plot:
-        plot_fits(fits, VERBOSE=VERBOSE)
+        plot_fits(fits, title=', '.join(regions), VERBOSE=VERBOSE, mu=mu)
 
         plt.ion()
         plt.show()
