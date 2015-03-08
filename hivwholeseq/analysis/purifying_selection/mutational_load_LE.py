@@ -31,10 +31,74 @@ from hivwholeseq.analysis.purifying_selection.filenames import get_fitness_cost_
 
 
 # Globals
+regions = ['p17', 'p24']
 
 
 
 # Functions
+def plot_mutational_load(data, scale_gw=False, type='density', VERBOSE=0):
+    '''Plot the distribution of mutation loads'''
+    data = data.copy()
+
+    region = data.iloc[0]['region']
+    pcode = data.iloc[0]['pcode']
+    nsites = data.iloc[0]['nsites']
+
+    if scale_gw:
+        L = 9000
+        data['fitness'] *= L / nsites
+
+    if type in ['both', 'cumulative']:
+        if VERBOSE >= 1:
+            print 'Plot cumulative distribution'
+        fig, ax = plt.subplots()
+        for it, (_, datum) in enumerate(data.iterrows()):
+            time = np.array(datum['time'])
+            fit_t = np.sort(-np.array(datum['fitness']))
+
+            x = fit_t
+            y = 1.0 - np.linspace(0, 1, len(x))
+            color = cm.jet(1.0 * it / len(times))
+            ax.plot(x, y, lw=2, color=color, label=str(int(time))+' days')
+
+        ax.set_xlabel('Fitness cost')
+        ax.set_ylabel('Fraction of haplotypes with fitness > x')
+        ax.set_title(', '.join([region, pcode]))
+        ax.grid(True)
+        ax.set_ylim(-0.05, 1.05)
+
+        plt.tight_layout()
+
+    if type in ['both', 'density']:
+        if VERBOSE >= 1:
+            print 'Plot density'
+        fig, ax = plt.subplots()
+        fitbounds = np.array([min(map(np.min, -data['fitness'])),
+                              max(map(np.max, -data['fitness']))])
+
+        bins = np.linspace(0.96 * fitbounds[0], 1.04 * fitbounds[1], 30)
+        binsc = 0.5 * (bins[1:] + bins[:-1])
+        for it, (_, datum) in enumerate(data.iterrows()):
+            time = np.array(datum['time'])
+            fit_t = -np.array(datum['fitness'])
+
+            fit_t = np.histogram(fit_t, bins=bins, density=True)[0]
+            x = binsc
+            y = fit_t
+            color = cm.jet(1.0 * it / len(times))
+            ax.plot(x, y, lw=2,
+                    color=color, alpha=0.7,
+                    label=str(int(time))+' days')
+
+        ax.set_xlabel('Fitness cost')
+        ax.set_ylabel('Density')
+        ax.set_title(', '.join([region, pcode]))
+        ax.grid(True)
+        ax.set_ylim(-0.04*ax.get_ylim()[1], 1.04*ax.get_ylim()[1])
+        ax.set_yticklabels([])
+        ax.legend(loc='upper right', title='Time:', fontsize=14)
+
+        plt.tight_layout()
 
 
 
@@ -51,9 +115,9 @@ if __name__ == '__main__':
                         help='Regions to analyze (e.g. F1 p17)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-4]')
-    parser.add_argument('--plot', nargs='?', default=None, const='2D',
+    parser.add_argument('--plot', action='store_true',
                         help='Plot results')
-    parser.add_argument('-N', type=int, default=100000,
+    parser.add_argument('-N', type=int, default=10000,
                         help='Number of points in the distribution')
 
     args = parser.parse_args()
@@ -82,8 +146,8 @@ if __name__ == '__main__':
         Ssub = get_subtype_reference_alignment_entropy(region, VERBOSE=VERBOSE)
 
         if VERBOSE >= 2:
-            print 'Get fitness costs'
-        fn = get_fitness_cost_entropy_filename(region)
+            print 'Get fitness costs (genomewide average)'
+        fn = get_fitness_cost_entropy_filename('all')
         fitness_cost = pd.read_pickle(fn)
         fitness_cost.set_index('iSbin', drop=False, inplace=True)
 
@@ -130,7 +194,7 @@ if __name__ == '__main__':
                 if protm[-1] == '*':
                     if VERBOSE >= 2:
                         print 'Ends with a stop, trim it'
-                    icons = icons[:-3]
+                    iconsm = iconsm[:-3]
                     consm = consm[:-3]
                     protm = protm[:-1]
                     aft = aft[:, :, :-3]
@@ -159,68 +223,40 @@ if __name__ == '__main__':
             ran = np.random.rand(N, aft_cons_sub.shape[0], aft_cons_sub.shape[-1])
             fitness_distr = np.dot((ran > aft_cons_sub), -fitness_cost_tmp).T
 
-            data.append({'pcode': pcode, 'region': region,
-                         'times': times, 'fitness': fitness_distr})
+            for time, fitn in izip(times, fitness_distr):
+                data.append({'pcode': pcode, 'region': region,
+                             'time': time, 'fitness': fitn,
+                             'nsites': len(pos_tmp)})
 
     data = pd.DataFrame(data)
+    data.set_index(['region', 'time'], drop=False, inplace=True)
+
+    # For genomewide estimates, take only shared time points
+    tmp = defaultdict(set)
+    for _, datum in data.iterrows():
+        tmp[datum['time']].add(datum['region'])
+    timesgw = sorted(t for t, val in tmp.iteritems() if len(val) == len(regions))
+
+    datagw = []
+    for time in timesgw:
+        datatmp = data.loc[data.loc[:, 'time'] == time]
+        datumgw = {'fitness': datatmp.loc[:, 'fitness'].sum(),
+                   'region': 'genomewide',
+                   'pcode': pcode,
+                   'time': time,
+                   'nsites': datatmp.loc[:, 'nsites'].sum()}
+        datagw.append(datumgw)
+    datagw = pd.DataFrame(datagw)
+
 
     if plot: 
         if VERBOSE >= 1:
             print 'Plot'
-        for _, datum in data.iterrows():
-            region = datum['region']
-            pcode = datum['pcode']
-            times = datum['times']
-            fitness = datum['fitness']
+        #for region, datum in data.groupby('region'):
+        #    datum['region'] = region
+        #    plot_mutational_load(datum, scale_gw=False, VERBOSE=VERBOSE)
 
-            # Plot cumulative
-            fig, ax = plt.subplots()
-            for it, time in enumerate(times):
-                # Get the absolute value for plotting with log scale
-                fit_t = -fitness[it]
-                fit_t.sort()
-
-                x = fit_t
-                y = 1.0 - np.linspace(0, 1, len(x))
-                color = cm.jet(1.0 * it / len(times))
-                ax.plot(x, y, lw=2, color=color, label=str(int(time))+' days')
-
-            ax.set_xlabel('Fitness cost')
-            ax.set_ylabel('Fraction of haplotypes with fitness > x')
-            ax.set_title(', '.join([region, pcode]))
-            ax.grid(True)
-            ax.set_ylim(-0.05, 1.05)
-            ax.set_xlim(0, 0.2)
-
-            plt.tight_layout()
-
-            # Plot density
-            fig, ax = plt.subplots()
-            bins = np.linspace(0.96 * -fitness.max(), 1.04 * -fitness.min(), 100)
-            binsc = 0.5 * (bins[1:] + bins[:-1])
-            for it, time in enumerate(times):
-                # Get the absolute value for plotting with log scale
-                fit_t = -fitness[it]
-                fit_t = np.histogram(fit_t, bins=bins, density=True)[0]
-
-                x = binsc
-                y = fit_t
-                color = cm.jet(1.0 * it / len(times))
-                ax.plot(x, y, lw=2,
-                        color=color, alpha=0.7,
-                        label=str(int(time))+' days')
-
-            ax.set_xlabel('Fitness cost')
-            ax.set_ylabel('Density')
-            ax.set_title(', '.join([region, pcode]))
-            ax.grid(True)
-            ax.set_xlim(0, 0.2)
-            ax.set_ylim(ymin=-0.04*ax.get_ylim()[1])
-            ax.set_yticklabels([])
-            ax.legend(loc='upper right', title='Time:', fontsize=14)
-
-            plt.tight_layout()
-
+        plot_mutational_load(datagw, scale_gw=True, VERBOSE=VERBOSE)
 
         plt.ion()
         plt.show()

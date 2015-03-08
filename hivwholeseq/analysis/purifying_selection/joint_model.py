@@ -43,7 +43,7 @@ def add_Sbins(data, bins=8, VERBOSE=0):
     '''Add entropy bins to the data'''
     #bins_S = np.array([0, 0.03, 0.06, 0.1, 0.25, 0.7, 3])
     if np.isscalar(bins):
-        bins = np.array(data['Ssub'].quantile(q=np.linspace(0, 1, bins)))
+        bins = np.array(data['Ssub'].quantile(q=np.linspace(0, 1, bins + 1)))
     
     binsc = 0.5 * (bins[1:] + bins[:-1])
 
@@ -217,13 +217,13 @@ if __name__ == '__main__':
     dataf = data.copy()
     dataf['mbin'] = map(muts.index, dataf['mut'])
 
-    # Get initial estimate for mu from Abram2010, resorted
+    # Get initial estimate for mu from Abram2010, resorted, PER DAY
     from hivwholeseq.analysis.mutation_rate.comparison_Abram import get_mu_Abram2010
-    mu0 = get_mu_Abram2010().loc[muts]
+    mu0 = get_mu_Abram2010().loc[muts] / 2.0
 
     # Get initial estimate for s from our fixed-mu estimate
     from hivwholeseq.analysis.purifying_selection.filenames import get_fitness_cost_entropy_filename
-    sdata = pd.read_pickle(get_fitness_cost_entropy_filename('p17'))
+    sdata = pd.read_pickle(get_fitness_cost_entropy_filename('all'))
     s = sdata['s']
 
     # Bin by subtype entropy, taking bins from fitness cost estimate
