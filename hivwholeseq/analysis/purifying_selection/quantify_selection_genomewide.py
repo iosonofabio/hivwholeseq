@@ -38,26 +38,58 @@ fun = lambda x, l, u: l * (1 - np.exp(- u/l * x))
 
 
 # Functions
-def fit_fitness_cost(x, y, VERBOSE=0, mu=5e-6):
+def fit_fitness_cost(x, y, mu, VERBOSE=0):
     '''Fit saturation curve for fitness costs
     
     NOTE: as can be seen from the plots below, the fit for l is not very
     sensitive to mu.
     '''
-    fun_min = lambda x, l, u: ((y - fun(x, l, u))**2).sum()
+    from scipy.optimize import minimize_scalar
 
-    # Minimization poor man's style: we compute the function everywhere
-    # NOTE: I am not retarded. This solution is chosen because it's still cheap
-    # and the right flank of the objective function in l is much steeper than
-    # the left flank, causing some troubles
-    ls = np.logspace(-5, 0)
-    z = np.array([fun_min(x, l, mu) for l in ls])
-    l = ls[z.argmin()]
+    fun_min_scalar = lambda s: ((y - fun(x, mu/s, mu))**2).sum()
+    s = minimize_scalar(fun_min_scalar, bounds=[1e-5, 1e0]).x
 
-    # FIXME: if we fix mu, this is useless, but it's ok for now
-    params = (l, mu)
+    return s
 
-    return params
+
+def fit_saturation(data, bins_S, binsc_S, VERBOSE=0):
+    '''Fit saturation curves to the data'''
+    regions = np.unique(data['region'])
+
+    fits = []
+    dataf = data.copy()
+    dataf = (data
+             .loc[:, ['Sbin', 'mu', 'time', 'af']]
+             .groupby('Sbin'))
+    for iSbin, datum in dataf:
+        x = np.array(datum['time'])
+        y = np.array(datum['af'])
+        mu = np.array(datum['mu'])
+
+        ind = -(np.isnan(x) | np.isnan(y))
+        x = x[ind]
+        y = y[ind]
+        mu = mu[ind]
+
+        try:
+            s = fit_fitness_cost(x, y, mu, VERBOSE=VERBOSE)
+            if VERBOSE >= 3:
+                plot_function_minimization_1d(x, y, s, mu,
+                                              title=', '.join(regions)+', iSbin = '+str(iSbin))
+
+        except RuntimeError:
+            print 'Fit failed, Sbin = ', iSbin
+            continue
+
+        fits.append((iSbin, s))
+
+    fits = pd.DataFrame(data=fits,
+                        columns=['iSbin', 's'])
+    fits['S'] = binsc_S[fits['iSbin']]
+    fits['Smin'] = bins_S[fits['iSbin']]
+    fits['Smax'] = bins_S[fits['iSbin'] + 1]
+    
+    return fits
 
 
 def plot_function_minimization(x, y, params):
@@ -81,8 +113,9 @@ def plot_function_minimization(x, y, params):
     plt.ion()
     plt.show()
 
-def plot_function_minimization_1d(x, y, l, us=[1.2e-6], title=''):
+def plot_function_minimization_1d(x, y, s, mu, title=''):
     '''Investigate inconsistencies in fits'''
+    #FIXME: rewrite this function
     fun_min = lambda l, u: ((y - fun(x, l, u))**2).sum()
 
     p1 = np.logspace(np.log10(l) - 3, np.log10(l) + 3, 100)
@@ -121,11 +154,10 @@ def plot_fits(fitsreg, title='', VERBOSE=0, mu=5e-6):
         iSbin = fit['iSbin']
         Smin = fit['Smin']
         Smax = fit['Smax']
-        l = fit['l']
-        u = fit['u']
-        yfit = fun(xfit, l, u)
-        label = ('S e ['+'{:.1G}'.format(Smin)+', '+'{:.1G}'.format(Smax)+']'+
-                 ', s = '+'{:.1G}'.format(mu / l))
+        s = fit['s']
+        yfit = fun(xfit, mu/s, mu)
+        label = ('S e ['+'{:.2G}'.format(Smin)+', '+'{:.2G}'.format(Smax)+']'+
+                 ', s = '+'{:.2G}'.format(s))
 
         
         color = cm.jet(1.0 * iSbin / len(fitsreg))
@@ -136,7 +168,7 @@ def plot_fits(fitsreg, title='', VERBOSE=0, mu=5e-6):
     ax.set_ylabel('Allele frequency')
     ax.legend(loc='lower right', title='Entropy:', fontsize=10,
               ncol=2)
-    ax.text(0.05, 0.9,
+    ax.text(0.03, 0.92,
             ('$f(t) \, = \, \mu / s \, [1 - e^{-st}]$'),
             fontsize=20,
             horizontalalignment='left',
@@ -145,20 +177,6 @@ def plot_fits(fitsreg, title='', VERBOSE=0, mu=5e-6):
     ax.set_xscale('log')
     ax.set_yscale('log')
     ax.grid(True)
-
-
-    ## Plot the value at some reasonable time
-    #x0 = 2000
-    #fitsreg['y0'] = fun(x0, fitsreg['l'], fitsreg['u'])
-    #ax2 = axs[1]
-    #ax2.plot(fitsreg['S'], fitsreg['y0'], lw=2, c='k')
-
-    #ax2.set_xlabel('Entropy in subtype [bits]')
-    #ax2.set_ylabel('Fit value at x0 = '+str(x0))
-    #ax2.set_xscale('log')
-    #ax2.set_yscale('log')
-    #ax2.grid(True)
-
 
     # Plot the estimated fitness value
     ax3 = axs[1]
@@ -170,54 +188,13 @@ def plot_fits(fitsreg, title='', VERBOSE=0, mu=5e-6):
 
     ax3.set_xlabel('Entropy in subtype [bits]')
     ax3.set_ylabel('Fitness cost')
-    ax3.set_ylim(1e-3, 2e-1)
+    ax3.set_ylim(1e-5, 1e-1)
     ax3.set_xlim(1e-3, 2)
     ax3.set_xscale('log')
     ax3.set_yscale('log')
     ax3.grid(True, which='both')
 
     plt.tight_layout(rect=(0, 0, 1, 0.96))
-
-
-def fit_saturation(data, bins_S, binsc_S, mu, VERBOSE=0):
-    '''Fit saturation curves to the data'''
-    regions = np.unique(data['region'])
-
-    fits = []
-    dataf = (data
-             .loc[data.loc[:, 'Ssub'] < bins_S[-1]]
-             .loc[:, ['Sbin', 'time', 'af']]
-             .groupby('Sbin'))
-    for iSbin, datum in dataf:
-        x = np.array(datum['time'])
-        y = np.array(datum['af'])
-
-        ind = -(np.isnan(x) | np.isnan(y))
-        x = x[ind]
-        y = y[ind]
-
-        try:
-            (l, u) = fit_fitness_cost(x, y, mu=mu)
-            if VERBOSE >= 3:
-                plot_function_minimization_1d(x, y, l, us=[1e-6, 2e-6, 5e-6, 1e-5],
-                                              title=', '.join(regions)+', iSbin = '+str(iSbin))
-
-        except RuntimeError:
-            print 'Fit failed, Sbin = ', iSbin
-            continue
-
-        fits.append((iSbin, l, u))
-
-    fits = pd.DataFrame(data=fits,
-                        columns=['iSbin', 'l', 'u'])
-    fits['S'] = binsc_S[fits['iSbin']]
-    fits['Smin'] = bins_S[fits['iSbin']]
-    fits['Smax'] = bins_S[fits['iSbin'] + 1]
-    
-    # Estimate fitness cost
-    fits['s'] = mu / fits['l']
-
-    return fits
 
 
 
@@ -375,41 +352,40 @@ if __name__ == '__main__':
                                  'time', 'af'])
 
     # Bin by subtype entropy using quantiles
-    #bins_S = np.array([0, 0.03, 0.06, 0.1, 0.25, 0.7, 3])
-    bins_S = np.array(data['Ssub'].quantile(q=np.linspace(0, 1, 8)))
-    binsc_S = 0.5 * (bins_S[1:] + bins_S[:-1])
-    data['Sbin'] = -1
-    for b in bins_S:
-        data.loc[data.loc[:, 'Ssub'] >= b, 'Sbin'] += 1
-    data['Sbin'] = data['Sbin'].clip(0, len(binsc_S))
+    from hivwholeseq.analysis.purifying_selection.joint_model import add_Sbins
+    bins_S, binsc_S = add_Sbins(data, bins=8, VERBOSE=VERBOSE)
 
+    # Get mutation rates from Abram 2010
+    from hivwholeseq.analysis.mutation_rate.comparison_Abram import get_mu_Abram2010
+    # NOTE: we need mut rates PER DAY
+    mu = get_mu_Abram2010() / 2
+    data['mu'] = np.array(mu.loc[data['mut']])
 
     # Fit exponential saturation
-    mu = 5e-6
-    fits = fit_saturation(data, bins_S, binsc_S, mu, VERBOSE=VERBOSE)
+    fits = fit_saturation(data, bins_S, binsc_S, VERBOSE=VERBOSE)
 
-    # Bootstrap over patients
-    fits_bs = []
-    for i in xrange(10):
-        if VERBOSE >= 2:
-            print 'Bootstrap n.'+str(i+1)
-        pcodes_bs = np.array(patients.iloc[np.random.randint(len(pnames), size=len(pnames))]['code'])
-        data_bs = pd.concat([data.loc[data['pcode'] == pc] for pc in pcodes_bs])
-        fits_tmp = fit_saturation(data_bs, bins_S, binsc_S, mu, VERBOSE=VERBOSE)
-        fits_tmp['bootstrap'] = i
-        fits_bs.append(fits_tmp)
-    fits_bs = pd.concat(fits_bs)
+    ## Bootstrap over patients
+    #fits_bs = []
+    #for i in xrange(10):
+    #    if VERBOSE >= 2:
+    #        print 'Bootstrap n.'+str(i+1)
+    #    pcodes_bs = np.array(patients.iloc[np.random.randint(len(pnames), size=len(pnames))]['code'])
+    #    data_bs = pd.concat([data.loc[data['pcode'] == pc] for pc in pcodes_bs])
+    #    fits_tmp = fit_saturation(data_bs, bins_S, binsc_S, mu, VERBOSE=VERBOSE)
+    #    fits_tmp['bootstrap'] = i
+    #    fits_bs.append(fits_tmp)
+    #fits_bs = pd.concat(fits_bs)
 
-    fits['ds'] = fits_bs[['iSbin', 's']].groupby('iSbin').std()['s']
+    #fits['ds'] = fits_bs[['iSbin', 's']].groupby('iSbin').std()['s']
 
-    # Store fitness cost to file
-    if VERBOSE >= 1:
-        print 'Save to file'
-    fn_out = get_fitness_cost_entropy_filename('all')
-    fits.to_pickle(fn_out)
+    ## Store fitness cost to file
+    #if VERBOSE >= 1:
+    #    print 'Save to file'
+    #fn_out = get_fitness_cost_entropy_filename('all')
+    #fits.to_pickle(fn_out)
 
     if plot:
-        plot_fits(fits, title=', '.join(regions), VERBOSE=VERBOSE, mu=mu)
+        plot_fits(fits, title=', '.join(regions), VERBOSE=VERBOSE, mu=5e-6)
 
         plt.ion()
         plt.show()

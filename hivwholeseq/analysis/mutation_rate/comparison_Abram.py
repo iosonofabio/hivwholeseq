@@ -60,9 +60,9 @@ def get_mu_Abram2010():
     muAbram['C->T'] += 61
     muAbram['G->T'] += 0
 
-    # Normalize
-    muAbramAv = 1.4e-5
-    muAbram *= muAbramAv / muAbram.mean()
+    # Normalize with the max (how do they calculate the average??)
+    muAbramAv = 1e-5
+    muAbram *= muAbramAv / muAbram.max()
 
     return muAbram
 

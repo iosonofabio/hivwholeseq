@@ -48,7 +48,7 @@ def add_Sbins(data, bins=8, VERBOSE=0):
     binsc = 0.5 * (bins[1:] + bins[:-1])
 
     data['Sbin'] = -1
-    for b in bins_S:
+    for b in bins:
         data.loc[data.loc[:, 'Ssub'] >= b, 'Sbin'] += 1
     data['Sbin'] = data['Sbin'].clip(0, len(binsc) - 1)
 
