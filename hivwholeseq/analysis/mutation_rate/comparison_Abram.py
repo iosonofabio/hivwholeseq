@@ -19,6 +19,7 @@ from hivwholeseq.miseq import alpha, alphal
 from hivwholeseq.analysis.mutation_rate.explore_divergence_synonymous import (
     collect_data_mutation_rate, fit_mutation_rate)
 
+from hivwholeseq.analysis.mutation_rate.mutation_rate import plot_mu_matrix
 
 # Globals
 
@@ -60,60 +61,100 @@ def get_mu_Abram2010():
     muAbram['C->T'] += 61
     muAbram['G->T'] += 0
 
-    # Normalize with the max (how do they calculate the average??)
-    muAbramAv = 1e-5
-    muAbram *= muAbramAv / muAbram.max()
+    # Normalize
+    muAbramAv = 1.3e-5
+    muAbram *= muAbramAv / (muAbram.sum() / 4.0)
 
     return muAbram
 
 
-def comparison_Abram2010(mu, VERBOSE=2, title=''):
+def add_Abram2010(mu, generation_time=2.0, VERBOSE=2, title=''):
     '''Print a comparison with Abram 2010, J. Virol.'''
-    muAbram = get_mu_Abram2010()
+    muAbram = get_mu_Abram2010() / generation_time
     data = pd.concat([muAbram, mu], axis=1)
-    if VERBOSE >= 2:
+    if VERBOSE >= 3:
         if title:
             print title
         print data
 
-    data.rename(columns={0: 'Abram2010', 1: 'new'}, inplace=True)
+    if not title:
+        title = 'new'
+
+    data.rename(columns={0: 'Abram2010', 1: title}, inplace=True)
     return data
 
 
-def plot_mu_matrix(mu, time_unit='generation'):
-    '''Plot the mutation rate matrix'''
-    muM = np.ma.masked_all((4, 4))
-    for ia1, a1 in enumerate(alpha[:4]):
-        for ia2, a2 in enumerate(alpha[:4]):
-            if a1+'->'+a2 in mu.index:
-                muM[ia1, ia2] = mu.loc[a1+'->'+a2]
-
-    if time_unit == 'generation':
-        # Assume a generation time of 2 days
-        muM *= 2
+def plot_comparison(mu, method='joint'):
+    '''Plot comparison between our estimate and Abram2010'''
+    mus = add_Abram2010(mu)
 
     fig, ax = plt.subplots()
-    h = ax.imshow(np.log10(muM.T + 1e-10),
-                  interpolation='nearest',
-                  vmin=-9, vmax=-4)
+    x = np.array(mus['Abram2010'])
+    y = np.array(mus['new'])
 
-    ax.set_xticks(np.arange(4))
-    ax.set_yticks(np.arange(4))
-    ax.set_xticklabels(alpha[:4])
-    ax.set_yticklabels(alpha[:4])
+    r = np.corrcoef(np.log10(x), np.log10(y))[0, 1]
 
-    ax.set_xlabel('From:')
-    ax.set_ylabel('To:')
+    ax.scatter(x, y, s=40, color='k', label='{:2.0%}'.format(r))
+    xl = np.logspace(-8, -4, 100)
+    ax.plot(xl, xl, lw=2, c='grey')
+    ax.set_xlabel('Abram et al 2010 [changes / site / day]')
+    ax.set_ylabel(method.capitalize()+' estimate [changes / site / day]')
+    ax.set_xlim(1e-8, 1e-4)
+    ax.set_ylim(1e-8, 1e-4)
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    ax.legend(loc='upper left', title='Correlation\ncoefficient:', fontsize=14)
+    ax.grid(True)
 
-    cb = fig.colorbar(h)
-    cb.set_ticks(np.arange(-9, -3))
-    cb.set_ticklabels(['$10^{'+str(x)+'}$' for x in xrange(-9, -3)])
-    cb.set_label('changes / '+time_unit, rotation=270, labelpad=30)
+    plt.tight_layout()
 
-    plt.tight_layout(rect=(-0.1, 0, 1, 1))
 
-    plt.ion()
-    plt.show()
+def plot_three_comparison():
+    '''Plot three way comparison'''
+    # Load mutation rate from joint model
+    from hivwholeseq.analysis.filenames import analysis_data_folder
+    mu_neu = pd.read_pickle(analysis_data_folder+'mu_neutralclass.pickle')
+    mu_joi = pd.read_pickle(analysis_data_folder+'mu_joint.pickle')
+    mu_Abr = get_mu_Abram2010() / 2.0
+
+    data = pd.concat([mu_Abr, mu_neu, mu_joi], axis=1)
+    data.rename(columns={0: 'Abram2010', 1: 'neutralclass', 2: 'joint'}, inplace=True)
+    print data
+
+    fig, axs = plt.subplots(2, 1, figsize=(6, 7))
+    axfun = lambda x: axs[x >= len(data.index) // 2]
+    colord = {'neutralclass': 'darkred', 'joint': 'steelblue'}
+
+
+    for i, ax in enumerate(axs):
+        width = 0.4
+        xbase = np.arange(len(data.index) // 2) - width
+
+        for j, key in enumerate(['neutralclass', 'joint']):
+            xs = xbase + width * j
+            ys = ((data[key] / data['Abram2010'] - 1)
+                  .iloc[i * (len(data.index) // 2): (i + 1) * (len(data.index) // 2)])
+
+            ax.bar(xs, ys, width=width, bottom=1,
+                   color=colord[key],
+                   label=key,
+                  )
+
+        ax.plot([-1, len(data.index) // 2], [1, 1], color='k', lw=1)
+        muts = data.index[i * (len(data.index) // 2): (i + 1) * (len(data.index) // 2)].tolist()
+        ax.set_xticks(np.arange(len(data.index) // 2))
+        ax.set_xticklabels(muts)
+        ax.set_yscale('log')
+
+        ax.set_ylim(1e-1, 1e1)
+        ax.grid(True, which='both', axis='y')
+
+    ax.set_ylabel('Ratio to Abram et al 2010', position=(-0.02, 1))
+    axs[0].legend(loc='upper right')
+
+    plt.tight_layout(rect=(0.02, 0, 1, 1), h_pad=-4.5)
+
+
 
 
 
@@ -126,29 +167,25 @@ if __name__ == '__main__':
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     parser.add_argument('--patients', nargs='+',
                         help='Patient to analyze')
-    parser.add_argument('--regions', nargs='+', required=True,
-                        help='Regions to analyze (e.g. F1 p17)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-4]')
-    parser.add_argument('--plot', nargs='?', default=None, const='2D',
-                        help='Plot results')
+    parser.add_argument('--method', choices=['three', 'joint', 'neutralclass'], default='joint',
+                        help='Which method to compare')
 
     args = parser.parse_args()
     pnames = args.patients
-    regions = args.regions
     VERBOSE = args.verbose
-    plot = args.plot
+    method = args.method
 
-    data = defaultdict(list)
+    if method != 'three':
+        # Load mutation rate from joint model
+        from hivwholeseq.analysis.filenames import analysis_data_folder
+        fn_mu = analysis_data_folder+'mu_'+method+'.pickle'
+        mu = pd.read_pickle(fn_mu)
+        plot_mu_matrix(mu, time_unit='days')
+        plot_comparison(mu, method=method)
+    else:
+        plot_three_comparison()
 
-    patients = load_patients()
-    if pnames is None:
-        pnames = patients.index.tolist()
-
-    data = collect_data_mutation_rate(regions, pnames, VERBOSE=VERBOSE)
-    mu = fit_mutation_rate(data, VERBOSE=VERBOSE, Smin=0.1)
-
-    print comparison_Abram2010(mu)
-    
-    if plot:
-        plot_mu_matrix(mu)
+    plt.ion()
+    plt.show()

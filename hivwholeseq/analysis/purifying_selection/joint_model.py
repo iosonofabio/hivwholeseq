@@ -30,6 +30,12 @@ from hivwholeseq.patients.one_site_statistics import get_codons_n_polymorphic
 from hivwholeseq.analysis.mutation_rate.explore_divergence_synonymous import translate_masked
 from hivwholeseq.analysis.purifying_selection.filenames import get_fitness_cost_entropy_filename
 
+from hivwholeseq.analysis.purifying_selection.quantify_selection_genomewide import (
+    plot_fits as plot_fitness_cost)
+from hivwholeseq.analysis.mutation_rate.comparison_Abram import plot_comparison
+from hivwholeseq.analysis.mutation_rate.mutation_rate import plot_mu_matrix
+
+
 
 # Globals
 pnames = ['20097', '15376', '15823', '15241', '9669', '15319']
@@ -55,28 +61,8 @@ def add_Sbins(data, bins=8, VERBOSE=0):
     return bins, binsc
 
 
-
-# Script
-if __name__ == '__main__':
-
-    # Parse input args
-    parser = argparse.ArgumentParser(
-        description='Infer mutation rates AND fitness costs',
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
-    parser.add_argument('--patients', nargs='+', default=pnames,
-                        help='Patient to analyze')
-    parser.add_argument('--regions', nargs='+', default=regions,
-                        help='Regions to analyze (e.g. F1 p17)')
-    parser.add_argument('--verbose', type=int, default=2,
-                        help='Verbosity level [0-4]')
-    parser.add_argument('--plot', action='store_true',
-                        help='Plot results')
-
-    args = parser.parse_args()
-    pnames = args.patients
-    regions = args.regions
-    VERBOSE = args.verbose
-    plot = args.plot
+def collect_data_joint(pnames, regions, VERBOSE=0, plot=False):
+    '''Collect data for joint estimate of fitness cost and mutation rates'''
 
     data = []
 
@@ -210,28 +196,55 @@ if __name__ == '__main__':
                                  'Ssub',
                                  'time', 'af'])
 
-    # Fits
-    fits = []
+    return data
+
+
+def fit_joint_model(data, method='group', VERBOSE=0, plot=False):
+    '''Fit fitness cost and mutation rates at once'''
     from scipy.optimize import minimize
+
+    def get_initial_parameters(muts):
+        '''Get initial parameter vector for the fit'''
+    
+        # Get initial estimate for mu from Abram2010, resorted, PER DAY
+        from hivwholeseq.analysis.mutation_rate.comparison_Abram import get_mu_Abram2010
+        mu0 = get_mu_Abram2010().loc[muts] / 2.0
+    
+        # Get initial estimate for s from our fixed-mu estimate
+        from hivwholeseq.analysis.purifying_selection.filenames import get_fitness_cost_entropy_filename
+        sdata = pd.read_pickle(get_fitness_cost_entropy_filename('all_Abram2010'))
+        s = sdata['s']
+    
+        p0 = np.concatenate(map(np.array, [mu0, s]))
+        return {'p0': p0, 'mu0': mu0, 's0': s, 'sdata': sdata}
+
+    # NOTE: muts just sets the order of mutations in the vector
     muts = np.unique(data['mut']).tolist()
-    dataf = data.copy()
-    dataf['mbin'] = map(muts.index, dataf['mut'])
+    pdict = get_initial_parameters(muts)
+    p0 = pdict['p0']
+    s0 = pdict['s0']
+    mu0 = pdict['mu0']
+    sdata = pdict['sdata']
 
-    # Get initial estimate for mu from Abram2010, resorted, PER DAY
-    from hivwholeseq.analysis.mutation_rate.comparison_Abram import get_mu_Abram2010
-    mu0 = get_mu_Abram2010().loc[muts] / 2.0
+    # Bin by mutation type and subtype entropy, taking bins from fitness cost estimate
+    #FIXME: we could also make time bins (less data, more smooth)
+    data['mbin'] = map(muts.index, data['mut'])
+    bins_S = np.insert(np.array(sdata['Smax']), 0, 0)
+    bins_S, binsc_S = add_Sbins(data, bins=bins_S, VERBOSE=VERBOSE)
 
-    # Get initial estimate for s from our fixed-mu estimate
-    from hivwholeseq.analysis.purifying_selection.filenames import get_fitness_cost_entropy_filename
-    sdata = pd.read_pickle(get_fitness_cost_entropy_filename('all'))
-    s = sdata['s']
-
-    # Bin by subtype entropy, taking bins from fitness cost estimate
-    bins = np.insert(np.array(sdata['Smax']), 0, 0)
-    bins_S, binsc_S = add_Sbins(dataf, bins=bins, VERBOSE=VERBOSE)
-
-    dataf = dataf.loc[:, ['mbin', 'Sbin', 'af', 'time']]
-    p0 = np.concatenate(map(np.array, [mu0, s]))
+    if method == 'single':
+        dataf = (data
+                 .loc[:, ['mbin', 'Sbin', 'time', 'af']]
+                 .groupby(['mbin', 'Sbin']))
+    else:
+        dataf = (data
+                 .loc[:, ['mbin', 'Sbin', 'time', 'af']]
+                 .groupby(['mbin', 'Sbin', 'time'])
+                 .mean())
+        dataf['time'] = dataf.index.get_level_values('time')
+        dataf['Sbin'] = dataf.index.get_level_values('Sbin')
+        dataf['mbin'] = dataf.index.get_level_values('mbin')
+        dataf = dataf.groupby(['mbin', 'Sbin'])
 
     def fun_min(p):
         '''p is the parameters vector: #I mut rates + #J selection coefficients'''
@@ -241,25 +254,29 @@ if __name__ == '__main__':
         s = p[len(muts):]
 
         #res = 0
-        #for (imb, isb), datum in dataf.groupby(['mbin', 'Sbin']):
+        #for (imb, isb), datum in dataf:
         #    res += ((datum['af'] - fun(datum['time'], mu[imb], s[isb]))**2).sum()
 
         res = sum(((datum['af'] - fun(datum['time'], mu[imb], s[isb]))**2).sum()
-                  for (imb, isb), datum in (dataf.groupby(['mbin', 'Sbin'])))
+                  for (imb, isb), datum in dataf)
 
         return res
         
 
-    def get_funmin_neighbourhood(fun_min, p0, plot=False, title=''):
+    def get_funmin_neighbourhood(fun_min, p0, nfev=30, plot=False, title=''):
         '''Calculate a few function evaluations for testing'''
         dynrangeexp = 0.5
+        factorl = np.sort(np.concatenate([np.logspace(-dynrangeexp, dynrangeexp, nfev - 1),
+                                         [1]]))
+
         datap = []
         for i in xrange(len(p0)):
             if VERBOSE >= 2:
                 print 'Parameter n.'+str(i+1)
             x = []
             y = []
-            for factor in np.logspace(-dynrangeexp, dynrangeexp, 10):
+
+            for factor in factorl:
                 p = p0.copy()
                 p[i] *= factor
 
@@ -301,7 +318,7 @@ if __name__ == '__main__':
 
     if plot:
         if VERBOSE >= 1:
-            print 'Plot a few function evaluations for testing'
+            print 'Plot objective function in a neighbourhood of initial parameters'
 
         datap0 = get_funmin_neighbourhood(fun_min, p0, plot=plot)
 
@@ -316,13 +333,12 @@ if __name__ == '__main__':
     
     if plot:
         if VERBOSE >= 1:
-            print 'Plot a few function evaluations after minimization'
+            print 'Plot objective function in a neighbourhood of the solution'
 
         datapmin = get_funmin_neighbourhood(fun_min, pmin, plot=plot)
 
         plt.ion()
         plt.show()
-
 
     # Save results of minimization
     mu_min = pd.Series(pmin[:len(muts)], index=muts)
@@ -330,11 +346,110 @@ if __name__ == '__main__':
     s_min['Smin'] = sdata['Smin']
     s_min['Smax'] = sdata['Smax']
     s_min['S'] = sdata['S']
+    s_min['iSbin'] = s_min.index
 
+    return mu_min, s_min
+
+
+def plot_mutation_rate(mu, VERBOSE=0):
+    '''Plot mutation rate after joint minimization'''
+
+    # Plot matrix
+    muM = np.ma.masked_all((4, 4))
+    for ia1, a1 in enumerate(alpha[:4]):
+        for ia2, a2 in enumerate(alpha[:4]):
+            if a1+'->'+a2 in mu.index:
+                muM[ia1, ia2] = mu.loc[a1+'->'+a2]
+
+    fig, ax = plt.subplots()
+    h = ax.imshow(np.log10(muM.T + 1e-10),
+                  interpolation='nearest',
+                  vmin=-9, vmax=-4)
+
+    ax.set_xticks(np.arange(4))
+    ax.set_yticks(np.arange(4))
+    ax.set_xticklabels(alpha[:4])
+    ax.set_yticklabels(alpha[:4])
+
+    ax.set_xlabel('From:')
+    ax.set_ylabel('To:')
+
+    cb = fig.colorbar(h)
+    cb.set_ticks(np.arange(-9, -3))
+    cb.set_ticklabels(['$10^{'+str(x)+'}$' for x in xrange(-9, -3)])
+    cb.set_label('changes / position / day', rotation=270, labelpad=30)
+
+    plt.tight_layout(rect=(-0.1, 0, 1, 1))
+
+    # Plot comparison with Abram2010
+    from hivwholeseq.analysis.mutation_rate.comparison_Abram import add_Abram2010
+    mus = add_Abram2010(mu, VERBOSE=VERBOSE)
+
+    fig, ax = plt.subplots()
+    x = np.array(mus['Abram2010'])
+    y = np.array(mus['new'])
+
+    r = np.corrcoef(np.log10(x), np.log10(y))[0, 1]
+
+    ax.scatter(x, y, s=40, color='k', label='{:2.0%}'.format(r))
+    xl = np.logspace(-8, -4, 100)
+    ax.plot(xl, xl, lw=2, c='grey')
+    ax.set_xlabel('Abram et al 2010 [changes / site / day]')
+    ax.set_ylabel('Joint estimate [changes / site / day]')
+    ax.set_xlim(1e-8, 1e-4)
+    ax.set_ylim(1e-8, 1e-4)
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    ax.legend(loc='upper left', title='Correlation\ncoefficient:', fontsize=14)
+    ax.grid(True)
+
+    plt.tight_layout()
+
+
+
+# Script
+if __name__ == '__main__':
+
+    # Parse input args
+    parser = argparse.ArgumentParser(
+        description='Infer mutation rates AND fitness costs',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
+    parser.add_argument('--patients', nargs='+', default=pnames,
+                        help='Patient to analyze')
+    parser.add_argument('--regions', nargs='+', default=regions,
+                        help='Regions to analyze (e.g. F1 p17)')
+    parser.add_argument('--verbose', type=int, default=2,
+                        help='Verbosity level [0-4]')
+    parser.add_argument('--plot', action='store_true',
+                        help='Plot results')
+
+    args = parser.parse_args()
+    pnames = args.patients
+    regions = args.regions
+    VERBOSE = args.verbose
+    plot = args.plot
+
+    data = collect_data_joint(pnames, regions, VERBOSE=VERBOSE, plot=plot)
+
+    mu_min, s_min = fit_joint_model(data, VERBOSE=VERBOSE, plot=plot)    
+
+    if plot:
+        data['mu'] = np.array(mu_min.loc[data['mut']])
+        plot_fitness_cost(s_min, VERBOSE=VERBOSE, data=data)
+
+        plot_mu_matrix(mu_min, time_unit='days')
+        plot_comparison(mu_min)
+
+        plt.ion()
+        plt.show()
+
+    if VERBOSE >= 1:
+        print 'Save to file'
     from hivwholeseq.analysis.filenames import analysis_data_folder
     fn_out_mu = analysis_data_folder+'mu_joint.pickle'
     mu_min.to_pickle(fn_out_mu)
 
-    fn_out_s = analysis_data_folder+'s_joint.pickle'
+    from hivwholeseq.analysis.purifying_selection.filenames import get_fitness_cost_entropy_filename
+    fn_out_s = get_fitness_cost_entropy_filename('all_joint')
     s_min.to_pickle(fn_out_s)
 

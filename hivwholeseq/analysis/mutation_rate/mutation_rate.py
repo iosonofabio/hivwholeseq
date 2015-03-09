@@ -20,12 +20,17 @@ from hivwholeseq.miseq import alpha, alphal
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.utils.sequence import translate_with_gaps
 from hivwholeseq.utils.sequence import get_degeneracy_dict
-import hivwholeseq.utils.plot
 from hivwholeseq.cross_sectional.get_subtype_entropy_synonymous import \
     get_subtype_reference_alignment_entropy_syn
 from hivwholeseq.cross_sectional.get_subtype_consensus import \
     get_subtype_reference_alignment_consensus
 from hivwholeseq.patients.one_site_statistics import get_codons_n_polymorphic
+
+
+
+# Globals
+pnames = ['20097', '15376', '15823', '15241', '9669', '15319']
+regions = ['p17', 'p24', 'nef', 'PR', 'RT', 'IN', 'vif']
 
 
 
@@ -197,48 +202,31 @@ def collect_data_mutation_rate(regions, pnames, VERBOSE=0):
     return data
 
 
-def fit_mutation_rate_avgsample(data, VERBOSE=0, Smin=0.05):
-    '''Fit the mutation rate from the data, each sample weighs 1'''
-    muts = list(np.unique(data.loc[:, 'mut']))
-
-    # Average within time points first
-    datap = (data
-             .loc[data.loc[:, 'S'] >= Smin]
-             .loc[:, ['mut', 'time', 'af']]
-             .groupby(['mut', 'time'])
-             .mean()
-             .loc[:, 'af']
-             .unstack('time'))
-
-    fits = {}
-    for mut, datum in datap.iterrows():
-        x = np.array(datum.index)
-        y = np.array(datum)
-
-        # Get rid of masked stuff (this happens if we miss data in the means)
-        ind = -(np.isnan(x) | np.isnan(y))
-        x = x[ind]
-        y = y[ind]
-
-        # Linear fit
-        m = np.dot(y, x) / np.dot(x, x)
-        fits[mut] = m
-
-    return pd.Series(fits)
-
-
-def fit_mutation_rate(data, VERBOSE=0, Smin=0.05):
+def fit_mutation_rate(data, VERBOSE=0, Smin=0.05, method='group'):
     '''Fit the mutation rate from the data, each observation weighs 1'''
     muts = list(np.unique(data.loc[:, 'mut']))
     
-    fits = {}
-    for mut in muts:
-        datum = data.loc[data.loc[:, 'mut'] == mut]
+    if method == 'single':
+        dataf = (data
+                 .loc[data.loc[:, 'S'] >= Smin]
+                 .loc[:, ['mut', 'time', 'af']]
+                 .groupby(['mut']))
+    else:
+        dataf = (data
+                 .loc[data.loc[:, 'S'] >= Smin]
+                 .loc[:, ['mut', 'time', 'af']]
+                 .groupby(['mut', 'time'])
+                 .mean())
+        dataf['time'] = dataf.index.get_level_values('time')
+        dataf['mut'] = dataf.index.get_level_values('mut')
+        dataf = dataf.groupby(['mut'])
 
+    fits = {}
+    for mut, datum in dataf:
         x = np.array(datum['time'])
         y = np.array(datum['af'])
 
-        # Get rid of masked stuff (this happens if we miss data in the means)
+        # Get rid of masked stuff
         ind = -(np.isnan(x) | np.isnan(y))
         x = x[ind]
         y = y[ind]
@@ -247,82 +235,92 @@ def fit_mutation_rate(data, VERBOSE=0, Smin=0.05):
         m = np.dot(y, x) / np.dot(x, x)
         fits[mut] = m
 
-    return pd.Series(fits)
+    fits =  pd.Series(fits)
+    return fits
 
 
-def plot_mutation_rate(data, fits, VERBOSE=0):
-    '''Plot mutation rate estimate'''
-    muts = list(np.unique(data.loc[:, 'mut']))
+def plot_mu_matrix(mu, time_unit='days'):
+    '''Plot the mutation rate matrix'''
+    muM = np.ma.masked_all((4, 4))
+    for ia1, a1 in enumerate(alpha[:4]):
+        for ia2, a2 in enumerate(alpha[:4]):
+            if a1+'->'+a2 in mu.index:
+                muM[ia1, ia2] = mu.loc[a1+'->'+a2]
 
-    Sbins = [(0, 0.1), (0.1, 2)]
-    Sbin = Sbins[-1]
-    datap = (data
-             .loc[(data.loc[:, 'S'] > Sbin[0]) & (data.loc[:, 'S'] <= Sbin[1])]
-             .loc[:, ['mut', 'time', 'af']]
-             .groupby(['mut', 'time'])
-             .mean()
-             .loc[:, 'af']
-             .unstack('time'))
+    if time_unit == 'generation':
+        # Assume a generation time of 2 days
+        muM *= 2
+
+    fig, ax = plt.subplots()
+    h = ax.imshow(np.log10(muM.T + 1e-10),
+                  interpolation='nearest',
+                  vmin=-9, vmax=-4)
+
+    ax.set_xticks(np.arange(4))
+    ax.set_yticks(np.arange(4))
+    ax.set_xticklabels(alpha[:4])
+    ax.set_yticklabels(alpha[:4])
+
+    ax.set_xlabel('From:')
+    ax.set_ylabel('To:')
+
+    cb = fig.colorbar(h)
+    cb.set_ticks(np.arange(-9, -3))
+    cb.set_ticklabels(['$10^{'+str(x)+'}$' for x in xrange(-9, -3)])
+    cb.set_label('changes / position / '+time_unit, rotation=270, labelpad=30)
+
+    plt.tight_layout(rect=(-0.1, 0, 1, 1))
+
+    plt.ion()
+    plt.show()
 
 
-    fig, (ax, ax2, ax3) = plt.subplots(1, 3, figsize=(12, 5),
-                                       gridspec_kw={'width_ratios': [10, 12, 0.8]})
+def plot_fits(fits, title='', VERBOSE=0, data=None):
+    '''Plot the fits for purifying selection'''
+    ymin = 1e-5
 
-    for mut, datum in datap.iterrows():
-        x = np.array(datum.index) / 30.5
-        y = np.array(datum)
+    muts = fits.index.tolist()
 
-        # Get rid of masked stuff (this happens if we miss data in the means)
-        ind = -(np.isnan(x) | np.isnan(y))
-        x = x[ind]
-        y = y[ind]
+    fig, ax = plt.subplots()
+    ax.set_title(title, fontsize=20)
 
-        color = cm.jet(1.0 * muts.index(mut) / len(muts))
-        ax.scatter(x, y, color=color, label=mut)
+    # Plot the time-averaged data
+    datap = (data.loc[:, ['mut', 'time', 'af']]
+                 .groupby(['mut', 'time'])
+                 .mean())
+    datap['time'] = datap.index.get_level_values('time')
+    datap['mut'] = datap.index.get_level_values('mut')
+    datap = datap.groupby('mut')
+    for mut, datum in datap:
+        x = np.array(datum['time'])
+        # Add pseudocounts to keep plot tidy
+        y = np.array(datum['af']) + 1.1 * ymin
 
-        m = fits.loc[mut]
-        xfit = np.linspace(0, 150)
-        ax.plot(xfit, m * xfit, color=color, lw=1.5, alpha=0.5)
+        color = cm.jet(1.0 * muts.index(mut) / len(fits))
 
-    ax.set_xlabel('Time from infection [months]')
+        ax.scatter(x, y, s=40, color=color)
+
+    # Plot the fits
+    xfit = np.logspace(0, 3.5, 1000)
+    for mut, mu in fits.iteritems():
+        yfit = mu * xfit
+
+        label = mut
+        color = cm.jet(1.0 * muts.index(mut) / len(fits))
+
+        ax.plot(xfit, yfit, color=color, label=label, lw=2)
+
+    ax.set_xlabel('Time [days from infection]')
     ax.set_ylabel('Allele frequency')
-    ax.set_ylim(1e-4, 1)
+    ax.legend(loc='upper left', fontsize=14, ncol=2)
+    ax.set_xscale('log')
     ax.set_yscale('log')
+    ax.set_ylim(ymin, 1)
+    ax.set_xlim(100, 5000)
     ax.grid(True)
-    ax.legend(loc='upper left', fontsize=10, ncol=2)
 
-    mu = np.ma.masked_all((4, 4))
-    for mut, fit in fits.iteritems():
-        n1 = mut[0]
-        n2 = mut[-1]
-        # The mutation rate we want per generation (2 days)
-        mu[alphal.index(n1), alphal.index(n2)] = fit * 2
+    plt.tight_layout()
 
-    # Plot the log10 for better dynamic range
-    vmin = np.floor(np.log10(mu.min()))
-    vmax = np.ceil(np.log10(mu.max()))
-    h = ax2.imshow(np.log10(mu), interpolation='nearest',
-                   vmin=vmin, vmax=vmax)
-    
-    ax2.set_xticks(np.arange(4) + 0.0)
-    ax2.set_yticks(np.arange(4) + 0.0)
-    ax2.set_xticklabels(alphal[:4])
-    ax2.set_yticklabels(alphal[:4])
-    ax2.set_xlabel('to')
-    ax2.set_ylabel('from')
-
-    cticks = np.arange(vmin, vmax+1)
-
-    from matplotlib.ticker import Formatter
-    class LogTickFormatter(Formatter):
-        def __call__(self, x, pos=None):
-            '''Transform the logs into their 10**'''
-            return '$10^{'+'{:1.0f}'.format(x)+'}$'
-
-    cb = plt.colorbar(h, cax=ax3, ticks=cticks, format=LogTickFormatter())
-    cb.set_label('Mutation rate\n[changes / generation]', rotation=90, labelpad=-100)
-
-    plt.tight_layout(w_pad=0.05)
 
 
 
@@ -333,13 +331,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Explore conservation levels across patients and subtype',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
-    parser.add_argument('--patients', nargs='+',
+    parser.add_argument('--patients', nargs='+', default=pnames,
                         help='Patient to analyze')
-    parser.add_argument('--regions', nargs='+', required=True,
+    parser.add_argument('--regions', nargs='+', default=regions,
                         help='Regions to analyze (e.g. F1 p17)')
-    parser.add_argument('--verbose', type=int, default=0,
+    parser.add_argument('--verbose', type=int, default=2,
                         help='Verbosity level [0-4]')
-    parser.add_argument('--plot', nargs='?', default=None, const='2D',
+    parser.add_argument('--plot', action='store_true',
                         help='Plot results')
 
     args = parser.parse_args()
@@ -349,11 +347,21 @@ if __name__ == '__main__':
     plot = args.plot
 
     data = collect_data_mutation_rate(regions, pnames, VERBOSE=VERBOSE)
-    fits = fit_mutation_rate(data, VERBOSE=VERBOSE)
+
+    mu_neu = fit_mutation_rate(data, VERBOSE=VERBOSE)
+    # Add pseudocounts (we have little data)
+    mu_neu = np.maximum(mu_neu, 4e-8)
 
     if plot:
-        plot_mutation_rate(data, fits, VERBOSE=VERBOSE)
+        plot_fits(mu_neu, VERBOSE=VERBOSE, data=data)
+        plot_mu_matrix(mu_neu)
 
         plt.ion()
         plt.show()
+
+    #if VERBOSE >= 1:
+    #    print 'Save to file'
+    #from hivwholeseq.analysis.filenames import analysis_data_folder
+    #fn_out_mu = analysis_data_folder+'mu_neutralclass.pickle'
+    #mu_neu.to_pickle(fn_out_mu)
 
