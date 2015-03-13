@@ -180,9 +180,6 @@ if __name__ == '__main__':
             coomapd = {'pat_to_subtype': dict(coomap[:, ::-1]),
                        'subtype_to_pat': dict(coomap)}
 
-            # FIXME: deal better with depth (this should be already there?)
-            aft[aft < 2e-3] = 0
-
             # Condition on fixation
             ind_sweep = zip(*((aft[0] < 0.05) & (aft[-1] > 0.95)).T.nonzero())
 

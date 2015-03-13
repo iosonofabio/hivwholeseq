@@ -104,6 +104,15 @@ class Patient(pd.Series):
         return n
 
 
+    def get_n_templates_roi(self, roi):
+        '''Get number of templates, roi specific from overlap frequencies'''
+        fragments = self.get_fragments_covered(roi)
+        n = [min(sample[fr+'q'] for fr in fragments)
+             for _, sample in self.samples.iterrows()]
+        n = np.ma.masked_invalid(n)
+        return n
+
+
     @property
     def initial_sample(self):
         '''The initial sample used as a mapping reference'''
@@ -120,11 +129,17 @@ class Patient(pd.Series):
 
     def get_fragmented_roi(self, roi, VERBOSE=0, **kwargs):
         '''Get a region of interest in fragment coordinates'''
-        from hivwholeseq.patients.get_roi import get_fragmented_roi
+        from .get_roi import get_fragmented_roi
         if isinstance(roi, basestring):
             roi = (roi, 0, '+oo')
         refseq = self.get_reference('genomewide', 'gb')
         return get_fragmented_roi(refseq, roi, VERBOSE=VERBOSE, **kwargs)
+
+    
+    def get_fragments_covered(self, roi, VERBOSE=0):
+        '''Get the list of fragments interested by this roi'''
+        from .get_roi import get_fragments_covered
+        return get_fragments_covered(self, roi, VERBOSE=VERBOSE)
 
 
     def get_reference_filename(self, fragment, format='fasta'):
@@ -273,8 +288,11 @@ class Patient(pd.Series):
         return (act.sum(axis=1), ind)
 
 
-    def get_allele_frequency_trajectories(self, region, cov_min=1,
-                                          depth_min=None, **kwargs):
+    def get_allele_frequency_trajectories(self, region,
+                                          cov_min=1,
+                                          depth_min=None,
+                                          error_rate=2e-3,
+                                          **kwargs):
         '''Get the allele frequency trajectories from files
         
         Args:
@@ -288,6 +306,8 @@ class Patient(pd.Series):
         '''
         (act, ind) = self.get_allele_count_trajectories(region, **kwargs)
         if depth_min is not None:
+            # FIXME: use number of templates from the overlaps
+            # if we require more than one fragment, take the min of the touched ones
             indd = np.array(self.n_templates[ind] >= depth_min)
             act = act[indd]
             ind = ind[indd]
@@ -304,8 +324,11 @@ class Patient(pd.Series):
                           hard_mask=True,
                           fill_value=0)
 
-        aft[(aft < 1e-4)] = 0
-        # NOTE: we'd need to renormalize, but it's a small effect
+        # The error rate is the limit of sensible minor alleles anyway
+        aft[(aft < error_rate)] = 0
+
+        # Renormalize
+        aft = (aft.swapaxes(0, 1) / aft.sum(axis=1)).swapaxes(0, 1)
 
         return (aft, ind)
 
@@ -325,6 +348,8 @@ class Patient(pd.Series):
         '''
         (act, ind) = self.get_allele_count_trajectories_aa(protein, **kwargs)
         if depth_min is not None:
+            # FIXME: use number of templates from the overlaps
+            # if we require more than one fragment, take the min of the touched ones
             indd = np.array(self.n_templates[ind] >= depth_min)
             act = act[indd]
             ind = ind[indd]
@@ -377,8 +402,7 @@ class Patient(pd.Series):
             ind_safe = np.zeros(len(ind), bool)
             for ii, i in enumerate(ind):
                 sample = self.samples.iloc[i]
-                from .get_roi import get_fragments_covered
-                frags = get_fragments_covered(self, (fragment, start, end))
+                frags = self.get_fragments_covered((fragment, start, end))
                 ind_safe[ii] = all(getattr(sample, fr).upper() == 'OK'
                                    for fr in frags)
 
@@ -414,8 +438,7 @@ class Patient(pd.Series):
             ind_safe = np.zeros(len(ind), bool)
             for ii, i in enumerate(ind):
                 sample = self.samples.iloc[i]
-                from .get_roi import get_fragments_covered
-                frags = get_fragments_covered(self, (fragment, start, end))
+                frags = self.get_fragments_covered((fragment, start, end))
                 ind_safe[ii] = all(getattr(sample, fr).upper() == 'OK'
                                    for fr in frags)
 

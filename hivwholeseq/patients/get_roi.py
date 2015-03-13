@@ -77,8 +77,8 @@ def get_fragments_covered(patient, roi, VERBOSE=0):
     if roi[0] in ['F'+str(ifr) for ifr in xrange(1, 7)]:
         return [roi[0]]
 
-    (fragment, start, end) = get_fragmented_roi(patient, roi, VERBOSE=VERBOSE,
-                                                include_genomewide=True)
+    (fragment, start, end) = patient.get_fragmented_roi(roi, VERBOSE=VERBOSE,
+                                                        include_genomewide=True)
     if fragment != 'genomewide':
         return [fragment]
 

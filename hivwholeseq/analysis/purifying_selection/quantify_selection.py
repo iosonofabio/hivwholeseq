@@ -106,9 +106,6 @@ def collect_data_fitness_cost(regions, pnames, VERBOSE=0):
             ind_poly, _ = get_codons_n_polymorphic(aft, icons, n=[0, 1], VERBOSE=VERBOSE)
             ind_poly_dna = [i * 3 + j for i in ind_poly for j in xrange(3)]
 
-            # FIXME: deal better with depth (this should be already there?)
-            aft[aft < 2e-3] = 0
-
             for posdna in ind_poly_dna:
                 # Get the entropy
                 if posdna not in coomapd['pat_to_subtype']:

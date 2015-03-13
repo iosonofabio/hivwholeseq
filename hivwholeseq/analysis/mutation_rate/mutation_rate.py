@@ -145,9 +145,6 @@ def collect_data_mutation_rate(regions, pnames, VERBOSE=0):
             inds = [ip for ip, pp in izip(ind_poly, pos_poly)
                     if (ip in ind_4fold) and (0 not in pp) and (1 not in pp)]
 
-            # FIXME: deal better with depth (should be there already, I guess)
-            aft[aft < 2e-3] = 0
-
             for pos in inds:
                 if VERBOSE >= 3:
                     print pos

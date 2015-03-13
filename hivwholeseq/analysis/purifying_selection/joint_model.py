@@ -47,7 +47,6 @@ fun = lambda x, l, u: l * (1 - np.exp(- u/l * x))
 # Functions
 def add_Sbins(data, bins=8, VERBOSE=0):
     '''Add entropy bins to the data'''
-    #bins_S = np.array([0, 0.03, 0.06, 0.1, 0.25, 0.7, 3])
     if np.isscalar(bins):
         bins = np.array(data['Ssub'].quantile(q=np.linspace(0, 1, bins + 1)))
     
@@ -130,9 +129,6 @@ def collect_data_joint(pnames, regions, VERBOSE=0, plot=False):
             # Get only codons with at most one polymorphic site, to avoid obvious epistasis
             ind_poly, _ = get_codons_n_polymorphic(aft, icons, n=[0, 1], VERBOSE=VERBOSE)
             ind_poly_dna = [i * 3 + j for i in ind_poly for j in xrange(3)]
-
-            # FIXME: deal better with depth (this should be already there?)
-            aft[aft < 2e-3] = 0
 
             for posdna in ind_poly_dna:
                 # Get the entropy
