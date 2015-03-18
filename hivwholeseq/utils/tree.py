@@ -56,6 +56,35 @@ def build_tree_fasttree(filename_or_ali, rootname=None, VERBOSE=0):
         if filename_or_ali != filename:
             os.remove(filename)
 
+    # NOTE: nice fasttree trims sequence names at the first bracket, restore them
+    if VERBOSE >= 2:
+        print 'Check leaf labels integrity'
+    if filename_or_ali == filename:
+        from Bio import AlignIO
+        ali = AlignIO.read(filename_or_ali, 'fasta')
+    else:
+        ali = filename_or_ali
+    seq_names = set(seq.name for seq in ali)
+    leaves_miss = set()
+    for leaf in tree.get_terminals():
+        if leaf.name in seq_names:
+            seq_names.remove(leaf.name)
+        else:
+            leaves_miss.add(leaf)
+
+    if len(leaves_miss):
+        if VERBOSE >= 2:
+            print 'Correcting leaf integrity'
+        for leaf in leaves_miss:
+            for name in seq_names:
+                if name.split('(')[0] == leaf.name:
+                    leaf.name = name
+                    seq_names.remove(name)
+                    break
+            else:
+                print 'Leaf has unexpected (truncated?) name:', leaf.name
+
+
     return tree
 
 

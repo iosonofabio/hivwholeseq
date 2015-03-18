@@ -31,6 +31,11 @@ from hivwholeseq.utils.sequence import get_allele_frequencies_from_MSA
 
 
 
+# Globals
+regions = ['p17']
+
+
+
 # Functions
 def get_distance_matrix_in_coordinates_subtype(ds, seq, protsub, VERTBOSE=0):
     '''Get the distance as a dict in subtype coordinates'''
@@ -85,11 +90,11 @@ if __name__ == '__main__':
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     parser.add_argument('--patients', nargs='+',
                         help='Patient to analyze')
-    parser.add_argument('--regions', nargs='+', required=True,
+    parser.add_argument('--regions', nargs='+', default=regions,
                         help='Regions to analyze (e.g. F1 p17)')
-    parser.add_argument('--verbose', type=int, default=0,
+    parser.add_argument('--verbose', type=int, default=2,
                         help='Verbosity level [0-4]')
-    parser.add_argument('--plot', nargs='?', default=None, const='2D',
+    parser.add_argument('--plot', action='store_true',
                         help='Plot results')
 
     args = parser.parse_args()
@@ -99,6 +104,7 @@ if __name__ == '__main__':
     plot = args.plot
 
 
+    regdata = []
     data = []
 
     patients = load_patients()
@@ -124,6 +130,14 @@ if __name__ == '__main__':
         if VERBOSE >= 2:
             print 'Get subtype entropy'
         Ssub = get_subtype_reference_alignment_entropy(region, VERBOSE=VERBOSE)
+
+        if VERBOSE >= 2:
+            print 'Get subtype alignment'
+        ali = get_subtype_reference_alignment(region, VERBOSE=VERBOSE)
+        alim = np.array(ali)
+
+        regdata.append({'region': region, 'cons': conssub, 'af': af_sub, 'S': Ssub,
+                        'L': len(Ssub), 'ali': ali, 'alim': alim})
 
         for ipat, (pname, patient) in enumerate(patients.iterrows()):
             pcode = patient.code
@@ -152,9 +166,6 @@ if __name__ == '__main__':
 
             # Get the map as a dictionary from patient to subtype
             coomapd = dict(coomap[:, ::-1])
-
-            # FIXME: deal better with depth (this should be already there?)
-            aft[aft < 2e-3] = 0
 
             for posdna in xrange(aft.shape[-1]):
                 if VERBOSE >= 3:
@@ -220,10 +231,81 @@ if __name__ == '__main__':
                                             'Ssub', 'afmax',
                                             ))
 
+    regdata = pd.DataFrame(regdata)
+    regdata.set_index('region', drop=False, inplace=True)
 
-    # Select subset of positions that are at high frequency in the subtype, i.e.
-    # for which we suspect strong fitness effects
+
+    # Select subset of mutations for which the derived allele is much more
+    # frequent than the ancestral one, for primary sites
     data_cons = data[data['afdersub'] - data['afancsub'] > 0.8] 
+
+    sys.exit()
+
+    # Get pairs and ask abount correlation in the subtype
+    pairs = []
+    for (region, pcode), datum in data_cons.groupby(['region', 'pcode']):
+        alim = regdata.loc[region, 'alim']
+        N = alim.shape[0]
+
+        for _1, d1 in datum.iterrows():
+            pos1 = d1['possub']
+            nuc1 = d1['anc']
+
+            N1 = (alim[:, pos1] == nuc1).sum()
+            nu1 = 1.0 * N1 / N
+
+            for _2, d2 in datum.iterrows():
+                if _1 >= _2:
+                    continue
+
+                pos2 = d2['possub']
+                nuc2 = d2['anc']
+
+                N2 = (alim[:, pos2] == nuc2).sum()
+                nu2 = 1.0 * N2 / N
+
+                N12 = ((alim[:, pos1] == nuc1) & (alim[:, pos2] == nuc2)).sum()
+                nu12 = 1.0 * N12 / N
+
+                P0 = binom.cdf(int(nu1 * nu2 * N),
+                               n=np.minimum(N1, N2),
+                               p=np.maximum(nu1, nu2))
+                P = binom.cdf(N12,
+                              n=np.minimum(N1, N2),
+                              p=np.maximum(nu1, nu2))
+
+                if VERBOSE >= 3:
+                    print 'N1', N1, 'N2', N2, 'N1*N2/N', int(nu1 * nu2 * N), 'N12', N12, P0, P
+
+                # NOTE: conditioning on minimal number of observations makes the P value
+                # more robust, but also biases towards higher entropy sites (>~ 0.02 in p17)
+                if (N12 > 5) and (P > P0) and (P > 0.99):
+                    if VERBOSE >= 3:
+                        print pos1, pos2, N1, N2, N1*N2/N, N12
+
+                    pairs.append({'region': region,
+                                  'pcode': pcode,
+                                  'pos1': pos1,
+                                  'pos2': pos2,
+                                  'anc1': d1['anc'],
+                                  'anc2': d2['anc'],
+                                  'der1': d1['der'],
+                                  'der2': d2['der'],
+                                  'afanc1': d1['afancsub'],
+                                  'afanc2': d2['afancsub'],
+                                  'afder1': d1['afdersub'],
+                                  'afder2': d2['afdersub'],
+                                  'Ssub1': d1['Ssub'],
+                                  'Ssub2': d2['Ssub'],
+                                 })
+                
+    pairs = pd.DataFrame(pairs)
+
+    # NOTE: Taylor has the right question, i.e. which one is the null expectation
+    # for reversion of those, in absence of a valley (e.g. mutation rates etc.)?
+    # Well, if they have entropy 0.1-0.6 as they seem to, they should carry a fitness
+    # cost of 1e-3 approximately; not enough to sweep.
+
 
     for region, datar in data_cons.groupby('region'):
         ali = get_subtype_reference_alignment(region, VERBOSE=VERBOSE)

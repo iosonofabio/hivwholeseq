@@ -35,6 +35,19 @@ def get_subtype_reference_alignment_consensus_filename(region, subtype='B',
     return fn
 
 
+def get_subtype_reference_alignment_tree_filename(region, subtype='B',
+                                                  refname='HXB2',
+                                                  type='nuc',
+                                                  VERBOSE=0,
+                                                  format='newick'):
+    '''Get the filename of a subtype reference alignment allele frequencies'''
+    tree_ali_foldername = reference_folder+'alignments/pairwise_to_'+refname+'/'
+    fn = tree_ali_foldername+region+'.'+subtype+'.'+type+'.aligned_tree.'+format
+    if VERBOSE >= 3:
+        print 'Tree file:', fn
+    return fn
+
+
 def get_subtype_reference_alignment_allele_frequencies_filename(region, subtype='B',
                                                                 refname='HXB2',
                                                                 type='nuc',

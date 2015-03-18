@@ -188,7 +188,7 @@ def collect_data(pnames, regions, VERBOSE=0, plot=False):
 
                     if anc == nucsub:
                         away_conssub = 'away'
-                    elif der == nucsub:
+                    elif nuc == nucsub:
                         away_conssub = 'to'
                     else:
                         away_conssub = 'neither'
@@ -254,7 +254,7 @@ if __name__ == '__main__':
     if plot:
 
         fig, ax = plt.subplots(figsize=(6, 5))
-        bins = np.array(a.quantile(q=np.linspace(0, 1, 7)))
+        bins = np.array(data['Ssub'].quantile(q=np.linspace(0, 1, 7)))
         binsw = bins[1:] - bins[:-1]
         binsc = 0.5 * (bins[1:] + bins[:-1])
 

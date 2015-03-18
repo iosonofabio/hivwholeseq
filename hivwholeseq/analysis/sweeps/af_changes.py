@@ -31,9 +31,11 @@ from hivwholeseq.analysis.mutation_rate.explore_divergence_synonymous import tra
 from hivwholeseq.utils.sequence import get_coordinates_genomic_region
 
 
+
 # Globals
 pnames = ['20097', '15319', '9669', '15363', '15823', '15241', '15376']
 regions = ['p17', 'p24', 'vif', 'nef', 'PR', 'RT', 'IN']
+
 
 
 # Functions
