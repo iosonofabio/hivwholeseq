@@ -203,11 +203,11 @@ def plot_clusterforce(v, dcon):
 
 def draw_tree(tree, label_func=str, do_show=True, show_confidence=True,
          # For power users
+         fontsize=None, linewidth=None,
          axes=None, branch_labels=None, *args, **kwargs):
     """Plot the given tree using matplotlib (or pylab).
 
-    The graphic is a rooted tree, drawn with roughly the same algorithm as
-    draw_ascii.
+    The graphic is a rooted tree.
 
     Additional keyword arguments passed into this function are used as pyplot
     options. The input format should be in the form of:
@@ -289,8 +289,14 @@ def draw_tree(tree, label_func=str, do_show=True, show_confidence=True,
             "branch_labels must be either a dict or a callable (function)"
         format_branch_label = branch_labels
 
-    # Layout
+    # Options for line width, font size, etc.
+    if fontsize is None:
+        fontsize = plt.rcParams['font.size']
+    if linewidth is None:
+        linewidth = plt.rcParams['lines.linewidth']
 
+
+    # Layout
     def get_x_positions(tree):
         """Create a mapping of each clade to its horizontal position.
 
@@ -330,8 +336,7 @@ def draw_tree(tree, label_func=str, do_show=True, show_confidence=True,
     y_posns = get_y_positions(tree)
     # The function draw_clade closes over the axes object
     if axes is None:
-        fig = plt.figure()
-        axes = fig.add_subplot(1, 1, 1)
+        fig, axes = plt.subplots()
     elif not isinstance(axes, plt.matplotlib.axes.Axes):
         raise ValueError("Invalid argument for axes: %s" % axes)
 
@@ -354,7 +359,7 @@ def draw_tree(tree, label_func=str, do_show=True, show_confidence=True,
             vertical_linecollections.append(mpcollections.LineCollection(
                 [[(x_here, y_bot), (x_here, y_top)]], color=color, lw=lw),)
 
-    def draw_clade(clade, x_start, color, lw):
+    def draw_clade(clade, x_start, color, lw=1, fontsize='small'):
         """Recursively draw a tree, down from the given clade."""
         x_here = x_posns[clade]
         y_here = y_posns[clade]
@@ -365,7 +370,8 @@ def draw_tree(tree, label_func=str, do_show=True, show_confidence=True,
             lw = clade.width * plt.rcParams['lines.linewidth']
         # Draw a horizontal line from start to here
         draw_clade_lines(use_linecollection=True, orientation='horizontal',
-                         y_here=y_here, x_start=x_start, x_here=x_here, color=color, lw=lw)
+                         y_here=y_here, x_start=x_start, x_here=x_here,
+                         color=color, lw=lw)
         # Add node/taxon labels
         label = label_func(clade)
         if label not in (None, clade.__class__.__name__):
@@ -375,19 +381,20 @@ def draw_tree(tree, label_func=str, do_show=True, show_confidence=True,
         conf_label = format_branch_label(clade)
         if conf_label:
             axes.text(0.5 * (x_start + x_here), y_here, conf_label,
-                      fontsize='small', horizontalalignment='center')
+                      fontsize=fontsize, horizontalalignment='center')
         if clade.clades:
             # Draw a vertical line connecting all children
             y_top = y_posns[clade.clades[0]]
             y_bot = y_posns[clade.clades[-1]]
             # Only apply widths to horizontal lines, like Archaeopteryx
             draw_clade_lines(use_linecollection=True, orientation='vertical',
-                             x_here=x_here, y_bot=y_bot, y_top=y_top, color=color, lw=lw)
+                             x_here=x_here, y_bot=y_bot, y_top=y_top,
+                             color=color, lw=lw)
             # Draw descendents
             for child in clade:
                 draw_clade(child, x_here, color, lw)
 
-    draw_clade(tree.root, 0, 'k', plt.rcParams['lines.linewidth'])
+    draw_clade(tree.root, 0, 'k', lw=linewidth, fontsize=fontsize)
 
     # If line collections were used to create clade lines, here they are added
     # to the pyplot plot.
@@ -399,9 +406,9 @@ def draw_tree(tree, label_func=str, do_show=True, show_confidence=True,
     # Aesthetics
 
     if hasattr(tree, 'name') and tree.name:
-        axes.set_title(tree.name)
-    axes.set_xlabel('branch length')
-    axes.set_ylabel('taxa')
+        axes.set_title(tree.name, fontsize=fontsize)
+    axes.set_xlabel('branch length', fontsize=fontsize)
+    axes.set_ylabel('taxa', fontsize=fontsize)
     # Add margins around the tree to prevent overlapping the axes
     xmax = max(x_posns.values())
     axes.set_xlim(-0.05 * xmax, 1.25 * xmax)
@@ -481,35 +488,58 @@ if __name__ == '__main__':
 
         # Visualize subtype alignment in various ways
         # Force field clustering
-        from clusterforce.clustering import cluster_force
-        v = cluster_force(alisubm, method='BFGS-jac', plot=False)
+        from clusterforce.clustering import cluster_force, position_sequence
+        res = cluster_force(alisubm, method='BFGS-jac', plot=False)
+        v = res['x']
 
         dcon = (alisubm != consm).sum(axis=-1)
 
-        # For each patient, add the points
+        # For each patient, add the points according to the frozen force field
         for pcode, datumpa in datum.groupby('pcode'):
             fig, ax = plot_clusterforce(v, dcon)
 
             alipam = datumpa.iloc[0]['ali']
             hft = datumpa.iloc[0]['hft']
+            times = datumpa.iloc[0]['times']
 
-            d = get_pairwise_distance_alignments(alipam, alisubm)
-            imin = d.argmin(axis=1)
-            iminu = np.unique(imin)
-            labels = []
-            for i in iminu:
-                hfs = hft[:, imin == i]
-                label = '\n'.join([' '.join(['{:.1G}'.format(nu) for nu in hf])
-                                   for hf in hfs.T])
-                labels.append(label)
+            us = []
+            for seqpa, hf in izip(alipam, hft.T):
+                u = position_sequence(seqpa, v, alisubm, e1e2=res['e1e2'])
 
-            h = ax.scatter(v[iminu, 0], v[iminu, 1], s=100, marker='s',
-                           edgecolor='k', facecolor='none', lw=3,
-                           label=pcode)
-            for i in xrange(len(iminu)):
-                ax.text(v[iminu[i], 0], v[iminu[i], 1], labels[i], fontsize=8)
+                # Take the time of maximal frequency
+                it = hf.argmax()
+                time = times[it]
+                nu = hf[it]
+
+                numin = 0.01
+                if nu < numin:
+                    continue
+
+                label = '{:.1G}, {:d} m'.format(nu, int(time / 30.5))
+                color = cm.jet(1.0 * time / times.max())
+                color = tuple(list(color[:-1]) + [0.4])
+
+                size = 10 + 290 * (np.log(nu) - np.log(numin)) / (0.0 - np.log(numin))
+
+                ax.scatter(u[0], u[1],
+                           s=size,
+                           marker='s',
+                           edgecolor='k', facecolor=color, lw=1)
+                #ax.text(u[0], u[1], label, fontsize=8)
+
+                us.append(u)
 
             ax.set_title(pcode)
+
+            uall = np.vstack([v, us])
+            xmin = uall[:, 0].min()
+            xmax = uall[:, 0].max()
+            xspan = xmax - xmin
+            ymin = uall[:, 1].min()
+            ymax = uall[:, 1].max()
+            yspan = ymax - ymin
+            ax.set_xlim(xmin - 0.04 * xspan, xmax + 0.04 * xspan)
+            ax.set_ylim(ymin - 0.04 * yspan, ymax + 0.04 * yspan)
 
 
         # Phylogenetic tree with ancestral sequences
@@ -548,14 +578,15 @@ if __name__ == '__main__':
 
         # For each patient, add the points
         for pcode, datumpa in datum.groupby('pcode'):
+            if pcode != 'p8':
+                continue
             # Plot the tree
             fig, ax = plt.subplots()
-            from matplotlib import rcParams
-            tmp = rcParams['font.size']
-            rcParams['font.size'] = 8
-            datap = draw_tree(tree, axes=ax, show_confidence=False)
+            datap = draw_tree(tree, axes=ax, show_confidence=False, fontsize=8,
+                              linewidth=1.5, do_show=False,
+                              label_func=lambda x: None,
+                             )
             nodespos = datap['positions']
-            rcParams['font.size'] = tmp
 
             alipam = datumpa.iloc[0]['ali']
             hft = datumpa.iloc[0]['hft']
@@ -575,9 +606,10 @@ if __name__ == '__main__':
                 x = nodespos['x'][node]
                 y = nodespos['y'][node]
                 ax.scatter(x, y, s=100, marker='s', edgecolor='k', facecolor='none',
-                           lw=3)
+                           lw=3, zorder=100)
 
             ax.set_title(pcode)
+            ax.grid(True)
 
 
 
