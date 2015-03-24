@@ -541,6 +541,8 @@ if __name__ == '__main__':
             ax.set_xlim(xmin - 0.04 * xspan, xmax + 0.04 * xspan)
             ax.set_ylim(ymin - 0.04 * yspan, ymax + 0.04 * yspan)
 
+            plt.tight_layout()
+
 
         # Phylogenetic tree with ancestral sequences
         from hivwholeseq.cross_sectional.get_subtype_reference_alignment_tree import (
