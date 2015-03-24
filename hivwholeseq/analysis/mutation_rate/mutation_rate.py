@@ -155,10 +155,10 @@ def collect_data_mutation_rate(regions, pnames, VERBOSE=0):
                 # Get the entropy
                 if posdna not in coomapd['pat_to_subtype']:
                     continue
-                pos_sub = coomapd['pat_to_subtype'][posdna]
-                if (pos_sub not in Ssub) or (protm[pos] not in Ssub[pos_sub]):
+                pos_subaa = coomapd['pat_to_subtype'][posdna] // 3
+                if (pos_subaa not in Ssub) or (protm[pos] not in Ssub[pos_subaa]):
                     continue
-                Ssubpos = Ssub[pos_sub][protm[pos]]
+                Ssubpos = Ssub[pos_subaa][protm[pos]]
 
                 aft_pos = aft[:, :, posdna]
 
