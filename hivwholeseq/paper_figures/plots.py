@@ -661,6 +661,78 @@ def plot_substitution_rate(data,
         plt.show()
 
 
+def plot_substitution_rate_sliding(data,
+                                   regions,
+                                   title='',
+                                   VERBOSE=0, savefig=False):
+    '''Plot the substitution rates'''
+    from ..analysis.substitution_rate.rate_sliding_window import plot_region_boxes
+
+    if VERBOSE:
+        print 'Plot substitution rates in a sliding window'
+    
+    # Sort patient codes
+    pcodes = sorted(set(data['pcode']), key=lambda x: int(x[1:]))
+
+    cfun = lambda pcode: cm.jet(1.0 * pcodes.index(pcode) / len(pcodes))
+
+    fig, axs = plt.subplots(2, 1,
+                            sharex=True,
+                            figsize=(10, 7),
+                            gridspec_kw={'height_ratios':[4, 1]})
+
+    ax = axs[0]
+    for pcode in pcodes:
+        datum = data.loc[data['pcode'] == pcode].iloc[0]
+
+        y = datum['rate']
+        x = datum['x']
+        color = cfun(pcode)
+
+        ax.plot(x, y, color=color, lw=2, label=pcode)
+
+    ax.set_ylim(1e-4, 2e-1)
+    ax.set_yticklabels(ax.get_yticklabels(), fontsize=16)
+    ax.grid(True)
+    ax.set_yscale('log')
+    for item in ax.get_yticklabels():
+        item.set_fontsize(16)
+
+    ax.set_ylabel('Substitution rate\n[changes / year / site]', labelpad=20,
+                  fontsize=16)
+    ax.legend(loc='upper center',
+              title='Patients',
+              ncol=4,
+              fontsize=16)
+
+    ax = axs[1]
+    ax.set_ylim(-4, 26)
+    ax.set_xlabel('Position in HXB2 [bp]', fontsize=16, labelpad=20)
+    ax.set_yticks([])
+    for item in ax.get_xticklabels():
+        item.set_fontsize(16)
+    ax.grid(True, axis='x')
+
+    plot_region_boxes(regions, ax, VERBOSE=VERBOSE)
+
+    if title:
+        fig.suptitle(title)
+
+    if savefig:
+        fig_filename = savefig
+        fig_folder = os.path.dirname(fig_filename)
+
+        mkdirs(fig_folder)
+        plt.tight_layout(rect=(0, 0, 0.98, 1), h_pad=0.001)
+        fig.savefig(fig_filename)
+        plt.close(fig)
+
+    else:
+        plt.tight_layout(rect=(0, 0, 0.98, 1), h_pad=0.001)
+        plt.ion()
+        plt.show()
+
+
 def plot_mutation_rate(data,
                        title='', savefig=False,
                        VERBOSE=0):
@@ -676,64 +748,63 @@ def plot_mutation_rate(data,
 
     fits = data['fits']
     comp = data['comp']
-    data = data['data']
-
-    muts = list(np.unique(data.loc[:, 'mut']))
-
-    # The mutation rate we want per generation (2 days)
-    g_time = 2
-
-    Sbins = [(0, 0.1), (0.1, 2)]
-    Sbin = Sbins[-1]
-    datap = (data
-             .loc[(data.loc[:, 'S'] > Sbin[0]) & (data.loc[:, 'S'] <= Sbin[1])]
-             .loc[:, ['mut', 'time', 'af']]
-             .groupby(['mut', 'time'])
-             .mean()
-             .loc[:, 'af']
-             .unstack('time'))
 
 
     # Supplementary figure for the accumulation
-    fig1, ax1 = plt.subplots()
-    for mut, datum in datap.iterrows():
-        x = np.array(datum.index) / 30.5
-        y = np.array(datum)
+    if 'data' in data:
+        data = data['data']
+        muts = list(np.unique(data.loc[:, 'mut']))
+        Sbins = [(0, 0.1), (0.1, 2)]
+        Sbin = Sbins[-1]
+        datap = (data
+                 .loc[(data.loc[:, 'S'] > Sbin[0]) & (data.loc[:, 'S'] <= Sbin[1])]
+                 .loc[:, ['mut', 'time', 'af']]
+                 .groupby(['mut', 'time'])
+                 .mean()
+                 .loc[:, 'af']
+                 .unstack('time'))
 
-        # Get rid of masked stuff (this happens if we miss data in the means)
-        ind = -(np.isnan(x) | np.isnan(y))
-        x = x[ind]
-        y = y[ind]
+        fig1, ax1 = plt.subplots()
+        for mut, datum in datap.iterrows():
+            x = np.array(datum.index) / 30.5
+            y = np.array(datum)
 
-        color = cm.jet(1.0 * muts.index(mut) / len(muts))
-        ax1.scatter(x, y, color=color, label=mut)
+            # Get rid of masked stuff (this happens if we miss data in the means)
+            ind = -(np.isnan(x) | np.isnan(y))
+            x = x[ind]
+            y = y[ind]
 
-        m = fits.loc[mut] * 30.5
-        xfit = np.linspace(0, 100)
-        ax1.plot(xfit, m * xfit, color=color, lw=1.5, alpha=0.5)
+            color = cm.jet(1.0 * muts.index(mut) / len(muts))
+            ax1.scatter(x, y, color=color, label=mut)
 
-    ax1.set_xlabel('Time from infection [months]')
-    ax1.set_ylabel('Allele frequency')
-    ax1.set_ylim(1e-4, 1)
-    ax1.set_yscale('log')
-    ax1.grid(True)
-    ax1.legend(loc='upper left', fontsize=10, ncol=2)
+            m = fits.loc[mut] * 30.5
+            xfit = np.linspace(0, 100)
+            ax1.plot(xfit, m * xfit, color=color, lw=1.5, alpha=0.5)
 
-    plt.tight_layout(rect=(0, 0, 0.98, 1))
+        ax1.set_xlabel('Time from infection [months]')
+        ax1.set_ylabel('Allele frequency')
+        ax1.set_ylim(1e-4, 1)
+        ax1.set_yscale('log')
+        ax1.grid(True)
+        ax1.legend(loc='upper left', fontsize=10, ncol=2)
+
+        plt.tight_layout(rect=(0, 0, 0.98, 1))
+
+    else:
+        fig1 = None
 
     # Plot the mutation rate matrix
-    fig2, (ax2, ax3) = plt.subplots(1, 2, figsize=(6, 5),
-                                   gridspec_kw={'width_ratios': [12, 0.8]})
+    fig2, ax2 = plt.subplots(figsize=(5.3, 4))
 
     mu = np.ma.masked_all((4, 4))
     for mut, fit in fits.iteritems():
         n1 = mut[0]
         n2 = mut[-1]
-        mu[alphal.index(n1), alphal.index(n2)] = fit * g_time
+        mu[alphal.index(n1), alphal.index(n2)] = fit
 
     # Plot the log10 for better dynamic range
-    vmin = max(-10, np.floor(np.log10(mu.min())))
-    vmax = np.ceil(np.log10(mu.max()))
+    vmin = -9
+    vmax = -4
     h = ax2.imshow(np.log10(mu),
                    interpolation='nearest',
                    cmap=cm.jet,
@@ -741,10 +812,11 @@ def plot_mutation_rate(data,
     
     ax2.set_xticks(np.arange(4) + 0.0)
     ax2.set_yticks(np.arange(4) + 0.0)
-    ax2.set_xticklabels(alphal[:4])
-    ax2.set_yticklabels(alphal[:4])
-    ax2.set_xlabel('to')
-    ax2.set_ylabel('from')
+    ax2.set_xticklabels(alphal[:4], fontsize=16)
+    ax2.set_yticklabels(alphal[:4], fontsize=16)
+    ax2.set_xlabel('to', fontsize=16)
+    ax2.set_ylabel('from', fontsize=16)
+
 
     cticks = np.arange(vmin, vmax+1)
 
@@ -754,47 +826,59 @@ def plot_mutation_rate(data,
             '''Transform the logs into their 10**'''
             return '$10^{{{:1.0f}}}$'.format(x)
 
-    cb = plt.colorbar(h, cax=ax3, ticks=cticks, format=LogTickFormatter())
-    cb.set_label('Mutation rate\n[changes / generation]', rotation=90, labelpad=-100)
+    cb = plt.colorbar(h, ax=ax2, ticks=cticks, format=LogTickFormatter())
+    cb.set_label('Mutation rate\n[changes / position / day]', rotation=270,
+                 labelpad=45, fontsize=16)
+    cb.ax.tick_params(labelsize=16) 
 
-    plt.tight_layout(w_pad=0.05)
+    plt.tight_layout()
 
     # Plot the comparison with Abram 2010
-    fig3, ax4 = plt.subplots(figsize=(5, 4))
-    xmin_exp = -7.3
-    xpl = np.logspace(xmin_exp, -4, 1000)
-    ax4.plot(xpl, xpl, color='grey', lw=2)
-    ax4.scatter(comp.loc[:, 'Abram2010'], comp.loc[:, 'new'] * g_time,
+    fig3, ax3 = plt.subplots(figsize=(6, 5))
+    xmin_exp = -9
+    xmax_exp = -4
+    xpl = np.logspace(xmin_exp, xmax_exp, 1000)
+
+    x = np.array(comp.loc[:, 'Abram2010'])
+    y = np.array(comp.loc[:, 'new'])
+    r = np.corrcoef(np.log10(x), np.log10(y))[0, 1]
+
+    ax3.plot(xpl, xpl, color='grey', lw=2)
+    ax3.scatter(x, y,
                 s=40,
-                c='k', label=comp.index)
-    ax4.set_xlabel('Rate from Abram et al. 2010')
-    ax4.set_ylabel('Rate from longitudinal samples')
-    ax4.set_xscale('log')
-    ax4.set_yscale('log')
-    ax4.set_xlim(10**(xmin_exp), 1e-4)    
-    ax4.set_ylim(10**(xmin_exp), 1e-4)    
-    ax4.grid(True)
+                c='k',
+                label='{:2.0%}'.format(r))
+    ax3.set_xlabel('Rate from Abram et al. 2010', fontsize=16)
+    ax3.set_ylabel('Rate from longitudinal samples', fontsize=16)
+    ax3.set_xscale('log')
+    ax3.set_yscale('log')
+    ax3.set_xlim(10**(xmin_exp), 10**(xmax_exp))    
+    ax3.set_ylim(10**(xmin_exp), 10**(xmax_exp))    
+    ax3.legend(loc='upper left', title='Correlation\ncoefficient:', fontsize=16)
+    ax3.grid(True)
+    for item in ax3.get_xticklabels():
+        item.set_fontsize(16)
+    for item in ax3.get_yticklabels():
+        item.set_fontsize(16)
 
     plt.tight_layout()
 
     if title:
         fig1.suptitle(title)
         fig2.suptitle(title)
-        fig3.suptitle(title)
 
     if savefig:
         from itertools import izip
-        for fig, sf in izip((fig1, fig2, fig3), savefig):
+        figs = [fig for fig in (fig1, fig2, fig3) if fig is not None]
+        for fig, sf in izip(figs, savefig):
             fig_filename = sf
             fig_folder = os.path.dirname(fig_filename)
 
             mkdirs(fig_folder)
-            plt.tight_layout(rect=(0, 0, 0.98, 1))
             fig.savefig(fig_filename)
             plt.close(fig)
 
     else:
-        plt.tight_layout(rect=(0, 0, 0.98, 1))
         plt.ion()
         plt.show()
 
@@ -824,6 +908,69 @@ def plot_fitness_cost(fits, title='', VERBOSE=0, savefig=False):
 
     if title:
         ax.set_title(title, fontsize=20)
+
+    plt.tight_layout()
+
+    if savefig:
+        fig_filename = savefig
+        fig_folder = os.path.dirname(fig_filename)
+
+        mkdirs(fig_folder)
+        fig.savefig(fig_filename)
+        plt.close(fig)
+
+    else:
+        plt.ion()
+        plt.show()
+
+
+
+def plot_allele_freq_example(data, title='', VERBOSE=0, savefig=False):
+    '''Plot the estimated fitness value, for all regions together'''
+    fig, axs = plt.subplots(1, 3, figsize=(9, 4))
+    sns.set_style('darkgrid')
+
+    datum = data[0]
+    ind = np.arange(len(datum['times']))
+    ind = [0, len(ind) // 2, ind[-1]]
+
+    icons0 = datum['aft'][0].argmax(axis=0)
+
+    for ii, i in enumerate(ind):
+        ax = axs[ii]
+        time = datum['times'][i]
+        af = datum['aft'][i]
+
+        af_min = []
+        for pos, afpos in enumerate(af.T):
+            afpos = afpos.copy()
+            afpos[icons0[pos]] = 0
+            afpos.sort()
+            af_min.append(afpos[-1])
+        af_min = np.array(af_min)
+
+        x = np.arange(af.shape[1])
+        color = cm.jet(np.linspace(0, 1, len(x)))
+
+        ax.scatter(x, af_min, s=100, c=color, edgecolor='none')
+        
+        ax.set_ylim(1e-2, 1.35)
+        ax.set_xlim(-5, len(x) + 5)
+        ax.set_yscale('log')
+        ax.grid(True)
+        ax.set_title(str(int(time / 30.5))+' months', fontsize=18)
+        for item in ax.get_xticklabels():
+            item.set_fontsize(18)
+
+        if ii == 0:
+            for item in ax.get_yticklabels():
+                item.set_fontsize(18)
+        else:
+            ax.set_yticklabels([])
+
+    axs[1].set_xlabel('Position [bp]', fontsize=18, labelpad=20)
+    axs[0].set_ylabel('Allele frequency', fontsize=18, labelpad=20)
+
 
     plt.tight_layout()
 

@@ -27,6 +27,88 @@ window_size = 300
 
 
 # Functions
+def collect_data(pnames, window_size=300, VERBOSE=0):
+    '''Collect data for substitution rates'''
+
+    patients = load_patients()
+    if pnames is not None:
+        patients = patients.loc[pnames]
+    pcodes = patients.code.tolist()
+
+    data = []
+    for pname, patient in patients.iterrows():
+        patient = Patient(patient)
+        patient.discard_nonsequenced_samples()
+
+        if VERBOSE >= 1:
+            print pname, patient.code
+
+        aft, ind = patient.get_allele_frequency_trajectories('genomewide',
+                                                             cov_min=100,
+                                                             depth_min=100)
+        times = patient.times[ind]
+
+        from hivwholeseq.patients.get_divergence_diversity_local import (
+        get_divergence_diversity_sliding)
+        x, dg, _ = get_divergence_diversity_sliding(aft, window_size, VERBOSE=VERBOSE)
+
+        coomap = patient.get_map_coordinates_reference('genomewide')
+        coomapd = pd.Series(coomap[:, 0], index=coomap[:, 1])
+        x_sub = np.array(coomapd.loc[x.astype(int)])
+
+        # Exclude missing positions
+        ind_pos = -np.isnan(x_sub)
+        x_sub = x_sub[ind_pos]
+        dg = dg[:, ind_pos]
+
+        # Pad a bit left and right for low coverage
+        pad = 50
+        x_sub = x_sub[pad: -pad]
+        dg = dg[:, pad: -pad]
+
+        data.append({'pcode': patient.code,
+                     'x': x_sub,  # integer positions simplify a few things
+                     'dg': dg,
+                     't': times})
+
+    return data
+
+
+def fit_substitution_rate(data, VERBOSE=0):
+    '''Fit substitution rate'''
+
+    if VERBOSE >= 1:
+        print 'Fit slopes'
+
+    for d in data:
+        pcode = d['pcode']
+        dg = d['dg']
+        times = d['t']
+
+        r = np.ma.masked_all(dg.shape[1])
+        for pos, dg_pos in enumerate(dg.T):
+            ind = -dg_pos.mask
+            if ind.sum() < 3:
+                continue
+
+            y = dg_pos[ind].data
+            x = times[ind]
+            # Linear fit
+            r[pos] = np.dot(y, x) / np.dot(x, x)
+
+        d['r'] = r
+
+    if VERBOSE >= 1:
+        print 'Prepare data for plot'
+
+    datap = pd.DataFrame([{'pcode': d['pcode'],
+                           'x': d['x'],
+                           'rate': d['r'] * 365.24}
+                          for d in data])
+
+    return datap
+
+
 def plot_divergence_fit(data, VERBOSE=0):
     from operator import itemgetter
 
@@ -191,75 +273,10 @@ if __name__ == '__main__':
     plot = args.plot
     window_size = args.window
 
-    patients = load_patients()
-    if pnames is not None:
-        patients = patients.loc[pnames]
-    pcodes = patients.code.tolist()
 
-    data = []
-    for pname, patient in patients.iterrows():
-        patient = Patient(patient)
-        patient.discard_nonsequenced_samples()
+    data = collect_data(pnames, window_size=window_size, VERBOSE=VERBOSE)
 
-        if VERBOSE >= 1:
-            print pname, patient.code
-
-        aft, ind = patient.get_allele_frequency_trajectories('genomewide',
-                                                             cov_min=100,
-                                                             depth_min=100)
-        times = patient.times[ind]
-
-        from hivwholeseq.patients.get_divergence_diversity_local import (
-        get_divergence_diversity_sliding)
-        x, dg, _ = get_divergence_diversity_sliding(aft, window_size, VERBOSE=VERBOSE)
-
-        coomap = patient.get_map_coordinates_reference('genomewide')
-        coomapd = pd.Series(coomap[:, 0], index=coomap[:, 1])
-        x_sub = np.array(coomapd.loc[x.astype(int)])
-
-        # Exclude missing positions
-        ind_pos = -np.isnan(x_sub)
-        x_sub = x_sub[ind_pos]
-        dg = dg[:, ind_pos]
-
-        # Pad a bit left and right for low coverage
-        pad = 50
-        x_sub = x_sub[pad: -pad]
-        dg = dg[:, pad: -pad]
-
-        data.append({'pcode': patient.code,
-                     'x': x_sub,  # integer positions simplify a few things
-                     'dg': dg,
-                     't': times})
-
-    if VERBOSE >= 1:
-        print 'Fit slopes'
-
-    for d in data:
-        pcode = d['pcode']
-        dg = d['dg']
-        times = d['t']
-
-        r = np.ma.masked_all(dg.shape[1])
-        for pos, dg_pos in enumerate(dg.T):
-            ind = -dg_pos.mask
-            if ind.sum() < 3:
-                continue
-
-            y = dg_pos[ind].data
-            x = times[ind]
-            # Linear fit
-            r[pos] = np.dot(y, x) / np.dot(x, x)
-
-        d['r'] = r
-
-    if VERBOSE >= 1:
-        print 'Prepare data for plot'
-
-    datap = pd.DataFrame([{'pcode': d['pcode'],
-                           'x': d['x'],
-                           'rate': d['r'] * 365.24}
-                          for d in data])
+    datap = fit_substitution_rate(data, VERBOSE=VERBOSE)
 
     if plot:
         if VERBOSE >= 1:

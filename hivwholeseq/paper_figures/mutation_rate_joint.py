@@ -35,44 +35,35 @@ if __name__ == '__main__':
     foldername = get_figure_folder(username, 'first')
     fn_data = foldername+'data/'
     mkdirs(fn_data)
-    fn_fits = fn_data + 'mutation_rate.pickle'
-    fn_comp = fn_data + 'mutation_rate_comparison_Abram2010.pickle'
-    fn_data = fn_data + 'mutation_rate_data.pickle'
+    fn_fits = fn_data + 'mutation_rate_joint.pickle'
+    fn_comp = fn_data + 'mutation_rate_joint_comparison_Abram2010.pickle'
 
     if (not os.path.isfile(fn_data)) or (not os.path.isfile(fn_fits)):
-        from hivwholeseq.analysis.mutation_rate.mutation_rate import (
-            collect_data_mutation_rate, fit_mutation_rate)
-        from hivwholeseq.analysis.mutation_rate.comparison_Abram import (
-            add_Abram2010)
-
         if VERBOSE >= 1:
-            print 'Collecting data'
-        data = collect_data_mutation_rate(regions, pnames, VERBOSE=VERBOSE)
-
-        if VERBOSE >= 1:
-            print 'Fitting mu'
-        fits = fit_mutation_rate(data, VERBOSE=VERBOSE, Smin=0.1)
+            print 'Loading fits'
+        from hivwholeseq.analysis.filenames import analysis_data_folder
+        fn_out_mu = analysis_data_folder+'mu_joint.pickle'
+        fits = pd.read_pickle(fn_out_mu)
 
         if VERBOSE >= 1:
             print 'Comparing to Abram2010'
+        from hivwholeseq.analysis.mutation_rate.comparison_Abram import (
+            add_Abram2010)
         comp = add_Abram2010(fits)
 
         if VERBOSE >= 1:
             print 'Save data for plot to pickle'
-        data.to_pickle(fn_data)
         fits.to_pickle(fn_fits)
         comp.to_pickle(fn_comp)
 
     else:
-        data = pd.read_pickle(fn_data)
         fits = pd.read_pickle(fn_fits)
         comp = pd.read_pickle(fn_comp)
 
-    datap = {'data': data, 'fits': fits, 'comp': comp}
+    datap = {'fits': fits, 'comp': comp}
 
-    filenames = [foldername+'mutation_rate_fits_neutralclass',
-                 foldername+'mutation_rate_matrix_neutralclass',
-                 foldername+'mutation_rate_comparison_neutralclass']
+    filenames = [foldername+'mutation_rate_matrix_joint',
+                 foldername+'mutation_rate_comparison_joint']
     for ext in ['png', 'pdf', 'svg']:
         plot_mutation_rate(datap,
                            VERBOSE=VERBOSE,
