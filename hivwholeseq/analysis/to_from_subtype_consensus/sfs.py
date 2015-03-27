@@ -28,55 +28,15 @@ from hivwholeseq.patients.one_site_statistics import get_codons_n_polymorphic
 
 
 
+# Globals
+pnames = ['20097', '15363', '15823', '9669', '20529', '15241', '15376', '15319']
+regions = ['p17', 'p24', 'PR', 'RT', 'IN', 'vif', 'vpu', 'nef', 'gp41']
+
+
+
 # Functions
-def get_sfs(data, bins_af, attrnames=['tbin', 'awayto'], VERBOSE=0):
-    '''Get SFS from data'''
-    datah = data.loc[(data.loc[:, 'afbin'] != -1) &
-                     (data.loc[:, 'afbin'] != len(bins_af) - 1)]
-    datah = (datah
-             .loc[:, attrnames + ['afbin']]
-             .groupby(attrnames + ['afbin'])
-             .size()
-             .unstack('afbin'))
-    # Normalize
-    datah[np.isnan(datah)] = 0
-    datah = (datah.T / datah.sum(axis=1)).T # The sum of counts
-    # (the bin widths)
-    binsw_af = bins_af[1:] - bins_af[:-1]
-    datah /= binsw_af
-
-    # Add pseudocounts
-    vmin = 0.1 * datah[datah > 0].min().min()
-    datah[datah < vmin] = vmin
-
-    return datah
-
-
-
-
-# Script
-if __name__ == '__main__':
-
-    # Parse input args
-    parser = argparse.ArgumentParser(
-        description='Accumulation of minor alleles stratified by abundance difference in subtype',
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
-    parser.add_argument('--patients', nargs='+',
-                        help='Patient to analyze')
-    parser.add_argument('--regions', nargs='+', required=True,
-                        help='Regions to analyze (e.g. F1 p17)')
-    parser.add_argument('--verbose', type=int, default=0,
-                        help='Verbosity level [0-4]')
-    parser.add_argument('--plot', nargs='?', default=None, const='2D',
-                        help='Plot results')
-
-    args = parser.parse_args()
-    pnames = args.patients
-    regions = args.regions
-    VERBOSE = args.verbose
-    plot = args.plot
-
-
+def collect_data(pnames, regions, VERBOSE=0):
+    '''Collect data for the SFS'''
     data = []
 
     patients = load_patients()
@@ -115,7 +75,7 @@ if __name__ == '__main__':
                                                                  VERBOSE=VERBOSE)
             if len(ind) == 0:
                 if VERBOSE >= 2:
-                    print 'Skip'
+                    print 'No time points found: skip.'
                 continue
 
             times = patient.times[ind]
@@ -201,6 +161,58 @@ if __name__ == '__main__':
                                             'Ssub', 'conssub', 'awayto',
                                             'time', 'af'))
 
+    return data
+
+
+def get_sfs(data, bins_af, attrnames=['tbin', 'awayto'], VERBOSE=0):
+    '''Get SFS from data'''
+    datah = data.loc[(data.loc[:, 'afbin'] != -1) &
+                     (data.loc[:, 'afbin'] != len(bins_af) - 1)]
+    datah = (datah
+             .loc[:, attrnames + ['afbin']]
+             .groupby(attrnames + ['afbin'])
+             .size()
+             .unstack('afbin'))
+    # Normalize
+    datah[np.isnan(datah)] = 0
+    datah = (datah.T / datah.sum(axis=1)).T # The sum of counts
+    # (the bin widths)
+    binsw_af = bins_af[1:] - bins_af[:-1]
+    datah /= binsw_af
+
+    # Add pseudocounts
+    vmin = 0.1 * datah[datah > 0].min().min()
+    datah[datah < vmin] = vmin
+
+    return datah
+
+
+
+
+# Script
+if __name__ == '__main__':
+
+    # Parse input args
+    parser = argparse.ArgumentParser(
+        description='Accumulation of minor alleles stratified by abundance difference in subtype',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
+    parser.add_argument('--patients', nargs='+', default=pnames,
+                        help='Patient to analyze')
+    parser.add_argument('--regions', nargs='+', default=regions,
+                        help='Regions to analyze (e.g. F1 p17)')
+    parser.add_argument('--verbose', type=int, default=2,
+                        help='Verbosity level [0-4]')
+    parser.add_argument('--plot', action='store_true',
+                        help='Plot results')
+
+    args = parser.parse_args()
+    pnames = args.patients
+    regions = args.regions
+    VERBOSE = args.verbose
+    plot = args.plot
+
+
+    data = collect_data(pnames, regions, VERBOSE=VERBOSE)
 
     if plot:
 
@@ -299,6 +311,36 @@ if __name__ == '__main__':
         ax.grid(True)
         ax.legend(loc='upper right', ncol=2, fontsize=12, title='Categories')
         ax.set_ylabel('Spectrum [normalized by bin width]')
+
+
+        # Average frequency (simpler plot)
+        fig, ax = plt.subplots(figsize=(5, 4))
+        datap = (data
+                 .loc[:, ['Sbin', 'awayto', 'af']]
+                 .groupby(['Sbin', 'awayto'], as_index=False)
+                 .mean()
+                 .groupby('awayto'))
+        for awayto, datum in datap:
+            if awayto == 'away':
+                ls = '--'
+            else:
+                ls = '-'
+
+            x = binsc_S[datum['Sbin']]
+            y = datum['af']
+
+            ax.plot(x, y, ls=ls, lw=2, label=awayto, color='k')
+
+        ax.set_xlabel('Entropy in subtype [bits]')
+        ax.set_ylabel('Average frequency')
+        ax.set_ylim(1e-4, 1e-1)
+        ax.set_xlim(1e-3, 5)
+        ax.set_xscale('log')
+        ax.set_yscale('log')
+        ax.legend(loc='upper left')
+        ax.grid(True)
+
+        plt.tight_layout()
 
         plt.ion()
         plt.show()
