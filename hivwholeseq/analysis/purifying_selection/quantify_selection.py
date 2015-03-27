@@ -192,17 +192,61 @@ def fit_saturation(data, bins_S, binsc_S, method='group', VERBOSE=0):
        time averages ('group'). The fit result is similar, but noise statistics
        differ.
     '''
+    # Every single observation counts one
     if method == 'single':
         dataf = (data
                  .loc[:, ['Sbin', 'mu', 'time', 'af']]
                  .groupby('Sbin'))
-    else:
-        #FIXME: we could also make time bins (less data, more smooth)
+
+    # Avg over alleles from the same time point
+    elif method == 'group':
         dataf = (data
                  .loc[:, ['Sbin', 'mut', 'mu', 'time', 'af']]
-                 .groupby(['Sbin', 'mut', 'time'])
+                 .groupby(['Sbin', 'mut', 'time'], as_index=False)
+                 .mean()
+                 .groupby('Sbin'))
+
+    # Time bins
+    elif method == 'binned':
+        from hivwholeseq.utils.pandas import add_binned_column
+        bins_t = np.logspace(np.log10(max(1, data['time'].min())),
+                             np.log10(data['time'].max()),
+                             8)
+        binsc_t = np.sqrt(bins_t[1:] * bins_t[:-1])
+        add_binned_column(data, 'tbin', 'time', bins_t, clip=True)
+
+        dataf = (data
+                 .loc[:, ['Sbin', 'mut', 'mu', 'tbin', 'af']]
+                 .groupby(['Sbin', 'mut', 'tbin'], as_index=False)
                  .mean())
-        dataf['time'] = dataf.index.get_level_values('time')
+        dataf['time'] = binsc_t[dataf['tbin']]
+        dataf = dataf.groupby('Sbin')
+
+    # Time bins AND avg mutation rate instead of single ones
+    elif method == 'binnedavg':
+        from hivwholeseq.utils.pandas import add_binned_column
+        bins_t = np.logspace(np.log10(max(1, data['time'].min())),
+                             np.log10(data['time'].max()),
+                             8)
+        binsc_t = np.sqrt(bins_t[1:] * bins_t[:-1])
+        add_binned_column(data, 'tbin', 'time', bins_t, clip=True)
+
+        mutd = data.loc[:, ['mut', 'mu']].groupby('mut').mean()
+        n_obs = (data
+                 .loc[:, ['Sbin', 'mut', 'mu', 'tbin', 'af']]
+                 .groupby(['Sbin', 'tbin', 'mut'], as_index=False)
+                 .size())
+        mu_obs = mutd.loc[n_obs.index.get_level_values('mut')].set_index(n_obs.index)
+        mu_obs['n_obs'] = n_obs
+        mu_avg = (mu_obs.prod(axis=1).mean(axis=0, level=['Sbin', 'tbin']) / 
+                  mu_obs['n_obs'].mean(level=['Sbin', 'tbin']))
+        dataf = (data
+                 .loc[:, ['Sbin', 'tbin', 'af']]
+                 .groupby(['Sbin', 'tbin'])
+                 .mean())
+
+        dataf['mu'] = mu_avg
+        dataf['time'] = binsc_t[dataf.index.get_level_values('tbin')]
         dataf['Sbin'] = dataf.index.get_level_values('Sbin')
         dataf = dataf.groupby('Sbin')
 
@@ -418,7 +462,8 @@ if __name__ == '__main__':
                         help='Verbosity level [0-4]')
     parser.add_argument('--plot', action='store_true',
                         help='Plot results')
-    parser.add_argument('--method', default='group', choices=['single', 'group'],
+    parser.add_argument('--method', default='binned',
+                        choices=['single', 'group', 'binned', 'binnedavg'],
                         help='Fit method [group|single]')
 
     args = parser.parse_args()
@@ -447,7 +492,7 @@ if __name__ == '__main__':
     # Store fitness cost to file
     if VERBOSE >= 1:
         print 'Save to file'
-    fn_out = get_fitness_cost_entropy_filename('all_Abram2010')
+    fn_out = get_fitness_cost_entropy_filename('all_muAbram2010_'+fit_method)
     fitsgw.to_pickle(fn_out)
 
     if plot:
@@ -467,7 +512,7 @@ if __name__ == '__main__':
         # Store fitness cost to file
         if VERBOSE >= 1:
             print 'Save to file'
-        fn_out = get_fitness_cost_entropy_filename(region+'_Abram2010')
+        fn_out = get_fitness_cost_entropy_filename(region+'_muAbram2010_'+fit_method)
         fitsreg.to_pickle(fn_out)
 
         if plot:

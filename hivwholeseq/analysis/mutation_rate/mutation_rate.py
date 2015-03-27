@@ -208,7 +208,7 @@ def fit_mutation_rate(data, VERBOSE=0, Smin=0.05, method='group'):
                  .loc[data.loc[:, 'S'] >= Smin]
                  .loc[:, ['mut', 'time', 'af']]
                  .groupby(['mut']))
-    else:
+    elif method == 'group':
         dataf = (data
                  .loc[data.loc[:, 'S'] >= Smin]
                  .loc[:, ['mut', 'time', 'af']]
@@ -217,6 +217,8 @@ def fit_mutation_rate(data, VERBOSE=0, Smin=0.05, method='group'):
         dataf['time'] = dataf.index.get_level_values('time')
         dataf['mut'] = dataf.index.get_level_values('mut')
         dataf = dataf.groupby(['mut'])
+    elif method == 'binned':
+        raise NotImplementedError
 
     fits = {}
     for mut, datum in dataf:
