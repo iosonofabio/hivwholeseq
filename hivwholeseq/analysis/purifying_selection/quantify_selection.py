@@ -266,8 +266,8 @@ def fit_saturation(data, bins_S, binsc_S, method='group', VERBOSE=0):
             s = fit_fitness_cost(x, y, mu, VERBOSE=VERBOSE)
             if VERBOSE >= 3:
                 regions = np.unique(data['region'])
-                plot_function_minimization_1d(x, y, s, mu,
-                                              title=', '.join(regions)+', iSbin = '+str(iSbin))
+                plot_fit_single(x, y, s, mu,
+                                title=', '.join(regions)+', iSbin = '+str(iSbin))
 
         except RuntimeError:
             print 'Fit failed, Sbin = ', iSbin
@@ -321,25 +321,22 @@ def plot_function_minimization(x, y, params):
     plt.ion()
     plt.show()
 
-def plot_function_minimization_1d(x, y, s, mu, title=''):
+def plot_fit_single(x, y, s, mu, title=''):
     '''Investigate inconsistencies in fits'''
-    #FIXME: rewrite this function
-    fun_min = lambda l, u: ((y - fun(x, l, u))**2).sum()
-
-    p1 = np.logspace(np.log10(l) - 3, np.log10(l) + 3, 100)
-    zs = np.log(np.array([[fun_min(pp, u) for pp in p1] for u in us]))
-
     fig, ax = plt.subplots()
 
-    from itertools import izip
-    for i, (z, u) in enumerate(izip(zs, us)):
-        ax.plot(p1, z, lw=2, color=cm.jet(1.0 * i / len(us)),
-                label='mu = {:1.1e}'.format(u))
+    ax.scatter(x, y, s=50, color='k', label='data')
+
+    yfit = fun(x, mu/s, mu)
+    ax.scatter(x, yfit, s=30, marker='s', color='b', label='fits')
 
     if title:
         ax.set_title(title)
-    ax.set_xlabel('Saturation frequency ($\mu / s$)')
+    ax.set_xlabel('Time [days]')
+    ax.set_ylabel('Allele frequency')
+    ax.set_ylim(1e-6, 1e-1)
     ax.set_xscale('log')
+    ax.set_yscale('log')
     ax.grid(True)
     ax.legend(loc='upper left')
 
