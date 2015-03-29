@@ -37,7 +37,7 @@ freqmin = 0.01
 # Functions
 def store_alignments(alis, filename):
     '''Store alignments to file'''
-    import zipfile, zlib
+    import zipfile
     with zipfile.ZipFile(filename, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
         for i, ali in enumerate(alis):
             f = StringIO.StringIO()

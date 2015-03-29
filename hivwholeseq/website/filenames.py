@@ -69,9 +69,9 @@ def get_coverage_filename(pname, fragment):
     return filename
 
 
-def get_allele_count_trajectories_filename(pname, fragment):
+def get_allele_count_trajectories_filename(pname, fragment, format='npz'):
     '''Get the filename of allele count trajectories'''
-    filename = 'allele_counts_'+pname+'_'+fragment+'.npz'
+    filename = 'allele_counts_'+pname+'_'+fragment+'.'+format
     filename = get_foldername('one_site')+filename
     return filename
 
