@@ -34,6 +34,13 @@ def get_consensi_tree_filename(pname, fragment, format='newick'):
     return filename
 
 
+def get_tree_figure_filename(pname, region, format='svg'):
+    '''Get filename of the example tree for the patient page'''
+    filename = 'tree_'+pname+'_'+region+'_example.'+format
+    filename = get_foldername('trees')+filename
+    return filename
+
+
 def get_consensi_alignment_filename(pname, fragment, format='fasta'):
     '''Get the newick filename of a consensus tree'''
     filename = 'consensi_alignment_'+pname+'_'+fragment+'.'+format
@@ -89,6 +96,14 @@ def get_patient_reference_filename(pname, fragment='genomewide', format='gb'):
     filename = get_foldername('sequences')+filename
     return filename
     
+
+def get_coordinate_map_filename(pname, fragment='genomewide', refname='HXB2',
+                                format='tsv'):
+    '''Get the filename of the patient reference'''
+    filename = 'coordinate_map_'+pname+'_'+refname+'_'+fragment+'.'+format
+    filename = get_foldername('coordinate_maps')+filename
+    return filename
+
 
 def get_SFS_filename(pnames, fragments, suffix=None):
     '''Get the filename of the SFS'''
