@@ -20,6 +20,13 @@ def get_foldername(name):
     return foldername
 
 
+def get_sample_table_filename(pname):
+    '''Get filename of the same table'''
+    filename = 'samples_'+pname+'.tsv'
+    filename = get_foldername('tables')+filename
+    return filename
+
+
 def get_consensi_tree_filename(pname, fragment, format='newick'):
     '''Get the newick filename of a consensus tree'''
     filename = 'consensi_tree_'+pname+'_'+fragment+'.'+format
