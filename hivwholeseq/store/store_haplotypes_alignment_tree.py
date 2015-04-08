@@ -6,6 +6,7 @@ content:    Store phylogenetic tree of local haplotypes/consensi.
 '''
 # Modules
 import os
+import sys
 import argparse
 from operator import itemgetter, attrgetter
 import numpy as np
@@ -15,7 +16,6 @@ from Bio import Phylo
 from Bio import AlignIO
 
 from hivwholeseq.patients.patients import load_patients, Patient
-from hivwholeseq.utils.sequence import align_muscle, convert_alim_to_biopython
 from hivwholeseq.utils.tree import build_tree_fasttree
 from hivwholeseq.utils.argparse import RoiAction
 from hivwholeseq.store.store_tree_consensi import annotate_tree
@@ -80,62 +80,48 @@ def get_region_count_trajectories(patient, region, VERBOSE=0, countmin=5):
     return (hct.T, ind, seqs_set)
 
 
-def expand_duplicates_annotate_tree(tree, htf, times, seqs, minfreq=0.01):
+def expand_annotate_alignment(alim, hft, hct, times, freqmin=0.01, VERBOSE=0):
+    '''Expand alignment to duplicate leaves that stay, and rename seqs'''
+    from itertools import izip
+    from hivwholeseq.utils.sequence import convert_alim_to_biopython
+
+    seqs = []
+    names = []
+    for i, seq in enumerate(alim):
+        for time, hf, hc in izip(times, hft[i], hct[i]):
+            if hf >= freqmin:
+                name = str(time)+'_days_'+str(int(100 * hf))+'%_'+str(hc)+'_1'
+                while name in names:
+                    name = '_'.join(name.split('_')[:-1]+
+                                    [str(int(name.split('_')[-1]) + 1)])
+
+                seqs.append(seq)
+                names.append(name)
+
+    ali = convert_alim_to_biopython(seqs)
+    for name, seq in izip(names, ali):
+        seq.id = seq.name = name
+        seq.description = ''
+        
+    return ali
+
+
+def annotate_tree_time_freq_count(tree, ali):
     '''Annotate tree with days and colors'''
     from operator import attrgetter
-    from Bio.Phylo.BaseTree import Clade
 
-    # Reroot
-    iseqroot = htf[:, 0].argmax()
+    # Assign times and freqs to leaves
     for leaf in tree.get_terminals():
-        iseq = int(leaf.name[3:]) - 1
-        if iseq == iseqroot:
-            break
-    else:
-        raise ValueError('Not able to reroot!')
-    tree.root_with_outgroup(leaf)
+        leaf.DSI = float(leaf.name.split('_')[0])
+        leaf.frequency = float(leaf.name.split('_')[2].split('%')[0]) / 100.0
+        leaf.count = int(leaf.name.split('_')[3])
 
-    # Expand duplicates (same sequence but different time points)
-    leaves = tree.get_terminals()
-    for leaf in leaves:
-        iseq = int(leaf.name[3:]) - 1
-        seq = seqs[iseq]
-        ht = htf[iseq]
-
-        # Check how many copies of the leaf we need
-        indseq = set((ht > minfreq).nonzero()[0])
-        indseq.add(ht.argmax())
-        indseq = sorted(indseq)
-
-        # One copy only, just rename
-        if len(indseq) == 1:
-            it = indseq[0]
-            h = ht[it]
-            t = '{:1.1f}'.format(times[it])
-
-            leaf.name = str(t)+'_'+seq
-            leaf.frequency = h
-            leaf.sequence = seq
-            leaf.DSI = t
-
-            continue
-
-        # Several copy, transform into internal node and append subtree
-        for it in indseq:
-            h = ht[it]
-            t = '{:1.1f}'.format(times[it])
-
-            name = str(t)+'_'+seq
-            newleaf = Clade(branch_length=1e-4, name=name)
-            newleaf.frequency = h
-            newleaf.sequence = seq
-            newleaf.DSI = t
-
-            leaf.clades.append(newleaf)
-
-        leaf.name = None
-        leaf.confidence = 1.0
-        leaf.sequence = seq
+    
+    # Reroot
+    tmin = min(leaf.DSI for leaf in tree.get_terminals())
+    newroot = max((leaf for leaf in tree.get_terminals() if leaf.DSI == tmin),
+                   key=attrgetter('frequency'))
+    tree.root_with_outgroup(newroot)
 
 
 def annotate_tree_for_plot(tree, minfreq=0.02):
@@ -172,9 +158,11 @@ def extract_alignment(tree, VERBOSE=0):
     from Bio.Alphabet.IUPAC import ambiguous_dna
 
     ali = MSA([SeqRecord(Seq(leaf.sequence, ambiguous_dna),
-                         id='days_'+leaf.name+'_frequency_'+'{:2.0%}'.format(leaf.frequency),
-                         name='days_'+leaf.name+'_frequency_'+'{:2.0%}'.format(leaf.frequency),
-                         description='')
+                         id='days_'+str(int(leaf.DSI))+'_frequency_'+'{:2.0%}'.format(leaf.frequency),
+                         name='days_'+str(int(leaf.DSI))+'_frequency_'+'{:2.0%}'.format(leaf.frequency),
+                         description=('days since infection: '+str(int(leaf.DSI))+', '+
+                                      'frequency: '+'{:2.0%}'.format(leaf.frequency)+', '+
+                                      'n.reads: '+str(int(leaf.count))))
                for leaf in tree.get_terminals()])
     return ali
 
@@ -223,26 +211,19 @@ if __name__ == '__main__':
         if VERBOSE >= 2:
             print 'Get haplotypes'
 
-        (hct, ind, alim) =patient.get_haplotype_count_trajectory(region, aligned=True)
+        (hct, ind, alim) = patient.get_haplotype_count_trajectory(region, aligned=True)
         
+        times = patient.times[ind]
         hct = hct.T
-        htf = 1.0 * hct / hct.sum(axis=0)
+        hft = 1.0 * hct / hct.sum(axis=0)
+
+        # Duplicate sequences for tree
+        ali = expand_annotate_alignment(alim, hft, hct, times, freqmin=freqmin, VERBOSE=VERBOSE)
 
         # Exclude too rare haplos
-        indseq = (htf >= freqmin).any(axis=1)
+        indseq = (hft >= freqmin).any(axis=1)
         alim = alim[indseq]
-        htf = htf[indseq]
-
-        # Get initial top haplo
-        iseq0 = htf[:, 0].argmax()
-
-        times = patient.times[ind]
-
-        ali = convert_alim_to_biopython(alim)
-
-        #if VERBOSE >= 2:
-        #    print 'Align sequences'
-        #ali = align_muscle(*seqs, sort=True)
+        hft = hft[indseq]
 
         if VERBOSE >= 2:
             print 'Build local tree'
@@ -256,11 +237,9 @@ if __name__ == '__main__':
         a.cleanup_tree()
 
         if VERBOSE >= 2:
-            print 'Duplicate tree leaves and annotate with ALIGNED sequences'
-        expand_duplicates_annotate_tree(tree, htf, times,
-                                        map(''.join, ali),
-                                        minfreq=0.01)
-        
+            print 'Annotate with time and frequency'
+        annotate_tree_time_freq_count(tree, ali)
+
         # FIXME: for the amino acid mutations, we must make sure that we are
         # codon aligned (with codon_align). The problem is that sometimes
         # V3 has gaps of 1-2 nucleotides... at frequency 10%?!
@@ -283,6 +262,7 @@ if __name__ == '__main__':
                                              'muts',
                                              'VL', 'CD4',
                                              'frequency',
+                                             'count',
                                              'confidence'),
                                     )
             write_json(tree_json, fn)

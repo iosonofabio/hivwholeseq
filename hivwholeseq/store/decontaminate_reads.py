@@ -300,7 +300,8 @@ if __name__ == '__main__':
                 else:
                     PCRs_sample = [PCR]
                 for PCR_sample in PCRs_sample:
-                    bamfilename = sample.get_mapped_filtered_filename(fragment, PCR=PCR_sample)
+                    bamfilename = sample.get_mapped_filtered_filename(fragment, PCR=PCR_sample,
+                                                                      decontaminated=False)
                     if not os.path.isfile(bamfilename):
                         continue
                 
@@ -333,7 +334,8 @@ if __name__ == '__main__':
                 PCRs_sample = [PCR]
 
             for PCR_sample in PCRs_sample:
-                bamfilename = sample.get_mapped_filtered_filename(fragment, PCR=PCR_sample)
+                bamfilename = sample.get_mapped_filtered_filename(fragment, PCR=PCR_sample,
+                                                                  decontaminated=False)
                 if not os.path.isfile(bamfilename):
                     continue
 

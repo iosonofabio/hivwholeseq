@@ -118,7 +118,8 @@ def trim_read_roi(read, start, end):
     return seq
 
 
-def get_local_haplotypes(bamfilename, start, end, VERBOSE=0, maxreads=-1):
+def get_local_haplotypes(bamfilename, start, end, VERBOSE=0, maxreads=-1,
+                         label=''):
     '''Extract reads fully covering the region, discarding insertions'''
     import sys
     import pysam
@@ -142,6 +143,8 @@ def get_local_haplotypes(bamfilename, start, end, VERBOSE=0, maxreads=-1):
                 if not ((irp + 1) % 10000):
                     if irp + 1 != 10000:
                         sys.stdout.write("\x1b[1A\n")
+                    if label:
+                        sys.stdout.write(label+'\t')
                     sys.stdout.write(str(irp + 1))
                     sys.stdout.flush()
 
@@ -183,6 +186,11 @@ def get_local_haplotypes(bamfilename, start, end, VERBOSE=0, maxreads=-1):
             haplotypes[seq] += 1
             if VERBOSE >= 4:
                 import ipdb; ipdb.set_trace()
+
+    if VERBOSE >= 2:
+        if irp >= 10000:
+            sys.stdout.write('\n')
+            sys.stdout.flush()
 
     return haplotypes
 

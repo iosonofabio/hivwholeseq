@@ -73,7 +73,7 @@ def get_mapped_to_initial_filename(pname, samplename_pat,
 
 
 def get_mapped_filtered_filename(pname, samplename_pat, fragment, type='bam', PCR=1,
-                                 decontaminated=False):
+                                 decontaminated=True):
     '''Get the filename of the mapped and filtered reads to initial reference'''
     filename = fragment
     if not decontaminated:

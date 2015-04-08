@@ -199,7 +199,8 @@ class SamplePat(pd.Series):
         haplo = get_local_haplotypes(bamfilename,
                                      start, end,
                                      VERBOSE=VERBOSE,
-                                     maxreads=maxreads)
+                                     maxreads=maxreads,
+                                     label=self.name)
 
         if filters is not None:
             if 'noN' in filters:

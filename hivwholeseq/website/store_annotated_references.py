@@ -19,6 +19,25 @@ from hivwholeseq.reference import load_custom_reference
 
 
 # Functions
+def add_annotations_fragments(ref):
+    '''Add annotations of fragments to reference'''
+    from Bio.SeqFeature import SeqFeature, FeatureLocation
+
+    if 'HXB2' not in ref.name:
+        raise NotImplementedError
+
+    from hivwholeseq.sequencing.primer_info import (
+        primers_coordinates_HXB2_outer as primers)
+    for fr in ['F1', 'F2', 'F3B', 'F4', 'F5a', 'F6']:
+        coo = primers[fr]   
+        start = coo[0][0]
+        end = coo[1][1]
+        fea = SeqFeature(FeatureLocation(start, end, strand=+1),
+                         id=fr[:2],
+                         type="fragment")
+        ref.features.append(fea)
+
+
 def save_reference(ref, filename):
     '''Save reference to file for website'''
     from hivwholeseq.utils.sequence import correct_genbank_features_save
@@ -51,37 +70,40 @@ if __name__ == '__main__':
 
     refname = 'HXB2'
 
-    patients = load_patients()
-    for pname, patient in patients.iterrows():
-        patient = Patient(patient)
-        print patient.code, patient.name
+    #patients = load_patients()
+    #for pname, patient in patients.iterrows():
+    #    patient = Patient(patient)
+    #    print patient.code, patient.name
 
-        # Get reference
-        ref = patient.get_reference('genomewide', format='gb')
+    #    # Get reference
+    #    ref = patient.get_reference('genomewide', format='gb')
 
-        # Mask patient name into code
-        ref.id = 'ref_'+patient.code
-        ref.name = 'ref_'+patient.code
-        ref.description = 'reference for patient '+patient.code+', genomewide'
+    #    # Mask patient name into code
+    #    ref.id = 'ref_'+patient.code
+    #    ref.name = 'ref_'+patient.code
+    #    ref.description = 'reference for patient '+patient.code+', genomewide'
 
-        # Save to file GENBANK
-        fn_out = get_patient_reference_filename(patient.code, format='gb')
-        save_reference(ref, fn_out)
+    #    # Save to file GENBANK
+    #    fn_out = get_patient_reference_filename(patient.code, format='gb')
+    #    save_reference(ref, fn_out)
 
-        # Save to file FASTA
-        fn_out = get_patient_reference_filename(patient.code, format='fasta')
-        save_reference(ref, fn_out)
+    #    # Save to file FASTA
+    #    fn_out = get_patient_reference_filename(patient.code, format='fasta')
+    #    save_reference(ref, fn_out)
 
-        # Get coordinate maps
-        mapco = patient.get_map_coordinates_reference('genomewide', refname=refname)
-        fn_out = get_coordinate_map_filename(patient.code, refname=refname)
-        header = refname+'\t'+patient.code
-        save_mapco(mapco, fn_out, header)
+    #    # Get coordinate maps
+    #    mapco = patient.get_map_coordinates_reference('genomewide', refname=refname)
+    #    fn_out = get_coordinate_map_filename(patient.code, refname=refname)
+    #    header = refname+'\t'+patient.code
+    #    save_mapco(mapco, fn_out, header)
 
 
     # Store HXB2
     print refname
     ref = load_custom_reference(refname, format='gb')
+
+    # Add fragment annotations
+    add_annotations_fragments(ref)
 
     # Save to file GENBANK
     fn_out = get_patient_reference_filename(refname, format='gb')

@@ -137,7 +137,8 @@ def filter_mapped_reads(sample, fragment,
     ref = np.array(refseq)
 
     outfilename = get_mapped_filtered_filename(pname, samplename_pat, fragment,
-                                               type='bam', PCR=PCR)
+                                               type='bam', PCR=PCR,
+                                               decontaminated=False)
     trashfilename = outfilename[:-4]+'_trashed.bam'
 
     infilenames = [get_mapped_to_initial_filename(pname, samplename_pat,

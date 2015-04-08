@@ -167,6 +167,10 @@ def tree_from_json(json):
                     node.clades.append(child)
                     node_from_json(sub_json, child)
             else:
+                if attr == 'name':
+                    node.__setattr__(attr, str(val))
+                    continue
+
                 try:
                     node.__setattr__(attr, float(val))
                 except:

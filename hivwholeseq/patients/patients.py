@@ -217,13 +217,12 @@ class Patient(pd.Series):
 
     def get_local_tree(self, region):
         '''Get consensi tree from the patient'''
-        import os.path
+        from ..utils.generic import read_json
+        from ..utils.tree import tree_from_json
 
         fn = self.get_local_tree_filename(region, format='json')
-        if os.path.isfile(fn):
-            from ..utils.generic import read_json
-            from ..utils.tree import tree_from_json
-            return tree_from_json(read_json(fn))
+        return tree_from_json(read_json(fn))
+
 
 
     @staticmethod
@@ -581,6 +580,7 @@ class Patient(pd.Series):
                 hct[seqs_set.index(seq), i] = count
 
         seqs_set = np.array(seqs_set, 'S'+str(np.max(map(len, seqs_set))))
+
         return (hct.T, ind, seqs_set)
 
     

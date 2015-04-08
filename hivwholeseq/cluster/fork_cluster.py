@@ -894,7 +894,7 @@ def fork_store_haplotypes_website(pname, region, VERBOSE=0):
     if VERBOSE:
         print 'Forking to the cluster: patient '+pname+', region '+region
 
-    JOBSCRIPT = JOBDIR+'website/store_precompiled_alignments.py'
+    JOBSCRIPT = JOBDIR+'website/store_haplotype_alignments_trees.py'
     cluster_time = '23:59:59'
     vmem = '8G'
 

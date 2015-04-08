@@ -68,7 +68,7 @@ def read_json(file_name):
         with open(file_name, 'r') as infile:
             data = json.load(infile)
     except IOError:
-        print("Cannot open "+file_name)
+        raise IOError("Cannot open "+file_name)
     return data
 
 

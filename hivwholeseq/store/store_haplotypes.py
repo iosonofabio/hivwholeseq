@@ -72,11 +72,16 @@ if __name__ == '__main__':
                                                                    filters=filters,
                                                                    VERBOSE=VERBOSE)
 
+            # Filter out time points with no counts at all
+            indt = hct.sum(axis=1) >= 1
+            ind = np.array(ind, int)[indt].tolist()
+            hct = hct[indt]
+
             # Filter out tiny-frequency variants
             hft = (1.0 * hct.T / hct.sum(axis=1)).T
             ind_seqs = (hft > freqmin).any(axis=0)
-            hct = hct[:, ind_seqs]
-            hft = hft[:, ind_seqs]
+            hct = hct.T[ind_seqs].T
+            hft = hft.T[ind_seqs].T
             seqs = seqs[ind_seqs]
 
             # Align sequences

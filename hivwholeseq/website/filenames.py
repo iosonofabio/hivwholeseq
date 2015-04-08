@@ -27,13 +27,6 @@ def get_sample_table_filename(pname):
     return filename
 
 
-def get_consensi_tree_filename(pname, fragment, format='newick'):
-    '''Get the newick filename of a consensus tree'''
-    filename = 'consensi_tree_'+pname+'_'+fragment+'.'+format
-    filename = get_foldername('trees')+filename
-    return filename
-
-
 def get_tree_figure_filename(pname, region, format='svg'):
     '''Get filename of the example tree for the patient page'''
     filename = 'tree_'+pname+'_'+region+'_example.'+format
@@ -41,9 +34,30 @@ def get_tree_figure_filename(pname, region, format='svg'):
     return filename
 
 
+def get_consensi_tree_filename(pname, fragment, format='json'):
+    '''Get the filename of a consensus tree'''
+    filename = 'consensi_tree_'+pname+'_'+fragment+'.'+format
+    filename = get_foldername('trees')+filename
+    return filename
+
+
 def get_consensi_alignment_filename(pname, fragment, format='fasta'):
-    '''Get the newick filename of a consensus tree'''
+    '''Get the filename of a consensus alignment'''
     filename = 'consensi_alignment_'+pname+'_'+fragment+'.'+format
+    filename = get_foldername('alignments')+filename
+    return filename
+
+
+def get_haplotype_tree_filename(pname, fragment, format='json'):
+    '''Get the filename of a haplotype tree'''
+    filename = 'haplotype_tree_'+pname+'_'+fragment+'.'+format
+    filename = get_foldername('trees')+filename
+    return filename
+
+
+def get_haplotype_alignment_filename(pname, fragment, format='fasta'):
+    '''Get the filename of a haplotype alignment'''
+    filename = 'haplotype_alignment_'+pname+'_'+fragment+'.'+format
     filename = get_foldername('alignments')+filename
     return filename
 
@@ -179,11 +193,4 @@ def get_ntemplates_filename(pname):
     '''Get the filename of the template numbers'''
     filename = 'ntemplates_'+pname+'.dat'
     filename = get_foldername('physiological')+filename
-    return filename
-
-
-def get_precompiled_alignments_filename(pname, region):
-    '''Get the filename of a precompiled alignment'''
-    filename = 'alignments_'+pname+'_'+region+'.zip'
-    filename = get_foldername('alignments')+filename
     return filename

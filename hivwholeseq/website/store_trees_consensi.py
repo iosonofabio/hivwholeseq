@@ -30,9 +30,44 @@ refnames = ['LAI-III']
 # Script
 if __name__ == '__main__':
 
-    patients = load_patients()
 
-    # Patient by patient
+    # GLOABL CONSENSI TREES
+    print 'All patients'
+    refseq = load_custom_reference('HXB2', 'gb')
+    regions = ([fea.id for fea in refseq.features if len(fea.location.parts) == 1] +
+               ['F'+str(i) for i in xrange(1, 7)])
+
+    for region in regions:
+        print region,
+        fn = gfn_in('all', region, format='json')
+        if not os.path.isfile(fn):
+            print 'SKIP'
+            continue
+
+        # We need to reroot it between the subtypes
+        from hivwholeseq.utils.generic import read_json
+        from hivwholeseq.utils.tree import tree_from_json, tree_to_json
+        tree = tree_from_json(read_json(fn))
+
+        tree.root_at_midpoint()
+
+        tree_json = tree_to_json(tree.root,
+                                 fields=('CD4', 'DSI', 'VL',
+                                         'confidence',
+                                         'muts',
+                                         'patient',
+                                         'sequence',
+                                         'subtype'),
+                                )
+
+        # Write output
+        fn_out = gfn_out('all', region, format='json')
+        write_json(tree_json, fn_out)
+        print 'OK'
+
+
+    # PATIENT CONSENSI TREES
+    patients = load_patients()
     for pname, patient in patients.iterrows():
         patient = Patient(patient)
 
@@ -66,23 +101,3 @@ if __name__ == '__main__':
                                              'subtype'),
                                     )
             write_json(tree_json, fn_out, indent=1)
-
-
-    print 'All patients'
-
-    refseq = load_custom_reference('HXB2', 'gb')
-    regions = ([fea.id for fea in refseq.features if len(fea.location.parts) == 1] +
-               ['F'+str(i) for i in xrange(1, 7)])
-
-    for region in regions:
-        print region,
-        fn = gfn_in('all', region, format='json')
-        if not os.path.isfile(fn):
-            print 'SKIP'
-            continue
-
-        # Write output
-        fn_out = gfn_out('all', region, format='json')
-        shutil.copy(fn, fn_out)
-
-        print 'OK'
