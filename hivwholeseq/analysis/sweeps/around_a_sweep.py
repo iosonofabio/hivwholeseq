@@ -32,18 +32,27 @@ from hivwholeseq.analysis.mutation_rate.explore_divergence_synonymous import tra
 
 # Globals
 pnames = ['20097']
-regions = ['p17']
+regions = ['p17', 'p24', 'p6', 'p7',
+           'PR', 'RT', 'p15', 'IN',
+           'vif', 'vpu', 'vpr',
+           'gp120', 'gp41',
+           'nef']
 
 
 # Functions
 def collect_data(pnames, regions, VERBOSE=0, plot=False):
     '''Collect data to study allele freqs around sweeps'''
+    from hivwholeseq.reference import load_custom_reference
+    from hivwholeseq.utils.sequence import get_coordinates_genomic_region
+
     regdata = []
     data = []
 
     patients = load_patients()
     if pnames is not None:
         patients = patients.loc[pnames]
+
+    refseq = load_custom_reference('HXB2', 'gb')
 
     for region in regions:
         if VERBOSE >= 1:
@@ -60,7 +69,14 @@ def collect_data(pnames, regions, VERBOSE=0, plot=False):
         conssub = ''
         Ssub = np.zeros(1e4)
 
-        regdata.append({'name': region, 'consensus': conssub, 'S': Ssub, 'L': len(conssub)})
+        if VERBOSE >= 2:
+            print 'Get reference sequence'
+        location = get_coordinates_genomic_region(refseq, region)
+        start = location.nofuzzy_start
+        end = location.nofuzzy_end
+
+        regdata.append({'name': region, 'consensus': conssub, 'S': Ssub,
+                        'location': (start, end), 'L': end - start})
 
         for ipat, (pname, patient) in enumerate(patients.iterrows()):
             pcode = patient.code
@@ -111,7 +127,7 @@ def collect_data(pnames, regions, VERBOSE=0, plot=False):
                        'subtype_to_pat': dict(coomap)}
 
             # Condition on fixation
-            pos_sweeps, inuc_sweeps = ((aft[0] < 0.05) & (aft[-1] > 0.95)).T.nonzero()
+            pos_sweeps, inuc_sweeps = ((aft[0] < 0.05) & (aft > 0.95).any(axis=0)).T.nonzero()
             pos_sweepsl = pos_sweeps.tolist()
 
             # Get all trajectories and then we'll filter by distance from sweeps
@@ -175,7 +191,7 @@ def collect_data(pnames, regions, VERBOSE=0, plot=False):
                     # Get the whole trajectory for plots against time
                     for af, time, nt in izip(aftpos[inuc], timespos, ntpos):
                         data.append((region, pcode,
-                                     posdna, pos_sub,
+                                     posdna, pos_sub, pos_sub+start,
                                      anc, nuc, mut,
                                      codanc, codder,
                                      mutclass, trclass,
@@ -187,7 +203,7 @@ def collect_data(pnames, regions, VERBOSE=0, plot=False):
     if len(data):
         data = pd.DataFrame(data=data,
                             columns=['region', 'pcode',
-                                     'posdna', 'possub',
+                                     'posdna', 'possub', 'pos_HXB2',
                                      'anc', 'der', 'mut',
                                      'codanc', 'codder',
                                      'class', 'tr',
@@ -199,6 +215,15 @@ def collect_data(pnames, regions, VERBOSE=0, plot=False):
     regdata = pd.DataFrame(regdata).set_index('name', drop=False)
 
     return data, regdata
+
+
+def add_min_distance(data, pos, VERBOSE=0, attrname='dmin'):
+    '''Add minimal distance from some positions (e.g. sweeps)'''
+    data[attrname] = np.inf
+    for p in pos:
+        data[attrname] = np.minimum(data[attrname],
+                                    np.abs(data['pos_HXB2'] - p))
+
 
 
 
@@ -226,7 +251,11 @@ if __name__ == '__main__':
 
     data, regdata = collect_data(pnames, regions, VERBOSE=VERBOSE, plot=plot)
 
-    pos_sweeps = np.unique(data['posdna'].loc[data['sweep']])
+    pos_sweeps = np.unique(data.loc[data['sweep'] == True, 'pos_HXB2'])
+    add_min_distance(data, pos_sweeps, VERBOSE=VERBOSE)
+
+
+    sys.exit()
 
     # Monitor hitchhikers
     dmax = 80

@@ -579,7 +579,13 @@ class Patient(pd.Series):
             for seq, count in haplo.iteritems():
                 hct[seqs_set.index(seq), i] = count
 
-        seqs_set = np.array(seqs_set, 'S'+str(np.max(map(len, seqs_set))))
+        # Sometimes you collect no haplotype at all (too wide or unlucky regions)
+        if not len(seqs_set):
+            L = 1
+        else:
+            L = np.max(map(len, seqs_set))
+
+        seqs_set = np.array(seqs_set, 'S'+str(L))
 
         return (hct.T, ind, seqs_set)
 

@@ -152,15 +152,22 @@ def collect_data(pnames, regions, VERBOSE=0):
                         except ValueError:
                             continue
 
-                        div[('population', 'all')].append(afs[ider, posdna])
-                        div[('consensus', 'all')].append(der == consmt[posdna])
-                        div[('population', mutclass)].append(afs[ider, posdna])
-                        div[('consensus', mutclass)].append(der == consmt[posdna])
+                        div[('divergence', 'population', 'all')].append(afs[ider, posdna])
+                        div[('divergence', 'consensus', 'all')].append(der == consmt[posdna])
+                        div[('divergence', 'population', mutclass)].append(afs[ider, posdna])
+                        div[('divergence', 'consensus', mutclass)].append(der == consmt[posdna])
 
-                for (ctype, cl), tmp in div.iteritems():
+                        # Diversity: <sum(i e ACGT) x_i(1-x_i)>
+                        # averaged over positions
+                        tmp = afs[ider, posdna] * (1.0 - afs[ider, posdna])
+                        div[('diversity', 'population', 'all')].append(tmp)
+                        div[('diversity', 'population', mutclass)].append(tmp)
+
+
+                for (obs, ctype, cl), tmp in div.iteritems():
                     # NOTE: We count every derived allele, so each site contributes
-                    # with three alleles. Divergence, however, is defined per site,
-                    # so we sum over the three alleles
+                    # with three alleles. Divergence and diversity, however, are
+                    # defined per site, so we sum over the three alleles
                     divtmp = np.mean(tmp) * 3
                     datum = {'patient': patient.code,
                              'region': region,
@@ -169,6 +176,7 @@ def collect_data(pnames, regions, VERBOSE=0):
                              'ctype': ctype,
                              'div': divtmp,
                              'class': cl,
+                             'obs': obs,
                             }
                     data.append(datum)
 
@@ -191,27 +199,47 @@ def plot_data(data, VERBOSE=0):
 
     cls = np.unique(data['class'])
 
+    fig, axg = plt.subplots(len(reg_groups), len(cls),
+                            figsize=(2 + 4 * len(cls), 4 * len(reg_groups)),
+                            sharey=True, sharex=True)
 
-    for reg_group in reg_groups:
-        fig, axs = plt.subplots(1, len(cls),
-                                figsize=(2 + 4 * len(cls), 5),
-                                sharey=True)
-        fig.suptitle(', '.join(reg_group))
+    fig.text(0.41, 0.035, 'Time [days from infection]', fontsize=16)
+    fig.text(0.035, 0.6, 'Divergence [changes per site]', rotation=90, ha='center', fontsize=16)
 
-        axs[1].set_xlabel('Time [days from infection]')
-        axs[0].set_ylabel('Divergence [changes per site]')
+    if len(cls) == 2:
+        fig.text(0.32, 0.967, 'nonsyn', ha='center', fontsize=16)
+        fig.text(0.75, 0.967, 'syn', ha='center', fontsize=16)
+    else:
+        fig.text(0.22, 0.967, 'all', ha='center', fontsize=16)
+        fig.text(0.53, 0.967, 'nonsyn', ha='center', fontsize=16)
+        fig.text(0.82, 0.967, 'syn', ha='center', fontsize=16)
+
+
+    # Bin data in time
+    from hivwholeseq.utils.pandas import add_binned_column
+    _, times = add_binned_column(data, 'tbin', 'time',
+                                 bins=np.linspace(0, 3300, 8),
+                                 clip=True)
+    data.loc[:, 'tbinned'] = times[data['tbin']]
+
+    for irow, (axs, reg_group) in enumerate(izip(axg, reg_groups)):
+        axs[-1].set_ylabel(', '.join(reg_group), rotation=270, labelpad=27,
+                           fontsize=16)
+        axs[-1].yaxis.set_label_position("right")
         for ax in axs:
             ax.grid(True)
-        
-        datap = (data
-                 .loc[data['region'].isin(reg_group)]
-                 .groupby(['ctype', 'class', 'patient']))
 
-        for (ctype, cl, pcode), datum in datap:
-            if ctype == 'consensus':
+        def plot_single(obs, ctype, cl, pcode, datum, groupby='time'):
+            '''Plot single curve'''
+            if obs == 'diversity':
                 ls = '-'
+                dashes = [8, 4, 2, 4, 2, 4]
+            elif ctype == 'consensus':
+                ls = '-'
+                dashes = []
             else:
                 ls = '--'
+                dashes = [8, 6]
 
             if cl == 'all':
                 ax = axs[-3]
@@ -225,27 +253,45 @@ def plot_data(data, VERBOSE=0):
             else:
                 label = ''
 
-            datump = datum.groupby('time', as_index=False).mean()
-            x = datump['time'] - datump['t0']
+            if pcode in pcodes:
+                color = cm.jet(1.0 * pcodes.index(pcode) / len(pcodes))
+                alpha = 0.2
+            else:
+                color = 'k'
+                alpha = 1.0
+
+            datump = datum.groupby(groupby, as_index=False).mean()
+            x = datump[groupby]
             y = datump['div']
 
             ax.plot(x, y,
                     ls=ls,
+                    dashes=dashes,
                     lw=2,
-                    color=cm.jet(1.0 * pcodes.index(pcode) / len(pcodes)),
+                    color=color,
+                    alpha=alpha,
                     label=label,
                   )
-            ax.set_title(cl)
-
-        axs[0].legend(loc=2, ncol=2, fontsize=14, title='Patients:')
-
-        plt.tight_layout(rect=(0, 0, 1, 0.95))
         
+        # Plot single patients
+        datap = (data
+                 .loc[data['region'].isin(reg_group)]
+                 .groupby(['obs', 'ctype', 'class', 'patient']))
+        for (obs, ctype, cl, pcode), datum in datap:
+            plot_single(obs, ctype, cl, pcode, datum)
 
-    return datump
+        # Plot average
+        datap = (data
+                 .loc[data['region'].isin(reg_group)]
+                 .groupby(['obs', 'ctype', 'class']))
+        for (obs, ctype, cl), datum in datap:
+            plot_single(obs, ctype, cl, 'avg', datum, groupby='tbinned')
 
+        if irow == 0:
+            axs[-2].legend(loc=2, ncol=2, fontsize=14, title='Patients:')
 
-
+        
+    plt.tight_layout(rect=(0.05, 0.05, 0.98, 0.97))
 
 
 

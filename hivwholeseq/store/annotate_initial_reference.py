@@ -45,7 +45,7 @@ def get_edges_fragments(patient, VERBOSE=0):
     return edges
 
 
-def annotate_sequence(seqrecord, additional_edges={}, VERBOSE=0):
+def annotate_sequence(seqrecord, additional_edges={}, additional_features=['chunk'], VERBOSE=0):
     '''Annotate a consensus with the genes and stuff (in place)'''
     # TODO: what do we do with genes that do not start/end where they are
     # supposed to? Do we follow biology and track their new locations?
@@ -57,7 +57,8 @@ def annotate_sequence(seqrecord, additional_edges={}, VERBOSE=0):
                  'RNA structure': RNA_structure_edges,
                  'other': other_edges}
     edge_dict.update(additional_edges)
-    features = edge_dict.keys() + ['protein']
+    additional_features = ['protein'] + additional_features
+    features = edge_dict.keys() + additional_features
 
     if VERBOSE:
         print 'Features:', ', '.join(features)
@@ -123,29 +124,36 @@ def annotate_sequence(seqrecord, additional_edges={}, VERBOSE=0):
             feature = SeqFeature(location, type=feature_type, id=name, strand=1)
             seqrecord.features.append(feature)
 
-    # Add proteins
+    # Add proteins and other features from HXB2
     from operator import attrgetter
     from seqanpy import align_overlap
-    from hivwholeseq.genome_info import proteins
+    from hivwholeseq.genome_info import proteins, chunks
     from hivwholeseq.reference import load_custom_reference
+    additional_features_dict = {}
+    if 'protein' in additional_features:
+        additional_features_dict['protein'] = proteins
+    if 'chunk' in additional_features:
+        additional_features_dict['chunk'] = chunks
+
     ref_ann = load_custom_reference('HXB2', 'gb')
-    for prot in proteins:
-        if VERBOSE >= 2:
-            print prot,
+    for feagroup, additional_features_grp in additional_features_dict.iteritems():
+        for feaname in additional_features_grp:
+            if VERBOSE >= 2:
+                print feaname,
 
-        protfea = ref_ann.features[map(attrgetter('id'), ref_ann.features).index(prot)]
-        protseq = protfea.extract(ref_ann)
-        (score, ali1, ali2) = align_overlap(seqrecord, protseq, score_gapopen=-20)
-        pr_start = len(ali2) - len(ali2.lstrip('-'))
-        pr_end = len(ali2.rstrip('-'))
-        pr_end -= ali1[pr_start: pr_end].count('-')
+            fea = ref_ann.features[map(attrgetter('id'), ref_ann.features).index(feaname)]
+            seq = fea.extract(ref_ann)
+            (score, ali1, ali2) = align_overlap(seqrecord, seq, score_gapopen=-20)
+            start = len(ali2) - len(ali2.lstrip('-'))
+            end = len(ali2.rstrip('-'))
+            end -= ali1[start: end].count('-')
 
-        location = FeatureLocation(pr_start, pr_end)
-        if VERBOSE >= 2:
-            print 'found:', location
+            location = FeatureLocation(start, end)
+            if VERBOSE >= 2:
+                print 'found:', location
 
-        feature = SeqFeature(location, type='protein', id=prot, strand=1)
-        seqrecord.features.append(feature)
+            feature = SeqFeature(location, type=feagroup, id=feaname, strand=1)
+            seqrecord.features.append(feature)
 
 
 def compare_annotations(refseq_new, refseq_old, VERBOSE=0):
@@ -182,9 +190,7 @@ def compare_annotations(refseq_new, refseq_old, VERBOSE=0):
             if VERBOSE >= 1:
                 print fn, 'coordinates do not correspond', locold, locnew
             alert = True
-
-        if fn == 'gp120':
-            alert = False
+            break
 
     if alert:
         raise ValueError('Not all features are fine.')

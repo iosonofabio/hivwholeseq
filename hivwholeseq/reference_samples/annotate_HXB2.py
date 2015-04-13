@@ -43,14 +43,21 @@ coordinates = {'gene': {'gag': [(789, 2292)],
                                  "LTR3'": [(9085, 9719)],
                                  'RRE': None,
                                 },
-               'other': {'V1': [(6614, 6692)],
-                         'V2': [(6692, 6812)],
+               'other': {'V1': [(6615, 6692)],
+                         'V2': [(6693, 6812)],
                          # For V3 Jan wants a specific chunk
                          'V3': None,
-                         'V4': [(7376, 7478)],
-                         'V5': [(7601, 7634)],
+                         'V4': [(7377, 7478)],
+                         'V5': [(7602, 7634)],
                          'psi': None,
                          'env peptide': None},
+               'chunk': {'RT1': [(2549, 2549 + 351)],
+                         'RT2': [(2549 + 351,  2549 + 2 * 351)],
+                         'RT3': [(2549 + 2 * 351,  2549 + 3 * 351)],
+                         'RT4': [(2549 + 3 * 351,  3869)],
+                         'IN1': [(4229, 4229 + 351)],
+                         'IN2': [(4229 + 351, 4229 + 2 * 351)],
+                         'IN3': [(4229 + 2 * 351, 5096)]},
               }
 
 def get_coordinates_feature(smat, name):
@@ -135,6 +142,7 @@ if __name__ == '__main__':
         feaseq = fea.extract(seqnew)
         feaoldseq = feaold.extract(seqold)
 
+        # NOTE: add an if check here in case of misannotations
         assert ''.join(feaseq) == ''.join(feaoldseq)
 
 

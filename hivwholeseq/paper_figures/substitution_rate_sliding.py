@@ -22,7 +22,9 @@ from hivwholeseq.paper_figures.plots import plot_substitution_rate_sliding
 
 # Globals
 pnames = ['20097', '15363', '15823', '15376', '20529', '9669', '15241', '15319']
-regions = ['p17', 'p24', 'PR', 'RT', 'IN', 'vif', 'vpr', 'vpu', 'V3', 'RRE', 'gp41', 'nef']
+regions = ["LTR5'", 'p17', 'p24', 'PR', 'RT', 'IN', 'vif', 'vpr', 'vpu', 'V3',
+           'RRE', 'gp41', 'nef',
+           "LTR3'"]
 
 
 
@@ -64,11 +66,11 @@ if __name__ == '__main__':
 
     # Plot just the slope
     filename = foldername+'substitution_rates_sliding'
-    for ext in ['png', 'pdf', 'svg']:
-        plot_substitution_rate_sliding(datap,
-                                       regions,
-                                       VERBOSE=VERBOSE,
-                                       savefig=filename+'.'+ext)
+    #for ext in ['png', 'pdf', 'svg']:
+    #    plot_substitution_rate_sliding(datap,
+    #                                   regions,
+    #                                   VERBOSE=VERBOSE,
+    #                                   savefig=filename+'.'+ext)
 
     plot_substitution_rate_sliding(datap, regions, VERBOSE=VERBOSE)
 

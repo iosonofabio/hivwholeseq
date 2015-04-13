@@ -24,9 +24,11 @@ def add_binned_column(data, name, column, bins=10, clip=False):
     '''
     if np.isscalar(bins):
         bins = np.unique(np.array(data.loc[:, column].quantile(q=np.linspace(0, 1, bins + 1))))
-    data[name] = pd.cut(data.loc[:, column], bins=bins, include_lowest=True, labels=False)
+    
+    tmp = data.loc[:, column]
     if clip:
-        data[name] = data[name].clip(0, len(bins) - 2)
+        tmp = tmp.clip(bins[0], bins[-1])
+    data.loc[:, name] = pd.cut(data.loc[:, column], bins=bins, include_lowest=True, labels=False)
 
     binsc = 0.5 * (bins[1:] + bins[:-1])
     return bins, binsc

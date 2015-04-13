@@ -16,6 +16,7 @@ from Bio import Phylo
 
 from hivwholeseq.utils.generic import mkdirs
 from hivwholeseq.utils.mapping import align_muscle
+from hivwholeseq.utils.argparse import PatientsAction
 from hivwholeseq.patients.patients import load_patients, Patient
 
 
@@ -29,7 +30,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Store local haplotypes',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
-    parser.add_argument('--patients', nargs='+',
+    parser.add_argument('--patients', action=PatientsAction,
                         help='Patients to analyze')
     parser.add_argument('--regions', nargs='+', required=True,
                         help='Genomic regions (e.g. V3 IN)')

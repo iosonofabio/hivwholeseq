@@ -17,7 +17,7 @@ from Bio import AlignIO
 
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.utils.tree import build_tree_fasttree
-from hivwholeseq.utils.argparse import RoiAction
+from hivwholeseq.utils.argparse import PatientsAction
 from hivwholeseq.store.store_tree_consensi import annotate_tree
 from hivwholeseq.utils.nehercook.ancestral import ancestral_sequences
 from hivwholeseq.utils.tree import tree_to_json
@@ -171,17 +171,14 @@ def extract_alignment(tree, VERBOSE=0):
 # Script
 if __name__ == '__main__':
 
-    # Parse input args
     parser = argparse.ArgumentParser(description='Get local trees',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
-    parser.add_argument('--patients', nargs='+',
+    parser.add_argument('--patients', action=PatientsAction,
                         help='Patients to analyze')
-    parser.add_argument('--region', required=True,
+    parser.add_argument('--regions', required=True, nargs='+',
                         help='Genomic region (e.g. IN or V3)')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-4]')
-    parser.add_argument('--maxreads', type=int, default=-1,
-                        help='Number of reads analyzed per sample')
     parser.add_argument('--plot', action='store_true',
                         help='Plot local haplotype trajectories')
     parser.add_argument('--freqmin', type=int, default=0.01,
@@ -191,9 +188,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     pnames = args.patients
-    region = args.region
+    regions = args.regions
     VERBOSE = args.verbose
-    maxreads = args.maxreads
     use_plot = args.plot
     freqmin = args.freqmin
     use_save = args.save
@@ -202,95 +198,103 @@ if __name__ == '__main__':
     if pnames is not None:
         patients = patients.loc[pnames]
 
-    for pname, patient in patients.iterrows():
-        patient = Patient(patient)
+    for region in regions:
+        for pname, patient in patients.iterrows():
+            patient = Patient(patient)
 
-        if VERBOSE >= 1:
-            print pname
-    
-        if VERBOSE >= 2:
-            print 'Get haplotypes'
-
-        (hct, ind, alim) = patient.get_haplotype_count_trajectory(region, aligned=True)
+            if VERBOSE >= 1:
+                print pname, region
         
-        times = patient.times[ind]
-        hct = hct.T
-        hft = 1.0 * hct / hct.sum(axis=0)
+            if VERBOSE >= 2:
+                print 'Get haplotypes'
 
-        # Duplicate sequences for tree
-        ali = expand_annotate_alignment(alim, hft, hct, times, freqmin=freqmin, VERBOSE=VERBOSE)
-
-        # Exclude too rare haplos
-        indseq = (hft >= freqmin).any(axis=1)
-        alim = alim[indseq]
-        hft = hft[indseq]
-
-        if VERBOSE >= 2:
-            print 'Build local tree'
-        tree = build_tree_fasttree(ali, VERBOSE=VERBOSE)
-
-        if VERBOSE >= 2:
-            print 'Infer ancestral sequences'
-        a = ancestral_sequences(tree, ali, alphabet='ACGT-N', copy_tree=False,
-                                attrname='sequence', seqtype='str')
-        a.calc_ancestral_sequences()
-        a.cleanup_tree()
-
-        if VERBOSE >= 2:
-            print 'Annotate with time and frequency'
-        annotate_tree_time_freq_count(tree, ali)
-
-        # FIXME: for the amino acid mutations, we must make sure that we are
-        # codon aligned (with codon_align). The problem is that sometimes
-        # V3 has gaps of 1-2 nucleotides... at frequency 10%?!
-        # NOTE: this might be due to compensating indels right outside V3,
-        # as seen in cross-sectional alignments
-        if VERBOSE >= 2:
-            print 'Annotate tree'
-        annotate_tree(patient, tree, VERBOSE=VERBOSE)
+            (hct, ind, alim) = patient.get_haplotype_count_trajectory(region, aligned=True)
             
-        if VERBOSE >= 2:
-            print 'Ladderize tree'
-        tree.ladderize()
+            if len(ind) == 0:
+                if VERBOSE >= 2:
+                    print 'Not time points found. Skip'
+                continue
 
-        if use_save:
-            if VERBOSE >= 2:
-                print 'Save tree (JSON)'
-            fn = patient.get_local_tree_filename(region, format='json')
-            tree_json = tree_to_json(tree.root,
-                                     fields=('DSI', 'sequence',
-                                             'muts',
-                                             'VL', 'CD4',
-                                             'frequency',
-                                             'count',
-                                             'confidence'),
-                                    )
-            write_json(tree_json, fn)
+            times = patient.times[ind]
+            hct = hct.T
+            hft = 1.0 * hct / hct.sum(axis=0)
 
-        if VERBOSE >= 2:
-            print 'Extract alignment from tree (so with duplicates)'
-        ali_tree = extract_alignment(tree, VERBOSE=VERBOSE)
+            # Duplicate sequences for tree
+            ali = expand_annotate_alignment(alim, hft, hct, times, freqmin=freqmin, VERBOSE=VERBOSE)
 
-        if use_save:
-            if VERBOSE >= 2:
-                print 'Save alignment from tree'
-            fn = patient.get_haplotype_alignment_filename(region, format='fasta')
-            AlignIO.write(ali_tree, fn, 'fasta')
-
-
-        if use_plot:
-            annotate_tree_for_plot(tree, minfreq=0.1)
+            # Exclude too rare haplos
+            indseq = (hft >= freqmin).any(axis=1)
+            alim = alim[indseq]
+            hft = hft[indseq]
 
             if VERBOSE >= 2:
-                print 'Plot'
-            fig, ax = plt.subplots()
-            ax.set_title(patient.code+', '+region)
-            
-            Phylo.draw(tree, axes=ax, do_show=False, label_func=attrgetter('label'),
-                       show_confidence=False)
-            ax.grid(True)
-            ax.set_ylim(ax.get_ylim()[0] * 1.04, -ax.get_ylim()[0] * 0.04)
-            
-            plt.tight_layout()
-            plt.ion()
-            plt.show()
+                print 'Build local tree'
+            tree = build_tree_fasttree(ali, VERBOSE=VERBOSE)
+
+            if VERBOSE >= 2:
+                print 'Infer ancestral sequences'
+            a = ancestral_sequences(tree, ali, alphabet='ACGT-N', copy_tree=False,
+                                    attrname='sequence', seqtype='str')
+            a.calc_ancestral_sequences()
+            a.cleanup_tree()
+
+            if VERBOSE >= 2:
+                print 'Annotate with time and frequency'
+            annotate_tree_time_freq_count(tree, ali)
+
+            # FIXME: for the amino acid mutations, we must make sure that we are
+            # codon aligned (with codon_align). The problem is that sometimes
+            # V3 has gaps of 1-2 nucleotides... at frequency 10%?!
+            # NOTE: this might be due to compensating indels right outside V3,
+            # as seen in cross-sectional alignments
+            if VERBOSE >= 2:
+                print 'Annotate tree'
+            annotate_tree(patient, tree, VERBOSE=VERBOSE)
+                
+            if VERBOSE >= 2:
+                print 'Ladderize tree'
+            tree.ladderize()
+
+            if use_save:
+                if VERBOSE >= 2:
+                    print 'Save tree (JSON)'
+                fn = patient.get_local_tree_filename(region, format='json')
+                tree_json = tree_to_json(tree.root,
+                                         fields=('DSI', 'sequence',
+                                                 'muts',
+                                                 'VL', 'CD4',
+                                                 'frequency',
+                                                 'count',
+                                                 'confidence'),
+                                        )
+                write_json(tree_json, fn)
+
+            if VERBOSE >= 2:
+                print 'Extract alignment from tree (so with duplicates)'
+            ali_tree = extract_alignment(tree, VERBOSE=VERBOSE)
+
+            if use_save:
+                if VERBOSE >= 2:
+                    print 'Save alignment from tree'
+                fn = patient.get_haplotype_alignment_filename(region, format='fasta')
+                AlignIO.write(ali_tree, fn, 'fasta')
+
+
+            if use_plot:
+                annotate_tree_for_plot(tree, minfreq=0.1)
+
+                if VERBOSE >= 2:
+                    print 'Plot'
+                fig, ax = plt.subplots()
+                ax.set_title(patient.code+', '+region)
+                
+                Phylo.draw(tree, axes=ax, do_show=False, label_func=attrgetter('label'),
+                           show_confidence=False)
+                ax.grid(True)
+                ax.set_ylim(ax.get_ylim()[0] * 1.04, -ax.get_ylim()[0] * 0.04)
+                
+                plt.tight_layout()
+
+    if use_plot:
+        plt.ion()
+        plt.show()

@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from hivwholeseq.utils.generic import mkdirs
 
 from hivwholeseq.paper_figures.filenames import get_figure_folder
-from hivwholeseq.paper_figures.plots import plot_divergence_cons_pop
+from hivwholeseq.paper_figures.plots import plot_divergence_cons_pop_diversity
 
 
 # Globals
@@ -33,10 +33,10 @@ if __name__ == '__main__':
     foldername = get_figure_folder(username, 'first')
     fn_data = foldername+'data/'
     mkdirs(fn_data)
-    fn_data = fn_data + 'divergence_cons_pop.pickle'
+    fn_data = fn_data + 'divergence_cons_pop_diversity.pickle'
 
     if not os.path.isfile(fn_data):
-        from hivwholeseq.analysis.divdiv.divergence_consensus_population import (
+        from hivwholeseq.analysis.divdiv.divergence_diversity import (
             collect_data)
 
         if VERBOSE >= 1:
@@ -51,13 +51,13 @@ if __name__ == '__main__':
         data = pd.read_pickle(fn_data)
 
     # Plot
-    filename = foldername+'divergence_consensus_population'
+    filename = foldername+'divergence_consensus_population_diversity'
     for ext in ['png', 'pdf', 'svg']:
-        plot_divergence_cons_pop(data,
-                                 VERBOSE=VERBOSE,
-                                 savefig=filename+'.'+ext)
+        plot_divergence_cons_pop_diversity(data,
+                                           VERBOSE=VERBOSE,
+                                           savefig=filename+'.'+ext)
 
-    plot_divergence_cons_pop(data, VERBOSE=VERBOSE)
+    plot_divergence_cons_pop_diversity(data, VERBOSE=VERBOSE)
 
 
 

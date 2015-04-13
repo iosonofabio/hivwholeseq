@@ -1013,11 +1013,24 @@ def plot_divergence_cons_pop(data, VERBOSE=0, savefig=False,
                             figsize=(2 + 4 * len(cls), 4 * len(reg_groups)),
                             sharey=True, sharex=True)
 
-    fig.text(0.41, 0.035, 'Time [days from infection]', fontsize=16)
+    fig.text(0.41, 0.035, 'Time [months from infection]', fontsize=16)
     fig.text(0.035, 0.6, 'Divergence [changes per site]', rotation=90, ha='center', fontsize=16)
-    fig.text(0.32, 0.967, 'nonsyn', ha='center', fontsize=16)
-    fig.text(0.75, 0.967, 'syn', ha='center', fontsize=16)
 
+    if len(cls) == 2:
+        fig.text(0.32, 0.967, 'nonsyn', ha='center', fontsize=16)
+        fig.text(0.75, 0.967, 'syn', ha='center', fontsize=16)
+    else:
+        fig.text(0.22, 0.967, 'all', ha='center', fontsize=16)
+        fig.text(0.53, 0.967, 'nonsyn', ha='center', fontsize=16)
+        fig.text(0.82, 0.967, 'syn', ha='center', fontsize=16)
+ 
+
+    # Bin data in time
+    from ..utils.pandas import add_binned_column
+    _, times = add_binned_column(data, 'tbin', 'time',
+                                 bins=np.linspace(0, 3300, 8),
+                                 clip=True)
+    data.loc[:, 'tbinned'] = times[data['tbin']]
 
     for irow, (axs, reg_group) in enumerate(izip(axg, reg_groups)):
         axs[-1].set_ylabel(', '.join(reg_group), rotation=270, labelpad=27,
@@ -1026,11 +1039,8 @@ def plot_divergence_cons_pop(data, VERBOSE=0, savefig=False,
         for ax in axs:
             ax.grid(True)
         
-        datap = (data
-                 .loc[data['region'].isin(reg_group)]
-                 .groupby(['ctype', 'class', 'patient']))
-
-        for (ctype, cl, pcode), datum in datap:
+        def plot_single(ctype, cl, pcode, datum, groupby='time'):
+            '''Plot single curve'''
             if ctype == 'consensus':
                 ls = '-'
             else:
@@ -1048,16 +1058,39 @@ def plot_divergence_cons_pop(data, VERBOSE=0, savefig=False,
             else:
                 label = ''
 
-            datump = datum.groupby('time', as_index=False).mean()
-            x = datump['time']
+            if pcode in pcodes:
+                color = cm.jet(1.0 * pcodes.index(pcode) / len(pcodes))
+                alpha = 0.4
+            else:
+                color = 'k'
+                alpha = 1.0
+
+            datump = datum.groupby(groupby, as_index=False).mean()
+            x = datump[groupby] / 30.5
             y = datump['div']
 
             ax.plot(x, y,
                     ls=ls,
                     lw=2,
-                    color=cm.jet(1.0 * pcodes.index(pcode) / len(pcodes)),
+                    alpha=alpha,
+                    color=color,
                     label=label,
                   )
+
+
+        # Plot single patients
+        datap = (data
+                 .loc[data['region'].isin(reg_group)]
+                 .groupby(['ctype', 'class', 'patient']))
+        for (ctype, cl, pcode), datum in datap:
+            plot_single(ctype, cl, pcode, datum)
+
+        # Plot average over patients
+        datap = (data
+                 .loc[data['region'].isin(reg_group)]
+                 .groupby(['ctype', 'class']))
+        for (ctype, cl), datum in datap:
+            plot_single(ctype, cl, 'avg', datum, groupby='tbinned')
 
         if irow == 0:
             axs[-2].legend(loc=2, ncol=2, fontsize=14, title='Patients:')
@@ -1084,3 +1117,151 @@ def plot_divergence_cons_pop(data, VERBOSE=0, savefig=False,
     else:
         plt.ion()
         plt.show()
+
+
+def plot_divergence_cons_pop_diversity(data, VERBOSE=0, savefig=False,
+                                       include_all=False):
+    '''Plot divergence'''
+    from itertools import izip
+
+    sns.set_style('darkgrid')
+
+    if not include_all:
+        data = data.loc[data['class'] != 'all']
+
+    # NOTE: gp41 has overlaps with tat/rev (hard to tell syn/nonsyn)
+    # NOTE: gp120 has the V loops that are hard to call syn/nonsyn
+    reg_groups = [['PR', 'IN', 'p15', 'RT'],
+                  ['p17', 'p24', 'p6', 'p7'],
+                  ['vif', 'vpu', 'vpr', 'nef'],
+                 ]
+
+    pcodes = np.unique(data['patient']).tolist()
+    pcodes.sort(key=lambda x: int(x[1:]))
+
+    cls = np.unique(data['class'])
+
+    fig, axg = plt.subplots(len(reg_groups), len(cls),
+                            figsize=(2 + 4 * len(cls), 4 * len(reg_groups)),
+                            sharey=True, sharex=True)
+
+    fig.text(0.41, 0.035, 'Time [months from infection]', fontsize=16)
+    fig.text(0.035, 0.6, 'Divergence [changes per site]', rotation=90, ha='center', fontsize=16)
+
+    if len(cls) == 2:
+        fig.text(0.32, 0.967, 'nonsyn', ha='center', fontsize=16)
+        fig.text(0.75, 0.967, 'syn', ha='center', fontsize=16)
+    else:
+        fig.text(0.22, 0.967, 'all', ha='center', fontsize=16)
+        fig.text(0.53, 0.967, 'nonsyn', ha='center', fontsize=16)
+        fig.text(0.82, 0.967, 'syn', ha='center', fontsize=16)
+
+    # Bin data in time
+    from ..utils.pandas import add_binned_column
+    _, times = add_binned_column(data, 'tbin', 'time',
+                                 bins=np.linspace(0, 3300, 8),
+                                 clip=True)
+    data.loc[:, 'tbinned'] = times[data['tbin']]
+
+    for irow, (axs, reg_group) in enumerate(izip(axg, reg_groups)):
+        axs[-1].set_ylabel(', '.join(reg_group), rotation=270, labelpad=27,
+                           fontsize=16)
+        axs[-1].yaxis.set_label_position("right")
+        for ax in axs:
+            ax.grid(True)
+        
+        def plot_single(obs, ctype, cl, pcode, datum, groupby='time'):
+            '''Plot single curve'''
+            if obs == 'diversity':
+                ls = '-'
+                dashes = [8, 4, 2, 4, 2, 4]
+            elif ctype == 'consensus':
+                ls = '-'
+                dashes = []
+            else:
+                ls = '--'
+                dashes = [8, 6]
+
+            if cl == 'all':
+                ax = axs[-3]
+            elif cl == 'nonsyn':
+                ax = axs[-2]
+            else:
+                ax = axs[-1]
+
+            if (cl == 'nonsyn') and (ctype == 'consensus'):
+                label = pcode
+            elif (cl == 'syn') and (pcode == 'avg'):
+                if obs == 'diversity':
+                    label = 'Diversity'
+                elif ctype == 'consensus':
+                    label = 'Divergence (consensus)'
+                else:
+                    label = 'Divergence (population)'
+            else:
+                label = ''
+
+            if pcode in pcodes:
+                color = cm.jet(1.0 * pcodes.index(pcode) / len(pcodes))
+                alpha = 0.25
+                lw = 1
+            else:
+                color = 'k'
+                alpha = 1.0
+                lw = 2
+
+            datump = datum.groupby(groupby, as_index=False).mean()
+            x = datump[groupby] / 30.5
+            y = datump['div']
+
+            ax.plot(x, y,
+                    ls=ls,
+                    dashes=dashes,
+                    lw=lw,
+                    alpha=alpha,
+                    color=color,
+                    label=label,
+                  )
+
+
+        # Plot single patients
+        datap = (data
+                 .loc[data['region'].isin(reg_group)]
+                 .groupby(['obs', 'ctype', 'class', 'patient']))
+        for (obs, ctype, cl, pcode), datum in datap:
+            plot_single(obs, ctype, cl, pcode, datum)
+
+        # Plot average over patients
+        datap = (data
+                 .loc[data['region'].isin(reg_group)]
+                 .groupby(['obs', 'ctype', 'class']))
+        for (obs, ctype, cl), datum in datap:
+            plot_single(obs, ctype, cl, 'avg', datum, groupby='tbinned')
+
+        if irow == 0:
+            axs[-2].legend(loc=2, ncol=2, fontsize=14, title='Patients:')
+            axs[-1].legend(loc=2, ncol=1, fontsize=14)
+
+
+    for ax in axs:
+        for item in ax.get_xticklabels():
+            item.set_fontsize(16)
+
+    for axs in axg:
+        for item in axs[0].get_yticklabels():
+            item.set_fontsize(16)
+
+    plt.tight_layout(rect=(0.05, 0.05, 0.98, 0.97))
+        
+    if savefig:
+        fig_filename = savefig
+        fig_folder = os.path.dirname(fig_filename)
+
+        mkdirs(fig_folder)
+        fig.savefig(fig_filename)
+        plt.close(fig)
+
+    else:
+        plt.ion()
+        plt.show()
+
