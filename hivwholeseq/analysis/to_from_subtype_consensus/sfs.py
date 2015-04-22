@@ -84,6 +84,8 @@ def collect_data(pnames, regions, VERBOSE=0):
                 print 'Get coordinate map'
             coomap = patient.get_map_coordinates_reference(region, refname=('HXB2', region))
 
+            if VERBOSE >= 2:
+                print 'Get initial consensus'
             icons = patient.get_initial_consensus_noinsertions(aft, VERBOSE=VERBOSE,
                                                                return_ind=True)
             consm = alpha[icons]
@@ -91,9 +93,8 @@ def collect_data(pnames, regions, VERBOSE=0):
             # Get the map as a dictionary from patient to subtype
             coomapd = dict(coomap[:, ::-1])
 
-            # FIXME: deal better with depth (this should be already there?)
-            aft[aft < 2e-3] = 0
-
+            if VERBOSE >= 2:
+                print 'Get alleles'
             for posdna in xrange(aft.shape[-1]):
                 if VERBOSE >= 3:
                     print posdna

@@ -16,7 +16,7 @@ from hivwholeseq.utils.generic import mkdirs
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.patients.filenames import get_consensi_tree_filename as gfn_in
 from hivwholeseq.website.filenames import get_consensi_tree_filename as gfn_out
-from hivwholeseq.utils.tree import tree_to_json
+from hivwholeseq.utils.tree import tree_to_json, correct_minimal_branches
 from hivwholeseq.utils.generic import write_json
 from hivwholeseq.reference import load_custom_reference
 
@@ -48,6 +48,8 @@ if __name__ == '__main__':
         from hivwholeseq.utils.generic import read_json
         from hivwholeseq.utils.tree import tree_from_json, tree_to_json
         tree = tree_from_json(read_json(fn))
+
+        correct_minimal_branches(tree)
 
         tree.root_at_midpoint()
 
@@ -92,6 +94,8 @@ if __name__ == '__main__':
             tree.prune(leaf)
 
             tree.ladderize()
+
+            correct_minimal_branches(tree)
 
             # Write output
             fn_out = gfn_out(patient.code, region, format='json')

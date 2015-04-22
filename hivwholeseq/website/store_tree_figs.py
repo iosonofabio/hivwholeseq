@@ -14,7 +14,8 @@ from matplotlib import cm
 from hivwholeseq.utils.generic import mkdirs
 from hivwholeseq.patients.patients import load_patient
 from hivwholeseq.utils.sequence import align_muscle
-from hivwholeseq.utils.tree import build_tree_fasttree, filter_rare_leaves
+from hivwholeseq.utils.tree import (build_tree_fasttree, filter_rare_leaves,
+                                    correct_minimal_branches)
 
 from hivwholeseq.website.filenames import get_tree_figure_filename
 
@@ -192,11 +193,14 @@ if __name__ == '__main__':
     VERBOSE = 2
 
     for pname in pnames:
+        print pname
 
         patient = load_patient(pname)
         tree = patient.get_local_tree(region)
 
         filter_rare_leaves(tree, cutoff)
+        
+        correct_minimal_branches(tree)
 
         data = compress_data(tree, patient.code, region)
             

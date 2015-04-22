@@ -48,33 +48,36 @@ def load_data(fn):
 if __name__ == '__main__':
 
     VERBOSE = 2
+    regions = ['V3', 'RT3']
 
     username = os.path.split(os.getenv('HOME'))[-1]
     foldername = get_figure_folder(username, 'first')
-    fn_data = foldername+'data/'
-    mkdirs(fn_data)
-    fn_data = fn_data + 'haplotype_tree_example.pickle'
+    fd_data = foldername+'data/'
+    mkdirs(fd_data)
 
-    if not os.path.isfile(fn_data):
-        pname = '9669'
-        region = 'V3'
-        cutoff = 0.04
+    for region in regions:
+        print region
+        fn_data = fd_data + 'haplotype_tree_example_'+region+'.pickle'
 
-        patient = load_patient(pname)
-        tree = patient.get_local_tree(region)
+        if not os.path.isfile(fn_data):
+            pname = '15823'
+            cutoff = 0.04
 
-        filter_rare_leaves(tree, cutoff)
+            patient = load_patient(pname)
+            tree = patient.get_local_tree(region)
 
-        data = compress_data(tree, pname, region)
-        store_data(data, fn_data)
-    else:
-        data = load_data(fn_data)
-        
-    filename = foldername+'haplotype_tree_example'
-    for ext in ['png', 'pdf', 'svg']:
+            filter_rare_leaves(tree, cutoff)
+
+            data = compress_data(tree, pname, region)
+            store_data(data, fn_data)
+        else:
+            data = load_data(fn_data)
+            
+        filename = foldername+'haplotype_tree_example_'+region
+        for ext in ['png', 'pdf', 'svg']:
+            plot_haplotype_tree_example(data,
+                                        VERBOSE=VERBOSE,
+                                        savefig=filename+'.'+ext)
+
         plot_haplotype_tree_example(data,
-                                    VERBOSE=VERBOSE,
-                                    savefig=filename+'.'+ext)
-
-    plot_haplotype_tree_example(data,
-                                VERBOSE=VERBOSE)
+                                    VERBOSE=VERBOSE)

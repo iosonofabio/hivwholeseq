@@ -55,8 +55,8 @@ if __name__ == '__main__':
     fn_data = fn_data + 'allele_freq_example.pickle'
 
     if not os.path.isfile(fn_data):
-        pname = '9669'
-        region = 'p17'
+        pname = '15823'
+        region = 'RT3'
         cutoff = 0.01
 
         patient = load_patient(pname)

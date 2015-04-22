@@ -8,10 +8,11 @@ content:    Support module with tree utility functions.
 def build_tree_fasttree(filename_or_ali, rootname=None, VERBOSE=0):
     '''Build phylogenetic tree using FastTree
     
-    Args:
+    Parameters:
       filename_or_ali: filename of a FASTA multiple sequence alignment, or a
                        Biopython alignment itself
-          
+      rootname (str): name of the leaf that should be the new root (outgroup)
+      VERBOSE (int): verbosity level
     '''
     import os
     import subprocess as sp
@@ -86,6 +87,31 @@ def build_tree_fasttree(filename_or_ali, rootname=None, VERBOSE=0):
 
 
     return tree
+
+
+def correct_minimal_branches(tree, cutoff=1e-3, min_length=1e-8, VERBOSE=0):
+    '''FastTree has a minimal branch length of 1e-4, correct it down
+    
+    Parameters:
+       tree (Bio.Phylo.BaseTree.Tree): the tree to modify in place
+       cutoff (float): without ancestral sequences, shorten any branch <= this
+       min_length (float): new minimal length
+       VERBOSE (int): verbosity level
+
+    Note: if internal nodes have 'muts' (after ancestral sequences), only the
+    branches without mutations will be shortened
+    '''
+    for node in tree.find_clades():
+        try:
+            if len(node.muts) == 0:
+                if VERBOSE >= 3:
+                    print node, node.branch_length
+                node.branch_length = min_length
+        except AttributeError:
+            if 0 < node.branch_length <= cutoff:
+                if VERBOSE >= 3:
+                    print node, node.branch_length
+                node.branch_length = min_length
 
 
 def find_parent(tree, node):

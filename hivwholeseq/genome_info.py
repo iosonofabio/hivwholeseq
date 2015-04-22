@@ -13,8 +13,9 @@ from Bio.Seq import reverse_complement as rc
 genes = ('gag', 'pol', 'env', 'vif', 'vpr', 'vpu', 'tat', 'rev', 'nef')
 proteins = ('p17', 'p24', 'p2', 'p7', 'p1', 'p6', 'PR', 'RT', 'p15', 'IN', 'gp120', 'gp41')
 RNA_structures = ('RRE', "LTR5'", "LTR3'")
+
 # Additional chunks that are useful for haplotypes when the whole region is too long
-chunks = ('RT1', 'RT2', 'RT3', 'RT4', 'IN1', 'IN2', 'IN3')
+chunks = ('RT1', 'RT2', 'RT3', 'RT4', 'IN1', 'IN2', 'IN3', 'gp1201')
 
 # Relation protein-genes
 protein_genes = {'p17': 'gag', 'p24': 'gag', 'p2': 'gag', 'p7': 'gag',

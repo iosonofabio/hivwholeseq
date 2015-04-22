@@ -415,7 +415,7 @@ def plot_minor_allele_example(data, title='', VERBOSE=0, savefig=False):
 
     labels = ['control', 'patient']
     alphas = [0.6, 1]
-    colors = [sns.color_palette()[i] for i in [1, 0]]
+    colors = [sns.color_palette()[i] for i in [2, 0]]
     shapes = ['s', 'o']
 
     for idat, datum in enumerate(data):
@@ -434,19 +434,23 @@ def plot_minor_allele_example(data, title='', VERBOSE=0, savefig=False):
                     alpha=alphas[idat],
                     zorder=2 - idat)
 
-    axs[0].set_xlabel('Position [bp]')
-    axs[0].set_ylabel('Minor allele frequency')
+    axs[0].set_xlabel('Position [bp]', fontsize=18)
+    axs[0].set_ylabel('SNV frequency', fontsize=18)
     axs[0].set_yscale('log')
     axs[0].set_ylim(10**(-4), 1)
     axs[0].set_xlim(-20, y.nonzero()[0][-1] + 21)
     axs[0].grid(True)
+    axs[0].tick_params(axis='both', labelsize=18)
 
-    axs[1].set_xlabel('Number of alleles')
+    axs[1].set_xlabel('Number of alleles', fontsize=18)
     axs[1].grid(True)
     axs[1].set_yscale('log')
     axs[1].set_xlim(0.8, 2 * h[0].max())
     axs[1].set_xscale('log')
+    axs[1].tick_params(axis='x', labelsize=18)
     #axs[1].set_xticks([0, 50, 100, 150])
+
+    plt.tight_layout(rect=(0, 0, 1, 1))
 
     if title:
         fig.suptitle(title)
@@ -501,6 +505,7 @@ def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
 
     for datum in data:
         tree = datum['tree']
+        region = datum['region']
 
         times = sorted(set([leaf.DSI for leaf in tree.get_terminals()]))
 
@@ -534,38 +539,43 @@ def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
         ax.set_yticklabels([])
         for item in ax.get_xticklabels():
             item.set_fontsize(16)
-        ax.set_xlabel('Genetic distance [changes / site]', fontsize=16, labelpad=10)
+
+        if region != 'V3':
+            ax.set_xlabel('Genetic distance [changes / site]', fontsize=16, labelpad=10)
+        else:
+            ax.set_xlabel('')
 
         # Add circles to the leaves
         (x, y, s, c) = zip(*data_circles)
         ax.scatter(x, y, s=s, c=c, edgecolor='none', zorder=2)
         ax.set_xlim(-0.04 * maxdepth, 1.04 * maxdepth)
 
-        # Draw a "legend" for sizes
-        datal = [{'hf': 0.05, 'label': '5%'},
-                 {'hf': 0.20, 'label': '20%'},
-                 {'hf': 1.00, 'label': '100%'}]
-        ax.text(0.98 * maxdepth, 1.3, 'Haplotype frequency:', fontsize=16, ha='right')
-        for idl, datuml in enumerate(datal):
-            r = rfun(datuml['hf'])
-            y = 5 + 3 * idl
-            ax.scatter(0.85 * maxdepth, y, s=r,
-                       facecolor='k',
-                       edgecolor='none')
-            ax.text(0.98 * maxdepth, y + 0.9, datuml['label'], ha='right')
+        if region == 'V3':
+            # Draw a "legend" for sizes
+            datal = [{'hf': 0.05, 'label': '5%'},
+                     {'hf': 0.20, 'label': '20%'},
+                     {'hf': 1.00, 'label': '100%'}]
+            ax.text(0.98 * maxdepth, 1.3, 'Haplotype frequency:', fontsize=16, ha='right')
+            for idl, datuml in enumerate(datal):
+                r = rfun(datuml['hf'])
+                y = 5 + 3 * idl
+                ax.scatter(0.85 * maxdepth, y, s=r,
+                           facecolor='k',
+                           edgecolor='none')
+                ax.text(0.98 * maxdepth, y + 0.9, datuml['label'], ha='right')
 
-        # Draw legend for times
-        ytext = 0.43 * ax.get_ylim()[0]
-        ax.text(0.01 * maxdepth, ytext, 'Time:', fontsize=16)
-        datal = [{'time': t, 'color': cm.jet(1.0 * t / max(times))} for t in times]
-        for ico, datuml in enumerate(datal):
-            y = ytext + 2.8 + 3 * ico
-            ax.scatter(0.00 * maxdepth, y, s=rfun(0.5),
-                       facecolor=datuml['color'],
-                       edgecolor='none')
-            ax.text(0.19 * maxdepth, y + 0.9,
-                    str(int(datuml['time'] / 30.5))+' months',
-                    ha='right')
+            # Draw legend for times
+            ytext = 0.43 * ax.get_ylim()[0]
+            ax.text(0.01 * maxdepth, ytext, 'Time:', fontsize=16)
+            datal = [{'time': t, 'color': cm.jet(1.0 * t / max(times))} for t in times]
+            for ico, datuml in enumerate(datal):
+                y = ytext + 2.8 + 3 * ico
+                ax.scatter(0.00 * maxdepth, y, s=rfun(0.5),
+                           facecolor=datuml['color'],
+                           edgecolor='none')
+                ax.text(0.22 * maxdepth, y + 0.9,
+                        str(int(datuml['time'] / 30.5))+' months',
+                        ha='right')
 
     plt.tight_layout(rect=(0, 0, 0.98, 1))
 

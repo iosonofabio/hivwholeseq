@@ -31,7 +31,10 @@ from hivwholeseq.patients.one_site_statistics import get_codons_n_polymorphic
 
 # Globals
 pnames = ['20097', '15363', '15823', '9669', '20529', '15241', '15376', '15319']
-regions = ['p17', 'p24', 'p6', 'p7', 'PR', 'RT', 'p15', 'IN', 'vif', 'vpu', 'vpr', 'nef', 'gp41']
+regions = ['p17', 'p24', 'p6', 'p7',
+           'PR', 'RT', 'p15', 'IN',
+           'vif', 'vpu', 'vpr', 'nef',
+           'gp41', 'gp1201']
 
 
 
@@ -192,6 +195,7 @@ def plot_data(data, VERBOSE=0):
     reg_groups = [['PR', 'IN', 'p15', 'RT'],
                   ['p17', 'p24', 'p6', 'p7'],
                   ['vif', 'vpu', 'vpr', 'nef'],
+                  ['gp1201'],
                  ]
 
     pcodes = np.unique(data['patient']).tolist()

@@ -19,12 +19,12 @@ from Bio import Phylo
 from hivwholeseq.utils.generic import mkdirs
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.utils.generic import write_json
-from hivwholeseq.utils.tree import tree_to_json
+from hivwholeseq.utils.tree import tree_to_json, correct_minimal_branches
 from hivwholeseq.store.store_haplotypes_alignment_tree import extract_alignment
 from hivwholeseq.website.filenames import get_haplotype_tree_filename
 from hivwholeseq.website.filenames import get_haplotype_alignment_filename
 from hivwholeseq.website.filenames import get_consensi_alignment_filename
-from hivwholeseq.website import _regions as regions_all
+from hivwholeseq.website import _regions_haplotypes as regions_all
 
 
 
@@ -55,6 +55,9 @@ if __name__ == '__main__':
 
             print 'Get haplotype trees and alignments'
             tree = patient.get_local_tree(region)
+
+            print 'Correct minimal-length branches to a smaller value'
+            correct_minimal_branches(tree, VERBOSE=2)
             
             print 'Extract alignment from tree (so with duplicates)'
             ali_tree = extract_alignment(tree, VERBOSE=2)
