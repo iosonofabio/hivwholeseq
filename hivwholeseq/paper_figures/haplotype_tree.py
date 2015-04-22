@@ -18,12 +18,15 @@ from hivwholeseq.paper_figures.plots import plot_haplotype_tree_example
 
 
 # Functions
-def compress_data(tree, pname, region):
+def compress_data(tree, pname, pcode, region, title):
     '''Compress data for plots, discarding useless info'''
     data = []
     datum = {'tree': tree,
              'pname': pname,
-             'region': region}
+             'pcode': pcode,
+             'region': region,
+             'title': title,
+            }
     data.append(datum)
 
     return data
@@ -48,36 +51,41 @@ def load_data(fn):
 if __name__ == '__main__':
 
     VERBOSE = 2
-    regions = ['V3', 'RT3']
+    regions = [{'name': 'p17', 'title': 'p17'},
+               {'name': 'RT1', 'title': 'RT start'},
+               {'name': 'IN2', 'title': 'integrase middle'},
+               {'name': 'V3', 'title': 'V3'},
+              ]
+    pname = '15823'
+    cutoff = 0.02
 
     username = os.path.split(os.getenv('HOME'))[-1]
     foldername = get_figure_folder(username, 'first')
     fd_data = foldername+'data/'
     mkdirs(fd_data)
 
-    for region in regions:
-        print region
-        fn_data = fd_data + 'haplotype_tree_example_'+region+'.pickle'
-
-        if not os.path.isfile(fn_data):
-            pname = '15823'
-            cutoff = 0.04
-
-            patient = load_patient(pname)
+    fn_data = fd_data + 'haplotype_tree_example_'+pcode+'.pickle'
+    if not os.path.isfile(fn_data):
+        patient = load_patient(pname)
+        data = []
+        for regdata in regions:
+            region = regdata['name']
+            title = regdata['title']
+            print region, title
             tree = patient.get_local_tree(region)
-
             filter_rare_leaves(tree, cutoff)
-
-            data = compress_data(tree, pname, region)
-            store_data(data, fn_data)
-        else:
-            data = load_data(fn_data)
+            data.extend(compress_data(tree, pname, patient.code, region, title))
+        store_data(data, fn_data)
+    else:
+        data = load_data(fn_data)
             
-        filename = foldername+'haplotype_tree_example_'+region
-        for ext in ['png', 'pdf', 'svg']:
-            plot_haplotype_tree_example(data,
-                                        VERBOSE=VERBOSE,
-                                        savefig=filename+'.'+ext)
-
+    filename = foldername+''.join(['haplotype_tree_example', pcode, region])
+    for ext in ['png', 'pdf', 'svg']:
         plot_haplotype_tree_example(data,
-                                    VERBOSE=VERBOSE)
+                                    VERBOSE=VERBOSE,
+                                    legend=-1,
+                                    savefig=filename+'.'+ext)
+
+    plot_haplotype_tree_example(data,
+                                VERBOSE=VERBOSE)
+

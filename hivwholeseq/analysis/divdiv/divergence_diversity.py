@@ -13,6 +13,7 @@ from collections import defaultdict, Counter
 import numpy as np
 import pandas as pd
 from matplotlib import cm
+
 import matplotlib.pyplot as plt
 import hivwholeseq.utils.plot
 
@@ -35,6 +36,8 @@ regions = ['p17', 'p24', 'p6', 'p7',
            'PR', 'RT', 'p15', 'IN',
            'vif', 'vpu', 'vpr', 'nef',
            'gp41', 'gp1201']
+
+colors = ["#5097BA", "#60AA9E", "#75B681", "#8EBC66", "#AABD52", "#C4B945", "#D9AD3D", "#E59637", "#E67030", "#DF4327"];
 
 
 
@@ -145,20 +148,18 @@ def collect_data(pnames, regions, VERBOSE=0):
 
                     # Iterate over derived alleles
                     for ider, der in enumerate(alpha[:4]):
-                        # Skip non-mutations
-                        if ider == ianc:
-                            continue
-
                         # Classify syn/nonsyn
                         try:
                             mutclass = classify_syn(consm, posdna, der)
                         except ValueError:
                             continue
 
-                        div[('divergence', 'population', 'all')].append(afs[ider, posdna])
-                        div[('divergence', 'consensus', 'all')].append(der == consmt[posdna])
-                        div[('divergence', 'population', mutclass)].append(afs[ider, posdna])
-                        div[('divergence', 'consensus', mutclass)].append(der == consmt[posdna])
+                        # Skip non-mutations
+                        if ider != ianc:
+                            div[('divergence', 'population', 'all')].append(afs[ider, posdna])
+                            div[('divergence', 'consensus', 'all')].append(der == consmt[posdna])
+                            div[('divergence', 'population', mutclass)].append(afs[ider, posdna])
+                            div[('divergence', 'consensus', mutclass)].append(der == consmt[posdna])
 
                         # Diversity: <sum(i e ACGT) x_i(1-x_i)>
                         # averaged over positions
@@ -171,7 +172,7 @@ def collect_data(pnames, regions, VERBOSE=0):
                     # NOTE: We count every derived allele, so each site contributes
                     # with three alleles. Divergence and diversity, however, are
                     # defined per site, so we sum over the three alleles
-                    divtmp = np.mean(tmp) * 3
+                    divtmp = np.mean(tmp) * (4 if obs=='diversity' else 3)
                     datum = {'patient': patient.code,
                              'region': region,
                              'time': time,
@@ -276,6 +277,7 @@ def plot_data(data, VERBOSE=0):
                     alpha=alpha,
                     label=label,
                   )
+            plt.ylim([0,0.04])
         
         # Plot single patients
         datap = (data
@@ -297,6 +299,84 @@ def plot_data(data, VERBOSE=0):
         
     plt.tight_layout(rect=(0.05, 0.05, 0.98, 0.97))
 
+def plot_avg_only(data, VERBOSE=0):
+    '''Plot divergence'''
+    # NOTE: gp41 has overlaps with tat/rev (hard to tell syn/nonsyn)
+    # NOTE: gp120 has the V loops that are hard to call syn/nonsyn
+    reg_groups = [['PR', 'IN', 'p15', 'RT'],
+                  ['p17', 'p24', 'p6', 'p7'],
+                  ['vif', 'vpu', 'vpr', 'nef'],
+                 ]
+    alpha = 0.8
+    pcodes = np.unique(data['patient']).tolist()
+    pcodes.sort(key=lambda x: int(x[1:]))
+    cls = np.unique(data['class'])
+    fig, axs = plt.subplots(1, 2,
+                            figsize=(10, 5),
+                            sharey=True, sharex=True)
+
+    fig.text(0.41, 0.035, 'Time [days from infection]', fontsize=16)
+
+    fig.text(0.32, 0.967, 'nonsyn', ha='center', fontsize=16)
+    fig.text(0.75, 0.967, 'syn', ha='center', fontsize=16)
+
+    # Bin data in time
+    from hivwholeseq.utils.pandas import add_binned_column
+    _, times = add_binned_column(data, 'tbin', 'time',
+                                 bins=np.linspace(0, 3300, 8),
+                                 clip=True)
+    data.loc[:, 'tbinned'] = times[data['tbin']]
+    region_data = [(data
+                    .loc[data['region'].isin(reg)]
+                    .groupby(['obs', 'ctype', 'class']))
+                    for reg in reg_groups]
+    def label_func1(dclass, obs,reg_label):
+        if obs=='divergence' and reg_label=='accessory':
+            return dclass
+        elif obs=='diversity' and dclass=='nonsyn':
+            return reg_label
+        else:
+            return None
+    def label_func2(dclass, obs,reg_label):
+        if dclass=='nonsyn' and reg_label=='accessory':
+            return obs
+        elif dclass=='syn' and obs=='divergence':
+            return reg_label
+        else:
+            return None
+
+    def label_func3(dclass, ctype,reg_label):
+        if dclass=='nonsyn' and reg_label=='accessory':
+            return ctype
+        elif dclass=='syn' and ctype =='population':
+            return reg_label
+        else:
+            return None
+
+
+    for ax,dclass,ls2 in izip(axs,['nonsyn','syn'],['-','--']):
+        ax.grid(True)
+        for ctype, obs, ls in izip(['population', 'consensus'], ['divergence','divergence'], ['-','--']):
+            for reg, reg_label, color in izip(region_data, 
+                                    ['enzymes','structural', 'accessory'], 
+                                    [colors[i] for i in [0,4,9]]):
+                tmp = reg.get_group((obs, ctype,dclass)).groupby('tbinned', as_index=False).mean()
+                x = tmp['tbinned']
+                y = tmp['div']
+                ax.plot(x, y,
+                    ls=ls,
+                    lw=2,
+                    color=color,
+                    alpha=alpha,
+                    label=label_func3(dclass, ctype, reg_label),
+                  )
+                ax.legend(loc=2)
+    plt.ylim([0,0.04])
+    axs[0].set_yticks([0,0.02,0.04])
+    axs[0].set_ylabel('Divergence', fontsize=16)
+    axs[1].yaxis.set_label_position('right')
+    axs[1].set_ylabel('Diversity', fontsize=16)
+    plt.tight_layout(rect=(0.05, 0.05, 0.98, 0.97))
 
 
 # Script
@@ -327,6 +407,6 @@ if __name__ == '__main__':
 
     if plot:
         tmp = plot_data(data, VERBOSE=VERBOSE)
-
+        tmp = plot_avg_only(data)
         plt.ion()
         plt.show()

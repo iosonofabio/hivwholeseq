@@ -16,12 +16,13 @@ from hivwholeseq.paper_figures.plots import plot_allele_freq_example
 
 
 # Functions
-def compress_data(aft, times, pname, region):
+def compress_data(aft, times, pname, pcode, region):
     '''Compress data for plots, discarding useless info'''
     data = []
     datum = {'aft': aft,
              'times': times,
              'pname': pname,
+             'pcode': pcode,
              'region': region}
     data.append(datum)
 
@@ -56,7 +57,7 @@ if __name__ == '__main__':
 
     if not os.path.isfile(fn_data):
         pname = '15823'
-        region = 'RT3'
+        region = 'p17'
         cutoff = 0.01
 
         patient = load_patient(pname)
@@ -65,12 +66,13 @@ if __name__ == '__main__':
                                                              depth_min=cutoff)
         times = patient.times[ind]
 
-        data = compress_data(aft, times, pname, region)
+        data = compress_data(aft, times, pname, pcode, region)
         store_data(data, fn_data)
     else:
         data = load_data(fn_data)
         
-    filename = foldername+'allele_freq_example'
+    pcode = data['pcode']
+    filename = foldername+'_'.join(['allele_freq_example', pcode, region])
     for ext in ['png', 'pdf', 'svg']:
         plot_allele_freq_example(data,
                                     VERBOSE=VERBOSE,

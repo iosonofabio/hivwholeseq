@@ -11,7 +11,7 @@ def get_figure_folder(username, subfolder=''):
     elif username == 'fabio':
         fn = '/home/fabio/university/phd/papers/'
     elif username in ('richard', 'rneher'):
-        raise ValueError('R. please fill in this function in filenames.py')
+        fn = '/ebio/ag-neher/share/users/rneher/'
 
     if subfolder in ['controls']:
         fn = fn + 'HIVEVO_support/' +subfolder + '/figures/'

@@ -13,6 +13,19 @@ from matplotlib import cm
 
 from hivwholeseq.utils.generic import mkdirs
 
+def HIVEVO_colormap():
+    from scipy.interpolate import interp1d
+    colors = ["#5097BA", "#60AA9E", "#75B681", "#8EBC66", "#AABD52", "#C4B945", "#D9AD3D", "#E59637", "#E67030", "#DF4327"]
+    rgb_colors = []
+    for c in colors:
+        rgb_colors.append([int(c[i:i+2],16) for i in [1,3,5]]+[255])
+    tmp =interp1d(np.linspace(0,1,len(colors)), np.array(rgb_colors, dtype = float).T/255.0)
+    cmap = lambda x: [ c for c in tmp(x)]
+    return cmap
+
+
+
+
 
 # Functions
 def plot_cuts_quality_along_reads(data, title='',
@@ -470,7 +483,7 @@ def plot_minor_allele_example(data, title='', VERBOSE=0, savefig=False):
 
 
 def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
-                                color_by='DSI'):
+                                color_by='DSI', legend=True):
     '''Plot tree of minor haplotypes in a typical sample'''
     from Bio import Phylo
 
@@ -499,17 +512,17 @@ def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
     if VERBOSE:
         print 'Plot haplotype tree of example sample'
 
-    fig, ax = plt.subplots(1, 1, figsize=(7, 5))
+    fig, ax = plt.subplots(1, 1, figsize=(6, 5))
     sns.set_style('white')
     ax.grid(False)
-
+    colormap = HIVEVO_colormap()
     for datum in data:
         tree = datum['tree']
         region = datum['region']
-
+        tree.root.branch_length = 0.001
         times = sorted(set([leaf.DSI for leaf in tree.get_terminals()]))
 
-        assign_color(tree, attrname=color_by)
+        assign_color(tree, attrname=color_by, cmap=colormap)
         labels = ['{:>8s}'.format('{:>3.0%}'.format(leaf.frequency)+' '+
                    '{:>2d}'.format(int(float(leaf.DSI) / 30.5))+
                   'm')
@@ -529,14 +542,16 @@ def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
             y = il
             x = depths[leaf]
             c = [tone / 255.0 for tone in leaf.color.to_rgb()]
-            data_circles.append((x, y, 2 * r, c))
+            cs = [tone / 255.0 * 0.7 for tone in leaf.color.to_rgb()]
+            data_circles.append((x, y, 2 * r, c, cs))
 
         # Draw the tree
         Phylo.draw(tree, show_confidence=False, label_func=lambda x: '', axes=ax,
                    do_show=False)
-        ax.set_ylim((ax.get_ylim()[0] + 2, -2))
+        ax.set_ylim((1.02 * ax.get_ylim()[0], -0.2 - 1.8 * int(ax.get_ylim()[0] > 30)))
         ax.set_ylabel('')
         ax.set_yticklabels([])
+        ax.set_axis_off()
         for item in ax.get_xticklabels():
             item.set_fontsize(16)
 
@@ -546,8 +561,8 @@ def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
             ax.set_xlabel('')
 
         # Add circles to the leaves
-        (x, y, s, c) = zip(*data_circles)
-        ax.scatter(x, y, s=s, c=c, edgecolor='none', zorder=2)
+        (x, y, s, c, cs) = zip(*data_circles)
+        ax.scatter(x, y, s=s, c=c, edgecolor=cs, zorder=2)
         ax.set_xlim(-0.04 * maxdepth, 1.04 * maxdepth)
 
         if region == 'V3':
@@ -565,18 +580,38 @@ def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
                 ax.text(0.98 * maxdepth, y + 0.9, datuml['label'], ha='right')
 
             # Draw legend for times
-            ytext = 0.43 * ax.get_ylim()[0]
-            ax.text(0.01 * maxdepth, ytext, 'Time:', fontsize=16)
-            datal = [{'time': t, 'color': cm.jet(1.0 * t / max(times))} for t in times]
+            datal = [{'time': t,'color': [tone for tone in colormap(1.0 * t / max(times))[:3]],
+            'colorstroke': [tone * 0.7 for tone in colormap(1.0 * t / max(times))[:3]]} for t in times]
+            xtext = 0
+            ytext = (0.93 - 0.06 * min(8, len(datal))) * ax.get_ylim()[0]
+            ax.text(xtext-0.02*maxdepth, ytext, 'Time:', fontsize=16)
             for ico, datuml in enumerate(datal):
-                y = ytext + 2.8 + 3 * ico
-                ax.scatter(0.00 * maxdepth, y, s=rfun(0.5),
-                           facecolor=datuml['color'],
-                           edgecolor='none')
-                ax.text(0.22 * maxdepth, y + 0.9,
-                        str(int(datuml['time'] / 30.5))+' months',
-                        ha='right')
+                ytext += 0.06 * (ax.get_ylim()[0] - ax.get_ylim()[1])
 
+                if ico == 8:
+                    ytext -= 4 * 0.06 * (ax.get_ylim()[0] - ax.get_ylim()[1])
+                    xtext += 0.28 * maxdepth
+
+                ax.scatter(xtext, ytext, s=rfun(0.5),
+                           facecolor=datuml['color'],
+                           edgecolor=datuml['colorstroke'])
+                ax.text(xtext + 0.26 * maxdepth, ytext + 0.02 * ax.get_ylim()[0],
+                        str(int(datuml['time'] / 30.5))+' months',
+                        ha='right',
+                        fontsize=14,
+                       )
+
+        # Draw scale bar
+        print legend
+        xbar = (0.35 + 0.3 * (len(times) >= 9))*(legend) * maxdepth
+        ybar = 0.90 * ax.get_ylim()[0]
+        lbar = 0.05 * maxdepth
+        lbar_label = '{:.1G}'.format(lbar)
+        lbar = float(lbar_label)
+        ax.plot([xbar, xbar + lbar], [ybar, ybar], lw=4, c='k')
+        ax.text(xbar + 0.5 * lbar, ybar + 0.08 * ax.get_ylim()[0],
+                lbar_label, fontsize=14,
+                ha='center')
     plt.tight_layout(rect=(0, 0, 0.98, 1))
 
     if title:
@@ -591,7 +626,6 @@ def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
         plt.close(fig)
 
     else:
-        plt.tight_layout(rect=(0, 0, 0.98, 1))
         plt.ion()
         plt.show()
 
@@ -937,17 +971,20 @@ def plot_fitness_cost(fits, title='', VERBOSE=0, savefig=False):
 
 def plot_allele_freq_example(data, title='', VERBOSE=0, savefig=False):
     '''Plot the estimated fitness value, for all regions together'''
-    fig, axs = plt.subplots(1, 3, figsize=(9, 4))
+    fig, axs = plt.subplots(2, 3, figsize=(9, 8))
     sns.set_style('darkgrid')
-
+    fs=16
     datum = data[0]
     ind = np.arange(len(datum['times']))
     ind = [0, len(ind) // 2, ind[-1]]
 
     icons0 = datum['aft'][0].argmax(axis=0)
 
+    cmap = HIVEVO_colormap()
+    x = np.arange(datum['aft'].shape[2])
+    color = [[float(tmp) for tmp in cmap(p)] for p in np.linspace(0, 1, len(x))]
     for ii, i in enumerate(ind):
-        ax = axs[ii]
+        ax = axs[0][ii]
         time = datum['times'][i]
         af = datum['aft'][i]
 
@@ -958,32 +995,45 @@ def plot_allele_freq_example(data, title='', VERBOSE=0, savefig=False):
             afpos.sort()
             af_min.append(afpos[-1])
         af_min = np.array(af_min)
-
-        x = np.arange(af.shape[1])
-        color = cm.jet(np.linspace(0, 1, len(x)))
-
         ax.scatter(x, af_min, s=100, c=color, edgecolor='none')
         
         ax.set_ylim(1e-2, 1.35)
         ax.set_xlim(-5, len(x) + 5)
+        ax.set_xticks(range(0,len(x), 75))
         ax.set_yscale('log')
         ax.grid(True)
-        ax.set_title(str(int(time / 30.5))+' months', fontsize=18)
+        ax.set_title(str(int(time / 30.5))+' months', fontsize=fs)
         for item in ax.get_xticklabels():
-            item.set_fontsize(18)
+            item.set_fontsize(fs)
 
         if ii == 0:
             for item in ax.get_yticklabels():
-                item.set_fontsize(18)
+                item.set_fontsize(fs)
         else:
             ax.set_yticklabels([])
 
-    axs[1].set_xlabel('Position [bp]', fontsize=18, labelpad=20)
-    axs[0].set_ylabel('Allele frequency', fontsize=18, labelpad=20)
+    axs[0][1].set_xlabel('Position [bp]', fontsize=fs, labelpad=5)
+    axs[0][0].set_ylabel('SNV frequency', fontsize=fs, labelpad=5)
 
+    ax = plt.subplot2grid((2,3), (1,0), colspan = 3)
+    print datum['aft'].shape
+    tmonth = datum['times']/30.5
+    for pos in xrange(datum['aft'].shape[2]):
+        for nuc in xrange(4):
+            traj = datum['aft'][:,nuc,pos]
+            traj[traj<0.003] = 0.003
+            if traj[0]<0.5 and traj.max()>0.05:
+                ax.plot(tmonth, traj, c = color[pos])
+
+    ax.set_ylim(1e-2, 1.35)
+    ax.set_xlim(0, tmonth[-1]+1)
+    ax.set_yscale('log')
+    ax.set_ylabel('SNV frequency', fontsize=fs, labelpad=5)
+    ax.set_xlabel('Time since infection [months]', fontsize=fs)
+    for item in ax.get_xticklabels() + ax.get_yticklabels():
+        item.set_fontsize(fs)
 
     plt.tight_layout()
-
     if savefig:
         fig_filename = savefig
         fig_folder = os.path.dirname(fig_filename)

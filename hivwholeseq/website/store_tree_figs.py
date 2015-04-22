@@ -18,13 +18,14 @@ from hivwholeseq.utils.tree import (build_tree_fasttree, filter_rare_leaves,
                                     correct_minimal_branches)
 
 from hivwholeseq.website.filenames import get_tree_figure_filename
-
+from hivwholeseq.paper_figures.plots import HIVEVO_colormap
 
 # Globals
 pnames = ['20097', '15363', '15823', '15376', '9669', '15107', '15241', '15034', '15319']
 region = 'V3'
 cutoff = 0.04
 
+web_colormap = HIVEVO_colormap()
 
 
 
@@ -57,7 +58,6 @@ def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
     
         for node in tree.get_terminals():
             node.color = get_color(node)
-    
         # For internal nodes, set the attribute (e.g. age) as the arithmetic mean of
         # the children clades
         for node in tree.get_nonterminals(order='postorder'):
@@ -76,10 +76,11 @@ def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
 
     for datum in data:
         tree = datum['tree']
+        tree.root.branch_length = 0.001
 
         times = sorted(set([leaf.DSI for leaf in tree.get_terminals()]))
 
-        assign_color(tree, attrname=color_by)
+        assign_color(tree, attrname=color_by, cmap = web_colormap)
         labels = ['{:>8s}'.format('{:>3.0%}'.format(leaf.frequency)+' '+
                    '{:>2d}'.format(int(float(leaf.DSI) / 30.5))+
                   'm')
@@ -99,7 +100,8 @@ def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
             y = il
             x = depths[leaf]
             c = [tone / 255.0 for tone in leaf.color.to_rgb()]
-            data_circles.append((x, y, 2 * r, c))
+            cs = [tone / 255.0 * 0.7 for tone in leaf.color.to_rgb()]
+            data_circles.append((x, y, 2 * r, c, cs))
 
         # Draw the tree
         Phylo.draw(tree, show_confidence=False, label_func=lambda x: '', axes=ax,
@@ -113,8 +115,8 @@ def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
         ax.set_xlabel('Genetic distance [changes / site]', fontsize=16, labelpad=10)
 
         # Add circles to the leaves
-        (x, y, s, c) = zip(*data_circles)
-        ax.scatter(x, y, s=s, c=c, edgecolor='none', zorder=2)
+        (x, y, s, c,cs) = zip(*data_circles)
+        ax.scatter(x, y, s=s, c=c, edgecolor=cs, zorder=2)
         ax.set_xlim(-0.04 * maxdepth, 1.04 * maxdepth)
 
         # Draw a "legend" for sizes
@@ -134,7 +136,8 @@ def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
                     fontsize=14)
 
         # Draw legend for times
-        datal = [{'time': t,'color': cm.jet(1.0 * t / max(times))} for t in times]
+        datal = [{'time': t,'color': [tone for tone in web_colormap(1.0 * t / max(times))[:3]],
+        'colorstroke': [tone * 0.7 for tone in web_colormap(1.0 * t / max(times))[:3]]} for t in times]
         xtext = 0
         ytext = (0.93 - 0.06 * min(8, len(datal))) * ax.get_ylim()[0]
         ax.text(0.01 * maxdepth, ytext, 'Time:', fontsize=16)
@@ -147,7 +150,7 @@ def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
 
             ax.scatter(xtext, ytext, s=rfun(0.5),
                        facecolor=datuml['color'],
-                       edgecolor='none')
+                       edgecolor=datuml['colorstroke'])
             ax.text(xtext + 0.21 * maxdepth, ytext + 0.02 * ax.get_ylim()[0],
                     str(int(datuml['time'] / 30.5))+' months',
                     ha='right',
