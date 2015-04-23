@@ -483,8 +483,9 @@ def plot_minor_allele_example(data, title='', VERBOSE=0, savefig=False):
 
 
 def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
-                                color_by='DSI', legend=True):
+                                color_by='DSI', legend=None):
     '''Plot tree of minor haplotypes in a typical sample'''
+    from itertools import izip
     from Bio import Phylo
 
     def assign_color(tree, cmap='jet', attrname='DSI'):
@@ -512,11 +513,11 @@ def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
     if VERBOSE:
         print 'Plot haplotype tree of example sample'
 
-    fig, ax = plt.subplots(1, 1, figsize=(6, 5))
+    fig, axs = plt.subplots(2, 2, figsize=(10, 8))
     sns.set_style('white')
-    ax.grid(False)
     colormap = HIVEVO_colormap()
-    for datum in data:
+    for datum, ax in izip(data, axs.ravel()):
+        ax.grid(False)
         tree = datum['tree']
         region = datum['region']
         tree.root.branch_length = 0.001
@@ -562,10 +563,10 @@ def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
 
         # Add circles to the leaves
         (x, y, s, c, cs) = zip(*data_circles)
-        ax.scatter(x, y, s=s, c=c, edgecolor=cs, zorder=2)
+        ax.scatter(x, y, s=s, c=c, edgecolor=cs, zorder=2, clip_on=False)
         ax.set_xlim(-0.04 * maxdepth, 1.04 * maxdepth)
 
-        if region == 'V3':
+        if region == legend:
             # Draw a "legend" for sizes
             datal = [{'hf': 0.05, 'label': '5%'},
                      {'hf': 0.20, 'label': '20%'},
@@ -574,7 +575,7 @@ def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
             for idl, datuml in enumerate(datal):
                 r = rfun(datuml['hf'])
                 y = 5 + 3 * idl
-                ax.scatter(0.85 * maxdepth, y, s=r,
+                ax.scatter(0.80 * maxdepth, y, s=r,
                            facecolor='k',
                            edgecolor='none')
                 ax.text(0.98 * maxdepth, y + 0.9, datuml['label'], ha='right')
@@ -582,7 +583,7 @@ def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
             # Draw legend for times
             datal = [{'time': t,'color': [tone for tone in colormap(1.0 * t / max(times))[:3]],
             'colorstroke': [tone * 0.7 for tone in colormap(1.0 * t / max(times))[:3]]} for t in times]
-            xtext = 0
+            xtext = -0.015
             ytext = (0.93 - 0.06 * min(8, len(datal))) * ax.get_ylim()[0]
             ax.text(xtext-0.02*maxdepth, ytext, 'Time:', fontsize=16)
             for ico, datuml in enumerate(datal):
@@ -594,7 +595,8 @@ def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
 
                 ax.scatter(xtext, ytext, s=rfun(0.5),
                            facecolor=datuml['color'],
-                           edgecolor=datuml['colorstroke'])
+                           edgecolor=datuml['colorstroke'],
+                           clip_on=False)
                 ax.text(xtext + 0.26 * maxdepth, ytext + 0.02 * ax.get_ylim()[0],
                         str(int(datuml['time'] / 30.5))+' months',
                         ha='right',
@@ -602,17 +604,16 @@ def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
                        )
 
         # Draw scale bar
-        print legend
-        xbar = (0.35 + 0.3 * (len(times) >= 9))*(legend) * maxdepth
+        xbar = (0.35 + 0.3 * (len(times) >= 9))*(legend == region) * maxdepth
         ybar = 0.90 * ax.get_ylim()[0]
-        lbar = 0.05 * maxdepth
+        lbar = 0.15 * maxdepth
         lbar_label = '{:.1G}'.format(lbar)
         lbar = float(lbar_label)
         ax.plot([xbar, xbar + lbar], [ybar, ybar], lw=4, c='k')
-        ax.text(xbar + 0.5 * lbar, ybar + 0.08 * ax.get_ylim()[0],
-                lbar_label, fontsize=14,
+        ax.text(xbar + 0.5 * lbar, ybar + 0.11 * ax.get_ylim()[0],
+                lbar_label, fontsize=18,
                 ha='center')
-    plt.tight_layout(rect=(0, 0, 0.98, 1))
+    plt.tight_layout(rect=(0, 0, 0.98, 1), pad=0, w_pad=0, h_pad=0)
 
     if title:
         fig.suptitle(title)

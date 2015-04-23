@@ -624,7 +624,10 @@ def load_patients():
 def load_patient(pname):
     '''Get the patient from the sequences ones'''
     patients = load_patients()
-    patient = Patient(patients.loc[pname])
+    if pname in patients.index:
+        patient = Patient(patients.loc[pname])
+    else:
+        patient = Patient(patients.loc[patients.code == pname].iloc[0])
     return patient
 
 

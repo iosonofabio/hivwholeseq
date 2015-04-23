@@ -18,11 +18,10 @@ from hivwholeseq.paper_figures.plots import plot_haplotype_tree_example
 
 
 # Functions
-def compress_data(tree, pname, pcode, region, title):
+def compress_data(tree, pcode, region, title):
     '''Compress data for plots, discarding useless info'''
     data = []
     datum = {'tree': tree,
-             'pname': pname,
              'pcode': pcode,
              'region': region,
              'title': title,
@@ -56,7 +55,7 @@ if __name__ == '__main__':
                {'name': 'IN2', 'title': 'integrase middle'},
                {'name': 'V3', 'title': 'V3'},
               ]
-    pname = '15823'
+    pcode = 'p3'
     cutoff = 0.02
 
     username = os.path.split(os.getenv('HOME'))[-1]
@@ -66,7 +65,7 @@ if __name__ == '__main__':
 
     fn_data = fd_data + 'haplotype_tree_example_'+pcode+'.pickle'
     if not os.path.isfile(fn_data):
-        patient = load_patient(pname)
+        patient = load_patient(pcode)
         data = []
         for regdata in regions:
             region = regdata['name']
@@ -74,18 +73,20 @@ if __name__ == '__main__':
             print region, title
             tree = patient.get_local_tree(region)
             filter_rare_leaves(tree, cutoff)
-            data.extend(compress_data(tree, pname, patient.code, region, title))
+            data.extend(compress_data(tree, patient.code, region, title))
         store_data(data, fn_data)
     else:
         data = load_data(fn_data)
             
-    filename = foldername+''.join(['haplotype_tree_example', pcode, region])
-    for ext in ['png', 'pdf', 'svg']:
-        plot_haplotype_tree_example(data,
-                                    VERBOSE=VERBOSE,
-                                    legend=-1,
-                                    savefig=filename+'.'+ext)
+
+    #filename = foldername+'_'.join(['haplotype_tree_example', pcode])
+    #for ext in ['png', 'pdf', 'svg']:
+    #    plot_haplotype_tree_example(data,
+    #                                VERBOSE=VERBOSE,
+    #                                legend='V3',
+    #                                savefig=filename+'.'+ext)
 
     plot_haplotype_tree_example(data,
+                                legend='V3',
                                 VERBOSE=VERBOSE)
 
