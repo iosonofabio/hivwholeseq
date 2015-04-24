@@ -131,27 +131,99 @@ def collect_data(pnames, regions, VERBOSE=0):
     return data
 
 
-def get_sfs(data, bins_af, attrnames=['tbin', 'mutclass'], VERBOSE=0):
+def get_sfs(data, bins_af='linear', attrnames=['tbin', 'mutclass'], VERBOSE=0,
+            normalize='fraction'):
     '''Get SFS from data'''
+    # Bin
+    if bins_af == 'linear':
+        bins_af = np.linspace(1e-3, 1, 10)
+        binsc_af = 0.5 * (bins_af[1:] + bins_af[:-1])
+    elif bins_af == 'logit':
+        logistic_fun = lambda x: 1.0 / (1.0 + 10**(-x))
+        bins_af_logit = np.linspace(-2.5, 1.5, 8)
+        binsc_af_logit = 0.5 * (bins_af_logit[1:] + bins_af_logit[:-1])
+        bins_af = logistic_fun(bins_af_logit)
+        binsc_af = logistic_fun(binsc_af_logit)
+
+    binsw_af = bins_af[1:] - bins_af[:-1]
+    data['afbin'] = -1
+    for b in bins_af:
+        data.loc[data.loc[:, 'af'] >= b, 'afbin'] += 1
+
+    # Classify
     datah = data.loc[(data.loc[:, 'afbin'] != -1) &
                      (data.loc[:, 'afbin'] != len(bins_af) - 1)]
+
     datah = (datah
              .loc[:, attrnames + ['afbin']]
              .groupby(attrnames + ['afbin'])
              .size()
              .unstack('afbin'))
-    # Normalize
     datah[np.isnan(datah)] = 0
-    datah = (datah.T / datah.sum(axis=1)).T # The sum of counts
+    datah = datah.T
+
+    # Normalize
+    if normalize in ['fraction', 'density']:
+        datah /= datah.sum(axis=0) # The sum of counts
+
     # (the bin widths)
-    binsw_af = bins_af[1:] - bins_af[:-1]
-    datah /= binsw_af
+    if normalize in ['density']:
+        binsw_af = bins_af[1:] - bins_af[:-1]
+        datah /= binsw_af
 
     # Add pseudocounts
     vmin = 0.1 * datah[datah > 0].min().min()
     datah[datah < vmin] = vmin
 
+    # Add bin edges
+    datah['afbin_left'] = bins_af[datah.index]
+    datah['afbin_right'] = bins_af[datah.index + 1]
+    datah['afbin_center'] = binsc_af[datah.index]
+
     return datah
+
+
+def plot_sfs_synnonsyn(datah):
+    plot_props = [{'mutclass': 'syn',
+                   'color': 'steelblue',
+                   'label': 'synonymous',
+                  },
+                  {'mutclass': 'nonsyn',
+                   'color': 'darkred',                      
+                   'label': 'nonsynonymous',
+                  }]
+
+    fig, ax = plt.subplots() 
+    for ip, props in enumerate(plot_props):
+        mutclass = props['mutclass']
+        color = props['color']
+        label = props['label']
+
+        arr = datah.loc[:, mutclass]
+        y = np.array(arr)
+        x = datah.loc[:, 'afbin_left']
+        w = datah.loc[:, 'afbin_right'] - x
+
+        n_props = len(plot_props)
+        ws = 1.0 / (n_props + 1)
+        x += ws * w * ip
+
+        bottom = 1e-3
+        height = y - bottom
+        ax.bar(x, height, width=ws * w, bottom=bottom,
+               color=color,
+               label=label)
+
+
+    ax.set_xlabel('Allele frequency')
+    ax.set_xlim(0, 1)
+    ax.set_yscale('log')
+    ax.grid(True)
+    ax.legend(loc='upper right', ncol=1, fontsize=14)
+    ax.set_ylabel('Spectrum')
+
+    plt.ion()
+    plt.show()
 
 
 
@@ -180,81 +252,19 @@ if __name__ == '__main__':
 
     data = collect_data(pnames, regions, VERBOSE=VERBOSE)
 
-    # Bin by time
-    bins_t = 30.5 * np.array([-1, 12, 24, 48, 72, 120])
-    binsc_t = 0.5 * (bins_t[1:] + bins_t[:-1])
-    data['tbin'] = 0
-    for b in bins_t[1:]:
-        data.loc[data.loc[:, 'time'] >= b, 'tbin'] += 1
+    ## Bin by time
+    #bins_t = 30.5 * np.array([-1, 12, 24, 48, 72, 120])
+    #binsc_t = 0.5 * (bins_t[1:] + bins_t[:-1])
+    #data['tbin'] = 0
+    #for b in bins_t[1:]:
+    #    data.loc[data.loc[:, 'time'] >= b, 'tbin'] += 1
 
-    # Bin by allele freq
-    if False:
-        logistic_fun = lambda x: 1.0 / (1.0 + 10**(-x))
-        bins_af_logit = np.linspace(-2.5, 1.5, 8)
-        binsc_af_logit = 0.5 * (bins_af_logit[1:] + bins_af_logit[:-1])
-        bins_af = logistic_fun(bins_af_logit)
-        binsc_af = logistic_fun(binsc_af_logit)
-    else:
-        bins_af = np.linspace(1e-3, 1, 10)
-        binsc_af = 0.5 * (bins_af[1:] + bins_af[:-1])
-
-    binsw_af = bins_af[1:] - bins_af[:-1]
-    data['afbin'] = -1
-    for b in bins_af:
-        data.loc[data.loc[:, 'af'] >= b, 'afbin'] += 1
-
-    # SFS (time and away/to)
-    datah_t = get_sfs(data, bins_af, attrnames=['mutclass'], VERBOSE=VERBOSE)
+    # SFS
+    datah = get_sfs(data,
+                    bins_af='linear',
+                    normalize='fraction',
+                    attrnames=['mutclass'], VERBOSE=VERBOSE)
 
     if plot:
 
-        plot_props = [{'mutclass': 'syn',
-                       'color': 'steelblue',
-                       'label': 'synonymous',
-                      },
-                      {'mutclass': 'nonsyn',
-                       'color': 'darkred',                      
-                       'label': 'nonsynonymous',
-                      }]
-
-        fig, ax = plt.subplots() 
-        for ip, props in enumerate(plot_props):
-            mutclass = props['mutclass']
-            color = props['color']
-            label = props['label']
-
-            arr = datah_t.loc[mutclass]
-            x = binsc_af[np.array(arr.index)]
-            y = np.array(arr)
-            y /= (y * binsw_af).sum()
-
-            #ax.plot(x, y,
-            #        ls='-',
-            #        lw=2,
-            #        color=color,
-            #        label=label)
-
-            n_props = len(plot_props)
-            ws = 1.0 / (n_props + 1)
-            xleft = bins_af[np.array(arr.index)] + ws * binsw_af * ip
-            width = ws * binsw_af
-            bottom = 1e-2
-            height = y - bottom
-            ax.bar(xleft, height, width=width, bottom=bottom,
-                   color=color,
-                   label=label)
-
-
-        ax.set_xlabel('Allele frequency')
-        ax.set_xlim(bins_af[0], bins_af[-1])
-        #ax.set_xscale('logit')
-        ax.set_yscale('log')
-        #ax.set_ylim(ymax=1e2)
-        ax.grid(True)
-        ax.legend(loc='upper right', ncol=1, fontsize=14)
-        ax.set_ylabel('Spectrum')
-
-        plt.ion()
-        plt.show()
-
-
+        plot_sfs_synnonsyn(datah)

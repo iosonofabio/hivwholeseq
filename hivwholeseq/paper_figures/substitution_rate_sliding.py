@@ -21,14 +21,38 @@ from hivwholeseq.paper_figures.plots import plot_substitution_rate_sliding
 
 
 # Globals
-pnames = ['20097', '15363', '15823', '15376', '20529', '9669', '15241', '15319']
-regions = ["LTR5'", 'p17', 'p24', 'PR', 'RT', 'IN', 'vif', 'vpr', 'vpu', 'V3',
+pnames = ['20097', '15823', '15376', '20529', '9669', '15241', '15319']
+regions = ["LTR5'", 'p17', 'p24', 'PR', 'RT', 'IN', 'vif', 'vpr', 'vpu',
+           'V1', 'V2', 'V3', 'V4', 'V5',
            'RRE', 'gp41', 'nef',
            "LTR3'"]
 
 
 
 # Functions
+def get_subs_matrix(datap):
+    from collections import Counter
+
+    cou = Counter()
+    for _, row in datap.iterrows():
+        cou += Counter(row['x'].astype(int))
+
+    poss = np.sort([pos for pos, c in cou.iteritems() if c == len(datap)])
+    M = np.zeros((len(datap), len(poss)))
+    for i, (_, row) in enumerate(datap.iterrows()):
+        ind = np.array(pd.Series(row['x'].astype(int)).isin(poss))
+        M[i] = row['rate'][ind]
+
+    return M
+
+
+def calc_fold_change(M):
+    Mm = np.maximum(-4, np.log10(M))
+    Mmean = Mm.mean(axis=0)
+    avg = (Mm - Mmean).std(axis=0).mean() * np.log2(10)
+    std = (Mm - Mmean).std(axis=0).std() * np.log2(10)
+    print 'log2(fold change) = {:.1G} +- {:.1G}'.format(avg, std)
+
 
 
 
@@ -64,16 +88,19 @@ if __name__ == '__main__':
     else:
         datap = pd.read_pickle(fn_data)
 
-    # Plot just the slope
+
+    # Print fold changes excluding p9
+    M = get_subs_matrix(datap.loc[np.array(-datap['pcode'].isin(['p9']))])
+    calc_fold_change(M)
+
     filename = foldername+'substitution_rates_sliding'
-    #for ext in ['png', 'pdf', 'svg']:
-    #    plot_substitution_rate_sliding(datap,
-    #                                   regions,
-    #                                   VERBOSE=VERBOSE,
-    #                                   savefig=filename+'.'+ext)
+    for ext in ['png', 'pdf', 'svg']:
+        plot_substitution_rate_sliding(datap,
+                                       regions,
+                                       VERBOSE=VERBOSE,
+                                       savefig=filename+'.'+ext)
 
     plot_substitution_rate_sliding(datap, regions, VERBOSE=VERBOSE)
-
     plt.ion()
     plt.show()
 

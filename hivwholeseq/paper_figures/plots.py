@@ -13,9 +13,17 @@ from matplotlib import cm
 
 from hivwholeseq.utils.generic import mkdirs
 
-def HIVEVO_colormap():
+
+
+# Functions
+def HIVEVO_colormap(kind='website'):
     from scipy.interpolate import interp1d
-    colors = ["#5097BA", "#60AA9E", "#75B681", "#8EBC66", "#AABD52", "#C4B945", "#D9AD3D", "#E59637", "#E67030", "#DF4327"]
+    maps = {'website': ["#5097BA", "#60AA9E", "#75B681", "#8EBC66", "#AABD52",
+                        "#C4B945", "#D9AD3D", "#E59637", "#E67030", "#DF4327"],
+            'alternative': ["#A6CEE3", "#1F78B4", "#B2DF8A", "#33A02C", "#FB9A99",
+                            "#E31A1C", "#FDBF6F", "#FF7F00", "#CAB2D6", "#6A3D9A"],
+           }
+    colors = maps[kind]
     rgb_colors = []
     for c in colors:
         rgb_colors.append([int(c[i:i+2],16) for i in [1,3,5]]+[255])
@@ -24,10 +32,6 @@ def HIVEVO_colormap():
     return cmap
 
 
-
-
-
-# Functions
 def plot_cuts_quality_along_reads(data, title='',
                                   VERBOSE=0, savefig=False):
     '''Plot some cuts of the quality along the read'''
@@ -711,11 +715,78 @@ def plot_substitution_rate_sliding(data,
                                    title='',
                                    VERBOSE=0, savefig=False):
     '''Plot the substitution rates'''
-    from ..analysis.substitution_rate.rate_sliding_window import plot_region_boxes
-
     if VERBOSE:
         print 'Plot substitution rates in a sliding window'
     
+    def plot_region_boxes(regions, ax, refname='HXB2', VERBOSE=0):
+        '''Plot boxes for genomic regions of HXB2'''
+        import pandas as pd
+        from matplotlib.patches import Rectangle
+    
+        from hivwholeseq.reference import load_custom_reference
+        refseq = load_custom_reference(refname, format='gb')
+    
+        data = []
+        
+        y1 = 5
+        height = 5
+        pad = 2
+        for feature in refseq.features:
+            if feature.id in regions:
+                x = [max(547, feature.location.nofuzzy_start),
+                     min(9591, feature.location.nofuzzy_end)]
+                name = feature.id
+                if name == 'RRE':
+                    name = '         RRE'
+                elif name == 'V5':
+                    name = 'V5   '
+
+                data.append({'name': name,
+                             'x1': x[0], 'x2': x[1], 'width': x[1] - x[0]})
+    
+        data = pd.DataFrame(data)
+        data.sort('x1', inplace=True)
+        data.index = np.arange(len(data))
+        data['height'] = height
+        data['parity'] = ((1 + np.arange(len(data))) % 2)
+        data['row'] = 'bottom'; data.loc[np.array(data['parity'] == 1), 'row'] = 'top'
+        data['y1'] = y1 + (height + pad) * data['parity']
+        data['y2'] = data['y1'] + data['height']
+    
+        for _, datum in data.iterrows():
+            r = Rectangle((datum['x1'], datum['y1']),
+                          datum['width'],
+                          datum['height'],
+                          facecolor=[0.8] * 3,
+                          edgecolor='k',
+                          label=datum['name'])
+            
+            xt = datum['x1'] + 0.5 * datum['width']
+            yt = datum['y1'] + 0.5 * datum['height']
+            if datum['row'] == 'top':
+                yt +=  height + 0
+            else:
+                yt -= height + 4.2
+    
+            ax.add_patch(r)
+            ax.text(xt, yt,
+                    datum['name'],
+                    color='k', 
+                    fontsize=16,
+                    ha='center')
+
+            if 'RRE' in datum['name']:
+                ax.plot([datum['x1'] + 0.5 * datum['width'],
+                         datum['x1'] + 2.5 * datum['width'],
+                         datum['x1'] + 2.5 * datum['width'],
+                        ],
+                        [datum['y1'] + 0.5 * datum['height'],
+                         datum['y1'] + 0.5 * datum['height'],
+                         datum['y1'] + 0.0 * datum['height']
+                        ],
+                        lw=2, color='k')
+
+
     # Sort patient codes
     pcodes = sorted(set(data['pcode']), key=lambda x: int(x[1:]))
 
@@ -723,7 +794,7 @@ def plot_substitution_rate_sliding(data,
 
     fig, axs = plt.subplots(2, 1,
                             sharex=True,
-                            figsize=(10, 7),
+                            figsize=(8, 6),
                             gridspec_kw={'height_ratios':[4, 1]})
 
     ax = axs[0]
@@ -746,9 +817,13 @@ def plot_substitution_rate_sliding(data,
     ax.set_ylabel('Substitution rate\n[changes / year / site]', labelpad=20,
                   fontsize=16)
     ax.legend(loc='upper center',
-              title='Patients',
+              bbox_to_anchor=(0.5, 0.93),
               ncol=4,
               fontsize=16)
+    ax.text(0.5, 0.93, 'Patients:', fontsize=18,
+            ha='center',
+            transform=ax.transAxes,
+           )
 
     ax = axs[1]
     ax.set_ylim(-4, 26)
@@ -972,16 +1047,16 @@ def plot_fitness_cost(fits, title='', VERBOSE=0, savefig=False):
 
 def plot_allele_freq_example(data, title='', VERBOSE=0, savefig=False):
     '''Plot the estimated fitness value, for all regions together'''
-    fig, axs = plt.subplots(2, 3, figsize=(9, 8))
+    fig, axs = plt.subplots(2, 3, figsize=(7, 5))
     sns.set_style('darkgrid')
-    fs=16
+    fs = 18
     datum = data[0]
     ind = np.arange(len(datum['times']))
     ind = [0, len(ind) // 2, ind[-1]]
 
     icons0 = datum['aft'][0].argmax(axis=0)
 
-    cmap = HIVEVO_colormap()
+    cmap = HIVEVO_colormap(kind='alternative')
     x = np.arange(datum['aft'].shape[2])
     color = [[float(tmp) for tmp in cmap(p)] for p in np.linspace(0, 1, len(x))]
     for ii, i in enumerate(ind):
@@ -1000,7 +1075,7 @@ def plot_allele_freq_example(data, title='', VERBOSE=0, savefig=False):
         
         ax.set_ylim(1e-2, 1.35)
         ax.set_xlim(-5, len(x) + 5)
-        ax.set_xticks(range(0,len(x), 75))
+        ax.set_xticks(range(0, len(x), 150))
         ax.set_yscale('log')
         ax.grid(True)
         ax.set_title(str(int(time / 30.5))+' months', fontsize=fs)
@@ -1014,27 +1089,26 @@ def plot_allele_freq_example(data, title='', VERBOSE=0, savefig=False):
             ax.set_yticklabels([])
 
     axs[0][1].set_xlabel('Position [bp]', fontsize=fs, labelpad=5)
-    axs[0][0].set_ylabel('SNV frequency', fontsize=fs, labelpad=5)
+    fig.text(0.035, 0.5, 'SNV frequency', ha='center', va='center', rotation='vertical',
+             fontsize=fs)
 
-    ax = plt.subplot2grid((2,3), (1,0), colspan = 3)
-    print datum['aft'].shape
+    ax = plt.subplot2grid((2, 3), (1, 0), colspan=3)
     tmonth = datum['times']/30.5
     for pos in xrange(datum['aft'].shape[2]):
         for nuc in xrange(4):
             traj = datum['aft'][:,nuc,pos]
             traj[traj<0.003] = 0.003
-            if traj[0]<0.5 and traj.max()>0.05:
-                ax.plot(tmonth, traj, c = color[pos])
+            if (traj[0] < 0.5) and (traj.max() > 0.05):
+                ax.plot(tmonth, traj, c=color[pos])
 
     ax.set_ylim(1e-2, 1.35)
-    ax.set_xlim(0, tmonth[-1]+1)
+    ax.set_xlim(0, tmonth[-1] + 1)
     ax.set_yscale('log')
-    ax.set_ylabel('SNV frequency', fontsize=fs, labelpad=5)
     ax.set_xlabel('Time since infection [months]', fontsize=fs)
     for item in ax.get_xticklabels() + ax.get_yticklabels():
         item.set_fontsize(fs)
 
-    plt.tight_layout()
+    plt.tight_layout(rect=(0.07, 0.02, 0.98, 0.98), pad=0.05, h_pad=0.5, w_pad=0.4)
     if savefig:
         fig_filename = savefig
         fig_folder = os.path.dirname(fig_filename)
@@ -1325,4 +1399,64 @@ def plot_divergence_cons_pop_diversity(data, VERBOSE=0, savefig=False,
     else:
         plt.ion()
         plt.show()
+
+
+def plot_sfs_syn_nonsyn(data, VERBOSE=0, savefig=False):
+    '''Plot SFS synonymous/nonsynonymous'''
+    print 'Plot SFS syn/nonsyn'
+
+    sns.set_style('darkgrid')
+
+    plot_props = [{'mutclass': 'syn',
+                   'color': 'steelblue',
+                   'label': 'synonymous',
+                  },
+                  {'mutclass': 'nonsyn',
+                   'color': 'darkred',                      
+                   'label': 'nonsynonymous',
+                  }]
+
+    fig, ax = plt.subplots() 
+    for ip, props in enumerate(plot_props):
+        mutclass = props['mutclass']
+        color = props['color']
+        label = props['label']
+
+        arr = data.loc[:, mutclass]
+        y = np.array(arr)
+        x = data.loc[:, 'afbin_left']
+        w = data.loc[:, 'afbin_right'] - x
+
+        n_props = len(plot_props)
+        ws = 1.0 / (n_props + 1)
+        x += ws * w * ip
+
+        bottom = 1e-3
+        height = y - bottom
+        ax.bar(x, height, width=ws * w, bottom=bottom,
+               color=color,
+               label=label)
+
+
+    ax.set_xlabel('Allele frequency')
+    ax.set_xlim(0, 1)
+    ax.set_yscale('log')
+    ax.grid(True)
+    ax.legend(loc='upper right', ncol=1, fontsize=14)
+    ax.set_ylabel('Spectrum')
+
+    plt.tight_layout()
+        
+    if savefig:
+        fig_filename = savefig
+        fig_folder = os.path.dirname(fig_filename)
+
+        mkdirs(fig_folder)
+        fig.savefig(fig_filename)
+        plt.close(fig)
+
+    else:
+        plt.ion()
+        plt.show()
+
 
