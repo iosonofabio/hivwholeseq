@@ -1403,9 +1403,11 @@ def plot_divergence_cons_pop_diversity(data, VERBOSE=0, savefig=False,
 
 def plot_sfs_syn_nonsyn(data, VERBOSE=0, savefig=False):
     '''Plot SFS synonymous/nonsynonymous'''
-    print 'Plot SFS syn/nonsyn'
+    if VERBOSE >= 2:
+        print 'Plot SFS syn/nonsyn'
 
     sns.set_style('darkgrid')
+    fs = 18
 
     plot_props = [{'mutclass': 'syn',
                    'color': 'steelblue',
@@ -1416,16 +1418,16 @@ def plot_sfs_syn_nonsyn(data, VERBOSE=0, savefig=False):
                    'label': 'nonsynonymous',
                   }]
 
-    fig, ax = plt.subplots() 
+    fig, ax = plt.subplots(figsize=(5, 4)) 
     for ip, props in enumerate(plot_props):
         mutclass = props['mutclass']
         color = props['color']
         label = props['label']
 
-        arr = data.loc[:, mutclass]
+        arr = data.loc[:, mutclass+' fraction']
         y = np.array(arr)
-        x = data.loc[:, 'afbin_left']
-        w = data.loc[:, 'afbin_right'] - x
+        x = np.array(data.loc[:, 'afbin_left'])
+        w = np.array(data.loc[:, 'afbin_right'] - x)
 
         n_props = len(plot_props)
         ws = 1.0 / (n_props + 1)
@@ -1438,12 +1440,14 @@ def plot_sfs_syn_nonsyn(data, VERBOSE=0, savefig=False):
                label=label)
 
 
-    ax.set_xlabel('Allele frequency')
+    ax.set_xlabel('Allele frequency', fontsize=fs)
     ax.set_xlim(0, 1)
     ax.set_yscale('log')
     ax.grid(True)
-    ax.legend(loc='upper right', ncol=1, fontsize=14)
-    ax.set_ylabel('Spectrum')
+    ax.legend(loc='upper right', ncol=1, fontsize=fs)
+    ax.set_ylabel('Fraction of of SNVs', fontsize=fs)
+    ax.xaxis.set_tick_params(labelsize=fs)
+    ax.yaxis.set_tick_params(labelsize=fs)
 
     plt.tight_layout()
         
@@ -1459,4 +1463,138 @@ def plot_sfs_syn_nonsyn(data, VERBOSE=0, savefig=False):
         plt.ion()
         plt.show()
 
+
+def plot_divergence_diversity(data, VERBOSE=0, savefig=False):
+    '''Plot divergence and diversity in various genomic regions'''
+    from itertools import izip
+
+    if VERBOSE >= 2:
+        print 'Plot divergence and diversity'
+
+    colors = ["#5097BA", "#60AA9E", "#75B681", "#8EBC66", "#AABD52", "#C4B945",
+              "#D9AD3D", "#E59637", "#E67030", "#DF4327"]
+
+    # NOTE: gp41 has overlaps with tat/rev (hard to tell syn/nonsyn)
+    # NOTE: gp120 has the V loops that are hard to call syn/nonsyn
+    reg_groups = [['PR', 'IN', 'p15', 'RT'],
+                  ['p17', 'p24', 'p6', 'p7'],
+                  ['vif', 'vpu', 'vpr', 'nef'],
+                 ]
+    fs = 17
+    alpha = 0.8
+    pcodes = np.unique(data['patient']).tolist()
+    pcodes.sort(key=lambda x: int(x[1:]))
+    cls = np.unique(data['class'])
+    fig, axs = plt.subplots(1, 2,
+                            figsize=(8, 4),
+                            sharey=True,
+                            sharex=True)
+
+    fig.text(0.38, 0.035, 'Time [days from infection]', fontsize=fs)
+
+    axs[0].set_title('nonsyn', ha='center', fontsize=fs)
+    axs[1].set_title('syn', ha='center', fontsize=fs)
+
+    # Bin data in time
+    from hivwholeseq.utils.pandas import add_binned_column
+    _, times = add_binned_column(data, 'tbin', 'time',
+                                 bins=np.linspace(0, 3300, 8),
+                                 clip=True)
+    data.loc[:, 'tbinned'] = times[data['tbin']]
+    region_data = [(data
+                    .loc[data['region'].isin(reg)]
+                    .groupby(['obs', 'ctype', 'class']))
+                    for reg in reg_groups]
+
+
+    def label_func(dclass, obs, reg_label):
+        if dclass=='syn' and reg_label=='accessory':
+            return obs
+        elif dclass=='nonsyn' and obs=='divergence':
+            return reg_label
+        else:
+            return None
+
+
+    for ax, dclass, ls2 in izip(axs, ['nonsyn', 'syn'], ['-', '--']):
+        ax.grid(True)
+        for ctype, obs, ls in izip(['population', 'population'], ['divergence','diversity'], ['-','--']):
+            for reg, reg_label, color in izip(region_data, 
+                                    ['enzymes','structural', 'accessory'], 
+                                    [colors[i] for i in [0,4,9]]):
+                tmp = reg.get_group((obs, ctype, dclass)).groupby('tbinned', as_index=False).mean()
+                x = tmp['tbinned']
+                y = tmp['div']
+                ax.plot(x, y,
+                    ls=ls,
+                    lw=2,
+                    color=color,
+                    alpha=alpha,
+                    label=label_func(dclass, obs, reg_label),
+                  )
+        
+        ax.legend(loc=2, fontsize=fs)
+
+    ax.set_ylim([0,0.04])
+    axs[0].set_yticks([0,0.025, 0.05])
+    axs[0].set_xticks([0, 1500, 3000])
+    axs[0].yaxis.set_tick_params(labelsize=fs)
+    axs[0].xaxis.set_tick_params(labelsize=fs)
+    axs[1].xaxis.set_tick_params(labelsize=fs)
+    #axs[0].set_ylabel('Divergence', fontsize=fs, labelpad=10)
+    #axs[1].yaxis.set_label_position('right')
+    #axs[1].set_ylabel('Diversity', fontsize=fs, labelpad=10)
+    plt.tight_layout(rect=(0, 0.05, 0.98, 1))
+
+    if savefig:
+        fig_filename = savefig
+        fig_folder = os.path.dirname(fig_filename)
+
+        mkdirs(fig_folder)
+        fig.savefig(fig_filename)
+        plt.close(fig)
+
+    else:
+        plt.ion()
+        plt.show()
+
+
+
+def plot_LD(data, VERBOSE=0, savefig=False):
+    '''Plot linkage disequilibrium'''
+    if VERBOSE >= 2:
+        print 'Plot LD'
+
+    sns.set_style('darkgrid')
+    fs=16
+
+    binc = data['binc']
+    Dp_vs_distance = data['Dp']
+
+    fig = plt.figure(2, figsize=(5.5, 4.3))
+    ax = plt.subplot(111)
+    for frag, y in Dp_vs_distance.iteritems():
+        ax.plot(binc, y, label=frag, lw=3)
+
+    ax.set_xticks(range(0, 401, 100))
+    ax.set_yticks(np.arange(0., 1.01, 0.2))
+    for item in ax.get_xticklabels() + ax.get_yticklabels():
+        item.set_fontsize(fs)
+    ax.set_ylabel("linkage disequilibrium D'", fontsize=fs)
+    ax.set_xlabel("distance [bp]", fontsize=fs)
+    ax.legend(loc=1, fontsize=fs, ncol=3)
+
+    plt.tight_layout(rect=(0, 0, 0.98, 1))
+
+    if savefig:
+        fig_filename = savefig
+        fig_folder = os.path.dirname(fig_filename)
+
+        mkdirs(fig_folder)
+        fig.savefig(fig_filename)
+        plt.close(fig)
+
+    else:
+        plt.ion()
+        plt.show()
 

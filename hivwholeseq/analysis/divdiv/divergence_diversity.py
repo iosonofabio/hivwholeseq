@@ -299,6 +299,7 @@ def plot_data(data, VERBOSE=0):
         
     plt.tight_layout(rect=(0.05, 0.05, 0.98, 0.97))
 
+
 def plot_avg_only(data, VERBOSE=0):
     '''Plot divergence'''
     # NOTE: gp41 has overlaps with tat/rev (hard to tell syn/nonsyn)
@@ -330,6 +331,8 @@ def plot_avg_only(data, VERBOSE=0):
                     .loc[data['region'].isin(reg)]
                     .groupby(['obs', 'ctype', 'class']))
                     for reg in reg_groups]
+
+
     def label_func1(dclass, obs,reg_label):
         if obs=='divergence' and reg_label=='accessory':
             return dclass
@@ -377,6 +380,7 @@ def plot_avg_only(data, VERBOSE=0):
     axs[1].yaxis.set_label_position('right')
     axs[1].set_ylabel('Diversity', fontsize=16)
     plt.tight_layout(rect=(0.05, 0.05, 0.98, 0.97))
+
 
 
 # Script

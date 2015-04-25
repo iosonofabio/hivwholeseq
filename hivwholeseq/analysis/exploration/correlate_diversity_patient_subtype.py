@@ -40,6 +40,8 @@ colors = {'p17': 'r',
           'p15': 'purple',
           'IN': 'orange',
           'gp41': 'r'}
+regions = ['p17', 'p24', 'PR', 'RT', 'p15', 'IN', 'gp41']
+
 
 
 
@@ -97,13 +99,16 @@ def get_entropy_pats(afts, VERBOSE=0):
 # Script
 if __name__ == '__main__':
 
-    # Parse input args
+    #FIXME: this script is using multiple sequence alignments across patients,
+    # but since we have aligned everybody to HXB2 that would be a better option,
+    # since it's more flexible, less prone to bugs and stale data
+
     parser = argparse.ArgumentParser(
         description='Explore conservation levels across patients and subtype',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
-    parser.add_argument('--regions', nargs='+', required=True,
+    parser.add_argument('--regions', nargs='+', default=regions,
                         help='Regions to analyze (e.g. F1 p17)')
-    parser.add_argument('--verbose', type=int, default=0,
+    parser.add_argument('--verbose', type=int, default=2,
                         help='Verbosity level [0-4]')
     parser.add_argument('--plot', nargs='?', default=None, const='2D',
                         help='Plot results')

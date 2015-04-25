@@ -614,10 +614,12 @@ class Patient(pd.Series):
 
 
 # Functions
-def load_patients():
+def load_patients(pnames=None):
     '''Load patients from general table'''
     patients = pd.read_excel(table_filename, 'Patients', index_col=1)
     patients.index = pd.Index(map(str, patients.index))
+    if pnames is not None:
+        patients = patients.loc[pnames]
     return patients
 
 

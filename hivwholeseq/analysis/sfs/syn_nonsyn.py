@@ -121,11 +121,13 @@ def collect_data(pnames, regions, VERBOSE=0):
                         data.append((region, pcode,
                                      anc, der, mut,
                                      mutclass,
+                                     posdna,
                                      time, af))
 
     data = pd.DataFrame(data=data, columns=('region', 'pcode',
                                             'anc', 'der', 'mut',
                                             'mutclass',
+                                            'pos',
                                             'time', 'af'))
 
     return data
@@ -163,13 +165,16 @@ def get_sfs(data, bins_af='linear', attrnames=['tbin', 'mutclass'], VERBOSE=0,
     datah = datah.T
 
     # Normalize
+    cols = datah.columns
     if normalize in ['fraction', 'density']:
-        datah /= datah.sum(axis=0) # The sum of counts
+        for col in cols:
+            datah[col+' fraction'] = datah[col] / datah[col].sum()
 
     # (the bin widths)
     if normalize in ['density']:
         binsw_af = bins_af[1:] - bins_af[:-1]
-        datah /= binsw_af
+        for col in cols:
+            datah[col+' density'] = datah[col+' fraction'] / binsw_af
 
     # Add pseudocounts
     vmin = 0.1 * datah[datah > 0].min().min()
@@ -181,6 +186,27 @@ def get_sfs(data, bins_af='linear', attrnames=['tbin', 'mutclass'], VERBOSE=0,
     datah['afbin_center'] = binsc_af[datah.index]
 
     return datah
+
+
+def get_number_fixed(data):
+    '''Get numbers of fixed derived alleles'''
+    g = data.groupby(['pcode', 'mutclass', 'pos']).apply(lambda x: (x['af'] > 0.9).any())
+    h = g.unstack('pos').sum(axis=1).unstack('pcode')
+
+    # Some patients have no fixations at all
+    ind = np.array(h.sum(axis=0) > 0)
+    h = h.loc[:, ind]
+
+    avg = h.mean(axis=1)
+    std = h.std(axis=1)
+    ratio = h.loc['syn'] / h.loc['nonsyn']
+    ravg = ratio.mean()
+    rstd = ratio.std()
+    return {'avg': avg,
+            'std': std,
+            'ratio avg': ravg,
+            'ratio std': rstd,
+            'data': h}
 
 
 def plot_sfs_synnonsyn(datah):
@@ -199,7 +225,7 @@ def plot_sfs_synnonsyn(datah):
         color = props['color']
         label = props['label']
 
-        arr = datah.loc[:, mutclass]
+        arr = datah.loc[:, mutclass+' fraction']
         y = np.array(arr)
         x = datah.loc[:, 'afbin_left']
         w = datah.loc[:, 'afbin_right'] - x
