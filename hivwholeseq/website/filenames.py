@@ -20,9 +20,9 @@ def get_foldername(name):
     return foldername
 
 
-def get_sample_table_filename(pname):
+def get_sample_table_filename(pname, kind):
     '''Get filename of the same table'''
-    filename = 'samples_'+pname+'.tsv'
+    filename = 'samples_'+kind+'_'+pname+'.tsv'
     filename = get_foldername('tables')+filename
     return filename
 

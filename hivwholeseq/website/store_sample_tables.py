@@ -23,11 +23,18 @@ if __name__ == '__main__':
         print patient.code, patient.name
 
         # Samples table
-        table = (patient.samples[['days since infection'] +
-                                 ['F'+str(i)+'q' for i in xrange(1, 7)]]
-                 .set_index('days since infection'))
+        tables = [{'kind': 'quantitative', 'suffix': 'q'},
+                  {'kind': 'qualitative', 'suffix': ''}]
 
-        # Write output
-        fn_out = get_sample_table_filename(patient.code)
-        table.to_csv(fn_out, sep='\t')
+        for tdata in tables:
+
+            table = (patient.samples[['days since infection'] +
+                                     ['F'+str(i)+tdata['suffix'] for i in xrange(1, 7)]]
+                     .set_index('days since infection'))
+
+            table['RNA templates'] = np.array(patient.n_templates, int)
+
+            # Write output
+            fn_out = get_sample_table_filename(patient.code, kind=tdata['kind'])
+            table.to_csv(fn_out, sep='\t')
 
