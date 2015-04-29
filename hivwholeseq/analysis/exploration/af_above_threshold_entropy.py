@@ -78,7 +78,7 @@ def collect_data(pnames, regions, VERBOSE=0):
             patient = Patient(patient)
             aft, ind = patient.get_allele_frequency_trajectories(region,
                                                                  cov_min=1000,
-                                                                 depth_min=300,
+                                                                 depth_min=30,
                                                                  VERBOSE=VERBOSE)
             if len(ind) == 0:
                 if VERBOSE >= 2:
@@ -122,83 +122,37 @@ def collect_data(pnames, regions, VERBOSE=0):
                 if aft_anc0 < 0.9:
                     continue
 
+                # KEY: Take sum of derived alleles
+                aft_der = 1.0 - aft[:, ianc, posdna]
 
                 # Get only non-masked time points
-                aft_der = aft[:, 0, posdna]
                 indpost = -aft_der.mask
                 if indpost.sum() == 0:
                     continue
                 timespos = times[indpost]
-                aft_nm = aft[indpost, :, posdna]
 
+                # Set subtype wide properties
                 Spos_sub = Ssub[pos_sub]
                 conspos_sub = conssub[pos_sub]
-
                 if (anc == conspos_sub):
                     away_conssub = 'away'
                 else:
                     away_conssub = 'to'
 
                 for it, time in enumerate(timespos):
-                    S = -(aft_nm[it] * np.log2(aft_nm[it] + 1e-10)).sum()
+                    af = aft_der[it]
                     data.append((region, pcode,
                                  anc,
                                  Spos_sub, conspos_sub, away_conssub,
-                                 time, S))
+                                 time, af))
 
     data = pd.DataFrame(data=data, columns=('region', 'pcode',
                                             'anc',
                                             'Ssub', 'conssub', 'awayto',
-                                            'time', 'S'))
+                                            'time', 'af'))
 
 
     return data
-
-
-def calculate_correlation(data, VERBOSE=0):
-    '''Calculate correlation coefficients'''
-    from scipy.stats import pearsonr, spearmanr
-
-    datap = []
-    for (pcode, region), datum in data.groupby(['pcode', 'region']):
-        for t, datumt in datum.groupby('time'):
-            M = np.array(datumt[['Ssub', 'S']]).T
-            rho, P = spearmanr(M[0], M[1])
-            datap.append({'pcode': pcode,
-                          'region': region,
-                          'time': t,
-                          'rho': rho,
-                         })
-    datap = pd.DataFrame(datap)
-
-    return datap
-
-
-def plot_correlation(datap, VERBOSE=0, colormap='jet'):
-    '''Plot the correlation between intrapatient and subtype diversity'''
-    if isinstance(colormap, basestring):
-        if colormap == 'jet':
-            colormap = cm.jet
-        else:
-            raise ValueError('colormap not recognized')
-
-    pcodes = datap['pcode'].unique().tolist()
-    for region, datump in datap.groupby('region'):
-
-        fig, ax = plt.subplots()
-
-
-        for ip, (pcode, datumpp) in enumerate(datump.groupby('pcode')):
-            x = np.array(datumpp['time'])
-            y = np.array(datumpp['rho'])
-            ax.plot(x, y,
-                    lw=2,
-                    color=colormap(1.0 * ip / len(pcodes)),
-                   )
-
-        ax.set_xlabel('Time [days from infection')
-        ax.set_ylabel('Spearmanr pat/subtype B')
-        ax.grid(True)
 
 
 
@@ -225,12 +179,59 @@ if __name__ == '__main__':
 
     data = collect_data(pnames, regions, VERBOSE=VERBOSE)
 
-    datap = calculate_correlation(data, VERBOSE=VERBOSE)
+    # Calculate the fraction of allele above thresholds
+    from hivwholeseq.utils.pandas import add_binned_column
+    bins_S, binsc_S = add_binned_column(data, 'Sbin', 'Ssub', bins=5, clip=True)
+    bins_t, binsc_t = add_binned_column(data, 'tbin', 'time',
+                                        bins=300 * np.arange(8),
+                                        clip=True)
+
+    thresholds = 0.01 * np.arange(10)
+    datap = []
+    for (Sbin, tbin, pcode), datum in data.groupby(['Sbin', 'tbin', 'pcode']):
+        datump = {'Ssub': binsc_S[Sbin],
+                  'time': binsc_t[tbin],
+                  'pcode': pcode,
+                 }
+        for thr in thresholds:
+            datump['frac > '+'{:.1G}'.format(thr)] = (datum['af'] > thr).mean()
+        datap.append(datump)
+
+    datap = pd.DataFrame(datap)
 
 
+    # Plot
     if plot:
-        plot_correlation(datap, VERBOSE=VERBOSE)
+
+        thr = 0.01
+
+        Ssubs = datap.Ssub.unique().tolist()
+        colormap = cm.jet
+
+
+        fig, ax = plt.subplots()
+        for (Ssub, pcode), datump in datap.groupby(['Ssub', 'pcode']):
+            x = np.array(datump['time'])
+            y = np.array(datump['frac > '+'{:.1G}'.format(thr)])
+
+            if pcode == datap.pcode.unique()[0]:
+                label = '{:.1G}'.format(Ssub)
+            else:
+                label = ''
+
+            ax.plot(x, y,
+                    lw=2,
+                    ls='-', marker='o', ms=10,
+                    color=colormap(1.0 * Ssubs.index(Ssub) / len(Ssubs)),
+                    label=label,
+                   )
+
+        ax.set_xlabel('Time [days from infection]')
+        ax.set_ylabel('frac > '+'{:.1G}'.format(thr))
+        ax.grid(True)
+        ax.legend(loc=2, title='Subtype B entropy:')
+
+        plt.tight_layout()
+
         plt.ion()
         plt.show()
-
-

@@ -28,7 +28,7 @@ def add_binned_column(data, name, column, bins=10, clip=False):
     tmp = data.loc[:, column]
     if clip:
         tmp = tmp.clip(bins[0], bins[-1])
-    data.loc[:, name] = pd.cut(data.loc[:, column], bins=bins, include_lowest=True, labels=False)
+    data.loc[:, name] = pd.cut(tmp, bins=bins, include_lowest=True, labels=False)
 
     binsc = 0.5 * (bins[1:] + bins[:-1])
     return bins, binsc

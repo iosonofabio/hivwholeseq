@@ -24,7 +24,6 @@ from hivwholeseq.cross_sectional.get_subtype_entropy import (
     get_subtype_reference_alignment_entropy)
 from hivwholeseq.cross_sectional.get_subtype_allele_frequencies import (
     get_subtype_reference_alignment_allele_frequencies)
-from hivwholeseq.patients.one_site_statistics import get_codons_n_polymorphic
 
 
 
