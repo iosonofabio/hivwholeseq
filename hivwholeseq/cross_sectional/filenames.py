@@ -6,10 +6,17 @@ content:    Support module for filenames.
 '''
 # Modules
 from hivwholeseq.sequencing.filenames import reference_folder
+from hivwholeseq.filenames import table_folder
 
 
 
 # Functions
+def get_ctl_epitope_map_filename():
+    '''Get filename of epitope map from LANL'''
+    fn = 'ctl_summary.csv'
+    return table_folder+fn
+
+
 def get_subtype_reference_alignment_filename(region, subtype='B',
                                              refname='HXB2',
                                              type='nuc',

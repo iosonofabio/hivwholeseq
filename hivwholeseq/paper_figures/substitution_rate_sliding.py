@@ -30,6 +30,20 @@ regions = ["LTR5'", 'p17', 'p24', 'PR', 'RT', 'IN', 'vif', 'vpr', 'vpu',
 
 
 # Functions
+def store_data(data, fn):
+    '''Store data to file for the plots'''
+    import cPickle as pickle
+    with open(fn, 'wb') as f:
+        pickle.dump(data, f, protocol=-1)
+
+
+def load_data(fn):
+    '''Load the data for the plots'''
+    import cPickle as pickle
+    with open(fn, 'rb') as f:
+        return pickle.load(f)
+
+
 def get_subs_matrix(datap):
     from collections import Counter
 
@@ -74,23 +88,32 @@ if __name__ == '__main__':
             collect_data, fit_substitution_rate)
 
         if VERBOSE >= 1:
-            print 'Collect data'
+            print 'Collect data for substitution rates'
         data = collect_data(pnames, VERBOSE=VERBOSE)
 
         if VERBOSE >= 1:
             print 'Fit substitution rates'
-        datap = fit_substitution_rate(data, VERBOSE=VERBOSE)
+        datas = fit_substitution_rate(data, VERBOSE=VERBOSE)
+
+        if VERBOSE >= 1:
+            print 'Collect data for sweeps'
+        from hivwholeseq.analysis.sweeps.sweep_map import (
+            collect_data as collect_data_sweeps)
+        data_sweeps = collect_data_sweeps(pnames, VERBOSE=VERBOSE)
 
         if VERBOSE >= 1:
             print 'Save data for plot to pickle'
-        datap.to_pickle(fn_data)
+        datap = {'substitution_rate': datas,
+                 'sweeps': data_sweeps,
+                }
+        store_data(datap, fn_data)
 
     else:
-        datap = pd.read_pickle(fn_data)
-
+        datap = load_data(fn_data)
 
     # Print fold changes excluding p9
-    M = get_subs_matrix(datap.loc[np.array(-datap['pcode'].isin(['p9']))])
+    datas = datap['substitution_rate']
+    M = get_subs_matrix(datas.loc[np.array(-datas['pcode'].isin(['p9']))])
     calc_fold_change(M)
 
     filename = foldername+'substitution_rates_sliding'

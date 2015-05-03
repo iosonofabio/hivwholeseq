@@ -614,6 +614,11 @@ class Patient(pd.Series):
 
 
 # Functions
+def iterpatient(patients):
+    for pname, patient in patients.iterrows():
+        yield (pname, Patient(patient))
+
+
 def load_patients(pnames=None):
     '''Load patients from general table'''
     patients = pd.read_excel(table_filename, 'Patients', index_col=1)
@@ -652,3 +657,5 @@ def convert_date_deltas_to_float(deltas, unit='day'):
                             'year': 3600e9 * 24 * 365.25,
                            }
     return np.array(deltas, float) / nanoseconds_per_unit[unit]
+
+

@@ -717,6 +717,12 @@ def plot_substitution_rate_sliding(data,
     '''Plot the substitution rates'''
     if VERBOSE:
         print 'Plot substitution rates in a sliding window'
+
+    data_sweeps = data['sweeps']
+    data = data['substitution_rate']
+
+    # Plot parameters
+    fs = 16
     
     def plot_region_boxes(regions, ax, refname='HXB2', VERBOSE=0):
         '''Plot boxes for genomic regions of HXB2'''
@@ -772,7 +778,7 @@ def plot_substitution_rate_sliding(data,
             ax.text(xt, yt,
                     datum['name'],
                     color='k', 
-                    fontsize=16,
+                    fontsize=fs,
                     ha='center')
 
             if 'RRE' in datum['name']:
@@ -789,14 +795,14 @@ def plot_substitution_rate_sliding(data,
 
     # Sort patient codes
     pcodes = sorted(set(data['pcode']), key=lambda x: int(x[1:]))
-
     cfun = lambda pcode: cm.jet(1.0 * pcodes.index(pcode) / len(pcodes))
 
-    fig, axs = plt.subplots(2, 1,
+    fig, axs = plt.subplots(3, 1,
                             sharex=True,
-                            figsize=(8, 6),
-                            gridspec_kw={'height_ratios':[4, 1]})
+                            figsize=(8, 7),
+                            gridspec_kw={'height_ratios':[4, 1, 1]})
 
+    # Substitution rate
     ax = axs[0]
     for pcode in pcodes:
         datum = data.loc[data['pcode'] == pcode].iloc[0]
@@ -808,29 +814,51 @@ def plot_substitution_rate_sliding(data,
         ax.plot(x, y, color=color, lw=2, label=pcode)
 
     ax.set_ylim(1e-4, 2e-1)
-    ax.set_yticklabels(ax.get_yticklabels(), fontsize=16)
+    ax.set_yticklabels(ax.get_yticklabels(), fontsize=fs)
     ax.grid(True)
     ax.set_yscale('log')
-    for item in ax.get_yticklabels():
-        item.set_fontsize(16)
+    ax.xaxis.set_tick_params(labelsize=fs)
 
     ax.set_ylabel('Substitution rate\n[changes / year / site]', labelpad=20,
-                  fontsize=16)
+                  fontsize=fs)
     ax.legend(loc='upper center',
               bbox_to_anchor=(0.5, 0.93),
               ncol=4,
-              fontsize=16)
+              fontsize=fs)
     ax.text(0.5, 0.93, 'Patients:', fontsize=18,
             ha='center',
             transform=ax.transAxes,
            )
 
+    
+    # Sweeps
     ax = axs[1]
-    ax.set_ylim(-4, 26)
-    ax.set_xlabel('Position in HXB2 [bp]', fontsize=16, labelpad=20)
+    pnames = data_sweeps['pcode'].unique().tolist()
+    Lp = len(pnames)
+
+    for pname, datum in data_sweeps.groupby('pcode'):
+        x = np.array(datum['pos_ref'])
+        y = np.repeat(pnames.index(pname), len(x))
+
+        ax.scatter(x, y, s=30, marker='o',
+                   color=cfun(pname),
+                   label=pname,
+                  )
+
+    ax.set_xlim(-50, data_sweeps['pos_ref'].max() + 200)
+    ax.set_ylim(Lp, -1)
     ax.set_yticks([])
-    for item in ax.get_xticklabels():
-        item.set_fontsize(16)
+    ax.set_xticks([])
+    ax.set_ylabel('Sweeps', fontsize=fs, labelpad=60)
+    ax.grid(True)
+
+
+    # Genome map
+    ax = axs[2]
+    ax.set_ylim(-4, 26)
+    ax.set_xlabel('Position [bp]', fontsize=fs, labelpad=20)
+    ax.set_yticks([])
+    ax.xaxis.set_tick_params(labelsize=fs)
     ax.grid(True, axis='x')
 
     plot_region_boxes(regions, ax, VERBOSE=VERBOSE)
