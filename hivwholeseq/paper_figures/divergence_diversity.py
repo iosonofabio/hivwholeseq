@@ -19,7 +19,9 @@ from hivwholeseq.paper_figures.plots import plot_divergence_diversity
 
 # Globals
 pnames = ['20097', '15363', '15823', '9669', '20529', '15241', '15376', '15319']
-regions = ['p17', 'p24', 'p6', 'p7', 'PR', 'RT', 'p15', 'IN', 'vif', 'vpu', 'vpr', 'nef']
+regions = ['p17', 'p24', 'p6', 'p7', 'PR', 'RT', 'p15', 'IN', 'vif',
+           'vpu', 'vpr', 'nef',
+           'gp120_noVloops']
 
 
 

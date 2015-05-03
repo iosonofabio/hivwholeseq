@@ -74,6 +74,16 @@ V5_edges = ['ATCAAATATTACAGGGNTNNTAACAAGAGATGGNGGN', 'GNAGGAGGANATATGANGGANAATTG
 # INSIDE this primer
 V2_edges = ['TGCTCTTTCAATNTCANCNCANNNNTAANA',
             'AANACCTCANTCATTACACANGCNTGTCCAAANNTATCCTTTGANCCAATTCC']
+gp120_noVloops_edges = ['NNAGAANANTTGTGGGTCACAGTCTATTATGGGGTACCT',
+                        'AAAGCCTAAAGCCATGTGTAAAATTAACCCCACTCTGTGTTAGTTTAAAG',
+                        'AANACCTCANTCATTACACANGCNTGTCCAAANNTATCCTTTGANCCAATTCC',
+                        'ACAGTACAATGTACACATGGAATTANNCCA',
+                        'TTTAATTGTGGAGGGGAATTTTTCT',
+                        'GGGGAATTTTTCTAC',
+                        'GAATAAAACAAATTNTAAACANGTGGCAGAAAGTAGGAAAAGCA',
+                        'ATTACAGGGNTNNTATTAACAAGAGATGGTGGT',
+                        'GNAGGAGGANATATGANGGACAATTGGAGAAGT',
+                        'GGCAAAGAGAAGAGTGGTGCAGAGAGAAAAAAGA']
 
 
 other_edges = {'env peptide': env_peptide_edges,
@@ -83,6 +93,7 @@ other_edges = {'env peptide': env_peptide_edges,
                'V3': V3_edges,
                'V5': V5_edges,
                'V4': V4_edges,
+               'gp120_noVloops': gp120_noVloops_edges,
               }
 
 
@@ -94,7 +105,7 @@ all_edges.update(other_edges)
 
 
 # Functions
-def find_region_edges(refm, edges, minimal_fraction_match=0.60):
+def find_region_edges(refm, edges, minimal_fraction_match=0.60, shift=10):
     '''Find a region's edges in a sequence'''
     import numpy as np
 
@@ -102,7 +113,7 @@ def find_region_edges(refm, edges, minimal_fraction_match=0.60):
 
     # Start
     if edges[0] is None:
-        start = -50
+        start = -shift
         pos_edge.append(None)
     else:
         seed = np.ma.array(np.fromstring(edges[0], 'S1'))
@@ -120,7 +131,7 @@ def find_region_edges(refm, edges, minimal_fraction_match=0.60):
             start = pos_seed
             pos_edge.append(start)
         else:
-            start = -50
+            start = -shift
             pos_edge.append(None)
 
     # End
@@ -134,10 +145,10 @@ def find_region_edges(refm, edges, minimal_fraction_match=0.60):
         seed[seed == 'Y'] = np.ma.masked
         sl = len(seed)
         n_match = np.array([(refm[i: i + sl] == seed).sum()
-                            for i in xrange(start + 50, len(refm) - sl)], int)
+                            for i in xrange(start + shift, len(refm) - sl)], int)
         pos_seed = np.argmax(n_match)
         if n_match[pos_seed] > minimal_fraction_match * (-seed.mask).sum():
-            end = pos_seed + start + 50 + sl
+            end = pos_seed + start + shift + sl
         else:
             end = None
     pos_edge.append(end)

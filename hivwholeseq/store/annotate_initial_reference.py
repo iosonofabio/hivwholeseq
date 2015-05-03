@@ -114,7 +114,7 @@ def annotate_sequence(seqrecord, additional_edges={}, additional_features=['chun
                     pos_edges = [locate_gene(smat, name+suff, output_compact=True)
                                  for suff in ('1', '2')]
                 else:
-                    pos_edges = find_region_edges_multiple(smat, edges)
+                    pos_edges = find_region_edges_multiple(smat, edges, min_distance=1)
                 locations = [FeatureLocation(*pos_edge) for pos_edge in pos_edges]
                 location = CompoundLocation(locations)
 
@@ -188,7 +188,7 @@ def compare_annotations(refseq_new, refseq_old, VERBOSE=0):
 
         if str(locold) != str(locnew):
             if VERBOSE >= 1:
-                print fn, 'coordinates do not correspond', locold, locnew
+                print fn, 'coordinates do not correspond (old, new):', locold, locnew
             alert = True
             break
 
@@ -203,7 +203,7 @@ if __name__ == '__main__':
 
     # Parse input args
     parser = argparse.ArgumentParser(description='Annotate initial reference')
-    parser.add_argument('--verbose', type=int, default=0,
+    parser.add_argument('--verbose', type=int, default=2,
                         help='Verbosity level [0-3]')
     parser.add_argument('--patients', nargs='+',
                         help='Patient to analyze')

@@ -1507,6 +1507,7 @@ def plot_divergence_diversity(data, VERBOSE=0, savefig=False):
     reg_groups = [['PR', 'IN', 'p15', 'RT'],
                   ['p17', 'p24', 'p6', 'p7'],
                   ['vif', 'vpu', 'vpr', 'nef'],
+                  ['gp120_noVloops'],
                  ]
     fs = 17
     alpha = 0.8
@@ -1548,8 +1549,8 @@ def plot_divergence_diversity(data, VERBOSE=0, savefig=False):
         ax.grid(True)
         for ctype, obs, ls in izip(['population', 'population'], ['divergence','diversity'], ['-','--']):
             for reg, reg_label, color in izip(region_data, 
-                                    ['enzymes','structural', 'accessory'], 
-                                    [colors[i] for i in [0,4,9]]):
+                                    ['enzymes','structural', 'accessory', 'envelope'], 
+                                    [colors[i] for i in [0,4,9,7]]):
                 tmp = reg.get_group((obs, ctype, dclass)).groupby('tbinned', as_index=False).mean()
                 x = tmp['tbinned']
                 y = tmp['div']

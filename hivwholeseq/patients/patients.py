@@ -383,30 +383,81 @@ class Patient(pd.Series):
         from operator import itemgetter
         from .one_site_statistics import get_allele_count_trajectories
 
-        # Fall back on genomewide counts if no single fragment is enough
-        (fragment, start, end) = self.get_fragmented_roi((region, 0, '+oo'),
-                                                         include_genomewide=True)
-        (sns, act) = get_allele_count_trajectories(self.name, self.samples.index,
-                                                   fragment,
-                                                   use_PCR1=2, **kwargs)
-        # Select genomic region
-        act = act[:, :, start: end]
+        # Multi-location regions are special
+        multi_location_regions = {'gp120_noVloops': 'F5'}
+        if region in ['tat', 'rev']:
+            raise NotImplementedError
+        
+        # NOTE: this logic is a bit redundant for the gp120_noVloops,
+        # but can be readily extended to tat/rev in the future
+        elif region in ['gp120_noVloops']:
+            fragment = multi_location_regions[region]
+            refseq = self.get_reference('genomewide', 'gb')
+            frag_found = False
+            reg_found = False
+            for fea in refseq.features:
+                if fea.id == region:
+                    fea_reg = fea
+                    reg_found = True
+                elif fea.id == fragment:
+                    fea_frag = fea
+                    frag_found = True
+                if reg_found and frag_found:
+                    break
 
-        # Select time points
-        ind = np.array([i for i, (_, sample) in enumerate(self.samples.iterrows())
-                        if sample.name in map(itemgetter(0), sns)], int)
+            else:
+                raise ValueError('Region not found!')
 
-        # If safe, take only samples tagged with 'OK'
-        if safe:
-            ind_safe = np.zeros(len(ind), bool)
-            for ii, i in enumerate(ind):
-                sample = self.samples.iloc[i]
-                frags = self.get_fragments_covered((fragment, start, end))
-                ind_safe[ii] = all(getattr(sample, fr).upper() == 'OK'
-                                   for fr in frags)
+            acts = []
+            inds = []
+            for part in fea.location.parts:
+                start = part.nofuzzy_start - fea_frag.location.nofuzzy_start
+                end = part.nofuzzy_end - fea_frag.location.nofuzzy_start
+                (sns, act) = get_allele_count_trajectories(self.name, self.samples.index,
+                                                           fragment,
+                                                           use_PCR1=2, **kwargs)
+                act = act[:, :, start: end]
+                ind = np.array([i for i, (_, sample) in enumerate(self.samples.iterrows())
+                                if sample.name in map(itemgetter(0), sns)], int)
+                acts.append(act)
+                inds.append(ind)
 
-            act = act[ind_safe]
-            ind = ind[ind_safe]
+            # Take intersection of all time points
+            ind = np.array(sorted(set.intersection(*map(set, inds))), int)
+            if len(ind) == 0:
+                act = np.array([])
+            else:
+                for iact, act in enumerate(acts):
+                    indtmp = [ii for ii, i in enumerate(inds[iact]) if i in ind]
+                    acts[iact] = act[indtmp]
+                act = np.dstack(acts)        
+
+        else:
+
+            # Fall back on genomewide counts if no single fragment is enough
+            (fragment, start, end) = self.get_fragmented_roi((region, 0, '+oo'),
+                                                             include_genomewide=True)
+            (sns, act) = get_allele_count_trajectories(self.name, self.samples.index,
+                                                       fragment,
+                                                       use_PCR1=2, **kwargs)
+            # Select genomic region
+            act = act[:, :, start: end]
+
+            # Select time points
+            ind = np.array([i for i, (_, sample) in enumerate(self.samples.iterrows())
+                            if sample.name in map(itemgetter(0), sns)], int)
+
+            # If safe, take only samples tagged with 'OK'
+            if safe:
+                ind_safe = np.zeros(len(ind), bool)
+                for ii, i in enumerate(ind):
+                    sample = self.samples.iloc[i]
+                    frags = self.get_fragments_covered((fragment, start, end))
+                    ind_safe[ii] = all(getattr(sample, fr).upper() == 'OK'
+                                       for fr in frags)
+
+                act = act[ind_safe]
+                ind = ind[ind_safe]
 
 
         return (act, ind)

@@ -99,10 +99,6 @@ def collect_data(pnames, regions, VERBOSE=0):
 
             times = patient.times[ind]
 
-            if VERBOSE >= 2:
-                print 'Get coordinate map'
-            coomap = patient.get_map_coordinates_reference(region, refname=('HXB2', region))
-
             icons = patient.get_initial_consensus_noinsertions(aft, VERBOSE=VERBOSE,
                                                                return_ind=True)
             consm = alpha[icons]
