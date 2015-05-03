@@ -50,7 +50,15 @@ coordinates = {'gene': {'gag': [(789, 2292)],
                          'V4': [(7377, 7478)],
                          'V5': [(7602, 7634)],
                          'psi': None,
-                         'env peptide': None},
+                         'env peptide': None,
+                         # gp120 excluding V loops, everything in frame
+                         # this is useful for alignments, because aligning the
+                         # loops might be hard at times
+                         'gp120_noVloops': [(6314, 6614),
+                                            (6812, 6983),
+                                            (7349, 7376),
+                                            (7478, 7601),
+                                            (7634, 7757)]},
                'chunk': {'RT1': [(2549, 2549 + 351)],
                          'RT2': [(2549 + 351,  2549 + 2 * 351)],
                          'RT3': [(2549 + 2 * 351,  2549 + 3 * 351)],
@@ -99,8 +107,8 @@ if __name__ == '__main__':
                                  id=name)
 
             else:
-                fea = SeqFeature(CompoundLocation([FeatureLocation(edges[0][0], edges[0][1], strand=+1),
-                                                   FeatureLocation(edges[1][0], edges[1][1], strand=+1)]),
+                fea = SeqFeature(CompoundLocation([FeatureLocation(edge[0], edge[1], strand=+1)
+                                                   for edge in edges]),
                                  type=typ,
                                  id=name)
             
