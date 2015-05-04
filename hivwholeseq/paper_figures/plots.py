@@ -459,7 +459,7 @@ def plot_minor_allele_example(data, title='', VERBOSE=0, savefig=False):
     axs[0].grid(True)
     axs[0].tick_params(axis='both', labelsize=18)
 
-    axs[1].set_xlabel('Number of alleles', fontsize=18)
+    axs[1].set_xlabel('Number of positions', fontsize=18)
     axs[1].grid(True)
     axs[1].set_yscale('log')
     axs[1].set_xlim(0.8, 2 * h[0].max())
@@ -1618,6 +1618,64 @@ def plot_LD(data, VERBOSE=0, savefig=False):
     ax.legend(loc=1, fontsize=fs, ncol=3)
 
     plt.tight_layout(rect=(0, 0, 0.98, 1))
+
+    if savefig:
+        fig_filename = savefig
+        fig_folder = os.path.dirname(fig_filename)
+
+        mkdirs(fig_folder)
+        fig.savefig(fig_filename)
+        plt.close(fig)
+
+    else:
+        plt.ion()
+        plt.show()
+
+
+def plot_coverage_example(data, VERBOSE=0, savefig=False):
+    '''Plot an example of coverage'''
+    if VERBOSE >= 2:
+        print 'Plot coverage'
+
+    sns.set_style('darkgrid')
+    fs=16
+    colormap = HIVEVO_colormap(kind='alternative')
+
+    fig, ax = plt.subplots(figsize=(8, 4))
+    L = len(data['cov']['genomewide']['cov'])
+
+    y = data['n_templates']
+    ax.plot([0, L], [y] * 2, lw=10, color='darkred',
+            label='Number of HIV-1 RNA molecules in serum sample',
+            zorder=1,
+           )
+
+    x = np.arange(L)
+    ax.plot(x, data['cov']['genomewide']['cov'],
+            color='k',
+            lw=2,
+            zorder=10,
+            )
+
+    for ifr, fragment in enumerate(['F'+str(i) for i in xrange(1, 7)]):
+        y = data['cov'][fragment]['cov']
+        x = np.arange(len(y)) + data['cov'][fragment]['pos']
+        ax.scatter(x, y, color=colormap(1.0 * ifr / 6),
+                   s=65,
+                   marker='o',
+                   zorder=3,
+                  )
+
+    ax.legend(loc='lower right', fontsize=fs)
+    ax.set_xlabel('Position [bp]', fontsize=fs)
+    ax.set_ylabel('Coverage', fontsize=fs)
+    ax.set_yscale('log')
+    ax.set_ylim(0.105, 2e5)
+    ax.set_xlim(-200, L + 200)
+    ax.xaxis.set_tick_params(labelsize=fs)
+    ax.yaxis.set_tick_params(labelsize=fs)
+
+    plt.tight_layout()
 
     if savefig:
         fig_filename = savefig
