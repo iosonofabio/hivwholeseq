@@ -682,8 +682,15 @@ class Patient(pd.Series):
         return hla
 
 
-    def get_ctl_epitopes(self, regions):
-        '''Get list of CTL epitopes'''
+    def get_ctl_epitopes(self,
+                         regions=['gag', 'pol',
+                                  'gp120', 'gp41',
+                                  'vif', 'vpr', 'vpu', 'nef']):
+        '''Get list of CTL epitopes
+        
+        Parameters:
+           regions (list): restrict to epitopes within these regions
+        '''
         from ..cross_sectional.ctl_epitope_map import (get_ctl_epitope_map,
                                                        get_ctl_epitope_hla)
         
@@ -703,7 +710,7 @@ class Patient(pd.Series):
             ctl_table = ctl_table_main.iloc[ind].copy()
 
             # Restrict to the correct region
-            ind = ctl_table['Protein'] == region
+            ind = np.array([str(x).lower() == region for x in ctl_table['Protein']], bool)
             ind |= np.array([str(x).split('(')[0] == region for x in ctl_table['Subprotein']], bool)
             ctl_table = ctl_table.loc[ind]
 

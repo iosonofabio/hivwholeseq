@@ -21,7 +21,7 @@ from hivwholeseq.website.filenames import get_tree_figure_filename
 from hivwholeseq.paper_figures.plots import HIVEVO_colormap
 
 # Globals
-pnames = ['20097', '15363', '15823', '15376', '9669', '15107', '15241', '15034', '15319']
+pnames = ['20097', '15363', '15823', '15376', '9669', '15107', '15241', '15034', '15319', '20529']
 region = 'V3'
 cutoff = 0.04
 

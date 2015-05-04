@@ -1411,12 +1411,10 @@ def plot_divergence_cons_pop_diversity(data, VERBOSE=0, savefig=False,
 
 
     for ax in axs:
-        for item in ax.get_xticklabels():
-            item.set_fontsize(16)
+        ax.xaxis.set_tick_params(labelsize=16)
 
     for axs in axg:
-        for item in axs[0].get_yticklabels():
-            item.set_fontsize(16)
+        ax.yaxis.set_tick_params(labelsize=16)
 
     plt.tight_layout(rect=(0.05, 0.05, 0.98, 0.97))
         
@@ -1570,7 +1568,9 @@ def plot_divergence_diversity(data, VERBOSE=0, savefig=False):
 
     ax.set_ylim([0,0.04])
     axs[0].set_yticks([0,0.025, 0.05])
+    axs[1].set_yticks([0,0.025, 0.05])
     axs[0].set_xticks([0, 1500, 3000])
+    axs[1].set_xticks([0, 1500, 3000])
     axs[0].yaxis.set_tick_params(labelsize=fs)
     axs[0].xaxis.set_tick_params(labelsize=fs)
     axs[1].xaxis.set_tick_params(labelsize=fs)
