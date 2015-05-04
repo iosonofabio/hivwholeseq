@@ -557,3 +557,11 @@ def get_consensus_from_MSA(alim, alpha=alpha):
     icons = af.argmax(axis=0)
     cons = alpha[icons]
     return cons
+
+
+def find_annotation(seq, annotation):
+    '''Find an annotation in a SeqRecord'''
+    for fea in seq.features:
+        if fea.id == annotation:
+            return fea
+    return -1
