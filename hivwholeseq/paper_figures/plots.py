@@ -840,16 +840,20 @@ def plot_substitution_rate_sliding(data,
         x = np.array(datum['pos_ref'])
         y = np.repeat(pnames.index(pname), len(x))
 
-        ax.scatter(x, y, s=30, marker='o',
-                   color=cfun(pname),
-                   label=pname,
-                  )
+        for ind, marker, s in [(datum['epitope'], 'o', 50),
+                               (-datum['epitope'], 'x', 30)]:
+            ind = np.array(ind)
+            ax.scatter(x[ind], y[ind],
+                       s=s, marker=marker,
+                       color=cfun(pname),
+                       label=pname,
+                      )
 
     ax.set_xlim(-50, data_sweeps['pos_ref'].max() + 200)
     ax.set_ylim(Lp, -1)
     ax.set_yticks([])
     ax.set_xticks([])
-    ax.set_ylabel('Sweeps', fontsize=fs, labelpad=60)
+    ax.set_ylabel('Substitutions', fontsize=fs, labelpad=60)
     ax.grid(True)
 
 

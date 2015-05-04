@@ -663,6 +663,71 @@ class Patient(pd.Series):
         return get_haplotype_alignment_filename(self.name, region, format=format)
 
 
+    def get_hla_type(self, MHC=1):
+        '''Get a list with all HLA loci
+        
+        Parameters:
+           MHC (None/1/2): MHC class I/II only, or all
+        '''
+        if MHC == 1:
+            loci = ('A', 'B', 'C')
+        elif MHC == 2:
+            loci = ('DRB1', 'DRQ1')
+        else:
+            loci = ('A', 'B', 'C', 'DRB1', 'DRQ1')
+
+        hla = np.concatenate([[locus+self['HLA-'+locus],
+                               locus+self['HLA-'+locus+'-2']]
+                              for locus in loci]).tolist()
+        return hla
+
+
+    def get_ctl_epitopes(self, regions):
+        '''Get list of CTL epitopes'''
+        from ..cross_sectional.ctl_epitope_map import (get_ctl_epitope_map,
+                                                       get_ctl_epitope_hla)
+        
+        ctl_table_main = get_ctl_epitope_map(species='human')
+
+        # Restrict epitope table to patient HLA
+        hla = self.get_hla_type(MHC=1)
+        ctl_table_main = get_ctl_epitope_hla(ctl_table_main, hla)
+
+        data = []
+        for region in regions:
+
+            # Restrict epitope table to founder virus sequence
+            seq = self.get_reference(region)
+            prot = str(seq.seq.translate())
+            ind = [i for i, epi in enumerate(ctl_table_main['Epitope']) if epi in prot]
+            ctl_table = ctl_table_main.iloc[ind].copy()
+
+            # Restrict to the correct region
+            ind = ctl_table['Protein'] == region
+            ind |= np.array([str(x).split('(')[0] == region for x in ctl_table['Subprotein']], bool)
+            ctl_table = ctl_table.loc[ind]
+
+            # Set position in region
+            ctl_table['start_region'] = [3 * prot.find(x) for x in ctl_table['Epitope']]
+            ctl_table['end_region'] = [3 * (prot.find(x) + len(x)) for x in ctl_table['Epitope']]
+            ctl_table['start_HXB2'] = [int(x.split('.')[0]) - 1 for x in ctl_table['HXB2 DNA Contig']]
+            ctl_table['end_HXB2'] = [int(x.split('.')[-1]) for x in ctl_table['HXB2 DNA Contig']]
+
+            ctl_table['region'] = region
+
+            del ctl_table['HXB2 start']
+            del ctl_table['HXB2 end']
+            del ctl_table['Protein']
+            del ctl_table['Subprotein']
+            del ctl_table['HXB2 DNA Contig']
+
+            data.append(ctl_table)
+
+        ctl_table = pd.concat(data).sort('start_HXB2')
+
+        return ctl_table
+
+
 
 # Functions
 def iterpatient(patients):

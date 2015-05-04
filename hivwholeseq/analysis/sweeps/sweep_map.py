@@ -63,6 +63,14 @@ def collect_data(pnames, region='genomewide', VERBOSE=0):
         times = patient.times[ind]
 
         if VERBOSE >= 2:
+            print 'Get CTL epitopes'
+        ctl_table = patient.get_ctl_epitopes(regions=['p17', 'p24', 'p6', 'p7',
+                                                      'vif', 'vpr', 'vpu',
+                                                      'gp120', 'gp41',
+                                                      'PR', 'RT', 'p15', 'IN',
+                                                      'nef'])
+
+        if VERBOSE >= 2:
             print 'Get coordinate map'
         coomap = patient.get_map_coordinates_reference(region, refname=('HXB2', region))
 
@@ -112,12 +120,17 @@ def collect_data(pnames, region='genomewide', VERBOSE=0):
             else:
                 trclass = 'tv'
 
+            # Find whether is within an epitope
+            is_epitope = ((pos_sub >= np.array(ctl_table['start_HXB2'])) &
+                          (pos_sub < np.array(ctl_table['end_HXB2']))).any()
+
             datum = {'pcode': patient.code,
                      'region': region,
                      'pos_patient': posdna,
                      'pos_ref': pos_sub,
                      'mut': mut,
                      'trclass': trclass,
+                     'epitope': is_epitope,
                     }
 
             data.append(datum)
@@ -142,10 +155,16 @@ def plot_sweeps(data):
         x = np.array(datum['pos_ref'])
         y = np.repeat(pnames.index(pname), len(x))
 
-        ax.scatter(x, y, s=30, marker='x',
-                   color=colormap(1.0 * pnames.index(pname) / Lp),
-                   label=pname,
-                  )
+        # Divide by epitope/nonepitope
+        for ind, marker, s in [(datum['epitope'], 'o', 50),
+                               (-datum['epitope'], 'x', 30)]:
+            ind = np.array(ind)
+
+            ax.scatter(x[ind], y[ind], s=s,
+                       marker=marker,
+                       color=colormap(1.0 * pnames.index(pname) / Lp),
+                       label=pname,
+                      )
 
     ax.set_xlim(-50, data['pos_ref'].max() + 200)
     ax.set_ylim(Lp - 0.5, -0.5)

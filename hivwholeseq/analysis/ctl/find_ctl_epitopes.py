@@ -14,7 +14,8 @@ from matplotlib import cm
 
 from hivwholeseq.patients.patients import load_patients, iterpatient
 from hivwholeseq.utils.argparse import PatientsAction
-from hivwholeseq.cross_sectional.ctl_epitope_map import get_ctl_epitope_map
+from hivwholeseq.cross_sectional.ctl_epitope_map import (get_ctl_epitope_map,
+                                                         get_ctl_epitope_hla)
 
 
 
@@ -37,13 +38,17 @@ def collect_data(pnames, regions, VERBOSE=0):
             if VERBOSE >= 1:
                 print region, patient.code
 
+            # Restrict epitope table to patient HLA
+            hla = patient.get_hla_type(MHC=1)
+            ctl_table_pat = get_ctl_epitope_hla(ctl_table, hla)
+
+            # Restrict epitope table to founder virus sequence
             seq = patient.get_reference(region)
             prot = seq.seq.translate()
-
-            ind = [i for i, epi in enumerate(ctl_table['Epitope'])
+            ind = [i for i, epi in enumerate(ctl_table_pat['Epitope'])
                    if epi in prot]
 
-            datum = ctl_table.loc[ind].copy()
+            datum = ctl_table_pat.iloc[ind].copy()
             datum['pcode'] = patient.code
             datum['region'] = region
             data.append(datum)

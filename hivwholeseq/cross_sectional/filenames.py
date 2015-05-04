@@ -17,6 +17,12 @@ def get_ctl_epitope_map_filename():
     return table_folder+fn
 
 
+def get_hla_dictionary_filename():
+    '''Get the filename of the HLA dictionary'''
+    fn = 'hla_dictionary.csv'
+    return table_folder+fn
+
+
 def get_subtype_reference_alignment_filename(region, subtype='B',
                                              refname='HXB2',
                                              type='nuc',
