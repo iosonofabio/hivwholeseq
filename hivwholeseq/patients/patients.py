@@ -685,20 +685,79 @@ class Patient(pd.Series):
     def get_ctl_epitopes(self,
                          regions=['gag', 'pol',
                                   'gp120', 'gp41',
-                                  'vif', 'vpr', 'vpu', 'nef']):
+                                  'vif', 'vpr', 'vpu', 'nef'],
+                         kind='epitoolkit',
+                        ):
         '''Get list of CTL epitopes
         
         Parameters:
            regions (list): restrict to epitopes within these regions
+           kind (str): LANL/mhci
         '''
         from ..cross_sectional.ctl_epitope_map import (get_ctl_epitope_map,
                                                        get_ctl_epitope_hla)
         
-        ctl_table_main = get_ctl_epitope_map(species='human')
 
-        # Restrict epitope table to patient HLA
-        hla = self.get_hla_type(MHC=1)
-        ctl_table_main = get_ctl_epitope_hla(ctl_table_main, hla)
+        # Get epitope table for patient HLA
+        if kind == 'LANL':
+            ctl_table_main = get_ctl_epitope_map(species='human')
+            hla = self.get_hla_type(MHC=1)
+            ctl_table_main = get_ctl_epitope_hla(ctl_table_main, hla)
+            del ctl_table['HXB2 start']
+            del ctl_table['HXB2 end']
+            del ctl_table['HXB2 DNA Contig']
+
+        elif kind == 'mhci':
+            def get_ctl_epitope_map_mhci(pname):
+                def get_ctl_epitope_map_filename(pname):
+                    from .filenames import root_patient_folder
+                    filename = root_patient_folder+pname+'/ctl_epitopes.tsv'
+                    return filename
+
+                import pandas as pd
+                table = pd.read_csv(get_ctl_epitope_map_filename(pname),
+                                    skiprows=3,
+                                    sep='\t',
+                                    usecols=['peptide'],
+                                    # NOTE: top epitopes only, this is a parameter
+                                    nrows=200,
+                                   )
+                table.drop_duplicates(inplace=True)
+
+                table.rename(columns={'peptide': 'Epitope'}, inplace=True)
+                return table
+
+            ctl_table_main = get_ctl_epitope_map_mhci(self.name)
+
+        elif kind == 'epitoolkit':
+            def get_ctl_epitope_map_epitoolkit(pcode):
+                def get_ctl_epitope_map_filenames(pcode):
+                    import glob
+                    from .filenames import root_data_folder
+                    blobname = root_data_folder+'CTL/ctl_'+pcode+'/*.csv'
+                    return glob.glob(blobname)
+
+                import pandas as pd
+                table = pd.concat([pd.read_csv(fn,
+                                               skiprows=1,
+                                               sep=',',
+                                               usecols=['Sequence'],
+                                              )
+                                   for fn in get_ctl_epitope_map_filenames(pcode)])
+                table.drop_duplicates(inplace=True)
+
+                table.rename(columns={'Sequence': 'Epitope'}, inplace=True)
+                return table
+
+            ctl_table_main = get_ctl_epitope_map_epitoolkit(self.code)
+
+        else:
+            raise ValueError('kind of CTL table not understood')
+
+        # Load HXB2 to set the coordinates
+        from ..reference import load_custom_reference
+        from ..utils.sequence import find_annotation
+        ref = load_custom_reference('HXB2', 'gb')
 
         data = []
         for region in regions:
@@ -709,28 +768,48 @@ class Patient(pd.Series):
             ind = [i for i, epi in enumerate(ctl_table_main['Epitope']) if epi in prot]
             ctl_table = ctl_table_main.iloc[ind].copy()
 
-            # Restrict to the correct region
-            ind = np.array([str(x).lower() == region for x in ctl_table['Protein']], bool)
-            ind |= np.array([str(x).split('(')[0] == region for x in ctl_table['Subprotein']], bool)
-            ctl_table = ctl_table.loc[ind]
+            if kind == 'LANL':
+                # Restrict to the correct region
+                ind = np.array([str(x).lower() == region for x in ctl_table['Protein']], bool)
+                ind |= np.array([str(x).split('(')[0] == region for x in ctl_table['Subprotein']], bool)
+                ctl_table = ctl_table.loc[ind]
+                del ctl_table['Protein']
+                del ctl_table['Subprotein']
 
             # Set position in region
             ctl_table['start_region'] = [3 * prot.find(x) for x in ctl_table['Epitope']]
             ctl_table['end_region'] = [3 * (prot.find(x) + len(x)) for x in ctl_table['Epitope']]
-            ctl_table['start_HXB2'] = [int(x.split('.')[0]) - 1 for x in ctl_table['HXB2 DNA Contig']]
-            ctl_table['end_HXB2'] = [int(x.split('.')[-1]) for x in ctl_table['HXB2 DNA Contig']]
+
+            # Set position in HXB2
+            regpos = find_annotation(ref, region).location.nofuzzy_start
+            comap = dict(self.get_map_coordinates_reference(region)[:, ::-1], refname='HXB2')
+            poss = []
+            for x in ctl_table['start_region']:
+                while True:
+                    if x in comap:
+                        poss.append(x)
+                        break
+                    elif x < 0:
+                        raise ValueError('Position not found in HXB2')
+                    x -= 1
+            ctl_table['start_HXB2'] = np.array(poss, int) + regpos
+            poss = []
+            for x in ctl_table['end_region']:
+                while True:
+                    if x in comap:
+                        poss.append(x)
+                        break
+                    elif x > 10000:
+                        raise ValueError('Position not found in HXB2')
+                    x += 1
+            ctl_table['end_HXB2'] = np.array(poss, int) + regpos
 
             ctl_table['region'] = region
-
-            del ctl_table['HXB2 start']
-            del ctl_table['HXB2 end']
-            del ctl_table['Protein']
-            del ctl_table['Subprotein']
-            del ctl_table['HXB2 DNA Contig']
 
             data.append(ctl_table)
 
         ctl_table = pd.concat(data).sort('start_HXB2')
+        ctl_table.index = range(len(ctl_table))
 
         return ctl_table
 

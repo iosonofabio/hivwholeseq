@@ -362,27 +362,39 @@ def plot_allele_frequency_overlap(data, title='', VERBOSE=0, use_logit=True, sav
     sns.set_style('whitegrid')
 
     colors = sns.color_palette('Set1', 5)
+    fs = 16
+    xmin = 1e-3
+
     legend = set()
     for ida, datum in enumerate(data):
         afjoint = datum['af']
         color = colors[datum['io']]
         if datum['overlap'] not in legend:
             label = datum['overlap']
-            legend.add(datum['overlap'])
+            #legend.add(datum['overlap'])
         else:
             label = None
         ax.scatter(afjoint[0].ravel(), afjoint[1].ravel(),
                    s=50,
                    color=color,
                    alpha=0.7,
-                   label=label,
+                   #label=label,
                    edgecolor='none')
+
+        # Plot stddev in Poisson sampling
+        n = datum['n']
+        x = np.linspace(np.log10(xmin), 0, 1000)
+        x = 1.0 / (1 + 10**(-x))
+        y = x - np.sqrt(x / n)
+        ax.plot(np.concatenate([x, 1 - y[::-1]]), np.concatenate([y, 1 - x[::-1]]), lw=3, c=color, alpha=0.5)
+        ax.plot(np.concatenate([y, 1 - x[::-1]]), np.concatenate([x, 1 - y[::-1]]), lw=3, c=color, alpha=0.5,
+                label=datum['overlap'])
+
     
-    xmin = 1e-4
     ax.plot([xmin, 1 - xmin], [xmin, 1 - xmin], lw=2, color='k', alpha=0.5)
 
-    ax.set_xlabel('allele frequency leading fragment')
-    ax.set_ylabel('allele frequency trailing fragment')
+    ax.set_xlabel('allele frequency leading fragment', fontsize=fs)
+    ax.set_ylabel('allele frequency trailing fragment', fontsize=fs)
     ax.grid(True)
 
     if use_logit:
@@ -391,16 +403,9 @@ def plot_allele_frequency_overlap(data, title='', VERBOSE=0, use_logit=True, sav
         ax.set_xlim(xmin, 1 - xmin)
         ax.set_ylim(xmin, 1 - xmin)
 
-    # Plot stddev of a certain number of molecules in Poisson sampling
-    n = 300
-    x = np.linspace(-4, 0, 1000)
-    x = 1.0 / (1 + 10**(-x))
-    y = x - np.sqrt(x / n)
-    ax.plot(np.concatenate([x, 1 - y[::-1]]), np.concatenate([y, 1 - x[::-1]]), lw=4, c='black', alpha=0.7)
-    ax.plot(np.concatenate([y, 1 - x[::-1]]), np.concatenate([x, 1 - y[::-1]]), lw=4, c='black', alpha=0.7,
-            label='Poisson noise, n = '+str(n))
-
-    ax.legend(loc=2)
+    ax.xaxis.set_tick_params(labelsize=fs)
+    ax.yaxis.set_tick_params(labelsize=fs)
+    ax.legend(loc=2, fontsize=fs)
 
     if title:
         ax.set_title(title)
@@ -685,7 +690,7 @@ def plot_substitution_rate(data,
     ax.set_yscale('log')
 
     ax.set_xlabel('Genomic region', fontsize=16)
-    ax.set_ylabel('Substitution rate\n[changes / year / site]', labelpad=10, fontsize=16)
+    ax.set_ylabel('Divergence rate\nin observed period\n[changes / year / site]', labelpad=10, fontsize=16)
     ax.legend(loc='lower left',
               title='Patients',
               ncol=4,
@@ -819,7 +824,8 @@ def plot_substitution_rate_sliding(data,
     ax.set_yscale('log')
     ax.xaxis.set_tick_params(labelsize=fs)
 
-    ax.set_ylabel('Substitution rate\n[changes / year / site]', labelpad=20,
+    ax.set_ylabel('Divergence rate\nduring observed period\n[changes / year / site]',
+                  labelpad=15,
                   fontsize=fs)
     ax.legend(loc='upper center',
               bbox_to_anchor=(0.5, 0.93),
@@ -1672,6 +1678,75 @@ def plot_coverage_example(data, VERBOSE=0, savefig=False):
     ax.set_yscale('log')
     ax.set_ylim(0.105, 2e5)
     ax.set_xlim(-200, L + 200)
+    ax.xaxis.set_tick_params(labelsize=fs)
+    ax.yaxis.set_tick_params(labelsize=fs)
+
+    plt.tight_layout()
+
+    if savefig:
+        fig_filename = savefig
+        fig_folder = os.path.dirname(fig_filename)
+
+        mkdirs(fig_folder)
+        fig.savefig(fig_filename)
+        plt.close(fig)
+
+    else:
+        plt.ion()
+        plt.show()
+
+
+def plot_af_above_threshold(datap, threshold=0.01, singles=False,
+                            VERBOSE=0,
+                            savefig=False):
+    '''Plot the fraction of alleles above a certain threshold'''
+    if VERBOSE >= 2:
+        print 'Plot allele frequencies above thresholds'
+
+    Ssubs = datap.Ssub.unique().tolist()
+
+    sns.set_style('darkgrid')
+    colormap = cm.jet
+    fs = 14
+
+    fig, ax = plt.subplots(figsize=(5.5, 4))
+
+    if singles:
+        for (Ssub, pcode), datump in datap.groupby(['Ssub', 'pcode']):
+            x = np.array(datump['time'])
+            y = np.array(datump['frac > '+'{:.1G}'.format(threshold)])
+
+            ax.plot(x, y,
+                    lw=1,
+                    ls='-', marker='x', ms=10,
+                    color=colormap(1.0 * Ssubs.index(Ssub) / len(Ssubs)),
+                    alpha=0.7,
+                   )
+
+    # Average over patients
+    for Ssub, datump in datap.groupby('Ssub'):
+        datumpt = datump.groupby('time').mean()
+        ddatumpt = datump.groupby('time').std()
+        x = np.array(datumpt.index)
+        y = np.array(datumpt['frac > '+'{:.1G}'.format(threshold)])
+        dy = np.array(ddatumpt['frac > '+'{:.1G}'.format(threshold)])
+        label = '{:.1G}'.format(Ssub)
+        ax.errorbar(x, y, yerr=dy,
+                    lw=2,
+                    ls='-', marker='o', ms=12,
+                    color=colormap(1.0 * Ssubs.index(Ssub) / len(Ssubs)),
+                    label=label,
+                   )
+
+    # Change legend order
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(handles[::-1], labels[::-1],
+              loc=2, title='Subtype B entropy:', fontsize=fs)
+
+    ax.set_ylim(ymin=-0.02)
+    ax.set_xlabel('Time [days from infection]', fontsize=fs)
+    ax.set_ylabel('Fraction of SNVs > '+'{:.1G}'.format(threshold), fontsize=fs)
+    ax.grid(True)
     ax.xaxis.set_tick_params(labelsize=fs)
     ax.yaxis.set_tick_params(labelsize=fs)
 

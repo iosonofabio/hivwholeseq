@@ -32,13 +32,6 @@ from hivwholeseq.cross_sectional.get_subtype_allele_frequencies import (
 
 
 # Globals
-colors = {'p17': 'r',
-          'p24': 'g',
-          'PR': 'r',
-          'RT': 'g',
-          'p15': 'purple',
-          'IN': 'orange',
-          'gp41': 'r'}
 regions = ['p17', 'p24', 'PR', 'RT', 'p15', 'IN', 'gp41']
 pnames = ['20097', '15363', '15823', '9669', '20529', '15241', '15376', '15319']
 
@@ -155,6 +148,74 @@ def collect_data(pnames, regions, VERBOSE=0):
     return data
 
 
+def calculate_fraction_above_threshold(data):
+    '''Calculate the fraction of allele above thresholds'''
+    from hivwholeseq.utils.pandas import add_binned_column
+    bins_S, binsc_S = add_binned_column(data, 'Sbin', 'Ssub', bins=5, clip=True)
+    bins_t, binsc_t = add_binned_column(data, 'tbin', 'time',
+                                        bins=300 * np.arange(8),
+                                        clip=True)
+
+    thresholds = 0.01 * np.arange(10)
+    datap = []
+    for (Sbin, tbin, pcode), datum in data.groupby(['Sbin', 'tbin', 'pcode']):
+        datump = {'Ssub': binsc_S[Sbin],
+                  'time': binsc_t[tbin],
+                  'pcode': pcode,
+                 }
+        for thr in thresholds:
+            datump['frac > '+'{:.1G}'.format(thr)] = (datum['af'] > thr).mean()
+        datap.append(datump)
+
+    datap = pd.DataFrame(datap)
+
+    return datap
+
+
+def plot_af_above_threshold(datap, threshold=0.01, singles=False):
+    '''Plot the fraction of alleles above a certain threshold'''
+    Ssubs = datap.Ssub.unique().tolist()
+
+    colormap = cm.jet
+    fs = 16
+
+    fig, ax = plt.subplots()
+
+    if singles:
+        for (Ssub, pcode), datump in datap.groupby(['Ssub', 'pcode']):
+            x = np.array(datump['time'])
+            y = np.array(datump['frac > '+'{:.1G}'.format(threshold)])
+
+            ax.plot(x, y,
+                    lw=1,
+                    ls='-', marker='x', ms=10,
+                    color=colormap(1.0 * Ssubs.index(Ssub) / len(Ssubs)),
+                    alpha=0.7,
+                   )
+
+    # Average over patients
+    for Ssub, datump in datap.groupby('Ssub'):
+        datumpt = datump.groupby('time').mean()
+        ddatumpt = datump.groupby('time').std()
+        x = np.array(datumpt.index)
+        y = np.array(datumpt['frac > '+'{:.1G}'.format(threshold)])
+        dy = np.array(ddatumpt['frac > '+'{:.1G}'.format(threshold)])
+        label = '{:.1G}'.format(Ssub)
+        ax.errorbar(x, y, yerr=dy,
+                    lw=2,
+                    ls='-', marker='o', ms=12,
+                    color=colormap(1.0 * Ssubs.index(Ssub) / len(Ssubs)),
+                    label=label,
+                   )
+
+    ax.set_xlabel('Time [days from infection]', fontsize=fs)
+    ax.set_ylabel('frac > '+'{:.1G}'.format(threshold), fontsize=fs)
+    ax.grid(True)
+    ax.legend(loc=2, title='Subtype B entropy:', fontsize=fs)
+
+    plt.tight_layout()
+
+
 
 # Script
 if __name__ == '__main__':
@@ -179,59 +240,10 @@ if __name__ == '__main__':
 
     data = collect_data(pnames, regions, VERBOSE=VERBOSE)
 
-    # Calculate the fraction of allele above thresholds
-    from hivwholeseq.utils.pandas import add_binned_column
-    bins_S, binsc_S = add_binned_column(data, 'Sbin', 'Ssub', bins=5, clip=True)
-    bins_t, binsc_t = add_binned_column(data, 'tbin', 'time',
-                                        bins=300 * np.arange(8),
-                                        clip=True)
+    datap = calculate_fraction_above_threshold(data)
 
-    thresholds = 0.01 * np.arange(10)
-    datap = []
-    for (Sbin, tbin, pcode), datum in data.groupby(['Sbin', 'tbin', 'pcode']):
-        datump = {'Ssub': binsc_S[Sbin],
-                  'time': binsc_t[tbin],
-                  'pcode': pcode,
-                 }
-        for thr in thresholds:
-            datump['frac > '+'{:.1G}'.format(thr)] = (datum['af'] > thr).mean()
-        datap.append(datump)
-
-    datap = pd.DataFrame(datap)
-
-
-    # Plot
     if plot:
-
-        thr = 0.01
-
-        Ssubs = datap.Ssub.unique().tolist()
-        colormap = cm.jet
-
-
-        fig, ax = plt.subplots()
-        for (Ssub, pcode), datump in datap.groupby(['Ssub', 'pcode']):
-            x = np.array(datump['time'])
-            y = np.array(datump['frac > '+'{:.1G}'.format(thr)])
-
-            if pcode == datap.pcode.unique()[0]:
-                label = '{:.1G}'.format(Ssub)
-            else:
-                label = ''
-
-            ax.plot(x, y,
-                    lw=2,
-                    ls='-', marker='o', ms=10,
-                    color=colormap(1.0 * Ssubs.index(Ssub) / len(Ssubs)),
-                    label=label,
-                   )
-
-        ax.set_xlabel('Time [days from infection]')
-        ax.set_ylabel('frac > '+'{:.1G}'.format(thr))
-        ax.grid(True)
-        ax.legend(loc=2, title='Subtype B entropy:')
-
-        plt.tight_layout()
+        plot_af_above_threshold(datap, threshold=0.01, singles=False)
 
         plt.ion()
         plt.show()
