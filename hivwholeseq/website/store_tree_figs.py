@@ -76,7 +76,14 @@ def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
 
     for datum in data:
         tree = datum['tree']
-        tree.root.branch_length = 0.001
+        # FIXME: this has impact on the margins and stuff, do it properly based
+        # on the width of the time legend in the bottom left corner
+        tree.root.branch_length = 0.01
+
+        # Set the times as positive, because p10 has t0 = -5 for now
+        for node in tree.get_terminals() + tree.get_nonterminals():
+            if hasattr(node, 'DSI') and node.DSI is not None:
+                node.DSI = max(node.DSI, 1)
 
         times = sorted(set([leaf.DSI for leaf in tree.get_terminals()]))
 
@@ -136,8 +143,12 @@ def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
                     fontsize=14)
 
         # Draw legend for times
-        datal = [{'time': t,'color': [tone for tone in web_colormap(1.0 * t / max(times))[:3]],
-        'colorstroke': [tone * 0.7 for tone in web_colormap(1.0 * t / max(times))[:3]]} for t in times]
+        tone_fun = lambda t: np.array(web_colormap(1.0 * t / max(times))[:3])
+        datal = [{'time': t,
+                  'color': tone_fun(t).tolist(),
+                  'colorstroke': (0.7 * tone_fun(t)).tolist(),
+                 }
+                 for t in times]
         xtext = 0
         ytext = (0.93 - 0.06 * min(8, len(datal))) * ax.get_ylim()[0]
         ax.text(0.01 * maxdepth, ytext, 'Time:', fontsize=16)
