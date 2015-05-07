@@ -591,12 +591,21 @@ class Patient(pd.Series):
             return mapco[ind]
 
 
-    def get_local_haplotype_trajectories(self, fragment, start, end, VERBOSE=0,
+    def get_local_haplotype_trajectories(self, region, start, end, VERBOSE=0,
                                          **kwargs):
-        '''Get trajectories of local haplotypes'''
-        if fragment not in ['F'+str(i) for i in xrange(1, 7)]:
-            (fragment, start, end) = self.get_fragmented_roi((fragment, start, end),
+        '''Get trajectories of local haplotypes
+        
+        Parameters:
+           region (str): genomic region or fragment
+           start (int): start position in region
+           end (int): end position in region ('+oo': end of the region)
+        '''
+        if region in ['F'+str(i) for i in xrange(1, 7)]:
+            fragment = region
+        else:
+            (fragment, start, end) = self.get_fragmented_roi((region, start, end),
                                                              VERBOSE=VERBOSE)
+
         ind = []
         haplos = []
         for i, sample in enumerate(self.itersamples()):
@@ -607,16 +616,28 @@ class Patient(pd.Series):
             except IOError:
                 continue
 
-            haplos.append(haplo)
-            ind.append(i)
+            # Discard time points with zero coverage
+            if len(haplo):
+                haplos.append(haplo)
+                ind.append(i)
 
         return (haplos, ind)
 
 
-    def get_local_haplotype_count_trajectories(self, fragment, start=0, end='+oo', VERBOSE=0,
+    def get_local_haplotype_count_trajectories(self,
+                                               region, start=0, end='+oo',
+                                               VERBOSE=0,
+                                               align=False,
+                                               return_dict=False,
                                                **kwargs):
-        '''Get trajectories of local haplotypes counts'''
-        (haplos, ind) = self.get_local_haplotype_trajectories(fragment,
+        '''Get trajectories of local haplotypes counts
+        
+        Parameters:
+           region (str): genomic region or fragment
+           start (int): start position in region
+           end (int): end position in region ('+oo': end of the region)
+        '''
+        (haplos, ind) = self.get_local_haplotype_trajectories(region,
                                                               start, end,
                                                               VERBOSE=VERBOSE,
                                                               **kwargs)
@@ -637,6 +658,27 @@ class Patient(pd.Series):
             L = np.max(map(len, seqs_set))
 
         seqs_set = np.array(seqs_set, 'S'+str(L))
+
+        if align:
+            from ..utils.sequence import align_muscle
+            ali = align_muscle(*seqs_set, sort=True)
+            alim = np.array(ali)
+            
+            if return_dict:
+                return {'hct': hct,
+                        'ind': ind,
+                        'seqs': seqs_set,
+                        'ali': ali,
+                        'alim': alim,
+                       } 
+
+            return (hct.T, ind, seqs_set, ali)
+
+        if return_dict:
+            return {'hct': hct,
+                    'ind': ind,
+                    'seqs': seqs_set,
+                   } 
 
         return (hct.T, ind, seqs_set)
 

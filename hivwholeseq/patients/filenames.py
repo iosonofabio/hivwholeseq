@@ -135,16 +135,31 @@ def get_consensi_tree_filename(pname, fragment, format='newick'):
 
 
 def get_haplotype_count_trajectory_filename(pname, region):
-    '''Get the filename of the region haplotype count trajectory'''
-    filename = 'haplotype_count_trajectory_'+region+'.npz'
-    filename = get_foldername(pname)+'haplotypes/'+filename
+    '''Get the filename of the region haplotype count trajectory
+    
+    NOTE: if region starts with 'scan_' it is treated specially as a subfolder.
+    '''
+    filename = 'haplotype_count_trajectory_'
+    if region[:5] == 'scan_':
+        filename = 'scan/'+filename+region[5:]
+    else:
+        filename = filename+region
+
+    filename = get_foldername(pname)+'haplotypes/'+filename+'.npz'
     return filename
 
 
 def get_local_tree_filename(pname, region, format='json'):
-    '''Get the filename of the local haplotype tree'''
-    filename = 'local_tree_'+region+'.'+format
-    filename = get_foldername(pname)+'trees/'+filename
+    '''Get the filename of the local haplotype tree
+    
+    NOTE: if region starts with 'scan_' it is treated specially as a subfolder.
+    '''
+    filename = 'local_tree_'
+    if region[:5] == 'scan_':
+        filename = 'scan/'+filename+region[5:]
+    else:
+        filename = filename+region
+    filename = get_foldername(pname)+'trees/'+filename+'.'+format
     return filename
 
 

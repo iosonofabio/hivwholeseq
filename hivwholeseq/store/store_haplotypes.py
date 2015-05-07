@@ -67,26 +67,16 @@ if __name__ == '__main__':
     
             if VERBOSE >= 2:
                 print 'Get region haplotypes'
-            filters = ['noN', 'mincount='+str(countmin)]
-            (hct, ind, seqs) = \
-                    patient.get_local_haplotype_count_trajectories(region,
-                                                                   filters=filters,
-                                                                   VERBOSE=VERBOSE)
-
-            # Filter out time points with no counts at all
-            indt = hct.sum(axis=1) >= 1
-            ind = np.array(ind, int)[indt].tolist()
-            hct = hct[indt]
-
-            # Filter out tiny-frequency variants
-            hft = (1.0 * hct.T / hct.sum(axis=1)).T
-            ind_seqs = (hft > freqmin).any(axis=0)
-            hct = hct.T[ind_seqs].T
-            hft = hft.T[ind_seqs].T
-            seqs = seqs[ind_seqs]
-
-            # Align sequences
-            ali = np.array(align_muscle(*seqs, sort=True))
+            datum = patient.get_local_haplotype_count_trajectories(\
+                           region,
+                           filters=['noN',
+                                    'mincount='+str(countmin),
+                                    'freqmin='+str(freqmin),
+                                   ],
+                           VERBOSE=VERBOSE,
+                           align=True,
+                           return_dict=True)
+            datum['times'] = patient.times[datum['ind']]
 
             if use_save:
                 if VERBOSE >= 2:
@@ -94,8 +84,9 @@ if __name__ == '__main__':
                 fn_out = patient.get_haplotype_count_trajectory_filename(region)
                 mkdirs(os.path.dirname(fn_out))
                 np.savez_compressed(fn_out,
-                                    hct=hct,
-                                    ind=ind,
-                                    times=patient.times[ind],
-                                    seqs=seqs,
-                                    ali=ali)
+                                    hct=datum['hct'],
+                                    ind=datum['ind'],
+                                    times=datum['times'],
+                                    seqs=datum['seqs'],
+                                    ali=datum['alim'],
+                                   )

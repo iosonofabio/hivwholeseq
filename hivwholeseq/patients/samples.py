@@ -191,8 +191,12 @@ class SamplePat(pd.Series):
         return cov
 
 
-    def get_local_haplotypes(self, fragment, start, end,
-                             VERBOSE=0, maxreads=-1, filters=None, PCR=1):
+    def get_local_haplotypes(self,
+                             fragment, start, end,
+                             VERBOSE=0,
+                             maxreads=-1,
+                             filters=None,
+                             PCR=1):
         '''Get local haplotypes'''
         from hivwholeseq.patients.get_local_haplotypes import get_local_haplotypes
         bamfilename = self.get_mapped_filtered_filename(fragment, PCR=PCR)
@@ -208,6 +212,11 @@ class SamplePat(pd.Series):
                 for hname in hnames:
                     del haplo[hname]
 
+            if 'nosingletons' in filters:
+                hnames = [hname for hname, c in haplo.iteritems() if c <= 1]
+                for hname in hnames:
+                    del haplo[hname]
+
             if any('mincount=' in ft for ft in filters):
                 for ft in filters:
                     if 'mincount=' in ft:
@@ -217,8 +226,13 @@ class SamplePat(pd.Series):
                 for hname in hnames:
                     del haplo[hname]
             
-            if 'nosingletons' in filters:
-                hnames = [hname for hname, c in haplo.iteritems() if c <= 1]
+            if any('freqmin=' in ft for ft in filters):
+                for ft in filters:
+                    if 'freqmin=' in ft:
+                        break
+                fmin = float(ft[len('minfreq='):])
+                csum = sum(haplo.itervalues())
+                hnames = [hname for hname, c in haplo.iteritems() if c < fmin * csum]
                 for hname in hnames:
                     del haplo[hname]
 

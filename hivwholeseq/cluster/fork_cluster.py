@@ -887,6 +887,39 @@ def fork_get_allele_frequency_trajectory(pname, fragment, VERBOSE=0):
     return sp.check_output(qsub_list)
 
 
+def fork_store_haplotypes_scan(pname, width, gap, start, end, VERBOSE=0,
+                               freqmin=0.01, countmin=3):
+    '''Fork to the cluster for each patient'''
+    if VERBOSE:
+        print 'Forking to the cluster: patient '+pname
+    JOBSCRIPT = JOBDIR+'store/store_haplotypes_scan.py'
+    cluster_time = '23:59:59'
+    vmem = '2G'
+
+    qsub_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'scan '+pname,
+                 '-l', 'h_rt='+cluster_time,
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--patients', pname,
+                 '--width', width,
+                 '--gap', gap,
+                 '--start', start,
+                 '--end', end,
+                 '--freqmin', freqmin,
+                 '--countmin', countmin,
+                 '--verbose', VERBOSE,
+                 '--save',
+                ]
+    qsub_list = map(str, qsub_list)
+    if VERBOSE:
+        print ' '.join(qsub_list)
+    return sp.check_output(qsub_list)
+
 
 # WEBSITE
 def fork_store_haplotypes_website(pname, region, VERBOSE=0):

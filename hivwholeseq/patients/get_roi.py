@@ -8,6 +8,7 @@ content:    Get genomic region of interest from a number of possible inputs.
 import argparse
 from hivwholeseq.patients.patients import load_patient
 from hivwholeseq.patients.samples import SamplePat
+from hivwholeseq.utils.exceptions import RoiError
 from hivwholeseq.utils.argparse import RoiAction
 
 
@@ -24,7 +25,7 @@ def get_fragmented_roi(refseq, roi, VERBOSE=0, include_genomewide=False):
                 return (fea.id, start - fr_start, end - fr_start)
         
         if not include_genomewide:
-            raise ValueError('No fragment found that fully covers this roi')
+            raise RoiError('No fragment found that fully covers this roi')
         else:
             return ('genomewide', start, end)
 

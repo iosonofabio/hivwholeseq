@@ -16,8 +16,8 @@ from Bio import Phylo
 from Bio import AlignIO
 
 from hivwholeseq.patients.patients import load_patients, Patient
-from hivwholeseq.utils.tree import build_tree_fasttree
 from hivwholeseq.utils.argparse import PatientsAction
+from hivwholeseq.utils.tree import build_tree_fasttree
 from hivwholeseq.store.store_tree_consensi import annotate_tree
 from hivwholeseq.utils.nehercook.ancestral import ancestral_sequences
 from hivwholeseq.utils.tree import tree_to_json
@@ -167,6 +167,25 @@ def extract_alignment(tree, VERBOSE=0):
     return ali
 
 
+def plot_tree(tree, title=''):
+    '''Plot the haplotype tree'''
+    annotate_tree_for_plot(tree, minfreq=0.1)
+
+    fig, ax = plt.subplots()
+    
+    Phylo.draw(tree,
+               axes=ax,
+               do_show=False,
+               label_func=attrgetter('label'),
+               show_confidence=False)
+    ax.grid(True)
+    ax.set_ylim(ax.get_ylim()[0] * 1.04, -ax.get_ylim()[0] * 0.04)
+    if title:
+        ax.set_title(title)
+    
+    plt.tight_layout()
+
+
 
 # Script
 if __name__ == '__main__':
@@ -280,20 +299,6 @@ if __name__ == '__main__':
                 AlignIO.write(ali_tree, fn, 'fasta')
 
 
-            if use_plot:
-                annotate_tree_for_plot(tree, minfreq=0.1)
-
-                if VERBOSE >= 2:
-                    print 'Plot'
-                fig, ax = plt.subplots()
-                ax.set_title(patient.code+', '+region)
-                
-                Phylo.draw(tree, axes=ax, do_show=False, label_func=attrgetter('label'),
-                           show_confidence=False)
-                ax.grid(True)
-                ax.set_ylim(ax.get_ylim()[0] * 1.04, -ax.get_ylim()[0] * 0.04)
-                
-                plt.tight_layout()
 
     if use_plot:
         plt.ion()
