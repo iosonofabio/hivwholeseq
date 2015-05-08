@@ -20,12 +20,11 @@ from hivwholeseq.cross_sectional.ctl_epitope_map import (get_ctl_epitope_map,
 
 
 # Globals
-regions = ['p17', 'p24', 'PR', 'RT', 'IN']
 
 
 
 # Functions
-def collect_data(pnames, regions, VERBOSE=0):
+def collect_data(pnames, VERBOSE=0):
     '''Collect data for CTL epitope map'''
     import pandas as pd
 
@@ -33,25 +32,15 @@ def collect_data(pnames, regions, VERBOSE=0):
     ctl_table = get_ctl_epitope_map(species='human')
 
     data = []
-    for region in regions:
-        for pname, patient in iterpatient(patients):
-            if VERBOSE >= 1:
-                print region, patient.code
+    for pname, patient in iterpatient(patients):
+        if VERBOSE >= 1:
+            print region, patient.code
 
-            # Restrict epitope table to patient HLA
-            hla = patient.get_hla_type(MHC=1)
-            ctl_table_pat = get_ctl_epitope_hla(ctl_table, hla)
+        ctl_table = patient.get_ctl_epitopes()
 
-            # Restrict epitope table to founder virus sequence
-            seq = patient.get_reference(region)
-            prot = seq.seq.translate()
-            ind = [i for i, epi in enumerate(ctl_table_pat['Epitope'])
-                   if epi in prot]
 
-            datum = ctl_table_pat.iloc[ind].copy()
-            datum['pcode'] = patient.code
-            datum['region'] = region
-            data.append(datum)
+        datum['pcode'] = patient.code
+        data.append(datum)
     
     data = pd.concat(data)
 

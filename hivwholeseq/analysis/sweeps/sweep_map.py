@@ -39,6 +39,7 @@ from hivwholeseq.utils.argparse import PatientsAction
 def collect_data(pnames, region='genomewide', VERBOSE=0):
     '''Collect data for sweep call'''
     data = []
+    data_ctl = []
     patients = load_patients()
     if pnames is not None:
         patients = patients.loc[pnames]
@@ -64,11 +65,9 @@ def collect_data(pnames, region='genomewide', VERBOSE=0):
 
         if VERBOSE >= 2:
             print 'Get CTL epitopes'
-        ctl_table = patient.get_ctl_epitopes(regions=['p17', 'p24', 'p6', 'p7',
-                                                      'vif', 'vpr', 'vpu',
-                                                      'gp120', 'gp41',
-                                                      'PR', 'RT', 'p15', 'IN',
-                                                      'nef'])
+        ctl_table = patient.get_ctl_epitopes(kind='mhci')
+        ctl_table['pcode'] = patient.code
+        data_ctl.append(ctl_table)
 
         if VERBOSE >= 2:
             print 'Get coordinate map'
@@ -82,10 +81,9 @@ def collect_data(pnames, region='genomewide', VERBOSE=0):
         coomapd = {'pat_to_subtype': dict(coomap[:, ::-1]),
                    'subtype_to_pat': dict(coomap)}
 
-        # Condition on fixation
-        ind_sweep = zip(*((aft[0] < 0.05) & (aft[-2:] > 0.95).any(axis=0)).T.nonzero())
-
-        for posdna, inuc in ind_sweep:
+        if VERBOSE >= 2:
+            print 'Look for substitutions'
+        for posdna in xrange(aft.shape[-1]):
             # Get the position in reference coordinates
             if posdna not in coomapd['pat_to_subtype']:
                 continue
@@ -96,47 +94,59 @@ def collect_data(pnames, region='genomewide', VERBOSE=0):
 
             # Get only non-masked time points
             indpost = -aftpos[0].mask
-            if indpost.sum() == 0:
+            if indpost.sum() < 2:
                 continue
             timespos = times[indpost]
-            aftpos = aftpos[:, indpost]
+            aftpos = aftpos[:, indpost].T
 
             anc = consm[posdna]
             ianc = icons[posdna]
-            nuc = alpha[inuc]
-            mut = anc+'->'+nuc
 
             # Ignore indels
-            if (inuc >= 4) or (ianc >= 4):
+            if ianc >= 4:
                 continue
 
-            # Skip if the site is already polymorphic at the start
-            if aftpos[ianc, 0] < 0.95:
+            # Check for fixation
+            if (aftpos[0, ianc] < 0.95) or (aftpos[-1, ianc] > 0.05):
                 continue
 
-            # Define transition/transversion
-            if frozenset(nuc+anc) in (frozenset('CT'), frozenset('AG')):
-                trclass = 'ts'
-            else:
-                trclass = 'tv'
+            # Check which allele (if any) is fixing
+            for inuc, nuc in enumerate(alpha[:4]):
+                if nuc == anc:
+                    continue
+                
+                if aftpos[-1, inuc] < 0.95:
+                    continue
 
-            # Find whether is within an epitope
-            is_epitope = ((pos_sub >= np.array(ctl_table['start_HXB2'])) &
-                          (pos_sub < np.array(ctl_table['end_HXB2']))).any()
+                nuc = alpha[inuc]
+                mut = anc+'->'+nuc
 
-            datum = {'pcode': patient.code,
-                     'region': region,
-                     'pos_patient': posdna,
-                     'pos_ref': pos_sub,
-                     'mut': mut,
-                     'trclass': trclass,
-                     'epitope': is_epitope,
-                    }
+                # Define transition/transversion
+                if frozenset(nuc+anc) in (frozenset('CT'), frozenset('AG')):
+                    trclass = 'ts'
+                else:
+                    trclass = 'tv'
 
-            data.append(datum)
+                # Find whether it is within an epitope
+                is_epitope = ((pos_sub >= np.array(ctl_table['start_HXB2'])) &
+                              (pos_sub < np.array(ctl_table['end_HXB2']))).any()
+
+                datum = {'pcode': patient.code,
+                         'region': region,
+                         'pos_patient': posdna,
+                         'pos_ref': pos_sub,
+                         'mut': mut,
+                         'trclass': trclass,
+                         'epitope': is_epitope,
+                        }
+
+                data.append(datum)
 
     data = pd.DataFrame(data)
-    return data
+    data_ctl = pd.concat(data_ctl)
+    return {'substitutions': data,
+            'ctl': data_ctl,
+           }
 
 
 def plot_sweeps(data):
@@ -147,11 +157,15 @@ def plot_sweeps(data):
     colormap = cm.jet
     fs = 16
 
+    data_sub = data['substitutions']
+    data_ctl = data['ctl']
+
     fig, ax = plt.subplots(figsize=(6, 3))
-    pnames = data['pcode'].unique().tolist()
+    pnames = data_sub['pcode'].unique().tolist()
     Lp = len(pnames)
 
-    for pname, datum in data.groupby('pcode'):
+    # Plot the substitutions
+    for pname, datum in data_sub.groupby('pcode'):
         x = np.array(datum['pos_ref'])
         y = np.repeat(pnames.index(pname), len(x))
 
@@ -166,7 +180,20 @@ def plot_sweeps(data):
                        label=pname,
                       )
 
-    ax.set_xlim(-50, data['pos_ref'].max() + 200)
+    # Plot CTL epitopes
+    for pname, datum in data_ctl.groupby('pcode'):
+        y = pnames.index(pname) + 0.2
+        for _, datump in datum.iterrows():
+            x_left = datump['start_HXB2']
+            x_right = datump['end_HXB2']
+            width = x_right - x_left
+            ax.plot([x_left, x_right], [y] * 2,
+                    color=colormap(1.0 * pnames.index(pname) / Lp),
+                    lw=3,
+                   )
+
+
+    ax.set_xlim(-50, data_sub['pos_ref'].max() + 200)
     ax.set_ylim(Lp - 0.5, -0.5)
     ax.set_xlabel('Position in HXB2', fontsize=fs)
     ax.set_yticks(np.arange(Lp))

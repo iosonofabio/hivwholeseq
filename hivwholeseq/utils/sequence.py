@@ -564,4 +564,4 @@ def find_annotation(seq, annotation):
     for fea in seq.features:
         if fea.id == annotation:
             return fea
-    return -1
+    raise ValueError(annotation+' not found')

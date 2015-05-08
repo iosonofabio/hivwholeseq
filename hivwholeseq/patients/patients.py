@@ -734,49 +734,51 @@ class Patient(pd.Series):
         
         Parameters:
            regions (list): restrict to epitopes within these regions
-           kind (str): LANL/mhci
+           kind (str): LANL/epitoolkit/mhci=<n>, where <n> is the cutoff for
+           the MHCi predicted list: the first <n> entries are taken.
         '''
-        from ..cross_sectional.ctl_epitope_map import (get_ctl_epitope_map,
-                                                       get_ctl_epitope_hla)
-        
-
         # Get epitope table for patient HLA
         if kind == 'LANL':
+            from ..cross_sectional.ctl_epitope_map import (get_ctl_epitope_map,
+                                                           get_ctl_epitope_hla)
             ctl_table_main = get_ctl_epitope_map(species='human')
             hla = self.get_hla_type(MHC=1)
             ctl_table_main = get_ctl_epitope_hla(ctl_table_main, hla)
-            del ctl_table['HXB2 start']
-            del ctl_table['HXB2 end']
-            del ctl_table['HXB2 DNA Contig']
+            del ctl_table_main['HXB2 start']
+            del ctl_table_main['HXB2 end']
+            del ctl_table_main['HXB2 DNA Contig']
+            del ctl_table_main['Protein']
+            del ctl_table_main['Subprotein']
 
-        elif kind == 'mhci':
-            def get_ctl_epitope_map_mhci(pname):
-                def get_ctl_epitope_map_filename(pname):
-                    from .filenames import root_patient_folder
-                    filename = root_patient_folder+pname+'/ctl_epitopes.tsv'
+        elif 'mhci=' in kind:
+            n_entries = int(kind[5:])
+            def get_ctl_epitope_map_mhci(pcode):
+                def get_ctl_epitope_map_filename(pcode):
+                    from .filenames import root_data_folder
+                    filename = root_data_folder+'CTL/mhci/ctl_'+pcode+'.tsv'
                     return filename
 
                 import pandas as pd
-                table = pd.read_csv(get_ctl_epitope_map_filename(pname),
+                table = pd.read_csv(get_ctl_epitope_map_filename(pcode),
                                     skiprows=3,
                                     sep='\t',
                                     usecols=['peptide'],
                                     # NOTE: top epitopes only, this is a parameter
-                                    nrows=200,
+                                    nrows=n_entries,
                                    )
                 table.drop_duplicates(inplace=True)
 
                 table.rename(columns={'peptide': 'Epitope'}, inplace=True)
                 return table
 
-            ctl_table_main = get_ctl_epitope_map_mhci(self.name)
+            ctl_table_main = get_ctl_epitope_map_mhci(self.code)
 
         elif kind == 'epitoolkit':
             def get_ctl_epitope_map_epitoolkit(pcode):
                 def get_ctl_epitope_map_filenames(pcode):
                     import glob
                     from .filenames import root_data_folder
-                    blobname = root_data_folder+'CTL/ctl_'+pcode+'/*.csv'
+                    blobname = root_data_folder+'CTL/epitoolkit/ctl_'+pcode+'/*.csv'
                     return glob.glob(blobname)
 
                 import pandas as pd
@@ -801,29 +803,41 @@ class Patient(pd.Series):
         from ..utils.sequence import find_annotation
         ref = load_custom_reference('HXB2', 'gb')
 
+        # Load patient reference for coordinates
+        seqgw = self.get_reference('genomewide', 'gb')
+
         data = []
         for region in regions:
 
             # Restrict epitope table to founder virus sequence
-            seq = self.get_reference(region)
+            fea = find_annotation(seqgw, region)
+            regpos = fea.location.nofuzzy_start
+            seq = fea.extract(seqgw)
             prot = str(seq.seq.translate())
             ind = [i for i, epi in enumerate(ctl_table_main['Epitope']) if epi in prot]
             ctl_table = ctl_table_main.iloc[ind].copy()
 
-            if kind == 'LANL':
-                # Restrict to the correct region
-                ind = np.array([str(x).lower() == region for x in ctl_table['Protein']], bool)
-                ind |= np.array([str(x).split('(')[0] == region for x in ctl_table['Subprotein']], bool)
-                ctl_table = ctl_table.loc[ind]
-                del ctl_table['Protein']
-                del ctl_table['Subprotein']
-
             # Set position in region
-            ctl_table['start_region'] = [3 * prot.find(x) for x in ctl_table['Epitope']]
-            ctl_table['end_region'] = [3 * (prot.find(x) + len(x)) for x in ctl_table['Epitope']]
+            # NOTE: the same epitope could be there twice+ in a protein
+            import re
+            tmp = []
+            for epi in ctl_table['Epitope']:
+                for match in re.finditer(epi, prot):
+                    pos = match.start()
+                    tmp.append({'Epitope': epi,
+                                'start_region': 3 * pos,
+                                'end_region': 3 * (pos + len(epi)),
+                               })
+            ctl_table = pd.DataFrame(tmp)
+            if not len(ctl_table):
+                continue
+
+            # Set position genomewide
+            ctl_table['start'] = ctl_table['start_region'] + regpos
+            ctl_table['end'] = ctl_table['end_region'] + regpos
 
             # Set position in HXB2
-            regpos = find_annotation(ref, region).location.nofuzzy_start
+            regpos_HXB2 = find_annotation(ref, region).location.nofuzzy_start
             comap = dict(self.get_map_coordinates_reference(region)[:, ::-1], refname='HXB2')
             poss = []
             for x in ctl_table['start_region']:
@@ -832,9 +846,10 @@ class Patient(pd.Series):
                         poss.append(x)
                         break
                     elif x < 0:
-                        raise ValueError('Position not found in HXB2')
+                        poss.append(-1)
+                        break
                     x -= 1
-            ctl_table['start_HXB2'] = np.array(poss, int) + regpos
+            ctl_table['start_HXB2'] = np.array(poss, int) + regpos_HXB2
             poss = []
             for x in ctl_table['end_region']:
                 while True:
@@ -842,9 +857,13 @@ class Patient(pd.Series):
                         poss.append(x)
                         break
                     elif x > 10000:
-                        raise ValueError('Position not found in HXB2')
+                        poss.append(-1)
+                        break
                     x += 1
-            ctl_table['end_HXB2'] = np.array(poss, int) + regpos
+            ctl_table['end_HXB2'] = np.array(poss, int) + regpos_HXB2
+
+            # Filter out epitopes for which we cannot find an HXB2 position
+            ctl_table = ctl_table.loc[(ctl_table[['start_HXB2', 'end_HXB2']] != -1).all(axis=1)]
 
             ctl_table['region'] = region
 
@@ -855,6 +874,7 @@ class Patient(pd.Series):
 
         return ctl_table
 
+        
 
 
 # Functions
