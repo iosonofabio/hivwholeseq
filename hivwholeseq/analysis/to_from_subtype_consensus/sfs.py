@@ -43,8 +43,8 @@ def collect_data(pnames, regions, VERBOSE=0):
         patients = patients.loc[pnames]
 
     # FIXME
-    pbads = ('15313', '15107')
-    patients = patients.loc[-patients.index.isin(pbads)]
+    pbads = ('p4', 'p7')
+    patients = patients.loc[-patients.code.isin(pbads)]
 
     for region in regions:
         if VERBOSE >= 1:
@@ -217,18 +217,19 @@ if __name__ == '__main__':
     if plot:
 
         # Bin by time
+        from hivwholeseq.utils.pandas import add_binned_column
         bins_t = 30.5 * np.array([-1, 12, 24, 48, 72, 120])
         binsc_t = 0.5 * (bins_t[1:] + bins_t[:-1])
-        data['tbin'] = 0
-        for b in bins_t[1:]:
-            data.loc[data.loc[:, 'time'] >= b, 'tbin'] += 1
+        add_binned_column(data, 'tbin', 'time', bins=bins_t, clip=True)
+
+        # Bin by time, roughly
+        bins_tr = 365.24 * np.array([-0.1, 2, 4, 10])
+        add_binned_column(data, 'trbin', 'time', bins=bins_tr, clip=True)
 
         # Bin by subtype entropy
         bins_S = np.array([0, 0.01, 0.05, 0.1, 0.5, 3])
         binsc_S = 0.5 * (bins_S[1:] + bins_S[:-1])
-        data['Sbin'] = 0
-        for b in bins_S[1:]:
-            data.loc[data.loc[:, 'Ssub'] >= b, 'Sbin'] += 1
+        add_binned_column(data, 'Sbin', 'Ssub', bins=bins_S, clip=True)
 
         # Bin by allele freq
         logistic_fun = lambda x: 1.0 / (1.0 + 10**(-x))
@@ -237,42 +238,63 @@ if __name__ == '__main__':
         bins_af = logistic_fun(bins_af_logit)
         binsc_af = logistic_fun(binsc_af_logit)
         binsw_af = bins_af[1:] - bins_af[:-1]
-        data['afbin'] = -1
-        for b in bins_af:
-            data.loc[data.loc[:, 'af'] >= b, 'afbin'] += 1
+        add_binned_column(data, 'afbin', 'af', bins=bins_af, clip=False)
 
         # SFS (time and away/to)
-        datah_t = get_sfs(data, bins_af, attrnames=['tbin', 'awayto'], VERBOSE=VERBOSE)
+        datah_t = get_sfs(data, bins_af, attrnames=['trbin', 'awayto'], VERBOSE=VERBOSE)
+
+        import seaborn as sns
+        sns.set_style('darkgrid')
+        fs = 16
+        from hivwholeseq.paper_figures.plots import HIVEVO_colormap
+        colormap = HIVEVO_colormap('website')
 
         fig, ax = plt.subplots() 
         for ik, (keys, arr) in enumerate(datah_t.iterrows()):
-            time_window = str(int(binsc_t[keys[0]]))+'m'
+            time_window = '{:.0f} - {:.0f}'.format(max(0, bins_tr[keys[0]] / 365.24),
+                                                      (bins_tr[keys[0] + 1]) / 365.24)
             awayto = keys[1]
 
-            x = binsc_af[np.array(arr.index)]
+            x = binsc_af[np.array(arr.index, int)]
             y = np.array(arr)
             y *= 1e2 / y[0]
 
-            color = cm.jet(1.0 * keys[0] / len(binsc_t))
+            color = colormap(1.0 * keys[0] / len(binsc_t))
             if keys[1] == 'away':
                 ls = '--'
             else:
                 ls = '-'
-            label = ', '.join([time_window, awayto])
+
+            if awayto == 'to':
+                label = time_window
+            else:
+                label = ''
 
             ax.plot(x, y,
                     ls=ls,
                     lw=2,
-                    color=color, label=label)
+                    color=color,
+                    label=label)
 
-        ax.set_xlabel('Allele frequency')
+        # Fix legend
+        from matplotlib.lines import Line2D
+        lines = [Line2D([], [], ls='-', color='k', label='to'),
+                 Line2D([], [], ls='--', color='k', label='away')]
+        handles, _ = ax.get_legend_handles_labels()
+        handles.extend(lines)
+
+        ax.set_xlabel('Allele frequency', fontsize=fs)
         ax.set_xlim(bins_af[0], bins_af[-1])
         ax.set_xscale('logit')
         ax.set_yscale('log')
-        ax.set_ylim(ymax=1e4)
+        ax.set_ylim(ymax=5e2)
         ax.grid(True)
-        ax.legend(loc='upper right', ncol=2, fontsize=12, title='Categories')
-        ax.set_ylabel('Spectrum [normalized by bin width]')
+        ax.legend(handles=handles, loc='upper right', ncol=2, fontsize=fs-2,
+                  title='  Time from       Subtype\ninfection [yrs]   consensus')
+        ax.set_ylabel('Spectrum [normalized by bin width]', fontsize=fs)
+        ax.xaxis.set_tick_params(labelsize=fs)
+        ax.yaxis.set_tick_params(labelsize=fs)
+        plt.tight_layout()
 
         plt.ion()
         plt.show()
@@ -286,7 +308,7 @@ if __name__ == '__main__':
             iSbin = keys[0]
             awayto = keys[1]
 
-            x = binsc_af[np.array(arr.index)]
+            x = binsc_af[np.array(arr.index, int)]
             y = np.array(arr)
             y *= 1e2 / y[0]
 
@@ -303,14 +325,17 @@ if __name__ == '__main__':
                     lw=2,
                     color=color, label=label)
 
-        ax.set_xlabel('Allele frequency')
+        ax.set_xlabel('Allele frequency', fontsize=fs)
         ax.set_xlim(bins_af[0], bins_af[-1])
         ax.set_xscale('logit')
         ax.set_yscale('log')
         ax.set_ylim(ymax=1e4)
         ax.grid(True)
-        ax.legend(loc='upper right', ncol=2, fontsize=12, title='Categories')
-        ax.set_ylabel('Spectrum [normalized by bin width]')
+        ax.legend(loc='upper right', ncol=2, fontsize=fs-4, title='Categories')
+        ax.set_ylabel('Spectrum [normalized by bin width]', fontsize=fs)
+        ax.xaxis.set_tick_params(labelsize=fs)
+        ax.yaxis.set_tick_params(labelsize=fs)
+        plt.tight_layout()
 
 
         # Average frequency (simpler plot)
@@ -331,15 +356,16 @@ if __name__ == '__main__':
 
             ax.plot(x, y, ls=ls, lw=2, label=awayto, color='k')
 
-        ax.set_xlabel('Entropy in subtype [bits]')
-        ax.set_ylabel('Average frequency')
+        ax.set_xlabel('Entropy in subtype [bits]', fontsize=fs)
+        ax.set_ylabel('Average frequency', fontsize=fs)
         ax.set_ylim(1e-4, 1e-1)
         ax.set_xlim(1e-3, 5)
         ax.set_xscale('log')
         ax.set_yscale('log')
-        ax.legend(loc='upper left')
+        ax.legend(loc='upper left', fontsize=fs)
         ax.grid(True)
-
+        ax.xaxis.set_tick_params(labelsize=fs)
+        ax.yaxis.set_tick_params(labelsize=fs)
         plt.tight_layout()
 
         plt.ion()
