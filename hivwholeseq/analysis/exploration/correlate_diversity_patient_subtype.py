@@ -32,15 +32,9 @@ from hivwholeseq.cross_sectional.get_subtype_allele_frequencies import (
 
 
 # Globals
-colors = {'p17': 'r',
-          'p24': 'g',
-          'PR': 'r',
-          'RT': 'g',
-          'p15': 'purple',
-          'IN': 'orange',
-          'gp41': 'r'}
-regions = ['p17', 'p24', 'PR', 'RT', 'p15', 'IN', 'gp41']
-pnames = ['20097', '15363', '15823', '9669', '20529', '15241', '15376', '15319']
+# NOTE: we exclude env because of the whole antubody thing
+# The correlation in gp41 is lower and saturates fast
+regions = ['p17', 'p24', 'PR', 'RT', 'p15', 'IN', 'vif', 'vpu', 'nef']
 
 
 
@@ -53,6 +47,9 @@ def collect_data(pnames, regions, VERBOSE=0):
     patients = load_patients()
     if pnames is not None:
         patients = patients.loc[pnames]
+
+    # Restrict to subtype B patients
+    patients = patients.loc[patients.Subtype == 'B']
 
     for region in regions:
         if VERBOSE >= 1:
@@ -77,8 +74,8 @@ def collect_data(pnames, regions, VERBOSE=0):
 
             patient = Patient(patient)
             aft, ind = patient.get_allele_frequency_trajectories(region,
-                                                                 cov_min=1000,
-                                                                 depth_min=300,
+                                                                 cov_min=500,
+                                                                 depth_min=30,
                                                                  VERBOSE=VERBOSE)
             if len(ind) == 0:
                 if VERBOSE >= 2:
@@ -174,8 +171,12 @@ def calculate_correlation(data, VERBOSE=0):
     return datap
 
 
-def plot_correlation(datap, VERBOSE=0, colormap='jet'):
+def plot_correlation_single(datap, VERBOSE=0, colormap='jet'):
     '''Plot the correlation between intrapatient and subtype diversity'''
+    import seaborn as sns
+    sns.set_style('darkgrid')
+    fs = 16
+
     if isinstance(colormap, basestring):
         if colormap == 'jet':
             colormap = cm.jet
@@ -185,20 +186,84 @@ def plot_correlation(datap, VERBOSE=0, colormap='jet'):
     pcodes = datap['pcode'].unique().tolist()
     for region, datump in datap.groupby('region'):
 
-        fig, ax = plt.subplots()
-
+        fig, ax = plt.subplots(figsize=(6, 5))
+        ax.set_title(region, fontsize=fs)
 
         for ip, (pcode, datumpp) in enumerate(datump.groupby('pcode')):
             x = np.array(datumpp['time'])
             y = np.array(datumpp['rho'])
             ax.plot(x, y,
                     lw=2,
+                    marker='o',
+                    markersize=15,
                     color=colormap(1.0 * ip / len(pcodes)),
                    )
 
-        ax.set_xlabel('Time [days from infection')
-        ax.set_ylabel('Spearmanr pat/subtype B')
+        ax.set_xlim(xmin=-100)
+        ax.set_ylim(ymin=-0.03)
+        ax.set_xlabel('Time [days from infection', fontsize=fs)
+        ax.set_ylabel('Entropy correlation\nbetween patient and subtype B',
+                      fontsize=fs)
+        ax.xaxis.set_tick_params(labelsize=fs)
+        ax.yaxis.set_tick_params(labelsize=fs)
         ax.grid(True)
+
+        plt.tight_layout()
+
+
+def plot_correlation_avg(datap, VERBOSE=0, colormap='jet'):
+    '''Plot the correlation between intrapatient and subtype diversity'''
+    import seaborn as sns
+    sns.set_style('darkgrid')
+    fs = 16
+
+    if isinstance(colormap, basestring):
+        if colormap == 'jet':
+            colormap = cm.jet
+        else:
+            raise ValueError('colormap not recognized')
+
+    datump = datap.groupby(['pcode', 'time'], as_index=False).mean()
+    datump['rho_std'] = np.array(datap.groupby(['pcode', 'time']).std()['rho'])
+    pcodes = datap['pcode'].unique().tolist()
+    pcodes.sort(key=lambda x: int(x[1:]))
+
+    fig, ax = plt.subplots(figsize=(6, 5))
+    for ip, pcode in enumerate(pcodes):
+        datumpp = datump.groupby('pcode').get_group(pcode)
+        x = np.array(datumpp['time'])
+        y = np.array(datumpp['rho'])
+        dy = np.array(datumpp['rho_std'])
+        ax.errorbar(x, y, dy,
+                    ls="none",
+                    marker='o',
+                    markersize=15,
+                    color=colormap(1.0 * ip / len(pcodes)),
+                    label=pcode,
+                   )
+
+    # Plot linear fit excluding p7 which is very late and slow
+    ind = (datump['pcode'] != 'p7') & (-np.isnan(datump['rho_std']))
+    x = datump['time'].loc[ind]
+    y = datump['rho'].loc[ind]
+    dy = datump['rho_std'].loc[ind]
+    m, q = np.polyfit(x, y, 1, w=1.0/dy)
+    xfit = np.linspace(0, 3500, 1000)
+    yfit = q + m * xfit
+    ax.plot(xfit, yfit, lw=2, c='k')
+
+    ax.legend(loc='upper left', fontsize=fs-3, ncol=2, title='Patient:')
+    ax.set_xlim(-100, 3500)
+    ax.set_ylim(-0.03, 0.70)
+    ax.set_xlabel('Time from infection [days]', fontsize=fs)
+    ax.set_ylabel('Entropy correlation btw\npatient and subtype B',
+                  fontsize=fs)
+    ax.xaxis.set_tick_params(labelsize=fs)
+    ax.yaxis.set_tick_params(labelsize=fs)
+    ax.grid(True)
+
+    plt.tight_layout()
+
 
 
 
@@ -208,7 +273,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Explore conservation levels across patients and subtype',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
-    parser.add_argument('--patients', nargs='+', default=pnames,
+    parser.add_argument('--patients', nargs='+', default=None,
                         help='Patient to analyze')
     parser.add_argument('--regions', nargs='+', default=regions,
                         help='Regions to analyze (e.g. F1 p17)')
@@ -227,9 +292,9 @@ if __name__ == '__main__':
 
     datap = calculate_correlation(data, VERBOSE=VERBOSE)
 
-
     if plot:
-        plot_correlation(datap, VERBOSE=VERBOSE)
+        plot_correlation_single(datap, VERBOSE=VERBOSE)
+        plot_correlation_avg(datap, VERBOSE=VERBOSE)
         plt.ion()
         plt.show()
 

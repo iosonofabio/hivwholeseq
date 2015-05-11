@@ -37,7 +37,7 @@ from hivwholeseq.utils.argparse import PatientsAction
 
 
 # Functions
-def collect_data(pnames, region='genomewide', VERBOSE=0, ctl_kind='mhci=20'):
+def collect_data(pnames, region='genomewide', VERBOSE=0, ctl_kind='mhci=80'):
     '''Collect data for sweep call'''
     data = []
     data_ctl = []
@@ -124,6 +124,12 @@ def collect_data(pnames, region='genomewide', VERBOSE=0, ctl_kind='mhci=20'):
                 if aftpos[-1, inuc] < 0.95:
                     continue
 
+                # NOTE: OK, it's a substitution
+
+                # Assign a time to the substitution
+                ist = (aftpos[:, inuc] > 0.5).nonzero()[0]
+                tsubst = 0.5 * (timespos[ist - 1] + timespos[ist])
+
                 nuc = alpha[inuc]
                 mut = anc+'->'+nuc
 
@@ -154,6 +160,7 @@ def collect_data(pnames, region='genomewide', VERBOSE=0, ctl_kind='mhci=20'):
                          'trclass': trclass,
                          'epitope': is_epitope,
                          'awayto': away_conssub,
+                         'time': tsubst,
                         }
 
                 data.append(datum)
@@ -166,61 +173,6 @@ def collect_data(pnames, region='genomewide', VERBOSE=0, ctl_kind='mhci=20'):
     return {'substitutions': data,
             'ctl': data_ctl,
            }
-
-
-def plot_sweeps(data):
-    '''Plot sweeps of all patients'''
-    import seaborn as sns
-
-    sns.set_style('darkgrid')
-    colormap = cm.jet
-    fs = 16
-
-    data_sub = data['substitutions']
-    data_ctl = data['ctl']
-
-    fig, ax = plt.subplots(figsize=(6, 3))
-    pnames = data_sub['pcode'].unique().tolist()
-    Lp = len(pnames)
-
-    # Plot the substitutions
-    for pname, datum in data_sub.groupby('pcode'):
-        x = np.array(datum['pos_ref'])
-        y = np.repeat(pnames.index(pname), len(x))
-
-        # Divide by epitope/nonepitope
-        for ind, marker, s in [(datum['epitope'], 'o', 50),
-                               (-datum['epitope'], 'x', 30)]:
-            ind = np.array(ind)
-
-            ax.scatter(x[ind], y[ind], s=s,
-                       marker=marker,
-                       color=colormap(1.0 * pnames.index(pname) / Lp),
-                       label=pname,
-                      )
-
-    # Plot CTL epitopes
-    for pname, datum in data_ctl.groupby('pcode'):
-        y = pnames.index(pname) + 0.2
-        for _, datump in datum.iterrows():
-            x_left = datump['start_HXB2']
-            x_right = datump['end_HXB2']
-            width = x_right - x_left
-            ax.plot([x_left, x_right], [y] * 2,
-                    color=colormap(1.0 * pnames.index(pname) / Lp),
-                    lw=3,
-                   )
-
-
-    ax.set_xlim(-50, data_sub['pos_ref'].max() + 200)
-    ax.set_ylim(Lp - 0.5, -0.5)
-    ax.set_xlabel('Position in HXB2', fontsize=fs)
-    ax.set_yticks(np.arange(Lp))
-    ax.set_yticklabels(pnames, fontsize=fs)
-    ax.xaxis.set_tick_params(labelsize=fs)
-    ax.grid(True)
-
-    plt.tight_layout()
 
 
 def correlate_away_to_epitope(data):
@@ -280,6 +232,62 @@ def correlate_epitope_substitution(data):
            }
 
 
+def plot_sweeps(data):
+    '''Plot sweeps of all patients'''
+    import seaborn as sns
+
+    sns.set_style('darkgrid')
+    colormap = cm.jet
+    fs = 16
+
+    data_sub = data['substitutions']
+    data_ctl = data['ctl']
+
+    fig, ax = plt.subplots(figsize=(6, 3))
+    pnames = data_sub['pcode'].unique().tolist()
+    Lp = len(pnames)
+
+    # Plot the substitutions
+    for pname, datum in data_sub.groupby('pcode'):
+        x = np.array(datum['pos_ref'])
+        y = np.repeat(pnames.index(pname), len(x))
+
+        # Divide by epitope/nonepitope
+        for ind, marker, s in [(datum['epitope'], 'o', 50),
+                               (-datum['epitope'], 'x', 30)]:
+            ind = np.array(ind)
+
+            ax.scatter(x[ind], y[ind], s=s,
+                       marker=marker,
+                       color=colormap(1.0 * pnames.index(pname) / Lp),
+                       label=pname,
+                      )
+
+    # Plot CTL epitopes
+    for pname, datum in data_ctl.groupby('pcode'):
+        y = pnames.index(pname) + 0.2
+        for _, datump in datum.iterrows():
+            x_left = datump['start_HXB2']
+            x_right = datump['end_HXB2']
+            width = x_right - x_left
+            ax.plot([x_left, x_right], [y] * 2,
+                    color=colormap(1.0 * pnames.index(pname) / Lp),
+                    lw=3,
+                   )
+
+
+    ax.set_xlim(-50, data_sub['pos_ref'].max() + 200)
+    ax.set_ylim(Lp - 0.5, -0.5)
+    ax.set_xlabel('Position in HXB2', fontsize=fs)
+    ax.set_yticks(np.arange(Lp))
+    ax.set_yticklabels(pnames, fontsize=fs)
+    ax.xaxis.set_tick_params(labelsize=fs)
+    ax.grid(True)
+
+    plt.tight_layout()
+
+
+
 
 # Script
 if __name__ == '__main__':
@@ -291,7 +299,7 @@ if __name__ == '__main__':
                         help='Patient to analyze')
     parser.add_argument('--region', default='genomewide',
                         help='Region to analyze (e.g. F1 p17)')
-    parser.add_argument('--ctl-kind', default='mhci=20',
+    parser.add_argument('--ctl-kind', default='mhci=80',
                         help='Kind of CTL data to use')
     parser.add_argument('--verbose', type=int, default=2,
                         help='Verbosity level [0-4]')

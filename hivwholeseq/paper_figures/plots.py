@@ -357,13 +357,15 @@ def plot_rna_recombination(data, title='', VERBOSE=0, savefig=False):
 
 def plot_allele_frequency_overlap(data, title='', VERBOSE=0, use_logit=True, savefig=False):
     '''Plot allele frequency in the overlap regions'''
+    if VERBOSE >= 2:
+        print 'Plot allele frequency in overlaps'
 
-    fig, ax = plt.subplots()
-    sns.set_style('whitegrid')
-
+    sns.set_style('darkgrid')
     colors = sns.color_palette('Set1', 5)
     fs = 16
     xmin = 1e-3
+    
+    fig, ax = plt.subplots(figsize=(6, 5))
 
     legend = set()
     for ida, datum in enumerate(data):
@@ -393,8 +395,8 @@ def plot_allele_frequency_overlap(data, title='', VERBOSE=0, use_logit=True, sav
     
     ax.plot([xmin, 1 - xmin], [xmin, 1 - xmin], lw=2, color='k', alpha=0.5)
 
-    ax.set_xlabel('allele frequency leading fragment', fontsize=fs)
-    ax.set_ylabel('allele frequency trailing fragment', fontsize=fs)
+    ax.set_xlabel('SNV frequency leading fragment', fontsize=fs)
+    ax.set_ylabel('SNV frequency trailing fragment', fontsize=fs)
     ax.grid(True)
 
     if use_logit:
@@ -409,6 +411,8 @@ def plot_allele_frequency_overlap(data, title='', VERBOSE=0, use_logit=True, sav
 
     if title:
         ax.set_title(title)
+
+    plt.tight_layout()
 
     if savefig:
         fig_filename = savefig
@@ -723,7 +727,8 @@ def plot_substitution_rate_sliding(data,
     if VERBOSE:
         print 'Plot substitution rates in a sliding window'
 
-    data_sweeps = data['sweeps']
+    data_sweeps = data['substitutions']
+    data_ctl = data['ctl']
     data = data['substitution_rate']
 
     # Plot parameters
@@ -804,8 +809,8 @@ def plot_substitution_rate_sliding(data,
 
     fig, axs = plt.subplots(3, 1,
                             sharex=True,
-                            figsize=(8, 7),
-                            gridspec_kw={'height_ratios':[4, 1, 1]})
+                            figsize=(8, 8),
+                            gridspec_kw={'height_ratios':[4, 1.5, 1]})
 
     # Substitution rate
     ax = axs[0]
@@ -837,7 +842,7 @@ def plot_substitution_rate_sliding(data,
            )
 
     
-    # Sweeps
+    # Substitutions
     ax = axs[1]
     pnames = data_sweeps['pcode'].unique().tolist()
     Lp = len(pnames)
@@ -846,14 +851,24 @@ def plot_substitution_rate_sliding(data,
         x = np.array(datum['pos_ref'])
         y = np.repeat(pnames.index(pname), len(x))
 
-        for ind, marker, s in [(datum['epitope'], 'o', 50),
+        for ind, marker, s in [(datum['epitope'], 'o', 30),
                                (-datum['epitope'], 'x', 30)]:
             ind = np.array(ind)
             ax.scatter(x[ind], y[ind],
                        s=s, marker=marker,
                        color=cfun(pname),
-                       label=pname,
                       )
+
+    for pname, datum in data_ctl.groupby('pcode'):
+        y = pnames.index(pname) + 0.35
+        for _, datump in datum.iterrows():
+            x_left = datump['start_HXB2']
+            x_right = datump['end_HXB2']
+            width = x_right - x_left
+            ax.plot([x_left, x_right], [y] * 2,
+                    color=cfun(pname),
+                    lw=2,
+                   )
 
     ax.set_xlim(-50, data_sweeps['pos_ref'].max() + 200)
     ax.set_ylim(Lp, -1)
@@ -1749,6 +1764,204 @@ def plot_af_above_threshold(datap, threshold=0.01, singles=False,
     ax.grid(True)
     ax.xaxis.set_tick_params(labelsize=fs)
     ax.yaxis.set_tick_params(labelsize=fs)
+
+    plt.tight_layout()
+
+    if savefig:
+        fig_filename = savefig
+        fig_folder = os.path.dirname(fig_filename)
+
+        mkdirs(fig_folder)
+        fig.savefig(fig_filename)
+        plt.close(fig)
+
+    else:
+        plt.ion()
+        plt.show()
+
+
+def plot_af_entropy_awayto(data, VERBOSE=0, savefig=False):
+    '''Plot average frequency (simpler plot)'''
+    bins = data['bins']
+    datap = data['af_avg']
+
+    bins_S, binsc_S = bins['entropy']
+
+    fs = 16
+    sns.set_style('darkgrid')
+
+    fig, ax = plt.subplots(figsize=(5, 4))
+    keys = ('to', 'away')
+    for awayto in keys:
+        datum = datap.groupby('awayto').get_group(awayto)
+        if awayto == 'away':
+            ls = '--'
+            color = 'goldenrod'
+            marker = 's'
+        else:
+            ls = '-'
+            color = 'darkolivegreen'
+            marker = 'v'
+
+        x = binsc_S[datum['Sbin']]
+        y = datum['af']
+        dy = datum['af_std']
+
+        ax.errorbar(x, y, yerr=dy,
+                    ls=ls, lw=2,
+                marker=marker,
+                markersize=10,
+                label=awayto, color=color)
+
+    ax.set_xlabel('Entropy in subtype [bits]', fontsize=fs)
+    ax.set_ylabel('Average SNV frequency', fontsize=fs)
+    ax.set_ylim(1e-4, 1e-1)
+    ax.set_xlim(1e-3, 5)
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    ax.legend(loc='upper left', fontsize=fs)
+    ax.grid(True)
+    ax.xaxis.set_tick_params(labelsize=fs)
+    ax.yaxis.set_tick_params(labelsize=fs)
+    plt.tight_layout()
+
+    if savefig:
+        fig_filename = savefig
+        fig_folder = os.path.dirname(fig_filename)
+
+        mkdirs(fig_folder)
+        fig.savefig(fig_filename)
+        plt.close(fig)
+
+    else:
+        plt.ion()
+        plt.show()
+
+
+def plot_n_muts_awayto(data, VERBOSE=0, savefig=False):
+    '''Plot the averages'''
+    if VERBOSE >= 2:
+        print 'Plot number of mutations away/to subtype B consensus'
+
+    import pandas as pd
+
+    n_muts = data['n_muts']
+    frac = data['fraction']
+    frac0 = data['fraction0']
+
+    sns.set_style('darkgrid')
+    fs = 16
+    colormap = cm.jet
+    fig, ax = plt.subplots(figsize=(5, 4))
+
+    # Plot sum
+    x = np.array(n_muts['time'])
+    y = np.array(n_muts['nmuts'])
+    dy = np.array(n_muts['nmuts_std'])
+    ax.errorbar(x, y, yerr=dy,
+            lw=2,
+            marker='o',
+            markersize=15,
+            color='steelblue',
+           )
+
+    ax.set_xlabel('Time from infection [days]', fontsize=fs)
+    ax.set_ylabel('N. mutations / genome [no env]', fontsize=fs, labelpad=15)
+    ax.set_xticks([0, 1000, 2000, 3000])
+    ax.set_yticks([0, 35, 70])
+    ax.set_ylim(0, 70)
+    ax.xaxis.set_tick_params(labelsize=fs)
+    ax.yaxis.set_tick_params(labelsize=fs)
+    ax.grid(True)
+
+    # Plot fraction (from ratio)
+    ax = ax.twinx()
+    x = np.array(frac['time'])
+    y = 100. * np.array(frac['fraction to/away'])
+    dy = 100. * np.array(frac['fraction_std'])
+    ax.errorbar(x, y, yerr=dy,
+            lw=2,
+            marker='o',
+            markersize=15,
+            color='darkred',
+           )
+    y0 = 100. * np.repeat(frac0, len(x))
+    ax.plot(x, y0, lw=2, c='k', ls='--')
+
+    yticks = [0, 20, 40]
+    ax.set_ylim(yticks[0], yticks[-1])
+    ax.set_yticks(yticks)
+    ax.set_yticklabels([str(x)+'%' for x in yticks])
+    ax.set_xlim(-100, 3100)
+    ax.set_ylabel('SNVs to subtype B consensus',
+                  fontsize=fs,
+                  rotation=90,
+                  labelpad=15)
+    ax.yaxis.set_tick_params(labelsize=fs)
+    ax.grid(True)
+
+    plt.tight_layout()
+
+    if savefig:
+        fig_filename = savefig
+        fig_folder = os.path.dirname(fig_filename)
+
+        mkdirs(fig_folder)
+        fig.savefig(fig_filename)
+        plt.close(fig)
+
+    else:
+        plt.ion()
+        plt.show()
+
+
+def plot_entropy_correlation(datap, VERBOSE=0, savefig=False):
+    '''Plot the correlation between intrapatient and subtype diversity'''
+    if VERBOSE >= 2:
+        print 'Correlation in Shannon entropy between patient and subtype'''
+    
+    sns.set_style('darkgrid')
+    colormap = cm.jet#HIVEVO_colormap('website')
+    fs = 16
+
+    datump = datap.groupby(['pcode', 'time'], as_index=False).mean()
+    datump['rho_std'] = np.array(datap.groupby(['pcode', 'time']).std()['rho'])
+    pcodes = datap['pcode'].unique().tolist()
+    pcodes.sort(key=lambda x: int(x[1:]))
+
+    fig, ax = plt.subplots(figsize=(6, 5))
+    for ip, pcode in enumerate(pcodes):
+        datumpp = datump.groupby('pcode').get_group(pcode)
+        x = np.array(datumpp['time'])
+        y = np.array(datumpp['rho'])
+        dy = np.array(datumpp['rho_std'])
+        ax.errorbar(x, y, dy,
+                    ls="none",
+                    marker='o',
+                    markersize=15,
+                    color=colormap(1.0 * ip / len(pcodes)),
+                    label=pcode,
+                   )
+
+    # Plot linear fit excluding p7 which is very late and slow
+    ind = (datump['pcode'] != 'p7') & (-np.isnan(datump['rho_std']))
+    x = datump['time'].loc[ind]
+    y = datump['rho'].loc[ind]
+    dy = datump['rho_std'].loc[ind]
+    m, q = np.polyfit(x, y, 1, w=1.0/dy)
+    xfit = np.linspace(0, 3500, 1000)
+    yfit = q + m * xfit
+    ax.plot(xfit, yfit, lw=2, c='k')
+
+    ax.legend(loc='upper left', fontsize=fs-3, ncol=2, title='Patient:')
+    ax.set_xlim(-100, 3500)
+    ax.set_ylim(-0.03, 0.70)
+    ax.set_xlabel('Time from infection [days]', fontsize=fs)
+    ax.set_ylabel('Entropy correlation btw\npatient and subtype B',
+                  fontsize=fs)
+    ax.xaxis.set_tick_params(labelsize=fs)
+    ax.yaxis.set_tick_params(labelsize=fs)
+    ax.grid(True)
 
     plt.tight_layout()
 

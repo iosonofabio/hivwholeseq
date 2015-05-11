@@ -75,13 +75,13 @@ if __name__ == '__main__':
 
     VERBOSE = 2
     window_size = 300
+    ctl_kind = 'mhci=80'
 
     username = os.path.split(os.getenv('HOME'))[-1]
     foldername = get_figure_folder(username, 'first')
     fn_data = foldername+'data/'
     mkdirs(fn_data)
     fn_data = fn_data + 'substitution_rates_sliding.pickle'
-
 
     if not os.path.isfile(fn_data):
         from hivwholeseq.analysis.substitution_rate.rate_sliding_window import (
@@ -97,15 +97,14 @@ if __name__ == '__main__':
 
         if VERBOSE >= 1:
             print 'Collect data for sweeps'
-        from hivwholeseq.analysis.sweeps.sweep_map import (
+        from hivwholeseq.analysis.sweeps.substitutions_away_to_epitopes import (
             collect_data as collect_data_sweeps)
-        data_sweeps = collect_data_sweeps(pnames, VERBOSE=VERBOSE)
+        data_sweeps = collect_data_sweeps(pnames, VERBOSE=VERBOSE, ctl_kind=ctl_kind)
 
         if VERBOSE >= 1:
             print 'Save data for plot to pickle'
-        datap = {'substitution_rate': datas,
-                 'sweeps': data_sweeps,
-                }
+        datap = {'substitution_rate': datas}
+        datap.update(data_sweeps)
         store_data(datap, fn_data)
 
     else:
