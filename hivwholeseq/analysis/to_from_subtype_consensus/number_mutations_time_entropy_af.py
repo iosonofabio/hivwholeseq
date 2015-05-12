@@ -68,8 +68,8 @@ def collect_data(pnames, regions, VERBOSE=0):
 
             patient = Patient(patient)
             aft, ind = patient.get_allele_frequency_trajectories(region,
-                                                                 cov_min=1000,
-                                                                 depth_min=300,
+                                                                 cov_min=500,
+                                                                 depth_min=30,
                                                                  VERBOSE=VERBOSE)
             if len(ind) == 0:
                 if VERBOSE >= 2:
@@ -272,7 +272,13 @@ def average_n_muts_patients(datap, n_bootstrap=10, VERBOSE=0):
     datapf.index = np.arange(len(datapf))
     bins_t = 365.24 * np.array([0, 0.6, 1.3, 1.5, 4, 6, 10])
     bins_t, binsc_t = add_binned_column(datapf, 'tbin', 'time', bins=bins_t, clip=True)
-    n_muts = datapf[['af', 'tbin', 'awayto']].groupby(['tbin', 'awayto']).mean()
+    
+    # Actually perform the mean
+    n_muts = (datapf
+              .loc[:, ['af', 'tbin', 'awayto']]
+              .groupby(['tbin', 'awayto'])
+              .mean())
+
     n_muts.rename(columns={'af': 'nmuts'}, inplace=True)
     n_muts['time'] = binsc_t[n_muts.index.get_level_values('tbin')]
     n_muts['awayto'] = n_muts.index.get_level_values('awayto')
@@ -713,7 +719,7 @@ if __name__ == '__main__':
 
     if plot:
         
-        #plot_n_muts_single(datap)
+        plot_n_muts_single(datap)
 
         plot_n_muts_avg(n_muts)
 
