@@ -12,3 +12,8 @@ class RoiError(ValueError):
 class NoDataError(ValueError):
     '''Error in case we have no data covering this situation'''
     pass
+
+
+class PipelineError(Exception):
+    '''Error in the pipeline'''
+    pass

@@ -10,15 +10,18 @@ content:    Check status of patients: initial reference, genomewide reference,
 import os
 import argparse
 import datetime
-from hivwholeseq.patients.patients import load_patients, load_patient, Patient, \
-        SamplePat
+from hivwholeseq.patients.patients import (load_patients, load_patient,
+                                           iterpatient, SamplePat)
 from hivwholeseq.patients.filenames import get_decontaminate_summary_filename
 from hivwholeseq.utils.generic import modification_date
+from hivwholeseq.utils.argparse import PatientsAction
+
 
 
 # Globals
 title_len = 15
 cell_len = 7
+
 
 
 # Functions
@@ -63,10 +66,12 @@ def check_reference_overlap(p, VERBOSE=0):
         raise ValueError('GAPS status found') 
 
 
-def pretty_print_info_patient(p, title, name, method, name_requisite=None, mod_dates={},
-                              VERBOSE=0):
+def print_info_patient(p, title, name, method, name_requisite=None,
+                       VERBOSE=0):
     '''Pretty printer for whole-patient info, fragment by fragment'''
     import os, sys
+
+    mod_dates = p.mod_dates
 
     line = ('{:<'+str(title_len)+'}').format(title+':')
     stati = []
@@ -98,12 +103,13 @@ def pretty_print_info_patient(p, title, name, method, name_requisite=None, mod_d
     print line
 
 
-def pretty_print_info(p, title, name, method, name_requisite=None, mod_dates={},
-                      VERBOSE=0):
+def print_info(p, title, name, method, name_requisite=None, VERBOSE=0):
     '''Pretty printer for patient pipeline info'''
     import os, sys
     from hivwholeseq.patients.samples import SamplePat
     from hivwholeseq.utils.mapping import get_number_reads
+
+    mod_dates = p.mod_dates
 
     # NOTE: this function is used to check both entire patients and single samples
     if isinstance(p, SamplePat):
@@ -140,12 +146,24 @@ def pretty_print_info(p, title, name, method, name_requisite=None, mod_dates={},
                         status = 'OK'
                     else:
                         status = 'OLD'
+                        print fn, md, mod_dates[(name_requisite, fragment, samplename)]
 
                 elif ((name_requisite, fragment) in mod_dates):
                     if md > mod_dates[(name_requisite, fragment)]:
                         status = 'OK'
                     else:
                         status = 'OLD'
+
+                        # NOTE: on Nov 13, 2014 I updated the mod dates of all
+                        # references by mistake, without actually changing the
+                        # sequences (ironically, probably testing a backup system
+                        # for the refs themselves). So if the requisite is a ref
+                        # seq and the date is this one, it's OK
+                        if ((name_requisite == 'reference') and
+                            mod_dates[(name_requisite, fragment)].date() == \
+                            datetime.date(2014, 11, 13)):
+                            status = 'OK'
+
 
                 elif 'contaminated' in sample[fragment]:
                     status = 'CONT'
@@ -170,9 +188,10 @@ def pretty_print_info(p, title, name, method, name_requisite=None, mod_dates={},
         raise ValueError('OLD status found') 
 
 
-def pretty_print_info_genomewide(p, title, name, method, mod_dates={}, VERBOSE=0,
-                                 require_all=True):
+def print_info_genomewide(p, title, name, method, VERBOSE=0, require_all=True):
     '''Pretty printer for patient pipeline info'''
+
+    mod_dates = p.mod_dates
 
     def check_requisite_genomewide(md, name_requisite, samplename, mod_dates,
                                    require_all=True):
@@ -260,31 +279,11 @@ def pretty_print_info_genomewide(p, title, name, method, mod_dates={}, VERBOSE=0
         raise ValueError('OLD status found') 
 
 
+def check_pipeline_patient(p, VERBOSE=0):
+    '''Check patient pipeline'''
+    from hivwholeseq.utils.exceptions import PipelineError
 
-# Script
-if __name__ == '__main__':
-
-
-    # Parse input args
-    parser = argparse.ArgumentParser(description='Check patient samples')
-    parser.add_argument('--patients', nargs='+',
-                        help='Patient to analyze')
-    parser.add_argument('--verbose', type=int, default=0,
-                        help='Verbosity level [0-3]')
-
-    args = parser.parse_args()
-    VERBOSE = args.verbose
-    pnames = args.patients
-
-    patients = load_patients()
-    if pnames is not None:
-        patients = patients.loc[pnames]
-
-    for pname, p in patients.iterrows():
-        p = Patient(p)
-
-        mod_dates = {}
-
+    def print_info_summary(p):
         n_samples = len(p.samples)
         p.discard_nonsequenced_samples()
         n_samples_seq = len(p.samples)
@@ -306,8 +305,12 @@ if __name__ == '__main__':
 
         if status != 'OK':
             print ''
-            continue
+            raise PipelineError('Missing patient folder')
 
+        return status
+
+    def print_info_references(p):
+        '''Print info on references'''
         title = 'References'
         line = ('{:<'+str(title_len)+'}').format(title+':')
         stati = []
@@ -315,70 +318,116 @@ if __name__ == '__main__':
             fn = p.get_reference_filename(fragment)
             if os.path.isfile(fn):
                 status = 'OK'
-                mod_dates[('reference', fragment)] = modification_date(fn)
+                p.mod_dates[('reference', fragment)] = modification_date(fn)
             else:
                 status = 'MISS'
             stati.append(status)
             line = line + fragment + ': ' + ('{:>'+str(cell_len - len(fragment) - 1)+'}').format(status) + '  '
         print line
-
+    
         if frozenset(stati) != frozenset(['OK']):
             print ''
-            continue
-
+            raise PipelineError('Amplicon reference failed!')
+    
         title = 'Genome ref'
         line = ('{:<'+str(title_len)+'}').format(title+':')
-        fn = p.get_reference_filename('genomewide')
+        fn = p.get_reference_filename('genomewide', 'fasta')
         if os.path.isfile(fn):
             status = 'OK'
-            mod_dates[('reference', 'genomewide')] = modification_date(fn)
+            p.mod_dates[('reference', 'genomewide')] = modification_date(fn)
         else:
             status = 'MISS'
         line = line + ('{:<'+str(cell_len)+'}').format(status)
         print line
-
+    
         if status != 'OK':
             print ''
-            continue
-
+            raise PipelineError('Genomewide reference failed!')
+    
         check_reference_overlap(p)
 
-        # NOTE: we modify reference annotations all the time, but not the sequence
-        # FIXME: find a better way to do this?
-        pretty_print_info(p, 'Map + filter', 'filter',
-                          'get_mapped_filtered_filename',
-                          None,#'reference',
-                          mod_dates)
+        title = 'Annotated'
+        line = ('{:<'+str(title_len)+'}').format(title+':')
+        fn = p.get_reference_filename('genomewide', 'gb')
+        if os.path.isfile(fn):
+            md = modification_date(fn)
+            if md >= p.mod_dates[('reference', 'genomewide')]:
+                status = 'OK'
+            else:
+                status = 'OLD'
+        else:
+            status = 'MISS'
+        line = line + ('{:<'+str(cell_len)+'}').format(status)
+        print line
+        if status != 'OK':
+            print ''
+            raise PipelineError('Annotated reference failed!')
 
-        from hivwholeseq.patients.filenames import get_mapped_filtered_filename
-        pretty_print_info(p, 'Decontaminate', 'decontaminate',
-                          lambda pn, sn, fr: get_mapped_filtered_filename(pn, sn, fr, decontaminated=True),
-                          'filter', mod_dates)
 
-        pretty_print_info(p, 'Consensus', 'consensus',
-                          'get_consensus_filename',
-                          'decontaminate', mod_dates)
+    p.mod_dates = {}
+    
+    print_info_summary(p)
 
-        pretty_print_info_genomewide(p, 'Cons genomewide', 'consensus',
-                                     'get_consensus_filename',
-                                     mod_dates)
+    print_info_references(p)
 
-        pretty_print_info(p, 'Allele counts', 'allele counts',
+    from hivwholeseq.patients.filenames import get_mapped_filtered_filename
+    print_info(p, 'Map + filter', 'filter',
+               lambda pn, sn, fr: get_mapped_filtered_filename(pn, sn, fr, decontaminated=False),
+               'reference')
+
+    print_info(p, 'Decontaminate', 'decontaminate',
+               lambda pn, sn, fr: get_mapped_filtered_filename(pn, sn, fr, decontaminated=True),
+               'filter')
+
+    print_info(p, 'Consensus', 'consensus',
+               'get_consensus_filename',
+               'decontaminate')
+
+    print_info_genomewide(p, 'Cons genomewide', 'consensus',
+                          'get_consensus_filename')
+
+    print_info(p, 'Allele counts', 'allele counts',
+               'get_allele_counts_filename',
+               'decontaminate')
+
+    print_info(p, 'Allele cocounts', 'allele cocounts',
+               'get_allele_cocounts_filename',
+               'decontaminate')
+
+    print_info_genomewide(p, 'Allele counts genomewide', 'allele counts',
                           'get_allele_counts_filename',
-                          'decontaminate', mod_dates)
+                          require_all=False)
 
-        pretty_print_info(p, 'Allele cocounts', 'allele cocounts',
-                          'get_allele_cocounts_filename',
-                          'decontaminate', mod_dates)
-
-        pretty_print_info_genomewide(p, 'Allele counts genomewide', 'allele counts',
-                                     'get_allele_counts_filename',
-                                     mod_dates, require_all=False)
-
-        pretty_print_info_patient(p, 'Maps to HXB2', 'reference',
-                                  'get_map_coordinates_reference_filename',
-                                  'reference', mod_dates)
+    print_info_patient(p, 'Maps to HXB2', 'reference',
+                       'get_map_coordinates_reference_filename',
+                       'reference')
 
 
-        print ''
+    print ''
+
+
+
+
+# Script
+if __name__ == '__main__':
+
+
+    # Parse input args
+    parser = argparse.ArgumentParser(description='Check patient samples')
+    parser.add_argument('--patients', action=PatientsAction,
+                        help='Patient to analyze')
+    parser.add_argument('--verbose', type=int, default=0,
+                        help='Verbosity level [0-3]')
+
+    args = parser.parse_args()
+    VERBOSE = args.verbose
+    pnames = args.patients
+
+    patients = load_patients()
+    if pnames is not None:
+        patients = patients.loc[pnames]
+
+    for pname, p in iterpatient(patients):
+        check_pipeline_patient(p, VERBOSE=VERBOSE)
+
 
