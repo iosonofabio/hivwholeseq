@@ -40,12 +40,6 @@ class SamplePat(pd.Series):
         return get_sample_foldername(self.patient, self.name, PCR=PCR)
 
 
-    def get_mapped_filtered_filename(self, fragment, PCR=1, **kwargs):
-        '''Get filename(s) of mapped and filtered reads'''
-        from hivwholeseq.patients.filenames import get_mapped_filtered_filename
-        return get_mapped_filtered_filename(self.patient, self.name, fragment,
-                                            PCR=PCR, **kwargs)
-
     @property
     def samples_seq(self):
         '''Sequencing samples that refer to this patient sample'''
@@ -113,6 +107,21 @@ class SamplePat(pd.Series):
                                               PCR=PCR)
                for samplename, sample in samples_seq.iterrows()]
         return fns
+
+
+    def get_mapped_filtered_filename(self, fragment, PCR=1, **kwargs):
+        '''Get filename(s) of mapped and filtered reads'''
+        from hivwholeseq.patients.filenames import get_mapped_filtered_filename
+        return get_mapped_filtered_filename(self.patient, self.name, fragment,
+                                            PCR=PCR, **kwargs)
+
+
+    def get_number_reads(self, fragment, PCR=1, **kwargs):
+        '''Get the number of reads (not pairs)'''
+        from ..utils.mapping import get_number_reads
+        return get_number_reads(self.get_mapped_filtered_filename(fragment,
+                                                                  PCR=PCR,
+                                                                  **kwargs))
 
 
     def get_allele_counts_filename(self, fragment, PCR=1, qual_min=30, type='nuc'):
@@ -241,6 +250,11 @@ class SamplePat(pd.Series):
 
 
 # Functions
+def itersample(samples):
+    for samplename, sample in samples.iterrows():
+        yield (samplename, SamplePat(sample))
+
+
 def load_samples_sequenced(patients=None, include_wrong=False, include_cell=False):
     '''Load patient samples sequenced from general table'''
     sample_table = pd.read_excel(table_filename, 'Samples timeline sequenced',
