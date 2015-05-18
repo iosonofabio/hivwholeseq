@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 
 from hivwholeseq.utils.generic import mkdirs
 from hivwholeseq.patients.samples import load_samples_sequenced as lssp
-from hivwholeseq.patients.samples import SamplePat
+from hivwholeseq.patients.samples import itersample
 from hivwholeseq.patients.filenames import get_allele_count_trajectories_filename, \
         get_coverage_to_initial_figure_filename, get_figure_folder
 
@@ -51,12 +51,12 @@ if __name__ == '__main__':
     if VERBOSE >= 2:
         print 'samples', samples.index.tolist()
 
-    for ir, region in enumerate(regions):
-        if use_plot:
-            fig, ax = plt.subplots()
+    if use_plot:
+        fig, ax = plt.subplots()
 
-        for isam, (samplename, sample) in enumerate(samples.iterrows()):
-            samples = SamplePat(sample)
+    for ir, region in enumerate(regions):
+
+        for isam, (samplename, sample) in enumerate(itersample(samples)):
             if VERBOSE >= 1:
                 print samplename, region
 
@@ -64,17 +64,19 @@ if __name__ == '__main__':
         
             if use_plot:
                 color = cm.jet(1.0 * (isam + ir * len(samples)) / (len(regions) * len(samples)))
-                ax.plot(cov[i] + 0.1, lw=2, c=color, label=samplename)
+                ax.plot(cov + 0.1, lw=2, c=color, label=samplename+', '+region)
 
         if use_plot:
             ax.set_xlabel('Position [bp]')
             ax.set_ylabel('Coverage')
             ax.set_yscale('log')
             ax.set_ylim(0.1, 1e6)
-            ax.set_xlim(-30, cov.shape[-1] + 30)
-            ax.legend(loc='lower center', fontsize=12)
 
     if use_plot:
+        ax.legend(loc='lower center', fontsize=12)
+        ax.grid(True)
+        ax.set_xlim(-30, 2100)
+
         plt.ion()
         plt.show()
 

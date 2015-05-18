@@ -19,6 +19,7 @@ from hivwholeseq.utils.argparse import PatientsAction
 # Functions
 def collect_nreads(sample, fragments, VERBOSE=0, title_len=15, cell_len=9):
     '''Collect number of reads from each sample'''
+    from hivwholeseq.patients.patients import _pdict_back as patd
     n_reads = []
 
     title = sample.name
@@ -37,7 +38,7 @@ def collect_nreads(sample, fragments, VERBOSE=0, title_len=15, cell_len=9):
         line = line+fragment+': '+\
             ('{:>'+str(cell_len - len(fragment) - 1)+'}').format(nfmt)+'  '
 
-        n_reads.append({'pname': sample.patient,
+        n_reads.append({'pname': patd[sample.patient],
                         'samplename': sample.name,
                         'fragment': fragment,
                         'n': n})
@@ -61,7 +62,7 @@ if __name__ == '__main__':
                                  help='Samples to analyze (e.g. VL98-1253 VK03-4298)')
     parser.add_argument('--fragments', nargs='+',
                         help='Fragments to analyze (e.g. F1 F6)')
-    parser.add_argument('--verbose', type=int, default=0,
+    parser.add_argument('--verbose', type=int, default=2,
                         help='Verbosity level [0-4]')
 
     args = parser.parse_args()

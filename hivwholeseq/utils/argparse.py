@@ -7,22 +7,11 @@ content:    Support module for parsing input arguments
 # Modules
 from __future__ import absolute_import
 from argparse import Action
+from ..patients.patients import _pdict, _pdict_back
 
 
 
 # Globals
-_pdict = {'p1': '20097',
-          'p2': '15363',
-          'p3': '15823',
-          'p4': '15313',
-          'p5': '15376',
-          'p6': '20529',
-          'p7': '15107',
-          'p8': '9669',
-          'p9': '15241',
-          'p10': '15034',
-          'p11': '15319',
-         }
 
 
 

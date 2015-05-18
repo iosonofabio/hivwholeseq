@@ -13,17 +13,32 @@ from hivwholeseq.patients.samples import * # FIXME: lots of scripts import from 
 
 
 
+# Globals
+_pdict = {'p1': '20097',
+          'p2': '15363',
+          'p3': '15823',
+          'p4': '15313',
+          'p5': '15376',
+          'p6': '20529',
+          'p7': '15107',
+          'p8': '9669',
+          'p9': '15241',
+          'p10': '15034',
+          'p11': '15319',
+         }
+_pdict_back = dict(item[::-1] for item in _pdict.iteritems())
+
+
+
 # Classes
 class Patient(pd.Series):
     '''HIV patient'''
 
     def __init__(self, *args, **kwargs):
         '''Initialize a patient with all his samples'''
-        include_cell = kwargs.pop('include_cell', False)
-
         super(Patient, self).__init__(*args, **kwargs)
         from hivwholeseq.patients.samples import load_samples_sequenced
-        samples = load_samples_sequenced(patients=[self.name], include_cell=include_cell)
+        samples = load_samples_sequenced(patients=[self.name])
         self.samples = samples
 
 
