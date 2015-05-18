@@ -176,16 +176,15 @@ def get_diversity_trajectories_filename(pname, fragment):
 def get_reads_filename(pname, fragment, it, format='bam'):
     '''Get the filename of the mapped reads'''
     filename = fragment+'.'+format
-    filename = str(it+1)+'/'+filename
-    filename = pname+'/samples/'+filename
-    filename = get_foldername('patients')+filename
+    filename = pname+'/sample_'+str(it+1)+'/'+filename
+    filename = get_foldername('reads')+filename
     return filename
 
 
 def get_timeline_filename(pname):
     '''Get the filename of the patient timeline'''
-    filename = 'timeline.tsv'
-    filename = get_foldername('patients')+pname+'/'+filename
+    filename = 'time_points_'+pname+'.tsv'
+    filename = get_foldername('time_points')+pname+'/'+filename
     return filename
 
 
