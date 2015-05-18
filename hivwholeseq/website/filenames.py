@@ -93,14 +93,14 @@ def get_diversity_filename(pname, fragment):
 def get_coverage_filename(pname, fragment):
     '''Get the filename of coverage'''
     filename = 'coverage_'+pname+'_'+fragment+'.npz'
-    filename = get_foldername('one_site')+filename
+    filename = get_foldername('coverage')+filename
     return filename
 
 
 def get_allele_count_trajectories_filename(pname, fragment, format='npz'):
     '''Get the filename of allele count trajectories'''
     filename = 'allele_counts_'+pname+'_'+fragment+'.'+format
-    filename = get_foldername('one_site')+filename
+    filename = get_foldername('single_nucleotide_variants')+filename
     return filename
 
 
