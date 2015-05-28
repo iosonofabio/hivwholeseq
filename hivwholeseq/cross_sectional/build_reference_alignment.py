@@ -21,12 +21,13 @@ from hivwholeseq.utils.sequence import align_codon_pairwise
 
 
 # Functions
-def align_to_reference(seq, refstr, VERBOSE=0, codon_align=False):
+def align_to_reference(seq, refstr, VERBOSE=0, codon_align=False,
+                       require_full_cover=True):
     '''Align sequence to refernce, stripping reference gaps'''
     import numpy as np
     from Bio.Seq import Seq
     from Bio.SeqRecord import SeqRecord
-    from seqanpy import align_overlap
+    from seqanpy import align_overlap, align_local
     from hivwholeseq.utils.sequence import pretty_print_pairwise_ali
 
     seqstr = ''.join(seq).upper()
@@ -35,26 +36,44 @@ def align_to_reference(seq, refstr, VERBOSE=0, codon_align=False):
     if n_amb > 2:
         raise ValueError('Too many ambiguous sites')
 
-    def align_dna(seqstr, refstr):
-        (score, alis, alir) = align_overlap(seqstr, refstr)
-        start = len(alir) - len(alir.lstrip('-'))
-        end = len(alir.rstrip('-'))
-        alist = alis[start: end]
-        alirt = alir[start: end]
+    def align_dna(seqstr, refstr, require_full_cover=True):
+        if require_full_cover:
+            (score, alis, alir) = align_overlap(seqstr, refstr)
+            start = len(alir) - len(alir.lstrip('-'))
+            end = len(alir.rstrip('-'))
+            alist = alis[start: end]
+            alirt = alir[start: end]
+        else:
+            (score, alis, alir) = align_local(seqstr, refstr)
+            reftrim = alir.replace('-', '')
+            start = refstr.find(reftrim[:50])
+            end = refstr.rfind(reftrim[-50:]) + len(reftrim[-50:])
+            alist = ('N' * start) + alis + ('N' * (len(refstr) - end))
+            alirt = refstr[:start] + alir + refstr[end:]
+
         return (alist, alirt)
 
-    (alis, alir) = align_dna(seqstr, refstr)
+    (alis, alir) = align_dna(seqstr, refstr, require_full_cover=require_full_cover)
 
     if codon_align:
         (alis, alir) = align_codon_pairwise(alis.replace('-', ''), alir.replace('-', ''))
 
-    # If the sequence is shorter than HXB2, skip
-    if '-' in (alis[0], alis[-1]):
-        raise ValueError('The sequence does not fully cover the region')
+    if require_full_cover:
+        # If the sequence is shorter than HXB2, skip
+        if '-' in (alis[0], alis[-1]):
+            raise ValueError('The sequence does not fully cover the region')
 
-    # If the sequence has too much gapping close to the edges, it's also short
-    if (alis[:15].count('-') > 5) or (alis[-15:].count('-') > 5):
-        raise ValueError('The sequence does not fully cover the region')
+        # If the sequence has too much gapping close to the edges, it's also short
+        if (alis[:15].count('-') > 5) or (alis[-15:].count('-') > 5):
+            raise ValueError('The sequence does not fully cover the region')
+
+    else:
+        # Put N instead of gaps at the edges
+        first_nongap = len(alis) - len(alis.lstrip('-'))
+        last_nongap = len(alis.rstrip('-')) - 1
+        alis = (('N' * first_nongap) +
+                alis[first_nongap: last_nongap + 1] +
+                ('N' * (len(alis) - 1 - last_nongap)))
 
     if VERBOSE >= 2:
         pretty_print_pairwise_ali((alis, alir), width=100,
@@ -79,6 +98,7 @@ def build_reference_alignments(region, refname,
                                VERBOSE=0,
                                subtypes=['B', 'C', 'A', 'AE', 'F1', 'D', 'O', 'H'],
                                codon_align=False,
+                               require_full_cover=True,
                               ):
     '''Build reference alignment by subtype'''
     from hivwholeseq.reference import load_custom_reference
@@ -111,12 +131,12 @@ def build_reference_alignments(region, refname,
 
         try:
             rec = align_to_reference(seq, refstr, VERBOSE=VERBOSE,
+                                     require_full_cover=require_full_cover,
                                      codon_align=codon_align)
         except ValueError:
             continue
 
         seq_by_subtype[subtype].append(rec)
-
 
     for subtype, seqs in seq_by_subtype.iteritems():
         seq_by_subtype[subtype] = MultipleSeqAlignment(seqs)
@@ -140,6 +160,8 @@ if __name__ == '__main__':
                         help='Subtypes to keep')
     parser.add_argument('--codonalign', action='store_true',
                         help='Align codon by codon')
+    parser.add_argument('--partialcover', action='store_true',
+                        help='Partial coverage of the region is ok')
 
     args = parser.parse_args()
     region = args.region
@@ -147,10 +169,12 @@ if __name__ == '__main__':
     VERBOSE = args.verbose
     subtypes = args.subtypes
     codalign = args.codonalign
+    require_full_cover = not args.partialcover
 
     alis = build_reference_alignments(region, refname,
                                       subtypes=subtypes,
                                       codon_align=codalign,
+                                      require_full_cover=require_full_cover,
                                       VERBOSE=VERBOSE)
 
     for subtype, ali in alis.iteritems():

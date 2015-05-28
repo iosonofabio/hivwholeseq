@@ -93,8 +93,8 @@ if __name__ == '__main__':
 
             if VERBOSE >= 2:
                 print 'Calculate consensus'
-            consm = alphabet[afs.argmax(axis=0)]
-
+            
+            consm = alphabet[afs[:5].argmax(axis=0)]
             consrec = SeqRecord(Seq(''.join(consm), alphabet_bio),
                                 id='consensus_subtype'+subtype+'_refto_'+refname,
                                 name='consensus_subtype'+subtype+'_refto_'+refname,

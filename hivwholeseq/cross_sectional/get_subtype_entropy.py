@@ -23,14 +23,14 @@ def get_ali_entropy(ali, positions=None, alpha=alpha[:5], VERBOSE=0):
     '''Get entropy of alignment at some positions
     
     Parameters:
-       - alpha: alphabet for the sequences, defaults to ACGT.
+       - alpha: alphabet for the sequences, defaults to ACGT-.
     '''
     if positions is None:
         positions = np.arange(len(ali[0]))
 
     afs = np.zeros((len(alpha), len(positions)))
     for i, pos in enumerate(positions):
-        af = np.zeros(len(alpha))
+        af = np.zeros(len(alpha), float)
         col = np.fromstring(ali[:, pos], 'S1')
         for ia, nuc in enumerate(alpha):
             af[ia] = (col == nuc).sum()

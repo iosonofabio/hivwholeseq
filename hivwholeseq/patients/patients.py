@@ -903,9 +903,9 @@ def load_patients(pnames=None):
     patients = pd.read_excel(table_filename, 'Patients', index_col=1)
     patients.index = pd.Index(map(str, patients.index))
 
-    patients.
-
     if pnames is not None:
+        if 'p' in pnames[0]:
+            pnames = [_pdict[pname] for pname in pnames]
         patients = patients.loc[pnames]
     return patients
 

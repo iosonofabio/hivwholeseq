@@ -58,12 +58,12 @@ if __name__ == '__main__':
 
         data = collect_data(None, regions, VERBOSE=VERBOSE)
         bins = bin_data(data, ['time', 'time_rough', 'entropy', 'af'], VERBOSE=VERBOSE)
-        datap = get_n_mutations_patientwise(data, attrnames=['time', 'awayto'])
+        af_avg = get_allele_frequency_entropy(data, n_bootstrap=100, VERBOSE=3)
 
+        datap = get_n_mutations_patientwise(data, attrnames=['time', 'awayto'])
         n_muts = average_n_muts_patients_total(datap, n_bootstrap=100, VERBOSE=3)
         frac = average_n_muts_patients_fraction(datap, n_bootstrap=100, VERBOSE=3)
-        af_avg = get_allele_frequency_entropy(data, n_bootstrap=100, VERBOSE=3)
-        frac0 = get_fraction_to_baseline(data, bins)
+        frac0 = get_fraction_to_baseline(None, regions)
 
         datap = {'bins': bins,
                  'n_muts': n_muts,

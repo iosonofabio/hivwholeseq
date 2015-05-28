@@ -165,10 +165,14 @@ def collect_data(pnames, regions, VERBOSE=0):
 
 
                 for (obs, ctype, cl), tmp in div.iteritems():
+                    
                     # NOTE: We count every derived allele, so each site contributes
                     # with three alleles. Divergence and diversity, however, are
-                    # defined per site, so we sum over the three alleles
+                    # defined per site, so we sum over the alleles
+                    # FIXME: this is wrong for syn/nonsyn, see R.'s script for a
+                    # better approach (site by site)
                     divtmp = np.mean(tmp) * (4 if obs=='diversity' else 3)
+
                     datum = {'patient': patient.code,
                              'region': region,
                              'time': time,

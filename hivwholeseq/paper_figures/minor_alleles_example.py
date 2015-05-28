@@ -85,11 +85,11 @@ if __name__ == '__main__':
     # Add reference
     data = load_data(fn_data_ref) + data
         
-    filename = foldername+'freq_minor_alleles_example'
-    for ext in ['png', 'pdf', 'svg']:
-        plot_minor_allele_example(data,
-                                  VERBOSE=VERBOSE,
-                                  savefig=filename+'.'+ext)
+    #filename = foldername+'freq_minor_alleles_example'
+    #for ext in ['png', 'pdf', 'svg']:
+    #    plot_minor_allele_example(data,
+    #                              VERBOSE=VERBOSE,
+    #                              savefig=filename+'.'+ext)
 
     plot_minor_allele_example(data,
                               VERBOSE=VERBOSE)

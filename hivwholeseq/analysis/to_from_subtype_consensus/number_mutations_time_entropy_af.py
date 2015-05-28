@@ -29,7 +29,11 @@ from hivwholeseq.cross_sectional.get_subtype_allele_frequencies import (
 
 
 # Globals
-regions = ['p17', 'p24', 'PR', 'RT', 'IN', 'vif', 'vpu', 'nef', 'gp41']
+regions = ['p17', 'p24', 'PR',
+           'RT',
+           'IN', 'vif',
+           'vpu', 'nef',
+           'gp41', 'gp120']
 
 
 
@@ -41,9 +45,15 @@ def collect_data(pnames, regions, VERBOSE=0):
     patients = load_patients()
     if pnames is not None:
         patients = patients.loc[pnames]
+    else:
+        # Restrict to subtype B patients
+        patients = patients.loc[patients.Subtype == 'B']
+        patients = patients.loc[-patients.code.isin(['p4', 'p7'])]
 
-    # Restrict to subtype B patients
-    patients = patients.loc[patients.Subtype == 'B']
+    # Get HXB2 for coordinates
+    from hivwholeseq.reference import load_custom_reference
+    from hivwholeseq.utils.sequence import find_annotation
+    ref = load_custom_reference('HXB2', 'gb')
 
     for region in regions:
         if VERBOSE >= 1:
@@ -60,6 +70,10 @@ def collect_data(pnames, regions, VERBOSE=0):
         if VERBOSE >= 2:
             print 'Get subtype entropy'
         Ssub = get_subtype_reference_alignment_entropy(region, VERBOSE=VERBOSE)
+
+        if VERBOSE >= 2:
+            print 'Get position of region in HXB2 genomewide coordinates'
+        reg_start = find_annotation(ref, region).location.nofuzzy_start
 
         for ipat, (pname, patient) in enumerate(patients.iterrows()):
             pcode = patient.code
@@ -104,6 +118,10 @@ def collect_data(pnames, regions, VERBOSE=0):
                 if (pos_sub >= af_sub.shape[1]):
                     continue
 
+                # Discard if too many gaps in subtype alignment
+                if af_sub[4, pos_sub] > 0.05:
+                    continue
+
                 # Ancestral allele
                 ianc = icons[posdna]
                 anc = alpha[ianc]
@@ -130,9 +148,6 @@ def collect_data(pnames, regions, VERBOSE=0):
                     mut = anc + '->' + der
 
                     # Get the difference in subtype abundances
-                    afanc_sub = af_sub[ianc, pos_sub]
-                    afder_sub = af_sub[ider, pos_sub]
-                    daf_sub = afder_sub - afanc_sub
                     Spos_sub = Ssub[pos_sub]
                     conspos_sub = conssub[pos_sub]
 
@@ -149,13 +164,13 @@ def collect_data(pnames, regions, VERBOSE=0):
                         af = aft_der[it]
                         data.append((region, pcode,
                                      anc, der, mut,
-                                     afanc_sub, afder_sub, daf_sub,
+                                     pos_sub, pos_sub + reg_start,
                                      Spos_sub, conspos_sub, away_conssub,
                                      time, af))
 
     data = pd.DataFrame(data=data, columns=('region', 'pcode',
                                             'anc', 'der', 'mut',
-                                            'afancsub', 'afdersub', 'dafsub',
+                                            'pos_sub', 'pos_HXB2',
                                             'Ssub', 'conssub', 'awayto',
                                             'time', 'af'))
 
@@ -398,9 +413,56 @@ def average_n_muts_patients_fraction(datap, n_bootstrap=10, VERBOSE=0):
     return frac
 
 
-def get_fraction_to_baseline(data):
-    return (data['awayto'] == 'to').mean()
-    
+def get_fraction_to_baseline(pnames, regions):
+    patients = load_patients()
+    if pnames is not None:
+        patients = patients.loc[pnames]
+    else:
+        # Restrict to subtype B patients
+        patients = patients.loc[patients.Subtype == 'B']
+        patients = patients.loc[-patients.code.isin(['p4', 'p7'])]
+
+    data = []
+    for region in regions:
+        conssub = get_subtype_reference_alignment_consensus(region, VERBOSE=VERBOSE)
+
+        for ipat, (pname, patient) in enumerate(patients.iterrows()):
+            pcode = patient.code
+            patient = Patient(patient)
+            aft, ind = patient.get_allele_frequency_trajectories(region,
+                                                                 cov_min=500,
+                                                                 depth_min=30,
+                                                                 VERBOSE=VERBOSE)
+            icons = patient.get_initial_consensus_noinsertions(aft, VERBOSE=VERBOSE,
+                                                               return_ind=True)
+            consm = alpha[icons]
+            coomap = patient.get_map_coordinates_reference(region, refname=('HXB2', region))
+            coomapd = dict(coomap[:, ::-1])
+
+            datum = {'cons': 0,
+                     'noncons': 0,
+                     'pcode': pcode,
+                     'region': region,
+                    }
+            
+            for posdna in xrange(aft.shape[-1]):
+
+                # Look for this position in the subtype alignment
+                if posdna not in coomapd:
+                    continue
+                pos_sub = coomapd[posdna]
+                if (pos_sub >= len(conssub)):
+                    continue
+
+                if conssub[pos_sub] == consm[posdna]:
+                    datum['cons'] += 1
+                else:
+                    datum['noncons'] += 1
+
+            data.append(datum)
+
+    data = pd.DataFrame(data)
+    return 1.0 * data['noncons'].sum() / np.array(data[['cons', 'noncons']]).sum()
 
 
 def get_allele_frequency_entropy(data, n_bootstrap=10, VERBOSE=0, include_substitutions=True):
@@ -498,7 +560,7 @@ def plot_sfs_awayto_time(data, bins, VERBOSE=0):
     plt.tight_layout()
 
 
-def plot_af_avg_awayto_entropy(datap, VERBOSE=0):
+def plot_af_avg_awayto_entropy(datap, bins, VERBOSE=0):
     '''Plot average frequency (simpler plot)'''
     bins_S, binsc_S = bins['entropy']
 
@@ -524,7 +586,7 @@ def plot_af_avg_awayto_entropy(datap, VERBOSE=0):
 
     ax.set_xlabel('Entropy in subtype [bits]', fontsize=fs)
     ax.set_ylabel('Average frequency', fontsize=fs)
-    ax.set_ylim(1e-4, 1e-1)
+    ax.set_ylim(1e-5, 1)
     ax.set_xlim(1e-3, 5)
     ax.set_xscale('log')
     ax.set_yscale('log')
@@ -696,6 +758,37 @@ if __name__ == '__main__':
     # FIXME: why does p10 have only one time point??
     data = collect_data(pnames, regions, VERBOSE=VERBOSE)
 
+    # Plot afs of the low-entropy to-consensus alleles, since that is the main
+    # difference between Richard's and my script
+    def plot_afs_to_lowS(data, Smax=0.145):
+        import matplotlib.pyplot as plt
+        from matplotlib import cm
+
+        d = data.groupby('awayto').get_group('to')
+        d = d.loc[d['Ssub'] < Smax]
+        for pcode, dp in d.groupby('pcode'):
+            fig, ax = plt.subplots()
+            ax.set_xlabel('Time [DSI]')
+            ax.set_ylabel('af')
+            ax.set_title(pcode)
+            ax.grid(True)
+
+            for pos, datum in dp.groupby('pos_HXB2'):
+                datum = datum.sort('time')
+                x = np.array(datum['time'])
+                y = np.array(datum['af'])
+                ax.plot(x, y, label=str(pos),
+                        lw=2,
+                        color=cm.jet(1.0 * pos / 9800),
+                       )
+
+            plt.tight_layout()
+
+        plt.ion()
+        plt.show()
+
+    plot_afs_to_lowS(data, Smax=0.145)
+
     bins = bin_data(data, ['time', 'time_rough', 'entropy', 'af'], VERBOSE=VERBOSE,
                     include_substitutions=True)
 
@@ -710,6 +803,8 @@ if __name__ == '__main__':
     # Rebin by time and average over samples
     n_muts = average_n_muts_patients(datap)
 
+    frac = average_n_muts_patients_fraction(datap, n_bootstrap=100, VERBOSE=3)
+    frac0 = get_fraction_to_baseline(None, regions)
 
     ## NOTE: I tried the avg af without substitutions, tiny changes only
     #af_avg = get_allele_frequency_entropy(data, include_substitutions=False)
@@ -723,7 +818,7 @@ if __name__ == '__main__':
 
         plot_n_muts_avg(n_muts)
 
-        plot_af_avg_awayto_entropy(af_avg, VERBOSE=VERBOSE)
+        plot_af_avg_awayto_entropy(af_avg, bins, VERBOSE=VERBOSE)
 
         plt.ion()
         plt.show()

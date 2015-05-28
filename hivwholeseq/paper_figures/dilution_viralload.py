@@ -52,6 +52,7 @@ if __name__ == '__main__':
     else:
         data = load_data(fn_data)
         
+    import numpy as np
     x = np.concatenate([datum['n_approx'] for datum in data])
     y = np.concatenate([datum['n_dil'] for datum in data])
     eta = y / x
@@ -59,11 +60,11 @@ if __name__ == '__main__':
     print 'Efficiency: median', np.median(eta), 'quartiles', \
             np.percentile(eta, 25), np.percentile(eta, 75)
 
-    filename = foldername+'n_templates'
-    for ext in ['png', 'pdf', 'svg']:
-        plot_template_numbers(data,
-                              VERBOSE=VERBOSE,
-                              savefig=filename+'.'+ext)
+    #filename = foldername+'n_templates'
+    #for ext in ['png', 'pdf', 'svg']:
+    #    plot_template_numbers(data,
+    #                          VERBOSE=VERBOSE,
+    #                          savefig=filename+'.'+ext)
 
     plot_template_numbers(data,
                           VERBOSE=VERBOSE)

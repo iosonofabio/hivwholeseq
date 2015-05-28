@@ -115,12 +115,12 @@ if __name__ == '__main__':
     M = get_subs_matrix(datas.loc[np.array(-datas['pcode'].isin(['p9']))])
     calc_fold_change(M)
 
-    filename = foldername+'substitution_rates_sliding'
-    for ext in ['png', 'pdf', 'svg']:
-        plot_substitution_rate_sliding(datap,
-                                       regions,
-                                       VERBOSE=VERBOSE,
-                                       savefig=filename+'.'+ext)
+    #filename = foldername+'substitution_rates_sliding'
+    #for ext in ['png', 'pdf', 'svg']:
+    #    plot_substitution_rate_sliding(datap,
+    #                                   regions,
+    #                                   VERBOSE=VERBOSE,
+    #                                   savefig=filename+'.'+ext)
 
     plot_substitution_rate_sliding(datap, regions, VERBOSE=VERBOSE)
     plt.ion()

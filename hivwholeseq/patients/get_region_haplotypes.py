@@ -28,6 +28,10 @@ def plot_haplotype_frequencies(times, hft, figax=None, title='',
     import hivwholeseq.utils.plot
     from matplotlib import cm
     import matplotlib.pyplot as plt
+    import seaborn as sns
+
+    sns.set_style('darkgrid')
+    fs = 16
 
     if figax is None:
         fig, ax = plt.subplots(figsize=(12, 7))
@@ -54,13 +58,15 @@ def plot_haplotype_frequencies(times, hft, figax=None, title='',
                         label=str(i),
                         picker=picker)
 
-    ax.set_xlabel('Time from infection [days]')
-    ax.set_ylabel('Haplotype frequency')
+    ax.set_xlabel('Time from infection [days]', fontsize=fs)
+    ax.set_ylabel('Haplotype frequency', fontsize=fs)
     ax.set_ylim(1e-4, 1 - 1e-4)
     ax.set_xlim(times[0], times[-1])
+    ax.xaxis.set_tick_params(labelsize=fs)
+    ax.yaxis.set_tick_params(labelsize=fs)
 
     if title:
-        ax.set_title(title)
+        ax.set_title(title, fontsize=fs)
 
     return (fig, ax)
     
@@ -94,13 +100,14 @@ if __name__ == '__main__':
         print patient.name, region
 
 
-    hct, ind, seqs = patient.get_region_count_trajectories(region, VERBOSE=VERBOSE)
+    hct, ind, seqs = patient.get_haplotype_count_trajectory(region,
+                                                            aligned=True)
     hft = (1.0 * hct.T / hct.sum(axis=1)).T
 
 
     if use_plot:
         times = patient.times[ind]
-        plot_haplotype_frequencies(times, hft, title=region)
+        plot_haplotype_frequencies(times, hft, title=patient.code+', '+region)
 
         plt.tight_layout()
         plt.ion()

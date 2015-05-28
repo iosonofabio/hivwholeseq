@@ -28,7 +28,7 @@ def HIVEVO_colormap(kind='website'):
     for c in colors:
         rgb_colors.append([int(c[i:i+2],16) for i in [1,3,5]]+[255])
     tmp =interp1d(np.linspace(0,1,len(colors)), np.array(rgb_colors, dtype = float).T/255.0)
-    cmap = lambda x: [ c for c in tmp(x)]
+    cmap = lambda x: [c for c in tmp(x)]
     return cmap
 
 
@@ -829,7 +829,7 @@ def plot_substitution_rate_sliding(data,
     ax.set_yscale('log')
     ax.xaxis.set_tick_params(labelsize=fs)
 
-    ax.set_ylabel('Divergence rate\nduring observed period\n[changes / year / site]',
+    ax.set_ylabel('Evolutionary rate\nduring observed period\n[changes / year / site]',
                   labelpad=15,
                   fontsize=fs)
     ax.legend(loc='upper center',
@@ -1868,8 +1868,8 @@ def plot_n_muts_awayto(data, VERBOSE=0, savefig=False):
     ax.set_xlabel('Time from infection [days]', fontsize=fs)
     ax.set_ylabel('N. mutations / genome [no env]', fontsize=fs, labelpad=15)
     ax.set_xticks([0, 1000, 2000, 3000])
-    ax.set_yticks([0, 35, 70])
-    ax.set_ylim(0, 70)
+    ax.set_yticks([0, 50, 100])
+    ax.set_ylim(0, 100)
     ax.xaxis.set_tick_params(labelsize=fs)
     ax.yaxis.set_tick_params(labelsize=fs)
     ax.grid(True)
