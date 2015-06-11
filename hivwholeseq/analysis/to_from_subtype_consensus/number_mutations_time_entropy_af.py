@@ -29,11 +29,11 @@ from hivwholeseq.cross_sectional.get_subtype_allele_frequencies import (
 
 
 # Globals
-regions = ['p17', 'p24', 'PR',
-           'RT',
-           'IN', 'vif',
-           'vpu', 'nef',
-           'gp41', 'gp120']
+regions = ['p17', 'p24',
+           'PR', 'RT', 'IN',
+           'vif', 'vpu', 'nef',
+           'gp41', 'gp120',
+          ]
 
 
 
@@ -128,8 +128,8 @@ def collect_data(pnames, regions, VERBOSE=0):
 
                 # Discard if the initial time point is already polymorphic
                 aft_anc0 = aft[0, ianc, posdna]
-                if aft_anc0 < 0.9:
-                    continue
+                #if aft_anc0 < 0.9:
+                #    continue
 
                 # Iterate over derived alleles
                 for ider, der in enumerate(alpha[:4]):
@@ -787,7 +787,7 @@ if __name__ == '__main__':
         plt.ion()
         plt.show()
 
-    plot_afs_to_lowS(data, Smax=0.145)
+    #plot_afs_to_lowS(data, Smax=0.145)
 
     bins = bin_data(data, ['time', 'time_rough', 'entropy', 'af'], VERBOSE=VERBOSE,
                     include_substitutions=True)
