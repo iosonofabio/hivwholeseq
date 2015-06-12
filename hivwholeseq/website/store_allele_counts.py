@@ -4,7 +4,10 @@ author:     Fabio Zanini
 date:       07/11/14
 content:    Store allele counts for the website. We need two formats, one binary
             fast-access for the plots, and one annotated and standard for
-            downloads
+            downloads.
+
+            We store both allele count trajectories for whole patients and sample
+            by sample.
 '''
 # Modules
 import os
@@ -15,6 +18,7 @@ from hivwholeseq.miseq import alphal
 from hivwholeseq.utils.generic import mkdirs
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.website.filenames import get_allele_count_trajectories_filename as get_fn_out
+from hivwholeseq.website.filenames import get_allele_counts_filename as get_fn2_out
 from hivwholeseq.website.filenames import get_coverage_filename
 from hivwholeseq.patients.filenames import get_allele_count_trajectories_filename
 
@@ -67,34 +71,45 @@ def save_for_download(filename, **data):
 # Script
 if __name__ == '__main__':
 
-    fragments = ['F'+str(i) for i in xrange(1, 7)]
     patients = load_patients()
     for pname, patient in patients.iterrows():
         patient = Patient(patient)
         print patient.code, patient.name
 
-        # Allele counts
-        fn_in = get_allele_count_trajectories_filename(pname, 'genomewide')
-        npz = np.load(fn_in)
-        ind = npz['ind']
-        act = npz['act']
+        ## Allele count trajectories
+        #fn_in = get_allele_count_trajectories_filename(pname, 'genomewide')
+        #npz = np.load(fn_in)
+        #ind = npz['ind']
+        #act = npz['act']
 
-        times = patient.times[ind]
+        #times = patient.times[ind]
 
-        # Write allele counts
-        # 1. Binary
-        fn_out = get_fn_out(patient.code, 'genomewide', 'npz')
-        np.savez(fn_out, times=times, act=act, alpha=alphal)
+        ## Write to file
+        ## 1. Binary
+        #fn_out = get_fn_out(patient.code, 'genomewide', 'npz')
+        #np.savez(fn_out, times=times, act=act, alpha=alphal)
 
-        # 2. For download
-        fn_out = get_fn_out(patient.code, 'genomewide', 'zip')
-        save_for_download(fn_out, pcode=patient.code,
-                          times=times, act=act, alpha=alphal)
+        ## 2. For download
+        #fn_out = get_fn_out(patient.code, 'genomewide', 'zip')
+        #save_for_download(fn_out, pcode=patient.code,
+        #                  times=times, act=act, alpha=alphal)
 
 
-        # Coverage (binary format only)
-        cov = act.sum(axis=1)
+        ## Coverage trajectories (binary format only)
+        #cov = act.sum(axis=1)
 
-        # Write output
-        fn_out = get_coverage_filename(patient.code, 'genomewide')
-        np.savez(fn_out, times=times, cov=cov)
+        ## Write output
+        #fn_out = get_coverage_filename(patient.code, 'genomewide')
+        #np.savez(fn_out, times=times, cov=cov)
+
+
+        # Sample by sample
+        for i, sample in enumerate(patient.itersamples()):
+            samplename = patient.code+'_sample_'+str(i+1)
+
+            for region in ['F'+str(j) for j in xrange(1, 7)] + ['genomewide']:
+                fn_in = sample.get_allele_counts_filename(region)
+                fn_out = get_fn2_out(samplename, region, 'npy')
+                if (not os.path.isfile(fn_out)) and (not os.path.islink(fn_out)):
+                    os.symlink(fn_in, fn_out)
+

@@ -97,6 +97,19 @@ def get_coverage_filename(pname, fragment):
     return filename
 
 
+def get_allele_counts_filename(samplename, fragment, format='npy', type='nuc'):
+    '''Get the filename of allele count trajectories'''
+    filename = 'allele_counts_'+samplename+'_'+fragment+'.'+format
+    if type == 'nuc':
+        filename = get_foldername('single_nucleotide_variants')+filename
+    elif type == 'aa':
+        filename = get_foldername('single_aminoacid_variants')+filename
+    else:
+        raise ValueError('Data type not understood')
+
+    return filename
+
+
 def get_allele_count_trajectories_filename(pname, fragment, format='npz'):
     '''Get the filename of allele count trajectories'''
     filename = 'allele_counts_'+pname+'_'+fragment+'.'+format
