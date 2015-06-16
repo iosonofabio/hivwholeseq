@@ -10,7 +10,7 @@ import sys
 import numpy as np
 
 from hivwholeseq.utils.generic import mkdirs
-from hivwholeseq.patients.patients import load_patients, Patient
+from hivwholeseq.patients.patients import load_patients, iterpatient
 from hivwholeseq.website.filenames import get_divergence_filename, get_diversity_filename
 from hivwholeseq.website import _regions as regions_all
 
@@ -22,9 +22,7 @@ if __name__ == '__main__':
     fragments = ['F'+str(i) for i in xrange(1, 7)]
     regions = fragments + regions_all
     patients = load_patients()
-    for pname, patient in patients.iterrows():
-        patient = Patient(patient)
-
+    for pname, patient in iterpatient(patients):
         for region in regions:
             print patient.code, patient.name, region
 
@@ -43,6 +41,7 @@ if __name__ == '__main__':
                        delimiter='\t',
                        header='t [days]\tdg',
                        comments='')
+
 
             # Diversity
             ds, ind = patient.get_diversity(region,

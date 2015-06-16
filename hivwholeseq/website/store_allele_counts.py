@@ -37,6 +37,8 @@ latter should be rare and can be ignored for most purposes.
 Insertions are not included.
 '''
 
+proteins = ['RT', 'PR', 'p15', 'IN', 'p17', 'p24', 'nef', 'vpu', 'vpr', 'vif']
+
 
 
 # Functions
@@ -107,9 +109,14 @@ if __name__ == '__main__':
         for i, sample in enumerate(patient.itersamples()):
             samplename = patient.code+'_sample_'+str(i+1)
 
-            for region in ['F'+str(j) for j in xrange(1, 7)] + ['genomewide']:
-                fn_in = sample.get_allele_counts_filename(region)
-                fn_out = get_fn2_out(samplename, region, 'npy')
+            #for region in ['F'+str(j) for j in xrange(1, 7)] + ['genomewide']:
+            #    fn_in = sample.get_allele_counts_filename(region)
+            #    fn_out = get_fn2_out(samplename, region, 'npy')
+            #    if (not os.path.isfile(fn_out)) and (not os.path.islink(fn_out)):
+            #        os.symlink(fn_in, fn_out)
+
+            for protein in proteins:
+                fn_in = sample.get_allele_counts_filename(protein, type='aa')
+                fn_out = get_fn2_out(samplename, protein, 'npy', type='aa')
                 if (not os.path.isfile(fn_out)) and (not os.path.islink(fn_out)):
                     os.symlink(fn_in, fn_out)
-

@@ -69,6 +69,12 @@ class SamplePat(pd.Series):
         return get_fragmented_roi(refseq, roi, VERBOSE=VERBOSE, **kwargs)
 
 
+    def get_fragments_covered(self, roi, VERBOSE=0, include_coordinates=False):
+        '''Get fragments covering a certain roi'''
+        from .get_roi import get_fragments_covered
+        return get_fragments_covered(self, roi, VERBOSE=VERBOSE,
+                                     include_coordinates=include_coordinates)
+
 
     def get_reference_filename(self, fragment, format='fasta'):
         '''Get filename of the reference for mapping'''
@@ -173,14 +179,12 @@ class SamplePat(pd.Series):
         return ac
 
 
-    def get_allele_counts_aa(self, protein, PCR=1, qual_min=30, merge_read_types=True):
+    def get_allele_counts_aa(self, protein, PCR=1, qual_min=30):
         '''Get the amino acid allele counts'''
         import numpy as np
         ac = np.load(self.get_allele_counts_filename(protein, PCR=PCR,
                                                      qual_min=qual_min,
                                                      type='aa'))
-        if merge_read_types:
-            ac = ac.sum(axis=0)
         return ac
 
 

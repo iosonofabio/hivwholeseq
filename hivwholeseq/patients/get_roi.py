@@ -73,22 +73,45 @@ def get_fragmented_roi(refseq, roi, VERBOSE=0, include_genomewide=False):
     raise ValueError('Roi not understood')
 
 
-def get_fragments_covered(patient, roi, VERBOSE=0):
-    '''Get the list of fragments interested by this roi'''
+def get_fragments_covered(patsam, roi, VERBOSE=0, include_coordinates=False):
+    '''Get the list of fragments interested by this roi
+    
+    Parameters:
+       patsam (Patient or SamplePat): patient or sample to analyze
+       roi (str or ROI): region of interest
+    '''
     if roi[0] in ['F'+str(ifr) for ifr in xrange(1, 7)]:
         return [roi[0]]
 
-    (fragment, start, end) = patient.get_fragmented_roi(roi, VERBOSE=VERBOSE,
-                                                        include_genomewide=True)
+    (fragment, start, end) = patsam.get_fragmented_roi(roi, VERBOSE=VERBOSE,
+                                                       include_genomewide=True)
     if fragment != 'genomewide':
-        return [fragment]
+        if not include_coordinates:
+            return [fragment]
+        else:
+            return [{'name': fragment,
+                    'roi': (0, end - start),
+                    'fragment': (start, end),
+                   }]
 
-    refseq = patient.get_reference('genomewide', 'gb')
+    refseq = patsam.get_reference('genomewide', 'gb')
     frags_cov = []
     for fea in refseq.features:
         if fea.type == 'fragment':
-            if (fea.location.nofuzzy_start < end) & (fea.location.nofuzzy_end > start):
-                frags_cov.append(fea.id)
+            start_fr = fea.location.nofuzzy_start
+            end_fr = fea.location.nofuzzy_end
+            if (start_fr < end) & (end_fr > start):
+                if not include_coordinates:
+                    datum = fea.id
+                else:
+                    datum = {'name': fea.id,
+                             'roi': (max(start, start_fr) - start,
+                                     min(end, end_fr) - start),
+                             'fragment': (max(start, start_fr) - start_fr,
+                                          min(end, end_fr) - start_fr),
+                            }
+
+                frags_cov.append(datum)
 
     return frags_cov
 

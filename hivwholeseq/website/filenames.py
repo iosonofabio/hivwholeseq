@@ -78,14 +78,14 @@ def get_cell_count_filename(pname):
 
 def get_divergence_filename(pname, fragment):
     '''Get the filename of genetic divergence'''
-    filename = 'divergence_'+pname+'_'+fragment+'.dat'
+    filename = 'divergence_'+pname+'_'+fragment+'.tsv'
     filename = get_foldername('divdiv')+filename
     return filename
 
 
 def get_diversity_filename(pname, fragment):
     '''Get the filename of genetic diversity'''
-    filename = 'diversity_'+pname+'_'+fragment+'.dat'
+    filename = 'diversity_'+pname+'_'+fragment+'.tsv'
     filename = get_foldername('divdiv')+filename
     return filename
 
@@ -189,7 +189,7 @@ def get_diversity_trajectories_filename(pname, fragment):
 def get_reads_filename(pname, fragment, it, format='bam'):
     '''Get the filename of the mapped reads'''
     filename = fragment+'.'+format
-    filename = pname+'/sample_'+str(it+1)+'/'+filename
+    filename = pname+'_sample_'+str(it+1)+'_'+filename
     filename = get_foldername('reads')+filename
     return filename
 

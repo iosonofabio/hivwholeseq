@@ -94,6 +94,8 @@ def get_allele_counts_aa_read(read, start, end, counts_out, qual_min=30,
 
     Parameters:
        counts_out (ndarray, alphabet x protein length): output data structure for counts
+
+    NOTE: the data is added to a pointer instead of returned for efficiency reasons.
     '''
     from Bio.Seq import translate
 

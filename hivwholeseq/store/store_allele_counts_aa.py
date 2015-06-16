@@ -12,6 +12,7 @@ import argparse
 import numpy as np
 from Bio import SeqIO
 
+from hivwholeseq.utils.argparse import PatientsAction
 from hivwholeseq.patients.samples import load_samples_sequenced as lssp
 from hivwholeseq.patients.samples import SamplePat
 from hivwholeseq.patients.filenames import get_initial_reference_filename, \
@@ -32,8 +33,8 @@ if __name__ == '__main__':
     # Parse input args
     parser = argparse.ArgumentParser(description='Get allele counts of amino acids',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
-    pats_or_samples = parser.add_mutually_exclusive_group(required=True)
-    pats_or_samples.add_argument('--patients', nargs='+',
+    pats_or_samples = parser.add_mutually_exclusive_group(required=False)
+    pats_or_samples.add_argument('--patients', action=PatientsAction,
                                  help='Patient to analyze')
     pats_or_samples.add_argument('--samples', nargs='+',
                                  help='Samples to analyze (e.g. VL98-1253 VK03-4298)')
@@ -90,26 +91,52 @@ if __name__ == '__main__':
 
             sample = SamplePat(sample)
 
-            # NOTE: we should look codon by codon, incredible
-            (fragment, start, end) = sample.get_fragmented_roi((protein, 0, '+oo'),
-                                                               include_genomewide=True)
+            # NOTE: How do we find what fragment covers the protein? Well, a
+            # protein can happily cross fragments. Since each
+            # codon is independent, we should iterate over codons. We do not
+            # do that for efficiency reasons. Instead, we identify all potential
+            # fragments and split the protein into full codon chunks covered by
+            # a single fragment.
+            fragment_rois = sample.get_fragments_covered(protein,
+                                                         include_coordinates=True)
             
             refseq = sample.get_reference(protein)
-
             fn_out = sample.get_allele_counts_filename(protein, PCR=PCR,
                                                        qual_min=qual_min,
                                                        type='aa')
-            fn = sample.get_mapped_filtered_filename(fragment, PCR=PCR,
-                                                     decontaminated=True) #FIXME
-            
-            if not os.path.isfile(fn):
-                if VERBOSE >= 2:
-                    print 'SKIP'
-                continue
+
+            from hivwholeseq.utils.sequence import alphaa
+            count = np.zeros((len(alphaa), len(refseq) // 3), int)
+            for frroi in fragment_rois:
+                fragment = frroi['name']
+                start_fr, end_fr = frroi['fragment']
+                start, end = frroi['roi']
+
+                # Check that we align with codons
+                rf = start % 3
+                if rf:
+                    start_fr += 3 - rf
+                    start += 3 - rf
+                rf = end % 3
+                if rf:
+                    end_fr -= rf
+                    end -= rf
+                               
+                fn = sample.get_mapped_filtered_filename(fragment, PCR=PCR,
+                                                         decontaminated=True)
                 
-            if VERBOSE >= 2:
-                print 'Get allele counts for amino acids'
-            count = gac(fn, start, end, qual_min=qual_min, VERBOSE=VERBOSE)
+                if not os.path.isfile(fn):
+                    if VERBOSE >= 2:
+                        print 'SKIP'
+                    continue
+                
+                if VERBOSE >= 2:
+                    print 'Get allele counts for amino acids'
+                cou = gac(fn, start_fr, end_fr, qual_min=qual_min,
+                          VERBOSE=VERBOSE)
+                # We do not care about fwd/reverse
+                count[:, start // 3: end // 3] = cou.sum(axis=0)
+
             counts.append(count)
 
             if save_to_file:
