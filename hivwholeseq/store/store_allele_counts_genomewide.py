@@ -21,7 +21,7 @@ from hivwholeseq.patients.filenames import get_initial_reference_filename
 def merge_allele_counts(ref_genomewide, acs, VERBOSE=0):
     '''Merge the allele counts of all fragments
     
-    Note: we obviously do not require full coverage of all fragments, the missing
+    Note: we do not require full coverage of all fragments, the missing
           ones will just have zero counts. Sometimes, cherry-picking the data
           fragment by fragment might be a better choice.
     '''
@@ -34,8 +34,10 @@ def merge_allele_counts(ref_genomewide, acs, VERBOSE=0):
     for (fr, ref, acsi) in acs:
 
         # Find the coordinates
-        (score, ali1, ali2) = align_overlap(ref_genomewide[pos_ref - 1000: pos_ref + 3000],
-                                            ref, score_gapopen=-20)
+        (score, ali1, ali2) = align_overlap(ref_genomewide[pos_ref - 1000:],
+                                            ref,
+                                            #score_gapopen=-20,
+                                           )
         fr_start = len(ali2) - len(ali2.lstrip('-'))
         fr_end = len(ali2.rstrip('-'))
 
@@ -83,7 +85,7 @@ def merge_allele_counts(ref_genomewide, acs, VERBOSE=0):
 if __name__ == '__main__':
 
     # Parse input args
-    parser = argparse.ArgumentParser(description='Update initial consensus',
+    parser = argparse.ArgumentParser(description='Store genomewide allele counts',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     pats_or_samples = parser.add_mutually_exclusive_group(required=False)
     pats_or_samples.add_argument('--patients', nargs='+',

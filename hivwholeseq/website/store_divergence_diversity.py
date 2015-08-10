@@ -29,6 +29,7 @@ if __name__ == '__main__':
             # Divergence
             dg, ind = patient.get_divergence(region,
                                              cov_min=100)
+
             times = patient.times[ind]
             ind = -dg.mask
             dg = dg[ind].data

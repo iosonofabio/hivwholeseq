@@ -83,7 +83,14 @@ class Patient(pd.Series):
     @property
     def times(self, unit='day'):
         '''Get the times from transmission'''
-        return convert_date_deltas_to_float(self.dates - self.transmission_date, unit=unit)
+        ts = self.samples['days since infection']
+        if unit == 'month':
+            ts *= 1.0 / 30.5
+        elif unit == 'year':
+            ts *= 1.0 / 365.24
+        return ts
+
+        #return convert_date_deltas_to_float(self.dates - self.transmission_date, unit=unit)
 
 
     @property

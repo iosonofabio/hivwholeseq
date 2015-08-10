@@ -10,7 +10,7 @@ import sys
 import numpy as np
 
 from hivwholeseq.utils.generic import mkdirs
-from hivwholeseq.patients.patients import load_patients, Patient
+from hivwholeseq.patients.patients import load_patients, iterpatient
 from hivwholeseq.website.filenames import get_sample_table_filename
 
 
@@ -18,8 +18,7 @@ from hivwholeseq.website.filenames import get_sample_table_filename
 if __name__ == '__main__':
 
     patients = load_patients()
-    for pname, patient in patients.iterrows():
-        patient = Patient(patient)
+    for pname, patient in iterpatient(patients):
         print patient.code, patient.name
 
         # Samples table
@@ -33,6 +32,7 @@ if __name__ == '__main__':
                      .set_index('days since infection'))
 
             table['RNA templates'] = np.array(patient.n_templates, int)
+            table['RNA templates'][patient.n_templates.mask] = 0
 
             # Write output
             fn_out = get_sample_table_filename(patient.code, kind=tdata['kind'])
