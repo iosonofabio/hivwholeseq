@@ -1,11 +1,8 @@
--------------------------------------------------------------------------------
-		HIV WHOLE GENOME LONGITUDINAL HIV MISEQ SEQUENCING
--------------------------------------------------------------------------------
-F. Zanini, R. Neher (+ other authors for the non-coding part)
-LAST UPDATE: Aug 2014.
+# HIV WHOLE-GENOME LONGITUDINAL DEEP SEQUENCING
+- Authors: F. Zanini, R. Neher (+ other authors for the non-coding part), 2013-2015
+- License: MIT
 
-OVERVIEW
--------------------------------------------------------------------------------
+## OVERVIEW
 The analysis of HIV whole-genome longitudinal sequences consists of a set of
 scripts and modules. There are two levels of analysis:
 
@@ -25,13 +22,11 @@ A standard control for sequencing quality is co-sequencing of PhiX, a plasmid of
 sequence. The analysis pipeline on those reads is located in the README, "phix" folder.
 
 
-MAPPING PIPELINE FOR HIV SAMPLES
--------------------------------------------------------------------------------
+## MAPPING PIPELINE FOR HIV SAMPLES
 See "sequencing/README".
 
 
-POST-MAPPING PIPELINE FOR HIV SAMPLES
--------------------------------------------------------------------------------
+## POST-MAPPING PIPELINE FOR HIV SAMPLES
 At this point, reads are mapped against the patient-specific reference. See README in
 the "patients" folder for details on that part of the analysis.
 
@@ -42,12 +37,13 @@ Additional sample-by-sample analyses are possible:
 - Various popgen measures.
 
 
-DIAGRAMS
--------------------------------------------------------------------------------
+##DIAGRAMS
+```
 1. MAPPING: START -> TABLE -> SYMLINK -> PREMAP -> DIVIDE -> CONSENSUS -> MAP -> FILTER
 
 2.1 PATIENT: REFERENCE -> MAP -> FILTER -> ALLELES -> TRAJECTORIES
-                                        L> PAIRS
-                                        L> LOCAL HAPLOTYPES
+                                        -> PAIRS
+                                        -> LOCAL HAPLOTYPES
 
 2.2 CROSS SECTIONAL: CONSENSUS TREE
+```
