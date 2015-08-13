@@ -949,6 +949,34 @@ def fork_store_haplotypes_website(pname, region, VERBOSE=0):
     return sp.check_output(qsub_list)
 
 
+def fork_store_cocounts_website(pname, samplenumber, fragment, VERBOSE=0):
+    '''Fork to the cluster for each sample and fragment'''
+    if VERBOSE:
+        print 'Forking to the cluster: patient '+pname+', '+str(samplenumber)+', '+fragment
+
+    JOBSCRIPT = JOBDIR+'website/store_allele_cocounts.py'
+    cluster_time = '0:59:59'
+    vmem = '16G'
+
+    qsub_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'cc'+pname+str(samplenumber)+fragment,
+                 '-l', 'h_rt='+cluster_time,
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--patients', pname,
+                 '--samplenumbers', samplenumber,
+                 '--fragments', fragment,
+                ]
+    qsub_list = map(str, qsub_list)
+    if VERBOSE:
+        print ' '.join(qsub_list)
+    return sp.check_output(qsub_list)
+
+
 
 # THEORY
 def fork_calculate_beta_SFS(alpha, N, VERBOSE=0):

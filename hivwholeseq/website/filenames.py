@@ -110,6 +110,19 @@ def get_allele_counts_filename(samplename, fragment, format='npy', type='nuc'):
     return filename
 
 
+def get_allele_cocounts_filename(samplename, fragment, format='zip', type='nuc'):
+    '''Get the filename of allele count trajectories'''
+    filename = 'cocounts_'+samplename+'_'+fragment+'.'+format
+    if type == 'nuc':
+        filename = get_foldername('pair_nucleotide_variants')+filename
+    elif type == 'aa':
+        filename = get_foldername('pair_aminoacid_variants')+filename
+    else:
+        raise ValueError('Data type not understood')
+
+    return filename
+
+
 def get_allele_count_trajectories_filename(pname, fragment, format='npz'):
     '''Get the filename of allele count trajectories'''
     filename = 'allele_counts_'+pname+'_'+fragment+'.'+format

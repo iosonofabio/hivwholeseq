@@ -31,8 +31,7 @@ from hivwholeseq.website import _regions_haplotypes as regions_all
 # Script
 if __name__ == '__main__':
 
-    # Parse input args
-    parser = argparse.ArgumentParser(description='Perform PCA on the data',
+    parser = argparse.ArgumentParser(description='Store haplotypes and trees',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     parser.add_argument('--patients', nargs='+',
                         help='Patient to analyze')
