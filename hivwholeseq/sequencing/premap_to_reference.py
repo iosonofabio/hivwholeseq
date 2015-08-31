@@ -34,7 +34,7 @@ from hivwholeseq.sequencing.filenames import get_custom_reference_filename, \
         get_insert_size_distribution_filename
 from hivwholeseq.utils.mapping import stampy_bin, convert_sam_to_bam, convert_bam_to_sam
 from hivwholeseq.cluster.fork_cluster import fork_premap as fork_self
-from hivwholeseq.clean_temp_files import remove_premapped_tempfiles
+from hivwholeseq.utils.clean_temp_files import remove_premapped_tempfiles
 
 
 
