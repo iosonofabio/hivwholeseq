@@ -17,7 +17,7 @@ from Bio.Alphabet.IUPAC import ambiguous_dna
 from Bio import SeqIO
 from Bio.Seq import reverse_complement as rc
 
-from hivwholeseq.miseq import alpha
+from hivwholeseq.utils.miseq import alpha
 from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_allele_count_trajectories_filename, get_primers_filename
 from hivwholeseq.patients.patients import load_patient, SamplePat

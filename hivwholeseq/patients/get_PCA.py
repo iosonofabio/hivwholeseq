@@ -16,7 +16,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 import matplotlib.pyplot as plt
 
-from hivwholeseq.miseq import alpha
+from hivwholeseq.utils.miseq import alpha
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.patients.samples import SamplePat
 from hivwholeseq.utils.argparse import RoiAction

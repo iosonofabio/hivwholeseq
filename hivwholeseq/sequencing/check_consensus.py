@@ -12,7 +12,7 @@ import Bio.SeqIO as SeqIO
 import Bio.AlignIO as AlignIO
 
 from hivwholeseq.datasets import MiSeq_runs
-from hivwholeseq.miseq import alpha
+from hivwholeseq.utils.miseq import alpha
 from hivwholeseq.sequencing.adapter_info import load_adapter_table
 from hivwholeseq.sequencing.filenames import get_consensus_filename, \
         get_allele_counts_filename, get_coverage_filename

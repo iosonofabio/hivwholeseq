@@ -12,7 +12,7 @@ from operator import itemgetter
 import numpy as np
 
 from hivwholeseq.sequencing.samples import load_sequencing_run, SampleSeq
-from hivwholeseq.miseq import alpha
+from hivwholeseq.utils.miseq import alpha
 from hivwholeseq.sequencing.filenames import get_allele_counts_filename, get_coverage_filename, \
         get_allele_frequencies_filename
 from hivwholeseq.sequencing.adapter_info import load_adapter_table

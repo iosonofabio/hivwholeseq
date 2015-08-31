@@ -14,7 +14,7 @@ from operator import itemgetter
 import numpy as np
 from Bio import SeqIO
 
-from hivwholeseq.miseq import alpha
+from hivwholeseq.utils.miseq import alpha
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.patients.one_site_statistics import plot_coverage_trajectories_heatmap, \
         plot_coverage_trajectories_3d, plot_coverage_trajectories

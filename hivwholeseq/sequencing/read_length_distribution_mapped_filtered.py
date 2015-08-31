@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.sequencing.adapter_info import load_adapter_table
-from hivwholeseq.miseq import read_types
+from hivwholeseq.utils.miseq import read_types
 from hivwholeseq.sequencing.filenames import get_mapped_filename
 from hivwholeseq.utils.mapping import convert_sam_to_bam
 

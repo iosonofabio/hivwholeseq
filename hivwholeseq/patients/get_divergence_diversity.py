@@ -13,7 +13,7 @@ from Bio import SeqIO
 from matplotlib import cm
 import matplotlib.pyplot as plt
 
-from hivwholeseq.miseq import alpha
+from hivwholeseq.utils.miseq import alpha
 from hivwholeseq.patients.patients import load_patients, Patient
 
 

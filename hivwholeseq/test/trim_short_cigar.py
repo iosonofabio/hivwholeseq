@@ -15,7 +15,7 @@ from collections import defaultdict, Counter
 import numpy as np
 from copy import deepcopy
 
-from hivwholeseq.miseq import alphal
+from hivwholeseq.utils.miseq import alphal
 from hivwholeseq.utils.mapping import trim_short_cigars, trim_short_cigars_pair
 from hivwholeseq.test.utils import Read, fix_pair
 

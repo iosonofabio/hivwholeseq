@@ -20,7 +20,7 @@ import Bio.SeqIO as SeqIO
 import Bio.AlignIO as AlignIO
 
 from hivwholeseq.datasets import MiSeq_runs
-from hivwholeseq.miseq import alpha
+from hivwholeseq.utils.miseq import alpha
 from hivwholeseq.sequencing.primer_info import primers_inner as pri
 from hivwholeseq.sequencing.adapter_info import load_adapter_table
 from hivwholeseq.sequencing.filenames import get_consensus_filename, get_consensus_old_filename, \

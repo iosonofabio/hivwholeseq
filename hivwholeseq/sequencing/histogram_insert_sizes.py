@@ -16,7 +16,7 @@ import numpy as np
 from Bio import SeqIO
 
 from hivwholeseq.datasets import MiSeq_runs
-from hivwholeseq.miseq import alpha
+from hivwholeseq.utils.miseq import alpha
 from hivwholeseq.sequencing.filenames import get_consensus_filename, get_mapped_filename
 from hivwholeseq.utils.mapping import convert_sam_to_bam
 

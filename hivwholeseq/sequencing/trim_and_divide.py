@@ -20,7 +20,7 @@ import numpy as np
 from Bio import SeqIO
 import pysam
 
-from hivwholeseq.miseq import alpha
+from hivwholeseq.utils.miseq import alpha
 from hivwholeseq.sequencing.primer_info import primers_coordinates_HXB2_inner as pcis
 from hivwholeseq.sequencing.primer_info import primers_coordinates_HXB2_outer as pcos
 from hivwholeseq.sequencing.primer_info import primers_inner, primers_outer

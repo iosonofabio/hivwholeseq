@@ -14,7 +14,7 @@ from Bio import SeqIO
 from matplotlib import cm
 import matplotlib.pyplot as plt
 
-from hivwholeseq.miseq import alpha
+from hivwholeseq.utils.miseq import alpha
 from hivwholeseq.utils.argparse import PatientsAction
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.patients.filenames import get_allele_frequency_trajectories_filename, \
