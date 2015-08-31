@@ -6,7 +6,7 @@ content:    Module that contains fast conversion factories between private and
             anonymyzed versions of data.
 
             Such a module is useful during research development, when consensus
-            on anonymized patient/sample names has not been reached yey.
+            on anonymized patient/sample names has not been reached yet.
 
             NOTE: remember to always anonymyze data before publishing them!
 '''
