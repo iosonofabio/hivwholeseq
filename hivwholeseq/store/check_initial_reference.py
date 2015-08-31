@@ -18,7 +18,7 @@ from Bio import SeqIO
 from hivwholeseq.sequencing.samples import SampleSeq
 from hivwholeseq.patients.patients import load_patients, load_patient, Patient
 from hivwholeseq.patients.filenames import get_sample_foldername
-from hivwholeseq.genome_info import locate_gene
+from hivwholeseq.utils.genome_info import locate_gene
 from hivwholeseq.sequencing.primer_info import fragments_genes
 
 

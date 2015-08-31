@@ -22,7 +22,7 @@ from hivwholeseq.utils.nehercook.ancestral import ancestral_sequences
 from hivwholeseq.utils.tree import tree_to_json, correct_minimal_branches
 from hivwholeseq.utils.generic import write_json
 from hivwholeseq.utils.argparse import PatientsAction
-from hivwholeseq.genome_info import genes, proteins, RNA_structures
+from hivwholeseq.utils.genome_info import genes, proteins, RNA_structures
 from hivwholeseq.patients.filenames import (
     get_consensi_alignment_filename,
     get_consensi_tree_filename)

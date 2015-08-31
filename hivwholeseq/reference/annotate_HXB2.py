@@ -73,7 +73,7 @@ coordinates = {'gene': {'gag': [(789, 2292)],
 def get_coordinates_feature(smat, name):
     '''Get the coordinates of a feature that's missing them'''
     #NOTE: this function is semi-official and does not handle compound features
-    from hivwholeseq.genome_info import all_edges, find_region_edges
+    from hivwholeseq.utils.genome_info import all_edges, find_region_edges
 
     edges_chunk = all_edges[name]
     edges = find_region_edges(smat, edges_chunk)

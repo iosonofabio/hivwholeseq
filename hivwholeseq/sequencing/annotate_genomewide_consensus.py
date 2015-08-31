@@ -34,7 +34,7 @@ def extract_feature(refseq, featurename):
 def annotate_sequence(seqrecord, features=['gene', 'RNA structure', 'other']):
     '''Annotate a consensus with the genes and stuff (in place)'''
     from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
-    from hivwholeseq.genome_info import gene_edges, RNA_structure_edges, \
+    from hivwholeseq.utils.genome_info import gene_edges, RNA_structure_edges, \
             other_edges, find_region_edges, find_region_edges_multiple
     from hivwholeseq.sequencing.primer_info import primers_PCR as primers_PCR_edges
     edge_dict = {'gene': gene_edges,

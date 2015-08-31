@@ -7,7 +7,7 @@ content:    Support module with sequence utility functions which for some reason
 '''
 # Modules
 from numpy import array
-from hivwholeseq.genome_info import genes as genes_all
+from hivwholeseq.utils.genome_info import genes as genes_all
 
 
 # Globals

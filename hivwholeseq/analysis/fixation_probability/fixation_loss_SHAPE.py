@@ -30,7 +30,7 @@ def get_gene_overlaps(gene, gwseq, VERBOSE=0):
     gene_start = feagene.location.nofuzzy_start
     gene_end = feagene.location.nofuzzy_end
 
-    from hivwholeseq.genome_info import genes
+    from hivwholeseq.utils.genome_info import genes
     overlap = np.zeros(gene_end - gene_start, bool)
 
     for feagene2 in gwseq.features:
