@@ -17,7 +17,7 @@ from hivwholeseq.reference import load_custom_reference
 from hivwholeseq.sequencing.samples import load_samples_sequenced, SampleSeq
 from hivwholeseq.utils.sequence import pretty_print_pairwise_ali
 from hivwholeseq.utils.generic import getchar
-from hivwholeseq._secret import samplenames_suspected_contamination as samplenames
+from hivwholeseq.data._secret import samplenames_suspected_contamination as samplenames
 
 
 

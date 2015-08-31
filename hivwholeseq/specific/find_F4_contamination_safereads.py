@@ -19,7 +19,7 @@ from hivwholeseq.utils.sequence import pretty_print_pairwise_ali
 from hivwholeseq.utils.generic import getchar
 from hivwholeseq.patients.patients import load_samples_sequenced as lssp
 from hivwholeseq.patients.patients import SamplePat
-from hivwholeseq._secret import (
+from hivwholeseq.data._secret import (
     samplenames_suspected_contamination_consensus as samples_cont)
 
 
