@@ -6,16 +6,16 @@
 The analysis of HIV whole-genome longitudinal sequences consists of a set of
 scripts and modules. There are two levels of analysis:
 
-1. MAPPING: Reads from each sequenced sample must be cleaned and assigned to
-            regions. This step is performed on non-patient samples too. The
-            scripts and modules are located in the "sequencing" folder.
+1. SAMPLE: Reads from each sequenced sample must be cleaned and assigned to
+           regions. This step is performed on non-patient samples too. The
+           scripts and modules are located in the "sequencing" folder.
 
 2. PATIENT: Cleaned reads are mapped against a patient-specific reference (the
             majotiry sequence of the first time point), allele counts and linkage
-            data structures are precomputed, and population genetics is
-            studied. The scripts and modules are located in the subfolder "patients"
+            data structures are precomputed. The scripts and modules are located
+            in the subfolder "store".
 
-Scripts exist for checking the status of the analysis, both for the SEQUENCING and 
+Scripts exist for checking the status of the analysis, both for the SAMPLE and 
 for the PATIENT parts; see README in the respective folders.
 
 A standard control for sequencing quality is co-sequencing of PhiX, a plasmid of known
