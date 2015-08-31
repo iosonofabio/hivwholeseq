@@ -152,10 +152,32 @@ class SamplePat(pd.Series):
         return get_consensus_filename(self.patient, self.name, fragment, PCR=PCR)
 
 
-    def get_consensus(self, fragment, PCR=1):
-        '''Get consensu for this sample'''
+    def get_consensus(self, region, PCR=1):
+        '''Get consensus for this sample'''
+        from Bio.Seq import Seq
+        from Bio.SeqRecord import SeqRecord
         from Bio import SeqIO
-        return SeqIO.read(self.get_consensus_filename(fragment, PCR=PCR), 'fasta')
+        from seqanpy import align_overlap
+
+        (fragment, start, stop) = self.get_fragmented_roi(region,
+                                                          VERBOSE=0,
+                                                          include_genomewide=True)
+
+        seq = SeqIO.read(self.get_consensus_filename(fragment, PCR=PCR), 'fasta')
+        refseq = SeqIO.read(self.get_reference_filename(fragment, format='fasta'),
+                            'fasta')[start: stop]
+
+        score, ali1, ali2 = align_overlap(seq, refseq)
+        start = len(ali2) - len(ali2.lstrip('-'))
+        end = len(ali2.rstrip('-'))
+        seq_region = ali1[start: end]
+
+        seq = SeqRecord(Seq(seq_region, seq.seq.alphabet),
+                        id=self.name,
+                        name=self.name,
+                        description=self.name)
+
+        return seq
 
 
     # TODO: implement this with depth checks

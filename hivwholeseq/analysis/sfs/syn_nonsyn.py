@@ -26,7 +26,7 @@ from hivwholeseq.patients.one_site_statistics import get_codons_n_polymorphic
 
 
 # Globals
-pnames = ['20097', '15363', '15823', '9669', '20529', '15241', '15376', '15319']
+pnames = ['p1', 'p2', 'p3', 'p5', 'p6', 'p8', 'p9', 'p11']
 regions = ['p17', 'p24', 'PR', 'RT', 'IN', 'vif', 'vpu', 'nef', 'gp41']
 
 
@@ -41,8 +41,8 @@ def collect_data(pnames, regions, VERBOSE=0):
         patients = patients.loc[pnames]
 
     # FIXME
-    pbads = ('15313', '15107')
-    patients = patients.loc[-patients.index.isin(pbads)]
+    pbads = ('p4', 'p7')
+    patients = patients.loc[-patients.code.isin(pbads)]
 
     for region in regions:
         if VERBOSE >= 1:

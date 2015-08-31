@@ -39,7 +39,7 @@ from hivwholeseq.analysis.to_from_subtype_consensus.random_haplotypes import (
 
 
 # Globals
-pnames = ['20097', '15319', '9669', '15363', '15823', '15241', '15376']
+pnames = ['p1', 'p2', 'p3', 'p5', 'p8', 'p9', 'p11']
 regions = ['p17']
 
 

@@ -29,7 +29,8 @@ regionsprot = ['PR', 'RT']
 
 # Functions
 def annotate_tree(patient, tree, VERBOSE=0,
-                  fields=('DSI', 'muts', 'VL', 'ntemplates', 'CD4')):
+                  fields=('DSI', 'muts', 'VL', 'ntemplates', 'CD4',
+                          'patient')):
     '''Annotate a tree with info on the nodes'''
     from hivwholeseq.utils.tree import add_mutations_tree
 
@@ -63,6 +64,10 @@ def annotate_tree(patient, tree, VERBOSE=0,
         for node in tree.get_terminals() + tree.get_nonterminals():
             node.subtype = patient.Subtype
     
+    if 'patient' in fields:
+        for node in tree.get_terminals() + tree.get_nonterminals():
+            node.patient = patient.code
+
     if 'muts' in fields:
         add_mutations_tree(tree, translate=False, mutation_attrname='muts')
 

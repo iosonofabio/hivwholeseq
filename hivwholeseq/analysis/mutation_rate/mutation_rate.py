@@ -29,7 +29,7 @@ from hivwholeseq.patients.one_site_statistics import get_codons_n_polymorphic
 
 
 # Globals
-pnames = ['20097', '15376', '15823', '15241', '9669', '15319']
+pnames = ['p1', 'p3', 'p5', 'p8', 'p9', 'p11']
 regions = ['p17', 'p24', 'nef', 'PR', 'RT', 'IN', 'vif']
 
 

@@ -32,8 +32,8 @@ from hivwholeseq.cross_sectional.get_subtype_allele_frequencies import (
 
 
 # Globals
+pnames = ['p1', 'p2', 'p3', 'p5', 'p6', 'p8', 'p9', 'p11']
 regions = ['p17', 'p24', 'PR', 'RT', 'p15', 'IN', 'gp41']
-pnames = ['20097', '15363', '15823', '9669', '20529', '15241', '15376', '15319']
 
 
 

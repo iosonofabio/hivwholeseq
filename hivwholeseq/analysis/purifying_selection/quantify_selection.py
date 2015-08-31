@@ -31,7 +31,7 @@ from hivwholeseq.analysis.purifying_selection.filenames import get_fitness_cost_
 
 
 # Globals
-pnames = ['20097', '15376', '15823', '15241', '9669', '15319']
+pnames = ['p1', 'p3', 'p5', 'p8', 'p9', 'p11']
 regions = ['p17', 'p24', 'nef', 'PR', 'RT', 'IN', 'vif']
 fun = lambda x, l, u: l * (1 - np.exp(- u/l * x))
 

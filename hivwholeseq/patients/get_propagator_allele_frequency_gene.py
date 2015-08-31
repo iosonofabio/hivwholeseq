@@ -119,9 +119,9 @@ if __name__ == '__main__':
     patients = load_patients()
     if pnames is not None:
         patients = patients.loc[pnames]
-        # FIXME: the initial ref of 15107 is mislabelled and a mess
+        # FIXME: the initial ref of p7 is mislabelled and a mess
     else:
-        patients = patients.loc[patients.index != '15107']
+        patients = patients.loc[patients.code != 'p7']
 
     # Prepare output structures
     n_binsx = 5

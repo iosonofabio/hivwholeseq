@@ -33,7 +33,7 @@ from hivwholeseq.utils.sequence import get_coordinates_genomic_region
 
 
 # Globals
-pnames = ['20097']
+pnames = ['p1']
 regions = ['p17']
 
 

@@ -112,8 +112,8 @@ if __name__ == '__main__':
         patients = patients.loc[pnames]
 
     # FIXME
-    pbads = ('15313', '15107')
-    patients = patients.loc[-patients.index.isin(pbads)]
+    pbads = ('p4', 'p7')
+    patients = patients.loc[-patients.code.isin(pbads)]
 
     for region in regions:
         if VERBOSE >= 1:

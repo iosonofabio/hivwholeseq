@@ -64,15 +64,22 @@ def get_haplotype_alignment_filename(pname, fragment, format='fasta'):
 
 def get_viral_load_filename(pname):
     '''Get the filename of the viral load'''
-    filename = 'viral_load_'+pname+'.dat'
+    filename = 'viral_load_'+pname+'.tsv'
     filename = get_foldername('physiological')+filename
     return filename
 
 
 def get_cell_count_filename(pname):
     '''Get the filename of the CD4+ counts'''
-    filename = 'cell_count_'+pname+'.dat'
+    filename = 'cell_count_'+pname+'.tsv'
     filename = get_foldername('physiological')+filename
+    return filename
+
+
+def get_HLA_filename(pname):
+    '''Get the filename of the HLA of a patient'''
+    filename = 'HLA_'+pname+'.tsv'
+    filename = get_foldername('hla')+filename
     return filename
 
 
@@ -210,12 +217,12 @@ def get_reads_filename(pname, fragment, it, format='bam'):
 def get_timeline_filename(pname):
     '''Get the filename of the patient timeline'''
     filename = 'time_points_'+pname+'.tsv'
-    filename = get_foldername('time_points')+pname+'/'+filename
+    filename = get_foldername('time_points')+filename
     return filename
 
 
 def get_ntemplates_filename(pname):
     '''Get the filename of the template numbers'''
-    filename = 'ntemplates_'+pname+'.dat'
+    filename = 'ntemplates_'+pname+'.tsv'
     filename = get_foldername('physiological')+filename
     return filename

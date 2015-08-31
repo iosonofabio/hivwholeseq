@@ -31,7 +31,7 @@ from hivwholeseq.analysis.mutation_rate.explore_divergence_synonymous import tra
 
 
 # Globals
-pnames = ['20097']
+pnames = ['p1']
 regions = ['p17', 'p24', 'p6', 'p7',
            'PR', 'RT', 'p15', 'IN',
            'vif', 'vpu', 'vpr',

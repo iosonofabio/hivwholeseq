@@ -20,7 +20,7 @@ from hivwholeseq.patients.patients import load_patients, Patient
 
 
 # Globals
-pnames = ['20097', '15363', '15823', '15376', '20529', '9669', '15241', '15319']
+pnames = ['p1', 'p2', 'p3', 'p5', 'p6', 'p8', 'p9', 'p11']
 regions = ['p17', 'p24', 'PR', 'RT', 'IN', 'vif', 'vpr', 'vpu', 'V3', 'RRE', 'gp41', 'nef']
 window_size = 300
 

@@ -45,21 +45,21 @@ if __name__ == '__main__':
         patient = Patient(patient)
         print patient.code, patient.name
         
-        # reads
-        for fragment in fragments:
-            print fragment
-            for it, sample in enumerate(patient.itersamples()):
-                print it, sample.name, fragment
+        ## reads
+        #for fragment in fragments:
+        #    print fragment
+        #    for it, sample in enumerate(patient.itersamples()):
+        #        print it, sample.name, fragment
 
-                fn = sample.get_mapped_filtered_filename(fragment, decontaminated=True)
-                if not os.path.isfile(fn):
-                    continue
+        #        fn = sample.get_mapped_filtered_filename(fragment, decontaminated=True)
+        #        if not os.path.isfile(fn):
+        #            continue
 
-                fn_out = get_reads_filename(patient.code, fragment, it)
+        #        fn_out = get_reads_filename(patient.code, fragment, it)
 
-                mkdirs(os.path.dirname(fn_out))
+        #        mkdirs(os.path.dirname(fn_out))
 
-                copy_or_symlink_reads(fn, fn_out)
+        #        copy_or_symlink_reads(fn, fn_out)
 
         # time points
         fn_out = get_timeline_filename(patient.code)

@@ -35,7 +35,7 @@ if __name__ == '__main__':
         np.savetxt(fn_out,
                    np.vstack([times, viral_load]).T,
                    delimiter='\t',
-                   header='t\tvl',
+                   header='Days from infection\tViral load [virions/ml]',
                    comments='')
 
         # CD4+ counts
@@ -49,6 +49,6 @@ if __name__ == '__main__':
         np.savetxt(fn_out,
                    np.vstack([times, counts]).T,
                    delimiter='\t',
-                   header='t\tcc',
+                   header='Days from infection\tCD4+ count [cells/ul]',
                    comments='')
 

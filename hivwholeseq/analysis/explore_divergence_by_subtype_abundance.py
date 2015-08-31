@@ -54,7 +54,7 @@ if __name__ == '__main__':
         patients = patients.loc[pnames]
 
     # FIXME
-    pbads = ('15313', '15107')
+    pbads = ('p4', 'p7')
     patients = patients.loc[-patients.index.isin(pbads)]
 
     for region in regions:

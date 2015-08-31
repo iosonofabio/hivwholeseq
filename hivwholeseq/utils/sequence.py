@@ -565,3 +565,15 @@ def find_annotation(seq, annotation):
         if fea.id == annotation:
             return fea
     raise ValueError(annotation+' not found')
+
+
+def trim_to_refseq(seq, refseq):
+    '''Trim sequence to a reference sequence'''
+    from seqanpy import align_overlap
+
+    (score, ali1, ali2) = align_overlap(seq, refseq, score_gapopen=-20)
+    start = len(ali2) - len(ali2.lstrip('-'))
+    end = len(ali2.rstrip('-'))
+
+    return seq[start: end]
+

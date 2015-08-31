@@ -47,7 +47,7 @@ if __name__ == '__main__':
    
     from hivwholeseq.patients.patients import load_samples_sequenced as lssp
     from hivwholeseq.patients.patients import SamplePat
-    samples_pat = lssp(patients=['20529'])
+    samples_pat = lssp(patients=['p6'])
 
     potential_cont = defaultdict(list)
     for samplename_pat, sample_pat in samples_pat.iterrows():

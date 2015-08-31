@@ -21,7 +21,7 @@ from hivwholeseq.website.filenames import get_tree_figure_filename
 from hivwholeseq.paper_figures.plots import HIVEVO_colormap
 
 # Globals
-pnames = ['20097', '15363', '15823', '15376', '9669', '15107', '15241', '15034', '15319', '20529']
+pnames = ['p1', 'p2', 'p3', 'p5', 'p6', 'p8', 'p9', 'p10', 'p11']
 region = 'V3'
 cutoff = 0.04
 
@@ -162,8 +162,13 @@ def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
             ax.scatter(xtext, ytext, s=rfun(0.5),
                        facecolor=datuml['color'],
                        edgecolor=datuml['colorstroke'])
+            t_text = int(datuml['time'] / 30.5)
+            if t_text == 1:
+                t_text = str(t_text)+' month'
+            else:
+                t_text = str(t_text)+' months'
             ax.text(xtext + 0.21 * maxdepth, ytext + 0.02 * ax.get_ylim()[0],
-                    str(int(datuml['time'] / 30.5))+' months',
+                    t_text,
                     ha='right',
                     fontsize=14,
                    )
@@ -186,11 +191,15 @@ def plot_haplotype_tree_example(data, title='', VERBOSE=0, savefig=False,
         fig.suptitle(title)
 
     if savefig:
-        fig_filename = savefig
-        fig_folder = os.path.dirname(fig_filename)
+        if isinstance(savefig, basestring):
+            fig_filenames = [savefig]
+        else:
+            fig_filenames = savefig
 
-        mkdirs(fig_folder)
-        fig.savefig(fig_filename)
+        for fig_filename in fig_filenames:
+            fig_folder = os.path.dirname(fig_filename)
+            mkdirs(fig_folder)
+            fig.savefig(fig_filename)
         plt.close(fig)
 
     else:
@@ -218,13 +227,12 @@ if __name__ == '__main__':
 
         data = compress_data(tree, patient.code, region)
             
-        filename = get_tree_figure_filename(patient.code, region, format='svg')
-
+        filenames = [get_tree_figure_filename(patient.code, region, format='svg'),
+                     get_tree_figure_filename(patient.code, region, format='png')]
         plot_haplotype_tree_example(data,
                                     VERBOSE=VERBOSE,
-                                    savefig=filename)
+                                    savefig=filenames)
 
         #plot_haplotype_tree_example(data,
         #                            VERBOSE=VERBOSE,
         #                            )
-        #break

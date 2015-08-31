@@ -40,7 +40,7 @@ if __name__ == '__main__':
     VERBOSE = args.verbose
 
     VERBOSE = 1
-    pname = '20097'
+    pname = 'p1'
     itime = 0
     fragment = 'F5'
     maxgap = 0

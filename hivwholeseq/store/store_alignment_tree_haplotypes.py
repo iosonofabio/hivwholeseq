@@ -2,7 +2,7 @@
 '''
 author:     Fabio Zanini
 date:       11/12/14
-content:    Store phylogenetic tree of local haplotypes/consensi.
+content:    Store alignment and phylogenetic tree of local haplotypes.
 '''
 # Modules
 import os
@@ -15,10 +15,9 @@ import matplotlib.pyplot as plt
 from Bio import Phylo
 from Bio import AlignIO
 
-from hivwholeseq.patients.patients import load_patients, Patient
+from hivwholeseq.patients.patients import load_patients, iterpatient
 from hivwholeseq.utils.argparse import PatientsAction
 from hivwholeseq.utils.tree import build_tree_fasttree
-from hivwholeseq.store.store_tree_consensi import annotate_tree
 from hivwholeseq.utils.nehercook.ancestral import ancestral_sequences
 from hivwholeseq.utils.tree import tree_to_json
 from hivwholeseq.utils.generic import write_json
@@ -106,48 +105,31 @@ def expand_annotate_alignment(alim, hft, hct, times, freqmin=0.01, VERBOSE=0):
     return ali
 
 
-def annotate_tree_time_freq_count(tree, ali):
-    '''Annotate tree with days and colors'''
+def annotate_tree(patient, tree, ali, VERBOSE=0):
+    '''Annotate tree with metadata'''
+    from hivwholeseq.utils.tree import add_mutations_tree
     from operator import attrgetter
 
-    # Assign times and freqs to leaves
+    add_mutations_tree(tree, translate=False, mutation_attrname='muts')
+
     for leaf in tree.get_terminals():
         leaf.DSI = float(leaf.name.split('_')[0])
         leaf.frequency = float(leaf.name.split('_')[2].split('%')[0]) / 100.0
         leaf.count = int(leaf.name.split('_')[3])
+        leaf.name = None
 
-    
+        sample = patient.samples.loc[patient.times == leaf.DSI].iloc[0]
+        leaf.CD4 = sample['CD4+ count']
+        leaf.VL = sample['viral load']
+
+    for node in tree.get_terminals() + tree.get_nonterminals():
+        node.subtype = patient.Subtype
+
     # Reroot
     tmin = min(leaf.DSI for leaf in tree.get_terminals())
     newroot = max((leaf for leaf in tree.get_terminals() if leaf.DSI == tmin),
                    key=attrgetter('frequency'))
     tree.root_with_outgroup(newroot)
-
-
-def annotate_tree_for_plot(tree, minfreq=0.02):
-    '''Add annotations for plotting'''
-    from matplotlib import cm
-    cmap = cm.jet
-
-    last_tp = max(leaf.DSI for leaf in tree.get_terminals())
-    def get_color(node):
-        return map(int, np.array(cmap(node.DSI/last_tp*0.9)[:-1]) * 255)
-
-    # Annotate leaves
-    for leaf in tree.get_terminals():
-        leaf.color = get_color(leaf)
-
-        if leaf.frequency >= minfreq:
-            leaf.label = ('t = '+str(int(leaf.DSI))+
-                          ', f = '+'{:1.2f}'.format(leaf.frequency))
-        else:
-            leaf.label = ''
-
-    # Color internal branches
-    for node in tree.get_nonterminals(order='postorder'):
-        node.label = ''
-        node.DSI = np.mean([c.DSI for c in node.clades])
-        node.color = get_color(node)
 
 
 def extract_alignment(tree, VERBOSE=0):
@@ -169,6 +151,31 @@ def extract_alignment(tree, VERBOSE=0):
 
 def plot_tree(tree, title=''):
     '''Plot the haplotype tree'''
+    def annotate_tree_for_plot(tree, minfreq=0.02):
+        '''Add annotations for plotting'''
+        from matplotlib import cm
+        cmap = cm.jet
+    
+        last_tp = max(leaf.DSI for leaf in tree.get_terminals())
+        def get_color(node):
+            return map(int, np.array(cmap(node.DSI/last_tp*0.9)[:-1]) * 255)
+    
+        # Annotate leaves
+        for leaf in tree.get_terminals():
+            leaf.color = get_color(leaf)
+    
+            if leaf.frequency >= minfreq:
+                leaf.label = ('t = '+str(int(leaf.DSI))+
+                              ', f = '+'{:1.2f}'.format(leaf.frequency))
+            else:
+                leaf.label = ''
+    
+        # Color internal branches
+        for node in tree.get_nonterminals(order='postorder'):
+            node.label = ''
+            node.DSI = np.mean([c.DSI for c in node.clades])
+            node.color = get_color(node)
+
     annotate_tree_for_plot(tree, minfreq=0.1)
 
     fig, ax = plt.subplots()
@@ -196,7 +203,7 @@ if __name__ == '__main__':
                         help='Patients to analyze')
     parser.add_argument('--regions', required=True, nargs='+',
                         help='Genomic region (e.g. IN or V3)')
-    parser.add_argument('--verbose', type=int, default=0,
+    parser.add_argument('--verbose', type=int, default=2,
                         help='Verbosity level [0-4]')
     parser.add_argument('--plot', action='store_true',
                         help='Plot local haplotype trajectories')
@@ -218,30 +225,29 @@ if __name__ == '__main__':
         patients = patients.loc[pnames]
 
     for region in regions:
-        for pname, patient in patients.iterrows():
-            patient = Patient(patient)
-
+        for pname, patient in iterpatient(patients):
             if VERBOSE >= 1:
                 print pname, region
         
             if VERBOSE >= 2:
                 print 'Get haplotypes'
 
-            (hct, ind, alim) = patient.get_haplotype_count_trajectory(region, aligned=True)
+            (hct, ind, alim) = patient.get_haplotype_count_trajectory(region,
+                                                                      aligned=True)
             
             if len(ind) == 0:
                 if VERBOSE >= 2:
-                    print 'Not time points found. Skip'
+                    print 'No time points found. Skip'
                 continue
 
             times = patient.times[ind]
-            hct = hct.T
             hft = 1.0 * hct / hct.sum(axis=0)
 
-            # Duplicate sequences for tree
-            ali = expand_annotate_alignment(alim, hft, hct, times, freqmin=freqmin, VERBOSE=VERBOSE)
+            # Duplicate haplotypes if they appear more than once
+            ali = expand_annotate_alignment(alim, hft, hct, times,
+                                            freqmin=freqmin, VERBOSE=VERBOSE)
 
-            # Exclude too rare haplos
+            # Exclude too rare haplotypes
             indseq = (hft >= freqmin).any(axis=1)
             alim = alim[indseq]
             hft = hft[indseq]
@@ -258,18 +264,9 @@ if __name__ == '__main__':
             a.cleanup_tree()
 
             if VERBOSE >= 2:
-                print 'Annotate with time and frequency'
-            annotate_tree_time_freq_count(tree, ali)
-
-            # FIXME: for the amino acid mutations, we must make sure that we are
-            # codon aligned (with codon_align). The problem is that sometimes
-            # V3 has gaps of 1-2 nucleotides... at frequency 10%?!
-            # NOTE: this might be due to compensating indels right outside V3,
-            # as seen in cross-sectional alignments
-            if VERBOSE >= 2:
                 print 'Annotate tree'
-            annotate_tree(patient, tree, VERBOSE=VERBOSE)
-                
+            annotate_tree(patient, tree, ali, VERBOSE=VERBOSE)
+
             if VERBOSE >= 2:
                 print 'Ladderize tree'
             tree.ladderize()
@@ -279,14 +276,16 @@ if __name__ == '__main__':
                     print 'Save tree (JSON)'
                 fn = patient.get_local_tree_filename(region, format='json')
                 tree_json = tree_to_json(tree.root,
-                                         fields=('DSI', 'sequence',
+                                         fields=('DSI',
+                                                 'sequence',
                                                  'muts',
-                                                 'VL', 'CD4',
+                                                 'VL',
+                                                 'CD4',
                                                  'frequency',
                                                  'count',
                                                  'confidence'),
                                         )
-                write_json(tree_json, fn)
+                write_json(tree_json, fn, indent=1)
 
             if VERBOSE >= 2:
                 print 'Extract alignment from tree (so with duplicates)'

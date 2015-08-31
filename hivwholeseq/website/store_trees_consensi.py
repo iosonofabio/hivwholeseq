@@ -10,98 +10,66 @@ content:    Store phylogenetic trees in a suitable format for the website.
 import os
 import shutil
 import sys
-from operator import attrgetter
+import argparse
 
 from hivwholeseq.utils.generic import mkdirs
-from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.patients.filenames import get_consensi_tree_filename as gfn_in
 from hivwholeseq.website.filenames import get_consensi_tree_filename as gfn_out
-from hivwholeseq.utils.tree import tree_to_json, correct_minimal_branches
-from hivwholeseq.utils.generic import write_json
 from hivwholeseq.reference import load_custom_reference
+from hivwholeseq.website import _regions
 
 
 
 # Globals
-refnames = ['LAI-III']
 
 
 
 # Script
 if __name__ == '__main__':
 
+    parser = argparse.ArgumentParser(description='Align consensi and make trees',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
+    parser.add_argument('--patients', nargs='+',
+                        default=['p1', 'p2', 'p3', 'p5', 'p6', 'p8', 'p9', 'p10', 'p11'],
+                        help='Patients to analyze')
+    parser.add_argument('--regions', nargs='*', default=_regions,
+                        help='Regions to analyze (e.g. V3 F6)')
+
+    args = parser.parse_args()
+    pcodes = args.patients
+    regions = args.regions
 
     # GLOABL CONSENSI TREES
     print 'All patients'
-    refseq = load_custom_reference('HXB2', 'gb')
-    regions = ([fea.id for fea in refseq.features if len(fea.location.parts) == 1] +
-               ['F'+str(i) for i in xrange(1, 7)])
-
     for region in regions:
         print region,
-        fn = gfn_in('all', region, format='json')
-        if not os.path.isfile(fn):
+
+        reg_tmp = '_'.join(pcodes)+'_'+region
+        fn_in = gfn_in('all', reg_tmp, format='json')
+        if not os.path.isfile(fn_in):
             print 'SKIP'
             continue
 
-        # We need to reroot it between the subtypes
-        from hivwholeseq.utils.generic import read_json
-        from hivwholeseq.utils.tree import tree_from_json, tree_to_json
-        tree = tree_from_json(read_json(fn))
-
-        correct_minimal_branches(tree)
-
-        tree.root_at_midpoint()
-
-        tree_json = tree_to_json(tree.root,
-                                 fields=('CD4', 'DSI', 'VL',
-                                         'confidence',
-                                         'muts',
-                                         'patient',
-                                         'sequence',
-                                         'subtype'),
-                                )
-
         # Write output
         fn_out = gfn_out('all', region, format='json')
-        write_json(tree_json, fn_out)
+        shutil.copy(fn_in, fn_out)
         print 'OK'
 
 
     # PATIENT CONSENSI TREES
-    patients = load_patients()
-    for pname, patient in patients.iterrows():
-        patient = Patient(patient)
-
-        refseq_gw = patient.get_reference('genomewide', 'gb')
-        regions = map(attrgetter('id'), refseq_gw.features) + ['genomewide']
-
-        for region in regions:
-            print patient.code, patient.name, region
-
-            fn = patient.get_consensi_tree_filename(region, format='json')
-            if not os.path.isfile(fn):
-               continue
-
-            tree = patient.get_consensi_tree(region, format='json')
-
-            # Delete initial reference
-            for leaf in tree.get_terminals():
-                if 'reference' in leaf.name:
-                    break
-            else:
-                raise ValueError('Initial reference not found in tree')
-            tree.prune(leaf)
-
-            tree.ladderize()
-
-            correct_minimal_branches(tree)
-
+    print 'Single patients'
+    for region in regions:
+        print region
+        for pname in pcodes:
+            fn_in = gfn_in(pname, region, format='json')
+            if not os.path.isfile(fn_in):
+                print 'SKIP'
+                continue
+    
             # Write output
-            fn_out = gfn_out(patient.code, region, format='json')
-            tree_json = tree_to_json(tree.root,
-                                     fields=('DSI', 'sequence', 'muts',
-                                             'VL', 'CD4', 'confidence',
-                                             'subtype'),
-                                    )
-            write_json(tree_json, fn_out, indent=1)
+            fn_out = gfn_out(pname, region, format='json')
+            if os.path.isfile(fn_out):
+                os.remove(fn_out)
+            shutil.copy(fn_in, fn_out)
+            print 'OK'
+

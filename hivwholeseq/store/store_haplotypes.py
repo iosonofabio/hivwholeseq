@@ -7,6 +7,7 @@ content:    Store local haplotypes.
 '''
 # Modules
 import os
+import sys
 import argparse
 from operator import itemgetter, attrgetter
 import numpy as np
@@ -17,7 +18,7 @@ from Bio import Phylo
 from hivwholeseq.utils.generic import mkdirs
 from hivwholeseq.utils.mapping import align_muscle
 from hivwholeseq.utils.argparse import PatientsAction
-from hivwholeseq.patients.patients import load_patients, Patient
+from hivwholeseq.patients.patients import load_patients, iterpatient
 
 
 
@@ -34,7 +35,7 @@ if __name__ == '__main__':
                         help='Patients to analyze')
     parser.add_argument('--regions', nargs='+', required=True,
                         help='Genomic regions (e.g. V3 IN)')
-    parser.add_argument('--verbose', type=int, default=0,
+    parser.add_argument('--verbose', type=int, default=2,
                         help='Verbosity level [0-4]')
     parser.add_argument('--maxreads', type=int, default=-1,
                         help='Number of reads analyzed per sample')
@@ -58,9 +59,7 @@ if __name__ == '__main__':
     if pnames is not None:
         patients = patients.loc[pnames]
 
-    for pname, patient in patients.iterrows():
-        patient = Patient(patient)
-
+    for pname, patient in iterpatient(patients):
         for region in regions:
             if VERBOSE >= 1:
                 print pname, region
@@ -81,6 +80,11 @@ if __name__ == '__main__':
             if use_save:
                 if VERBOSE >= 2:
                     print 'Save to file'
+
+                if not datum['ind']:
+                    print 'No haplotypes'
+                    continue
+
                 fn_out = patient.get_haplotype_count_trajectory_filename(region)
                 mkdirs(os.path.dirname(fn_out))
                 np.savez_compressed(fn_out,

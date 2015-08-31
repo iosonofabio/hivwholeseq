@@ -11,7 +11,7 @@ import sys
 import numpy as np
 
 from hivwholeseq.utils.generic import mkdirs
-from hivwholeseq.patients.patients import load_patients, Patient
+from hivwholeseq.patients.patients import load_patients, iterpatient
 from hivwholeseq.website.filenames import get_divergence_trajectories_filename, \
         get_diversity_trajectories_filename
 from hivwholeseq.patients.filenames import get_divergence_trajectories_local_filename, \
@@ -23,8 +23,7 @@ from hivwholeseq.patients.filenames import get_divergence_trajectories_local_fil
 if __name__ == '__main__':
 
     patients = load_patients()
-    for pname, patient in patients.iterrows():
-        patient = Patient(patient)
+    for pname, patient in iterpatient(patients):
         print patient.code, patient.name
 
         # Divergence
@@ -33,11 +32,12 @@ if __name__ == '__main__':
         ind = npz['ind']
         dg = npz['dg']
         block_length = npz['block_length']
+        L = npz['L']
         times = patient.times[ind]
 
         # Write output
         fn_out = get_divergence_trajectories_filename(patient.code, 'genomewide')
-        np.savez(fn_out, times=times, dg=dg, block_length=block_length)
+        np.savez(fn_out, times=times, dg=dg, L=L, block_length=block_length)
 
         # Diversity
         npz = np.load(get_diversity_trajectories_local_filename(patient.name,
@@ -49,5 +49,5 @@ if __name__ == '__main__':
 
         # Write output
         fn_out = get_diversity_trajectories_filename(patient.code, 'genomewide')
-        np.savez(fn_out, times=times, ds=ds, block_length=block_length)
+        np.savez(fn_out, times=times, ds=ds, L=L, block_length=block_length)
 

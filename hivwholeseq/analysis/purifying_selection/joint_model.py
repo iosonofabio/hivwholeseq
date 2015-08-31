@@ -38,7 +38,7 @@ from hivwholeseq.analysis.mutation_rate.mutation_rate import plot_mu_matrix
 
 
 # Globals
-pnames = ['20097', '15376', '15823', '15241', '9669', '15319']
+pnames = ['p1', 'p3', 'p5', 'p8', 'p9', 'p11']
 regions = ['p17', 'p24', 'nef', 'PR', 'RT', 'IN', 'vif']
 fun = lambda x, l, u: l * (1 - np.exp(- u/l * x))
 

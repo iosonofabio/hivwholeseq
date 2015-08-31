@@ -9,23 +9,12 @@ import numpy as np
 import pandas as pd
 
 from hivwholeseq.sequencing.filenames import table_filename
-from hivwholeseq.patients.samples import * # FIXME: lots of scripts import from here still
+from .samples import * # FIXME: lots of scripts import from here still
+from ._patient_names import pdict as _pdict
 
 
 
 # Globals
-_pdict = {'p1': '20097',
-          'p2': '15363',
-          'p3': '15823',
-          'p4': '15313',
-          'p5': '15376',
-          'p6': '20529',
-          'p7': '15107',
-          'p8': '9669',
-          'p9': '15241',
-          'p10': '15034',
-          'p11': '15319',
-         }
 _pdict_back = dict(item[::-1] for item in _pdict.iteritems())
 
 
@@ -51,7 +40,7 @@ class Patient(pd.Series):
     def folder(self):
         '''The folder with the data on this patient'''
         from hivwholeseq.patients.filenames import get_foldername
-        return str(get_foldername(self.name))
+        return str(get_foldername(self.code))
 
 
     def discard_nonsequenced_samples(self):
@@ -234,7 +223,7 @@ class Patient(pd.Series):
     def get_local_tree_filename(self, region, format='json'):
         '''Get the filename of the consensi tree of the patient'''
         from hivwholeseq.patients.filenames import get_local_tree_filename
-        return get_local_tree_filename(self.name, region, format=format)
+        return get_local_tree_filename(self.code, region, format=format)
 
 
     def get_local_tree(self, region):
@@ -550,6 +539,22 @@ class Patient(pd.Series):
         return (get_diversity(aft), ind)
 
 
+    def get_divergence_trajectory_local(self, region, block_length=150, **kwargs):
+        '''Get local divergence trajectory'''
+        from hivwholeseq.patients.get_divergence_diversity_local import (
+            get_divergence_trajectory_local)
+        return get_divergence_trajectory_local(self.code, region,
+                                               block_length=block_length)
+
+
+    def get_diversity_trajectory_local(self, region, block_length=150, **kwargs):
+        '''Get local diversity trajectory'''
+        from hivwholeseq.patients.get_divergence_diversity_local import (
+            get_diversity_trajectory_local)
+        return get_diversity_trajectory_local(self.code, region,
+                                              block_length=block_length)
+
+
     @property
     def transmission_date(self):
         '''The most likely time of transmission'''
@@ -706,13 +711,21 @@ class Patient(pd.Series):
 
     
     def get_haplotype_count_trajectory_filename(self, region):
-        '''Get filename of the haplotype trajectory in a genomic region'''
+        '''Get filename of the haplotype count trajectory in a genomic region'''
         from .filenames import get_haplotype_count_trajectory_filename
-        return get_haplotype_count_trajectory_filename(self.name, region)
+        return get_haplotype_count_trajectory_filename(self.code, region)
 
 
     def get_haplotype_count_trajectory(self, region, aligned=True):
-        '''Get precompiled haplotype trajectory in a genomic region'''
+        '''Get precompiled haplotype count trajectory in a genomic region
+        
+        Returns:
+            (hct, ind, seqs): triple,
+                hct (matrix of int): counts (n. time points, n. haplotypes)
+                ind (array of int): indices for the time points
+                seqs (list or matrix): sequences or alignment of haplotypes
+            aligned (bool): get an alignment of the sequences or the raw ones
+        '''
         import numpy as np
         data = np.load(self.get_haplotype_count_trajectory_filename(region))
         if aligned:

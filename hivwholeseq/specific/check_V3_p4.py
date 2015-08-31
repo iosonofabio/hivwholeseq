@@ -2,7 +2,7 @@
 '''
 author:     Fabio Zanini
 date:       11/12/14
-content:    Check the V3 alignment in p4/15313, as it looks weird.
+content:    Check the V3 alignment in p4, as it looks weird.
 '''
 # Modules
 import os
@@ -74,7 +74,7 @@ def get_region_count_trajectories(patient, region, VERBOSE=0, countmin=5):
 if __name__ == '__main__':
 
     VERBOSE = 2
-    pname = '15313'
+    pname = 'p4'
     regions = ['psi', 'PR', 'V3']
     countmin = 5
 

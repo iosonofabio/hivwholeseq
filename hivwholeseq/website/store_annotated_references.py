@@ -9,6 +9,7 @@ content:    Store annotated initial references and other sequences for the
 import os
 import sys
 from Bio import SeqIO
+from datetime import date
 
 from hivwholeseq.utils.generic import mkdirs
 from hivwholeseq.patients.patients import load_patients, Patient
@@ -21,8 +22,9 @@ from hivwholeseq.reference import load_custom_reference
 # Functions
 def delete_features(ref):
     '''Delete useless features'''
-    fea_useless = ['gp120_noVloops']
-    ref.features = [fea for fea in ref.features if fea.id not in fea_useless]
+    fea_useless = ['gp120_noVloops', 'chunk']
+    ref.features = [fea for fea in ref.features
+                    if (fea.id not in fea_useless) and (fea.type not in fea_useless)]
 
 
 def add_annotations_fragments(ref):
@@ -85,9 +87,13 @@ if __name__ == '__main__':
         ref = patient.get_reference('genomewide', format='gb')
 
         # Mask patient name into code
-        ref.id = 'ref_'+patient.code
-        ref.name = 'ref_'+patient.code
+        ref.id = 'reference_'+patient.code
+        ref.name = 'reference_'+patient.code
         ref.description = 'reference for patient '+patient.code+', genomewide'
+
+        ref.annotations['organism'] = 'HIV-1'
+        ref.annotations['date'] = date.today().strftime('%d-%b-%Y').upper()
+        ref.annotations['accessions'] = [patient.code+'_genomewide']
 
         # Delete useless annotations
         delete_features(ref)
@@ -105,7 +111,6 @@ if __name__ == '__main__':
         fn_out = get_coordinate_map_filename(patient.code, refname=refname)
         header = refname+'\t'+patient.code
         save_mapco(mapco, fn_out, header)
-
 
     # Store HXB2
     print refname

@@ -2,7 +2,7 @@
 '''
 author:     Fabio Zanini
 date:       11/12/14
-content:    Check the V3 alignment in p4/15313, as it looks weird.
+content:    Get trees of haplotype alignments.
 '''
 # Modules
 import os

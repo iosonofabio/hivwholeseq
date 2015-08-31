@@ -36,7 +36,7 @@ from hivwholeseq.store.store_haplotypes_alignment_tree import (
 
 
 # Globals
-pnames = ['15319']
+pnames = ['p11']
 regions = ['p15']
 
 

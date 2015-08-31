@@ -94,7 +94,7 @@ if __name__ == '__main__':
         print 'The sequence is NL32, cut at both edges'
 
     from hivwholeseq.patients.patients import load_patient
-    patient = load_patient('20097')
+    patient = load_patient('p1')
     refpat = patient.get_reference('genomewide')
 
     add_SHAPE_to_seqrecord(refpat)
