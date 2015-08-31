@@ -107,7 +107,7 @@ def get_allele_frequency_trajectories(pname, samples, fragment, qual_min=30, VER
     from hivwholeseq.patients.filenames import get_initial_reference_filename, \
             get_mapped_to_initial_filename, get_allele_frequency_trajectories_filename, \
             get_allele_count_trajectories_filename
-    from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file, \
+    from hivwholeseq.utils.one_site_statistics import get_allele_counts_insertions_from_file, \
             get_allele_counts_insertions_from_file_unfiltered, \
             filter_nus
 

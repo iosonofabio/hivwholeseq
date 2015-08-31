@@ -10,7 +10,7 @@ import argparse
 import numpy as np
 
 from hivwholeseq.utils.sequence import alpha, alphaa
-from hivwholeseq.one_site_statistics import get_entropy
+from hivwholeseq.utils.one_site_statistics import get_entropy
 from hivwholeseq.cross_sectional.filenames import (
     get_subtype_reference_alignment_filename,
     get_subtype_reference_alignment_entropy_filename)

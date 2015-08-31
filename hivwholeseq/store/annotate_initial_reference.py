@@ -50,7 +50,7 @@ def annotate_sequence(seqrecord, additional_edges={}, additional_features=['chun
     # TODO: what do we do with genes that do not start/end where they are
     # supposed to? Do we follow biology and track their new locations?
     from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
-    from hivwholeseq.genome_info import gene_edges, RNA_structure_edges, \
+    from hivwholeseq.utils.genome_info import gene_edges, RNA_structure_edges, \
             other_edges, find_region_edges, find_region_edges_multiple, \
             locate_gene
     edge_dict = {'gene': gene_edges,
@@ -127,7 +127,7 @@ def annotate_sequence(seqrecord, additional_edges={}, additional_features=['chun
     # Add proteins and other features from HXB2
     from operator import attrgetter
     from seqanpy import align_overlap
-    from hivwholeseq.genome_info import proteins, chunks
+    from hivwholeseq.utils.genome_info import proteins, chunks
     from hivwholeseq.reference import load_custom_reference
     additional_features_dict = {}
     if 'protein' in additional_features:
@@ -241,7 +241,7 @@ if __name__ == '__main__':
                     continue
 
                 print feature.id, 
-                from hivwholeseq.genome_info import genes
+                from hivwholeseq.utils.genome_info import genes
                 if feature.type in ('gene', 'protein'):
                     print feature.extract(refseq).seq.translate()
                 else:

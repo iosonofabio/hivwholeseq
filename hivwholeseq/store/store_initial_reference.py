@@ -35,16 +35,16 @@ from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_foldername, get_initial_reference_foldername
 from hivwholeseq.sequencing.primer_info import primers_inner
 from hivwholeseq.sequencing.primer_info import primers_coordinates_HXB2_inner as pci
-from hivwholeseq.one_site_statistics import \
+from hivwholeseq.utils.one_site_statistics import \
         build_consensus_from_allele_counts_insertions as build_consensus
 from hivwholeseq.reference import load_custom_reference
 from hivwholeseq.annotate_genomewide_consensus import extract_feature
 from hivwholeseq.utils.mapping import align_muscle
 from hivwholeseq.utils.sequence import pretty_print_pairwise_ali
 from hivwholeseq.sequencing.filenames import get_mapped_filename
-from hivwholeseq.one_site_statistics import build_consensus_from_mapped_reads
-from hivwholeseq.genome_info import locate_gene, gene_edges
-from hivwholeseq.genome_info import genes as genes_all
+from hivwholeseq.utils.one_site_statistics import build_consensus_from_mapped_reads
+from hivwholeseq.utils.genome_info import locate_gene, gene_edges
+from hivwholeseq.utils.genome_info import genes as genes_all
 from hivwholeseq.sequencing.primer_info import fragments_genes
 from hivwholeseq.utils.sequence import merge_sequences
 

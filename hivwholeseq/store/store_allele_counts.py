@@ -16,7 +16,7 @@ from hivwholeseq.patients.samples import load_samples_sequenced as lssp
 from hivwholeseq.patients.samples import SamplePat
 from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_mapped_filtered_filename, get_allele_counts_filename
-from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file as gac
+from hivwholeseq.utils.one_site_statistics import get_allele_counts_insertions_from_file as gac
 from hivwholeseq.cluster.fork_cluster import fork_get_allele_counts_patient as fork_self 
 
 

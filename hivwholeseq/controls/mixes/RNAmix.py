@@ -217,8 +217,8 @@ def examine_few_reads(sample, fragment, refseqs, VERBOSE=0, maxreads=10):
 
 def get_cocounts_mix(sample, fragment, alim, VERBOSE=0, maxreads=100):
     '''Get the binary cocount matrix for the RNA mix'''
-    from hivwholeseq.two_site_statistics import get_coallele_counts_from_file
-    from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file
+    from hivwholeseq.utils.two_site_statistics import get_coallele_counts_from_file
+    from hivwholeseq.utils.one_site_statistics import get_allele_counts_insertions_from_file
     from hivwholeseq.utils.sequence import alphal
 
     if VERBOSE >= 2:

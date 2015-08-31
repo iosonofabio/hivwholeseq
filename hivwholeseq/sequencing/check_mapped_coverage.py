@@ -16,7 +16,7 @@ from hivwholeseq.sequencing.samples import load_sequencing_run, SampleSeq
 from hivwholeseq.miseq import read_types
 from hivwholeseq.reference import load_HXB2
 from hivwholeseq.sequencing.filenames import get_mapped_filename, get_consensus_filename
-from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file_unfiltered
+from hivwholeseq.utils.one_site_statistics import get_allele_counts_insertions_from_file_unfiltered
 from hivwholeseq.sequencing.minor_allele_frequency import get_minor_allele_counts
 
 

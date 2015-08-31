@@ -26,7 +26,7 @@ from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_mapped_to_initial_filename, get_filter_mapped_init_summary_filename, \
         get_allele_cocounts_filename, get_allele_frequency_trajectories_filename
 from hivwholeseq.utils.mapping import convert_sam_to_bam, pair_generator
-from hivwholeseq.two_site_statistics import get_coallele_counts_from_file
+from hivwholeseq.utils.two_site_statistics import get_coallele_counts_from_file
 
 
 # Script
