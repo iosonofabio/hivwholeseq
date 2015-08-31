@@ -38,7 +38,7 @@ trim_bad_cigars = 3
 # Functions
 def get_allele_counts(data_folder, qual_min=0, VERBOSE=0, maxreads=-1):
     '''Extract allele and insert counts from a bamfile'''
-    from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file
+    from hivwholeseq.utils.one_site_statistics import get_allele_counts_insertions_from_file
 
     reffilename = get_phix_filename()
     refseq = SeqIO.read(reffilename, 'fasta')

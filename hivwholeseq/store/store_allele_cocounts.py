@@ -16,7 +16,7 @@ from Bio import SeqIO
 from hivwholeseq.patients.samples import load_samples_sequenced as lssp
 from hivwholeseq.patients.samples import SamplePat
 from hivwholeseq.patients.filenames import get_initial_reference_filename
-from hivwholeseq.two_site_statistics import get_coallele_counts_from_file as gac
+from hivwholeseq.utils.two_site_statistics import get_coallele_counts_from_file as gac
 from hivwholeseq.cluster.fork_cluster import fork_get_cocounts_patient as fork_self
 
 

@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 
 from hivwholeseq.multipatient.get_shared_alleles_trajectories import (
     get_shared_allele_frequencies, get_patient_indices)
-from hivwholeseq.one_site_statistics import get_entropy
+from hivwholeseq.utils.one_site_statistics import get_entropy
 
 
 

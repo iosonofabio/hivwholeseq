@@ -12,7 +12,7 @@ from Bio import SeqIO
 
 from hivwholeseq.reference import load_custom_reference, load_custom_alignment
 from hivwholeseq.miseq import alpha
-from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file, \
+from hivwholeseq.utils.one_site_statistics import get_allele_counts_insertions_from_file, \
         get_allele_counts_insertions_from_file_unfiltered, \
         filter_nus
 from hivwholeseq.patients.patients import load_patients, Patient

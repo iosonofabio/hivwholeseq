@@ -36,8 +36,8 @@ from hivwholeseq.sequencing.filenames import get_HXB2_fragmented, \
         get_HXB2_index_file, get_HXB2_hash_file, get_consensus_filename, \
         get_divided_filenames, get_reference_premap_filename, \
         get_build_consensus_summary_filename
-from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file_unfiltered
-from hivwholeseq.one_site_statistics import build_consensus_from_allele_counts_insertions as build_consensus
+from hivwholeseq.utils.one_site_statistics import get_allele_counts_insertions_from_file_unfiltered
+from hivwholeseq.utils.one_site_statistics import build_consensus_from_allele_counts_insertions as build_consensus
 from hivwholeseq.cluster.fork_cluster import fork_build_consensus_iterative as fork_self
 from hivwholeseq.sequencing.filenames import get_build_consensus_summary_filename as get_summary_fn
 from hivwholeseq.sequencing.samples import samples

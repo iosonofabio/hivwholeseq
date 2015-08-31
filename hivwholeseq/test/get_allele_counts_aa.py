@@ -17,7 +17,7 @@ from collections import defaultdict, Counter
 import numpy as np
 
 from hivwholeseq.utils.sequence import alphaal
-from hivwholeseq.one_site_statistics import get_allele_counts_aa_read
+from hivwholeseq.utils.one_site_statistics import get_allele_counts_aa_read
 
 from hivwholeseq.test.utils import Read
 

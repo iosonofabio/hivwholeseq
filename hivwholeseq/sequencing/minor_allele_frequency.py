@@ -14,7 +14,7 @@ from hivwholeseq.miseq import alpha, read_types
 from hivwholeseq.sequencing.filenames import get_allele_counts_filename, get_coverage_filename, \
         get_allele_frequencies_filename
 from hivwholeseq.sequencing.adapter_info import load_adapter_table
-from hivwholeseq.one_site_statistics import filter_nus
+from hivwholeseq.utils.one_site_statistics import filter_nus
 
 
 

@@ -13,7 +13,7 @@ from Bio.Seq import MutableSeq
 from Bio.Alphabet.IUPAC import unambiguous_dna
 
 from hivwholeseq.miseq import alpha
-from hivwholeseq.one_site_statistics import get_allele_counts_insertions_from_file, \
+from hivwholeseq.utils.one_site_statistics import get_allele_counts_insertions_from_file, \
         get_allele_counts_insertions_from_file_unfiltered, \
         filter_nus
 from hivwholeseq.patients.patients import get_patient

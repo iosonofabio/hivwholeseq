@@ -157,7 +157,7 @@ if __name__ == '__main__':
 
             
             # Classify by entropy in the subtype
-            from hivwholeseq.one_site_statistics import get_entropy
+            from hivwholeseq.utils.one_site_statistics import get_entropy
             S = get_entropy(afsp)
 
             # Add to global data structure

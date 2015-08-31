@@ -14,7 +14,7 @@ from hivwholeseq.patients.patients import load_patient
 from hivwholeseq.structure.get_PDB import get_PDB
 from hivwholeseq.structure.filenames import get_PDB_filename
 from hivwholeseq.utils.structure import get_chainseq
-from hivwholeseq.one_site_statistics import get_entropy
+from hivwholeseq.utils.one_site_statistics import get_entropy
 from hivwholeseq.utils import ipymol
 
 

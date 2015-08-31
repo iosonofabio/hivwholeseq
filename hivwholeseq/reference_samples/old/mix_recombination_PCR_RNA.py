@@ -563,7 +563,7 @@ if __name__ == '__main__':
         if use_pol:
             # Check the alleles at 10%, what are the proportions there?
             afs = np.load(get_allele_frequencies_filename(data_folder, adaID, fragment))
-            from hivwholeseq.one_site_statistics import get_minor_allele_frequencies
+            from hivwholeseq.utils.one_site_statistics import get_minor_allele_frequencies
             allm, num = get_minor_allele_frequencies(afs, alpha=alpha)
             poss_ref_8percent = (num > 0.08).nonzero()[0]
             if VERBOSE >= 2:

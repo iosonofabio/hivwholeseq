@@ -24,7 +24,7 @@ from hivwholeseq.sequencing.filenames import reference_folder
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.utils.sequence import translate_alignment
 from hivwholeseq.utils.sequence import translate_with_gaps, get_subalignment
-from hivwholeseq.one_site_statistics import (get_entropy,
+from hivwholeseq.utils.one_site_statistics import (get_entropy,
     get_allele_frequencies_alignment)
 from hivwholeseq.multipatient.get_shared_alleles_trajectories import (
     get_shared_allele_frequencies, get_patient_indices)
