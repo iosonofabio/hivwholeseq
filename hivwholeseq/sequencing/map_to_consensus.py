@@ -26,7 +26,7 @@ from hivwholeseq.sequencing.filter_mapped_reads import match_len_min, trim_bad_c
 from hivwholeseq.sequencing.filter_mapped_reads import filter_reads as filter_mapped_reads
 from hivwholeseq.cluster.fork_cluster import fork_map_to_consensus as fork_self
 from hivwholeseq.sequencing.samples import load_sequencing_run, SampleSeq
-from hivwholeseq.clean_temp_files import remove_mapped_tempfiles
+from hivwholeseq.utils.clean_temp_files import remove_mapped_tempfiles
 
 
 
