@@ -22,28 +22,22 @@ A standard control for sequencing quality is co-sequencing of PhiX, a plasmid of
 sequence. The analysis pipeline on those reads is located in the README, "phix" folder.
 
 
-## MAPPING PIPELINE FOR HIV SAMPLES
+## 1. MAPPING/FILTERING, SAMPLE BY SAMPLE
 See "sequencing/README".
 
+## 2. MAPPING/FILTERING + INTERMEDIATE DATA STRUCTURES, PATIENT BY PATIENT
+To be done after 1. See "store/README".
 
-## POST-MAPPING PIPELINE FOR HIV SAMPLES
-At this point, reads are mapped against the patient-specific reference. See README in
-the "patients" folder for details on that part of the analysis.
+## 3. ANALYSIS OF CLEAN READS
+See `patients/patients.py` and `patients/samples.py` for general classes, and the scripts in `patients` for typical analyses.
 
-Additional sample-by-sample analyses are possible:
-
-- Calculate useful observables: coverage, allele frequencies, mutations.
-
-- Various popgen measures.
-
+At this stage, the [HIVEVO_access](https://github.com/neherlab/HIVEVO_access) repository is recommended. the codebase is much smaller and personal data on patients/samples should be hidden.
 
 ##DIAGRAMS
 ```
-1. MAPPING: START -> TABLE -> SYMLINK -> PREMAP -> DIVIDE -> CONSENSUS -> MAP -> FILTER
+1. START -> TABLE -> SYMLINK -> PREMAP -> DIVIDE -> CONSENSUS -> MAP -> FILTER
 
-2.1 PATIENT: REFERENCE -> MAP -> FILTER -> ALLELES -> TRAJECTORIES
-                                        -> PAIRS
-                                        -> LOCAL HAPLOTYPES
-
-2.2 CROSS SECTIONAL: CONSENSUS TREE
+2. REFERENCE -> MAP -> FILTER -> ALLELES -> TRAJECTORIES
+                                         -> PAIRS
+                                         -> LOCAL HAPLOTYPES
 ```
