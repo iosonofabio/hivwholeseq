@@ -17,6 +17,7 @@ from hivwholeseq.reference import load_custom_reference
 from hivwholeseq.sequencing.samples import load_samples_sequenced, SampleSeq
 from hivwholeseq.utils.sequence import pretty_print_pairwise_ali
 from hivwholeseq.utils.generic import getchar
+from hivwholeseq._secret import samplenames_suspected_contamination as samplenames
 
 
 
@@ -118,7 +119,6 @@ if __name__ == '__main__':
 
     # Take only the samples that Lina is suspecting
     if not allsamples:
-        samplenames = ['VK04-4187', '14908', '18113', '12879', '6154', '18798']
         samples = samples.loc[samples.index.isin(samplenames)]
 
     for samplename, sample in samples.iterrows():

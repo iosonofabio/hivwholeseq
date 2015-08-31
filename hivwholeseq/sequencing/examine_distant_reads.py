@@ -99,7 +99,7 @@ if __name__ == '__main__':
     runs_or_samples.add_argument('--runs', nargs='+',
                                  help='Seq runs to analyze (e.g. Tue28, test_tiny)')
     runs_or_samples.add_argument('--samples', nargs='+',
-                                 help='Samples to map (e.g. VL98-1253 VK03-4298)')
+                                 help='Samples to map')
     parser.add_argument('--adaIDs', nargs='+',
                         help='Adapter IDs to analyze (e.g. TS2)')
     parser.add_argument('--fragments', nargs='+',

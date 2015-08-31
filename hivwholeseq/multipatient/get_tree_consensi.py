@@ -136,13 +136,12 @@ def annotate_tree(tree, annotations, VERBOSE=0):
 # Script
 if __name__ == '__main__':
 
-    # Parse input args
     parser = argparse.ArgumentParser(description='Build tree of all patient samples')
     pats_or_samples = parser.add_mutually_exclusive_group(required=False)
     pats_or_samples.add_argument('--patients', nargs='+',
                                  help='Patient to analyze')
     pats_or_samples.add_argument('--samples', nargs='+',
-                                 help='Samples to map (e.g. VL98-1253 VK03-4298)')
+                                 help='Samples to analyze')
     parser.add_argument('--regions', nargs='+',
                         help='Regions to analyze (e.g. V3 F6)')
     parser.add_argument('--submit', action='store_true',

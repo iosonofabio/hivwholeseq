@@ -40,7 +40,7 @@ if __name__ == '__main__':
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-3]')
     parser.add_argument('--samples', nargs='*',
-                        help='Samples to map (e.g. VL98-1253 VK03-4298)')
+                        help='Samples to analyze')
     parser.add_argument('--threshold', type=float, default=-3,
                         help='Log10 of the minimal allele frequency to trust')
     parser.add_argument('--allele-frequencies', action='store_true',

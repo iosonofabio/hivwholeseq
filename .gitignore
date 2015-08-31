@@ -1,6 +1,6 @@
 ## test scripts
 hivwholeseq/patients/test.py
-hivwholeseq/patients/_patient_names.py
+hivwholeseq/_secret.py
 
 
 ## excel temp files

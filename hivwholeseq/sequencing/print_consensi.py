@@ -71,7 +71,7 @@ if __name__ == '__main__':
     target.add_argument('--patients', nargs='+',
                         help='Patient to analyze')
     target.add_argument('--samples', nargs='+',
-                        help='Samples to map (e.g. VL98-1253 VK03-4298)')
+                        help='Samples to map')
     parser.add_argument('--fragments', nargs='+',
                         help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('--maxreads', type=int, default=-1,

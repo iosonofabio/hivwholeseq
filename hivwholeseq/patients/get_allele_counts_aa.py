@@ -27,7 +27,7 @@ if __name__ == '__main__':
     pats_or_samples.add_argument('--patients', nargs='+',
                                  help='Patient to analyze')
     pats_or_samples.add_argument('--samples', nargs='+',
-                                 help='Samples to analyze (e.g. VL98-1253 VK03-4298)')
+                                 help='Samples to analyze')
     parser.add_argument('--proteins', nargs='+', required=True,
                         help='Proteins to analyze (e.g. PR IN)')
     parser.add_argument('--verbose', type=int, default=0,

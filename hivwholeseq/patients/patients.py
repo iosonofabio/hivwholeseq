@@ -10,7 +10,7 @@ import pandas as pd
 
 from hivwholeseq.sequencing.filenames import table_filename
 from .samples import * # FIXME: lots of scripts import from here still
-from ._patient_names import pdict as _pdict
+from .._secret import pdict as _pdict
 
 
 

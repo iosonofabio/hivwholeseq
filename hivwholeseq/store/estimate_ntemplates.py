@@ -294,7 +294,7 @@ if __name__ == '__main__':
     pats_or_samples.add_argument('--patients', nargs='+',
                                  help='Patient to analyze')
     pats_or_samples.add_argument('--samples', nargs='+',
-                                 help='Samples to analyze (e.g. VL98-1253 VK03-4298)')
+                                 help='Samples to analyze')
     parser.add_argument('--verbose', type=int, default=0,
                         help='Verbosity level [0-4]')
     parser.add_argument('--save', action='store_true',

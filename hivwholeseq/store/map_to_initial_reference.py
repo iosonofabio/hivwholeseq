@@ -417,7 +417,7 @@ if __name__ == '__main__':
     pats_or_samples.add_argument('--patients', nargs='+',
                                  help='Patient to analyze')
     pats_or_samples.add_argument('--samples', nargs='+',
-                                 help='Samples to map (e.g. VL98-1253 VK03-4298)')
+                                 help='Samples to map')
     parser.add_argument('--fragments', nargs='+',
                         help='Fragment to map (e.g. F1 F6)')
     parser.add_argument('--maxreads', type=int, default=-1,
@@ -437,7 +437,7 @@ if __name__ == '__main__':
     parser.add_argument('--unfiltered', action='store_false', dest='filtered',
                         help='Map unfiltered reads (for quick checks only)')
     parser.add_argument('--include-contaminated', action='store_true',
-                        help='Include majorly contaminated samples in the map (e.g. 12879 F4)')
+                        help='Include majorly contaminated samples in the map')
 
     args = parser.parse_args()
     pnames = args.patients
