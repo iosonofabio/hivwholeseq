@@ -6,33 +6,50 @@ content:    Module containing basic paths for the whole analysis.
 '''
 # Modules
 import os
+from warnings import warn
 
 import hivwholeseq as self
+from .utils.generic import which
 
 
 # Globals
-stampy_bin = None
-spades_bin = None
-bwa_bin = None
-# FIXME: use env vars and similia
-if os.path.isdir('/media/FZ_MPI/HIV_Sweden/'):
-    root_data_folder = '/media/FZ_MPI/HIV_Sweden/'
-    stampy_bin = '/usr/bin/stampy'
-elif os.path.isdir('/var/www/hivwholeweb/'):
-    root_data_folder = '/var/www/hivwholeweb/app/hiv/static/data/'
-elif os.path.isdir('/home/fabio/') and (not os.path.isdir('/ebio/ag-neher/share/data')):
-    root_data_folder = '/home/fabio/university/phd/sequencing/data/'
+root_data_folder = 'HIVWHOLESEQ_ROOT_DATA_FOLDER'
+if root_data_folder not in os.environ:
+    raise ValueError('Environment variable not found: '+root_data_folder)
+elif not os.path.isdir(os.environ[root_data_folder]):
+    raise IOError('Root data folder is not a folder')
 else:
-    root_data_folder = '/ebio/ag-neher/share/data/MiSeq_HIV_Karolinska/'
-    fasttree_bin = 'fasttree'
-    stampy_bin = '/ebio/ag-neher/share/programs/bundles/stampy-1.0.22/stampy.py'
-    spades_bin = '/ebio/ag-neher/share/programs/bundles/SPAdes-2.5.0-Linux/bin/spades.py'
-    bwa_bin = '/ebio/ag-neher/share/programs/bin/bwa'
+    root_data_folder = os.environ[root_data_folder]
 
-if os.path.isdir('/home/fabio/'):
-    fasttree_bin = 'FastTree'
+stampy_bin = 'STAMPY_BIN'
+if stampy_bin in os.environ:
+    if not os.path.isfile(os.environ[stampy_bin]):
+        raise IOError('Stampy bin is not a file')
+    else:
+        stampy_bin = os.environ[stampy_bin]
 else:
-    fasttree_bin = 'fasttree'
+    _locs = which('stampy')
+    if len(_locs):
+        stampy_bin = _locs[0]
+    else:
+        raise ValueError('Stampy not found. Install it in your PATH or set '+
+                         'the environment variable '+stampy_bin+'.')
+
+
+fasttree_bin = 'FASTTREE_BIN'
+if fasttree_bin in os.environ:
+    if not os.path.isfile(os.environ[fasttree_bin]):
+        raise IOError('FastTree bin is not a file')
+    else:
+        fasttree_bin = os.environ[fasttree_bin]
+else:
+    _locs = which('FastTree')
+    if len(_locs):
+        fasttree_bin = _locs[0]
+    else:
+        warn('FastTree not found. Install it in your PATH or set '+
+             'the environment variable '+fasttree_bin+'.')
+ 
 
 tmp_folder = root_data_folder+'tmp/'
 reference_folder = root_data_folder+'reference/'
