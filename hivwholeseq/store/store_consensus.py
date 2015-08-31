@@ -165,7 +165,7 @@ def build_consensus(bamfilename, len_reference, VERBOSE=0,
     from Bio.SeqRecord import SeqRecord
     from Bio.Alphabet.IUPAC import ambiguous_dna
 
-    from hivwholeseq.miseq import alpha
+    from hivwholeseq.utils.miseq import alpha
     from hivwholeseq.utils.mapping import pair_generator
     from hivwholeseq.utils.sequence import build_local_consensus
     

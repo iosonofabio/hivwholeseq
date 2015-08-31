@@ -14,7 +14,7 @@ import pandas as pd
 from matplotlib import cm
 import matplotlib.pyplot as plt
 
-from hivwholeseq.miseq import alphal, alpha
+from hivwholeseq.utils.miseq import alphal, alpha
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.reference import load_custom_reference, load_custom_alignment
 from hivwholeseq.cross_sectional.get_subtype_consensus import (

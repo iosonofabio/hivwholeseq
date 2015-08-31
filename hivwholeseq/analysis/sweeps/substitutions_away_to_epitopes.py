@@ -17,7 +17,7 @@ from matplotlib import cm
 import matplotlib.pyplot as plt
 from Bio.Seq import translate
 
-from hivwholeseq.miseq import alpha, alphal
+from hivwholeseq.utils.miseq import alpha, alphal
 from hivwholeseq.patients.patients import load_patients, iterpatient
 from hivwholeseq.utils.sequence import translate_with_gaps
 import hivwholeseq.utils.plot

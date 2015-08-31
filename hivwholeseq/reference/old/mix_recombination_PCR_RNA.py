@@ -22,7 +22,7 @@ import pysam
 from matplotlib import cm
 import matplotlib.pyplot as plt
 
-from hivwholeseq.miseq import alphal, alpha
+from hivwholeseq.utils.miseq import alphal, alpha
 from hivwholeseq.sequencing.samples import load_sample_sequenced
 from hivwholeseq.sequencing.filenames import get_consensus_filename, get_mapped_filename, \
         get_allele_counts_filename, get_coverage_filename

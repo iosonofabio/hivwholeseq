@@ -484,7 +484,7 @@ def filter_nus(counts, coverage=None, VERBOSE=0):
 def get_minor_allele_frequencies(afs, alpha=None):
     '''Get the identity and frequency of the top minor allele at every site'''
     if alpha is None:
-        from hivwholeseq.miseq import alpha
+        from hivwholeseq.utils.miseq import alpha
 
     allm = np.zeros(afs.shape[1], 'S1')
     num = np.zeros(afs.shape[1])

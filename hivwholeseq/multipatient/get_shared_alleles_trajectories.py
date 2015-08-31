@@ -12,7 +12,7 @@ from operator import itemgetter
 import numpy as np
 from Bio import SeqIO, AlignIO
 
-from hivwholeseq.miseq import alpha
+from hivwholeseq.utils.miseq import alpha
 from hivwholeseq.utils.mapping import align_muscle
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.patients.filenames import get_initial_reference_filename, \

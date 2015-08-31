@@ -18,7 +18,7 @@ from Bio import SeqIO
 from Bio.Seq import reverse_complement as rc
 
 from hivwholeseq.sequencing.samples import load_sequencing_run
-from hivwholeseq.miseq import alpha, read_types, alphal
+from hivwholeseq.utils.miseq import alpha, read_types, alphal
 from hivwholeseq.sequencing.filenames import get_phix_filename, get_allele_counts_phix_filename, \
         get_mapped_phix_filename
 from hivwholeseq.utils.mapping import get_ind_good_cigars

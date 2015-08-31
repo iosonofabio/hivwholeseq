@@ -16,7 +16,7 @@ import pysam
 from Bio import SeqIO
 from Bio import AlignIO
 
-from hivwholeseq.miseq import alpha
+from hivwholeseq.utils.miseq import alpha
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.sequencing.filenames import get_consensus_filename, \
         get_allele_frequencies_filename, \

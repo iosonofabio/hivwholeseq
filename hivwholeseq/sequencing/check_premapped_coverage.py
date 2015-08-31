@@ -14,7 +14,7 @@ from Bio import SeqIO
 import matplotlib.pyplot as plt
 from matplotlib import cm
 
-from hivwholeseq.miseq import read_types
+from hivwholeseq.utils.miseq import read_types
 from hivwholeseq.sequencing.filenames import get_premapped_filename, get_reference_premap_filename, \
         get_fragment_positions_filename
 from hivwholeseq.utils.one_site_statistics import get_allele_counts_insertions_from_file_unfiltered

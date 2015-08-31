@@ -13,7 +13,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from hivwholeseq.datasets import MiSeq_runs
-from hivwholeseq.miseq import alpha, read_types
+from hivwholeseq.utils.miseq import alpha, read_types
 from hivwholeseq.sequencing.filenames import get_allele_frequencies_filename
 
 

@@ -366,7 +366,7 @@ def build_local_consensus(seqs, VERBOSE=0, store_allele_counts=False, full_cover
     '''
 
     import numpy as np
-    from hivwholeseq.miseq import alpha
+    from hivwholeseq.utils.miseq import alpha
     from hivwholeseq.utils.mapping import align_muscle
 
     ali = np.array(align_muscle(*seqs, sort=True), 'S1', ndmin=2)

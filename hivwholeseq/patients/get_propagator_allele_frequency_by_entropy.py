@@ -13,7 +13,7 @@ import numpy as np
 from matplotlib import cm
 import matplotlib.pyplot as plt
 
-from hivwholeseq.miseq import alpha
+from hivwholeseq.utils.miseq import alpha
 from hivwholeseq.reference import load_custom_reference, load_custom_alignment
 from hivwholeseq.patients.patients import load_patients, filter_patients_n_times, Patient
 from hivwholeseq.patients.filenames import get_initial_reference_filename

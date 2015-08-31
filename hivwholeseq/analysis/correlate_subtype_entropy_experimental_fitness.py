@@ -11,7 +11,7 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
-from hivwholeseq.miseq import alpha
+from hivwholeseq.utils.miseq import alpha
 from hivwholeseq.reference import load_custom_reference
 from hivwholeseq.utils.sequence import get_coordinates_genomic_region
 from hivwholeseq.patients.explore_patconserved_subtype import get_subtype_reference_alignment, get_ali_entropy

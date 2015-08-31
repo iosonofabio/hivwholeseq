@@ -29,7 +29,7 @@ from Bio.SeqRecord import SeqRecord
 # Horizontal import of modules from this folder
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.sequencing.adapter_info import load_adapter_table, foldername_adapter
-from hivwholeseq.miseq import alpha, read_types
+from hivwholeseq.utils.miseq import alpha, read_types
 from hivwholeseq.utils.mapping import stampy_bin, subsrate, convert_sam_to_bam,\
         pair_generator, align_muscle
 from hivwholeseq.sequencing.filenames import get_HXB2_fragmented, \

@@ -16,7 +16,7 @@ from matplotlib import cm
 import matplotlib.pyplot as plt
 import hivwholeseq.utils.plot
 
-from hivwholeseq.miseq import alpha, alphal
+from hivwholeseq.utils.miseq import alpha, alphal
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.cross_sectional.get_subtype_reference_alignment import (
     get_subtype_reference_alignment)

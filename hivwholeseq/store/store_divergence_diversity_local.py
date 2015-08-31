@@ -12,7 +12,7 @@ from operator import itemgetter
 import numpy as np
 from Bio import SeqIO
 
-from hivwholeseq.miseq import alpha
+from hivwholeseq.utils.miseq import alpha
 from hivwholeseq.utils.argparse import PatientsAction
 from hivwholeseq.patients.patients import load_patients, Patient
 

@@ -13,7 +13,7 @@ from Bio import SeqIO
 import matplotlib.pyplot as plt
 
 from hivwholeseq.sequencing.samples import load_sequencing_run, SampleSeq
-from hivwholeseq.miseq import read_types
+from hivwholeseq.utils.miseq import read_types
 from hivwholeseq.reference import load_HXB2
 from hivwholeseq.sequencing.filenames import get_mapped_filename, get_consensus_filename
 from hivwholeseq.utils.one_site_statistics import get_allele_counts_insertions_from_file_unfiltered

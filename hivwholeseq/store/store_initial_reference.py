@@ -29,7 +29,7 @@ from hivwholeseq.utils.generic import mkdirs
 from hivwholeseq.sequencing.samples import SampleSeq
 from hivwholeseq.patients.patients import load_patient
 from hivwholeseq.patients.samples import load_sample_sequenced, SamplePat
-from hivwholeseq.miseq import alpha
+from hivwholeseq.utils.miseq import alpha
 from hivwholeseq.sequencing.filenames import get_consensus_filename
 from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_foldername, get_initial_reference_foldername

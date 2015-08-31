@@ -17,7 +17,7 @@ from scipy.stats import pearsonr, spearmanr
 from matplotlib import cm
 import matplotlib.pyplot as plt
 
-from hivwholeseq.miseq import alpha
+from hivwholeseq.utils.miseq import alpha
 from hivwholeseq.patients.patients import get_patient
 from hivwholeseq.sequencing.filter_mapped_reads import plot_distance_histogram, \
         plot_distance_histogram_sliding_window, get_distance_from_consensus, \

@@ -16,7 +16,7 @@ from Bio import SeqIO
 
 # Horizontal import of modules from this folder
 from hivwholeseq.sequencing.adapter_info import load_adapter_table
-from hivwholeseq.miseq import alpha, alphal, read_pair_types
+from hivwholeseq.utils.miseq import alpha, alphal, read_pair_types
 from hivwholeseq.sequencing.filenames import get_mapped_filename, get_allele_counts_filename, \
         get_coallele_counts_filename, get_consensus_filename
 from hivwholeseq.utils.mapping import pair_generator

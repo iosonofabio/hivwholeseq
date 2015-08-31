@@ -15,7 +15,7 @@ import pandas as pd
 from matplotlib import cm
 import matplotlib.pyplot as plt
 
-from hivwholeseq.miseq import alpha, alphal
+from hivwholeseq.utils.miseq import alpha, alphal
 from hivwholeseq.analysis.mutation_rate.explore_divergence_synonymous import (
     collect_data_mutation_rate, fit_mutation_rate)
 

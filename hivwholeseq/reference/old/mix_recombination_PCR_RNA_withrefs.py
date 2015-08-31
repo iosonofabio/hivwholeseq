@@ -15,7 +15,7 @@ import numpy as np
 import pysam
 from Bio import SeqIO
 
-from hivwholeseq.miseq import alpha
+from hivwholeseq.utils.miseq import alpha
 from hivwholeseq.sequencing.samples import load_sequencing_run
 from hivwholeseq.sequencing.filenames import get_consensus_filename, \
         get_allele_frequencies_filename, \

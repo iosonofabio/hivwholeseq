@@ -18,7 +18,7 @@ import pysam
 from matplotlib import cm
 import matplotlib.pyplot as plt
 
-from hivwholeseq.miseq import alphal
+from hivwholeseq.utils.miseq import alphal
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.sequencing.filenames import get_consensus_filename, get_mapped_filename, \
         get_allele_counts_filename, get_coverage_filename

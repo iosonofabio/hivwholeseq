@@ -11,7 +11,7 @@ import numpy as np
 from matplotlib import cm
 import matplotlib.pyplot as plt
 
-from hivwholeseq.miseq import alpha
+from hivwholeseq.utils.miseq import alpha
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.sequencing.filenames import get_allele_frequencies_filename
 from hivwholeseq.sequencing.check_overlaps import get_overlapping_fragments, \

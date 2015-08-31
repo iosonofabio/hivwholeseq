@@ -12,7 +12,7 @@ import sys
 import argparse
 import numpy as np
 
-from hivwholeseq.miseq import alphal
+from hivwholeseq.utils.miseq import alphal
 from hivwholeseq.utils.generic import mkdirs
 from hivwholeseq.patients.patients import load_patients, iterpatient
 from hivwholeseq.website.filenames import get_allele_cocounts_filename as get_fn_out

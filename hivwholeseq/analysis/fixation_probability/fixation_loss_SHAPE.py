@@ -15,7 +15,7 @@ from Bio.Alphabet.IUPAC import unambiguous_dna
 import matplotlib.pyplot as plt
 from seqanpy import align_overlap
 
-from hivwholeseq.miseq import alpha
+from hivwholeseq.utils.miseq import alpha
 from hivwholeseq.reference import load_custom_reference
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.patients.propagator_allele_frequency import Propagator

@@ -15,7 +15,7 @@ from matplotlib import cm
 import matplotlib.pyplot as plt
 import hivwholeseq.utils.plot
 
-from hivwholeseq.miseq import alpha
+from hivwholeseq.utils.miseq import alpha
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.patients.filenames import get_ntemplates_by_fragment_filename
 

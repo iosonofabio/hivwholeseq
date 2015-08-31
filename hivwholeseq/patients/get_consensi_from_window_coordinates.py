@@ -16,7 +16,7 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from Bio.Alphabet.IUPAC import ambiguous_dna
 
-from hivwholeseq.miseq import alpha
+from hivwholeseq.utils.miseq import alpha
 from hivwholeseq.patients.patients import patients as patients_all
 from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_foldername, get_coordinate_map_filename, \

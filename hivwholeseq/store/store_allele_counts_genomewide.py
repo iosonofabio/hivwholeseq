@@ -10,7 +10,7 @@ import argparse
 import numpy as np
 from Bio import SeqIO
 
-from hivwholeseq.miseq import alpha, read_types
+from hivwholeseq.utils.miseq import alpha, read_types
 from hivwholeseq.patients.samples import load_samples_sequenced as lssp
 from hivwholeseq.patients.samples import SamplePat
 from hivwholeseq.patients.filenames import get_initial_reference_filename
@@ -25,7 +25,7 @@ def merge_allele_counts(ref_genomewide, acs, VERBOSE=0):
           ones will just have zero counts. Sometimes, cherry-picking the data
           fragment by fragment might be a better choice.
     '''
-    from hivwholeseq.miseq import alpha, read_types
+    from hivwholeseq.utils.miseq import alpha, read_types
     from seqanpy import align_overlap
 
     ac = np.zeros((len(read_types), len(alpha), len(ref_genomewide)), int)

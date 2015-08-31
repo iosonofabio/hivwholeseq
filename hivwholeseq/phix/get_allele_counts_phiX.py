@@ -20,7 +20,7 @@ import pysam
 import argparse
 
 from hivwholeseq.sequencing.samples import load_sequencing_run
-from hivwholeseq.miseq import alpha, read_types
+from hivwholeseq.utils.miseq import alpha, read_types
 from hivwholeseq.sequencing.filenames import get_phix_filename, get_mapped_phix_filename, \
         get_allele_counts_phix_filename, get_insert_counts_phix_filename, \
         get_consensus_phix_filename

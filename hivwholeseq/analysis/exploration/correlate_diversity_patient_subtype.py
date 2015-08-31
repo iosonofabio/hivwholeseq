@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 from Bio import SeqIO, AlignIO
 from scipy.stats import pearsonr, spearmanr
 
-from hivwholeseq.miseq import alpha, alphal
+from hivwholeseq.utils.miseq import alpha, alphal
 from hivwholeseq.patients.filenames import root_patient_folder
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.cross_sectional.get_subtype_consensus import (

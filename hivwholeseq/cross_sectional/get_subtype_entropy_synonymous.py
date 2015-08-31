@@ -10,7 +10,7 @@ import argparse
 import cPickle as pickle
 import numpy as np
 
-from hivwholeseq.miseq import alpha
+from hivwholeseq.utils.miseq import alpha
 from hivwholeseq.utils.one_site_statistics import get_entropy
 from hivwholeseq.cross_sectional.filenames import (
     get_subtype_reference_alignment_filename,

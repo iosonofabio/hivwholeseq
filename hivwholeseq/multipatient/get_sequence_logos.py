@@ -12,7 +12,7 @@ from collections import defaultdict, Counter
 import numpy as np
 import matplotlib.pyplot as plt
 
-from hivwholeseq.miseq import alphal
+from hivwholeseq.utils.miseq import alphal
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.utils.argparse import RoiAction
 
