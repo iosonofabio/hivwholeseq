@@ -14,7 +14,7 @@ from collections import defaultdict
 import numpy as np
 from Bio import SeqIO
 
-from hivwholeseq.sequencing.primer_info import find_fragment
+from hivwholeseq.utils.sequence import find_fragment
 from hivwholeseq.reference import load_custom_reference
 from hivwholeseq.patients.patients import load_patients, Patient
 from hivwholeseq.patients.filenames import get_initial_reference_filename, \

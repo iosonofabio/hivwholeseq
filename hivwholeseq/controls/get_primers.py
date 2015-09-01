@@ -22,7 +22,8 @@ from hivwholeseq.patients.filenames import get_initial_reference_filename, \
         get_allele_count_trajectories_filename, get_primers_filename
 from hivwholeseq.patients.patients import load_patient, SamplePat
 from hivwholeseq.patients.samples import load_sample_sequenced
-from hivwholeseq.sequencing.primer_info import primers_outer, find_primer_seq
+from hivwholeseq.data.primers import primers_outer
+from hivwholeseq.utils.sequence import find_primer_seq
 from hivwholeseq.utils.sequence import expand_ambiguous_seq
 
 

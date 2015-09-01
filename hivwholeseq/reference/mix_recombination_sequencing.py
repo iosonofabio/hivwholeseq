@@ -82,11 +82,11 @@ if __name__ == '__main__':
     adaID = 18
 
     ## We are going to have a special file for these, but for now filter the unmapped
-    from mapping.primer_info import primers_coordinates_HXB2_inner as pcis
-    from mapping.primer_info import primers_coordinates_HXB2_outer as pcos
-    from mapping.primer_info import primers_inner, primers_outer
-    from mapping.trim_and_divide import test_outer_primer
-    from mapping.trim_and_divide import assign_to_fragment
+    from hivwholeseq.data.primers import primers_coordinates_HXB2_inner as pcis
+    from hivwholeseq.data.primers import primers_coordinates_HXB2_outer as pcos
+    from hivwholeseq.data.primers import primers_inner, primers_outer
+    from hivwholeseq.trim_and_divide import test_outer_primer
+    from hivwholeseq.trim_and_divide import assign_to_fragment
     unmapped_filename = get_divided_filenames(data_folder, adaID, fragments)[-2]
     crossmapped_filename = get_divided_filenames(data_folder, adaID, fragments)[-3]
     fragments = ['F1', 'F2', 'F3', 'F4', 'F5b', 'F6']
@@ -279,8 +279,8 @@ if __name__ == '__main__':
     F5_primer = dataset['primerF5'][dataset['adapters'].index(adaID)]
     fragments = ['F1', 'F2', 'F3', 'F4', F5_primer, 'F6']
     # This structure contains the inner primers coordinates in cropped ref
-    from mapping.primer_info import primers_coordinates_HXB2_inner as pcis_HXB2
-    from mapping.primer_info import primers_coordinates_HXB2_outer as pcos_HXB2
+    from hivwholeseq.data.primers import primers_coordinates_HXB2_inner as pcis_HXB2
+    from hivwholeseq.data.primers import primers_coordinates_HXB2_outer as pcos_HXB2
     frags_pos = np.zeros((2, len(fragments)), int)
     frags_pos_out = np.zeros((2, len(fragments)), int)
     for i, fragment in enumerate(fragments):

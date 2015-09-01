@@ -36,7 +36,7 @@ def annotate_sequence(seqrecord, features=['gene', 'RNA structure', 'other']):
     from Bio.SeqFeature import SeqFeature, FeatureLocation, CompoundLocation
     from hivwholeseq.utils.genome_info import gene_edges, RNA_structure_edges, \
             other_edges, find_region_edges, find_region_edges_multiple
-    from hivwholeseq.sequencing.primer_info import primers_PCR as primers_PCR_edges
+    from hivwholeseq.data.primers import primers_PCR as primers_PCR_edges
     edge_dict = {'gene': gene_edges,
                  'RNA structure': RNA_structure_edges,
                  'PCR primers': primers_PCR_edges,

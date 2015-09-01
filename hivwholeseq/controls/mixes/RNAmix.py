@@ -37,7 +37,7 @@ def get_refseqs(fragment, VERBOSE=0):
     '''Get reference sequences cut to the fragment specified'''
     if VERBOSE >= 2:
         print 'Get primers to cut'
-    from hivwholeseq.sequencing.primer_info import primers_PCR
+    from hivwholeseq.data.primers import primers_PCR
     pr_fwd, pr_rev = primers_PCR[fragment]
 
     if VERBOSE >= 2:

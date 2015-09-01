@@ -185,7 +185,7 @@ def correlate_away_to_epitope(data):
 
 def correlate_epitope_substitution(data):
     '''Correlate presence of a substitution with epitope'''
-    from hivwholeseq.sequencing.primer_info import primers_coordinates_HXB2_outer
+    from hivwholeseq.data.primers import primers_coordinates_HXB2_outer
     start_F1 = primers_coordinates_HXB2_outer['F1'][0][1]
     end_F6 = primers_coordinates_HXB2_outer['F6'][1][0]
 

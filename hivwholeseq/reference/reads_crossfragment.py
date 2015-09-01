@@ -56,9 +56,9 @@ if __name__ == '__main__':
     adaID = 16
 
     ## We are going to have a special file for these, but for now filter the unmapped
-    from mapping.primer_info import primers_coordinates_HXB2_inner as pcis
-    from mapping.primer_info import primers_coordinates_HXB2_outer as pcos
-    from mapping.primer_info import primers_inner, primers_outer
+    from hivwholeseq.data.primers import primers_coordinates_HXB2_inner as pcis
+    from hivwholeseq.data.primers import primers_coordinates_HXB2_outer as pcos
+    from hivwholeseq.data.primers import primers_inner, primers_outer
     from mapping.trim_and_divide import test_outer_primer
     from mapping.trim_and_divide import assign_to_fragment
     unmapped_filename = get_divided_filenames(data_folder, adaID, fragments)[-2]

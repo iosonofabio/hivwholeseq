@@ -19,7 +19,7 @@ from hivwholeseq.sequencing.samples import SampleSeq
 from hivwholeseq.patients.patients import load_patients, load_patient, Patient
 from hivwholeseq.patients.filenames import get_sample_foldername
 from hivwholeseq.utils.genome_info import locate_gene
-from hivwholeseq.sequencing.primer_info import fragments_genes
+from hivwholeseq.data.primers import fragments_genes
 
 
 # Functions
@@ -125,7 +125,7 @@ def check_has_premature_stops_noend(prot_ref, genename, VERBOSE=0):
 
 def get_fragment_length_HXB2(frag_spec):
     '''Get the length of a fragment in HXB2'''
-    from hivwholeseq.sequencing.primer_info import primers_coordinates_HXB2
+    from hivwholeseq.data.primers import primers_coordinates_HXB2
     pr_coord_HXB2 = primers_coordinates_HXB2[frag_spec]
     len_HXB2 = pr_coord_HXB2[1][0] - pr_coord_HXB2[0][1]
     return len_HXB2

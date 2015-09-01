@@ -93,7 +93,7 @@ def make_reference(data_folder, adaID, fragments, refname, VERBOSE=0, summary=Tr
         # NOTE: this works even if F1 or F6 are missing (e.g. only F2-5 are seq-ed)!
         # If more than one primer is used for the first or last fragment, take the
         # longest reference
-        from hivwholeseq.sequencing.primer_info import primers_PCR, primers_coordinates_HXB2
+        from hivwholeseq.data.primers import primers_PCR, primers_coordinates_HXB2
         if '+' in fragments[0]:
             fragment_subs = [fragments[0][:2]+fsub+fragments[0][-1]
                              for fsub in fragments[0][2:-1].split('+')]

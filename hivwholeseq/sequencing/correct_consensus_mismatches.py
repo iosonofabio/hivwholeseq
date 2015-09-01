@@ -21,7 +21,7 @@ import Bio.AlignIO as AlignIO
 
 from hivwholeseq.datasets import MiSeq_runs
 from hivwholeseq.utils.miseq import alpha
-from hivwholeseq.sequencing.primer_info import primers_inner as pri
+from hivwholeseq.data.primers import primers_inner as pri
 from hivwholeseq.sequencing.adapter_info import load_adapter_table
 from hivwholeseq.sequencing.filenames import get_consensus_filename, get_consensus_old_filename, \
         get_allele_counts_filename, get_coverage_filename

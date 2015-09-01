@@ -14,7 +14,6 @@ import matplotlib.pyplot as plt
 from hivwholeseq.utils.one_site_statistics import get_allele_counts_insertions_from_file_unfiltered
 from hivwholeseq.sequencing.samples import load_sample_sequenced
 from hivwholeseq.utils.miseq import alpha
-from hivwholeseq.sequencing.primer_info import find_fragment
 from hivwholeseq.utils.sequence import pretty_print_pairwise_ali
 
 from seqanpy import align_overlap
@@ -43,8 +42,6 @@ if __name__ == '__main__':
     consm[cov < 30] = 'N'
     conss = ''.join(consm)
 
-    #pos_F3 = find_fragment(consm, 'F3bo', threshold=0.7)
-   
     from hivwholeseq.patients.patients import load_samples_sequenced as lssp
     from hivwholeseq.patients.patients import SamplePat
     samples_pat = lssp(patients=['p6'])

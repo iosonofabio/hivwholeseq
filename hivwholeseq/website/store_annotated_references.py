@@ -34,7 +34,7 @@ def add_annotations_fragments(ref):
     if 'HXB2' not in ref.name:
         raise NotImplementedError
 
-    from hivwholeseq.sequencing.primer_info import (
+    from hivwholeseq.data.primers import (
         primers_coordinates_HXB2_outer as primers)
     for fr in ['F1', 'F2', 'F3B', 'F4', 'F5a', 'F6']:
         coo = primers[fr]   
