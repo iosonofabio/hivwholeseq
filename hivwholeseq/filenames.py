@@ -19,7 +19,7 @@ if root_data_folder not in os.environ:
 elif not os.path.isdir(os.environ[root_data_folder]):
     raise IOError('Root data folder is not a folder')
 else:
-    root_data_folder = os.environ[root_data_folder]
+    root_data_folder = os.environ[root_data_folder].rstrip('/')+'/'
 
 stampy_bin = 'STAMPY_BIN'
 if stampy_bin in os.environ:
