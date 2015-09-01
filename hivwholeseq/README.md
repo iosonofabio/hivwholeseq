@@ -9,6 +9,7 @@
  - `numpy`
  - `pandas`
  - `matplotlib`
+ - `biopython`
  - `seqanpy` (https://github.com/iosonofabio/seqanpy)
 - Add the repo folder to your `PYTHONPATH`, so that `import hivwholeseq` works.
 - Add the relevant data to the [data folder](hivwholeseq/data).
