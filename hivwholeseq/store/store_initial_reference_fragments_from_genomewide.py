@@ -12,7 +12,7 @@ from Bio import SeqIO
 from seqanpy import align_overlap
 
 from hivwholeseq.patients.patients import load_patient
-from hivwholeseq.sequencing.primer_info import primers_outer
+from hivwholeseq.data.primers import primers_outer
 
 
 

@@ -21,9 +21,9 @@ from Bio import SeqIO
 import pysam
 
 from hivwholeseq.utils.miseq import alpha
-from hivwholeseq.sequencing.primer_info import primers_coordinates_HXB2_inner as pcis
-from hivwholeseq.sequencing.primer_info import primers_coordinates_HXB2_outer as pcos
-from hivwholeseq.sequencing.primer_info import primers_inner, primers_outer
+from hivwholeseq.data.primers import primers_coordinates_HXB2_inner as pcis
+from hivwholeseq.data.primers import primers_coordinates_HXB2_outer as pcos
+from hivwholeseq.data.primers import primers_inner, primers_outer
 from hivwholeseq.sequencing.filenames import get_HXB2_entire, get_premapped_filename, \
         get_divided_filenames, get_divide_summary_filename, \
         get_reference_premap_filename
@@ -80,7 +80,7 @@ def write_fragment_positions(data_folder, adaID, fragments, frags_pos):
 
 def get_primer_positions(smat, fragments, type='both'):
     '''Get the primer positions for fwd, rev, or both primers'''
-    from hivwholeseq.sequencing.primer_info import primers_PCR
+    from hivwholeseq.data.primers import primers_PCR
     from hivwholeseq.utils.sequence import expand_ambiguous_seq as eas
 
     # j controls the direction: j = 0 --> FWD, j = 1 --> REV
@@ -507,7 +507,7 @@ def trim_and_divide_reads(data_folder, adaID, n_cycles, fragments,
             primers_out['rev'].append(fr[:-1]+'o')
 
     # Get all possible unambiguous primers for the unwanted outer primers
-    from hivwholeseq.sequencing.primer_info import primers_PCR
+    from hivwholeseq.data.primers import primers_PCR
     from hivwholeseq.utils.sequence import expand_ambiguous_seq as eas
     primers_out_seq = {'fwd': [np.array(map(list, eas(primers_PCR[fr][0])),
                                         'S1', ndmin=2)

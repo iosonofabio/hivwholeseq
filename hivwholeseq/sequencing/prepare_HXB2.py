@@ -11,8 +11,8 @@ import re
 import Bio.SeqIO as SeqIO
 
 from hivwholeseq.reference import load_HXB2
-from hivwholeseq.sequencing.primer_info import primers_coordinates_HXB2_inner as pci
-from hivwholeseq.sequencing.primer_info import primers_coordinates_HXB2_outer as pco
+from hivwholeseq.data.primers import primers_coordinates_HXB2_inner as pci
+from hivwholeseq.data.primers import primers_coordinates_HXB2_outer as pco
 from hivwholeseq.sequencing.filenames import get_HXB2_fragmented, get_HXB2_entire
 
 
