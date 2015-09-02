@@ -39,14 +39,14 @@ README, "phix" folder.
 
 
 ### 1. MAPPING/FILTERING, SAMPLE BY SAMPLE
-See [sequencing/README](hivwholeseq/sequencing/README).
+See [sequencing/README](/hivwholeseq/sequencing/README).
 
-![scheme of sample by sample pipeline](scheme.png)
+![scheme of sample by sample pipeline](/scheme.png)
 
 ### 2. MAPPING/FILTERING + INTERMEDIATE DATA STRUCTURES, PATIENT BY PATIENT
-To be done after 1. See [store/README](hivwholeseq/store/README).
+To be done after 1. See [store/README](/hivwholeseq/store/README).
 
-![scheme of patient by patient pipeline](scheme2.png)
+![scheme of patient by patient pipeline](/scheme2.png)
 
 ### 3. ANALYSIS OF CLEAN READS
 See `patients/patients.py` and `patients/samples.py` for general classes, and

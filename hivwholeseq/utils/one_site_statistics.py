@@ -13,10 +13,10 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from Bio.Alphabet.IUPAC import ambiguous_dna
 
-from .utils.sequence import alpha, alphaa
+from .sequence import alpha, alphaa
 from .miseq import read_types
-from .utils.mapping import get_ind_good_cigars
-from .utils.mapping import align_muscle
+from .mapping import get_ind_good_cigars
+from .mapping import align_muscle
 
 
 # Functions
@@ -26,7 +26,8 @@ def get_allele_counts_read(read, counts_out, inserts_out,
 
     Parameters:
        counts_out (ndarray, alphabet x sequence length): output data structure for counts
-       inserts_out (nested defaultdict): output data structure for insertions
+       inserts_out (counter dict): output data structure for insertions. The key
+       of the dictionary is the signature of the insertion, (position, insertion)
     '''
 
     # Read CIGARs (they should be clean by now)
@@ -73,7 +74,7 @@ def get_allele_counts_read(read, counts_out, inserts_out,
             qualb = qual[:block_len]
             # Accept only high-quality inserts
             if (qualb >= qual_min).all():
-                inserts_out[pos][seqb.tostring()] += 1
+                inserts_out[(pos, seqb.tostring())] += 1
     
             # Chop off seq, but not pos
             if ic != len(read.cigar) - 1:
@@ -198,22 +199,30 @@ def get_allele_counts_aa_read(read, start, end, counts_out, qual_min=30,
 
 
 def get_allele_counts_insertions_from_file(bamfilename, length, qual_min=30,
-                                           maxreads=-1, VERBOSE=0):
-    '''Get the allele counts and insertions'''
-    from collections import defaultdict, Counter
+                                           maxreads=-1, VERBOSE=0,
+                                           merge_read_types=False):
+    '''Get the allele counts and insertions
+    
+    Parameters
+       bamfilename (str): path to the BAM with the reads
+       length (int): length of the mapping reference. In case of doubt, choose
+       a number that is larger than maximal mapping position + max insert size
+       qual_min (int): minimal PHRED quality of the base to be counted
+       maxreads (int): maximal number of reads to scan (-1: all reads)
+       VERBOSE (int): verbosity level
+
+    Returns
+       counts (matrix): allele count matrix, <alphabet size> x length
+       inserts (Pandas DataFrame): insertions
+    '''
+    from collections import Counter
 
     # Prepare output structures
     counts = np.zeros((len(read_types), len(alpha), length), int)
-    # Note: the data structure for inserts is a nested dict with:
-    # read type --> position --> string --> count
-    #  (list)        (dict)      (dict)     (int)
-    inserts = [defaultdict(lambda: Counter()) for rt in read_types]
+    inserts = [Counter() for rt in read_types]
 
-    # Open BAM file
     # Note: the reads should already be filtered of unmapped stuff at this point
     with pysam.Samfile(bamfilename, 'rb') as bamfile:
-
-        # Iterate over single reads
         for i, read in enumerate(bamfile):
 
             # Max number of reads
@@ -223,7 +232,7 @@ def get_allele_counts_insertions_from_file(bamfilename, length, qual_min=30,
                 break
         
             # Print output
-            if (VERBOSE >= 3) and (not ((i +1) % 10000)):
+            if (VERBOSE >= 3) and (not ((i +1) % 1000)):
                 print (i+1)
         
             # Divide by read 1/2 and forward/reverse
@@ -233,6 +242,10 @@ def get_allele_counts_insertions_from_file(bamfilename, length, qual_min=30,
                                    length=length,
                                    qual_min=qual_min,
                                    VERBOSE=VERBOSE)
+
+    if merge_read_types:
+        counts = counts.sum(axis=0)
+        inserts = sum(inserts, Counter())
 
     return (counts, inserts)
 

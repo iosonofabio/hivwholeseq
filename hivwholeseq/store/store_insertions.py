@@ -18,16 +18,25 @@ from hivwholeseq.utils.exceptions import NoDataWarning
 from hivwholeseq.patients.samples import load_samples_sequenced as lssp
 from hivwholeseq.patients.samples import SamplePat
 from hivwholeseq.patients.filenames import get_initial_reference_filename, \
-        get_mapped_filtered_filename, get_allele_counts_filename
+        get_mapped_filtered_filename, get_insertions_filename
 from hivwholeseq.utils.one_site_statistics import get_allele_counts_insertions_from_file as gac
-from hivwholeseq.cluster.fork_cluster import fork_get_allele_counts_patient as fork_self 
+from hivwholeseq.cluster.fork_cluster import fork_get_insertions_patient as fork_self 
+
+
+
+# Functions
+def save_insertions(filename, insertions):
+    '''Save insertions to file'''
+    import cPickle as pickle
+    with open(filename, 'w') as f:
+        pickle.dump(insertions, f, protocol=-1)
 
 
 
 # Script
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(description='Get allele counts',
+    parser = argparse.ArgumentParser(description='Store insertions',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)    
     pats_or_samples = parser.add_mutually_exclusive_group(required=True)
     pats_or_samples.add_argument('--patients', action=PatientsAction,
@@ -36,7 +45,7 @@ if __name__ == '__main__':
                                  help='Samples to analyze')
     parser.add_argument('--fragments', nargs='+',
                         help='Fragments to analyze (e.g. F1 F6)')
-    parser.add_argument('--verbose', type=int, default=0,
+    parser.add_argument('--verbose', type=int, default=2,
                         help='Verbosity level [0-4]')
     parser.add_argument('--save', action='store_true',
                         help='Save the allele counts to file')
@@ -72,7 +81,7 @@ if __name__ == '__main__':
         print 'fragments', fragments
 
     for fragment in fragments:
-        counts = []
+        inses = []
         for samplename, sample in samples.iterrows():
             if submit:
                 fork_self(samplename, fragment, VERBOSE=VERBOSE, qual_min=qual_min)
@@ -90,13 +99,13 @@ if __name__ == '__main__':
                 warn('No BAM file found', NoDataWarning)
                 continue
 
-            count, _ = gac(fn, len(refseq), qual_min=qual_min, VERBOSE=VERBOSE)
-            counts.append(count)
+            _, inse = gac(fn, len(refseq), qual_min=qual_min, VERBOSE=VERBOSE)
+            inses.append(inse)
 
             if save_to_file:
-                fn_out = sample.get_allele_counts_filename(fragment, PCR=PCR,
-                                                           qual_min=qual_min)
-                count.dump(fn_out)
+                fn_out = sample.get_insertions_filename(fragment, PCR=PCR,
+                                                        qual_min=qual_min)
+                save_insertions(fn_out, inse)
 
                 if VERBOSE >= 2:
-                    print 'Allele counts saved:', samplename, fragment
+                    print 'Insertions saved:', samplename, fragment

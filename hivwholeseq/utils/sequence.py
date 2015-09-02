@@ -306,48 +306,57 @@ def rfind_seed_imperfect(seq, seed, threshold=0.7, VERBOSE=0):
     raise ValueError('Seed not found at specified threshold ('+str(threshold)+')')
 
 
-def merge_sequences(seqs, minimal_fraction_match=0.75, skip_initial=30, VERBOSE=0):
-    '''Merge sequences from subsequent fragments into a genomewide one'''
+def merge_sequences(seqs, skip_initial=30, accept_gaps=False, VERBOSE=0):
+    '''Merge sequences with overlaps
+    
+    Parameters:
+       seqs (list): sequences to merge
+       skip_initial (int): trim from the beginning of overlaps because we do not
+       really trust those bases
+       accept_gaps (bool): accept gaps in the overlaps
+    '''
+    from itertools import izip
+    from seqanpy import align_ladder
     import numpy as np
 
     seqs = map(''.join, seqs)
 
-    if VERBOSE:
-        print 'Start with F1'
-    seqs_all = [seqs[0]]
-    for ifr, seq in enumerate(seqs[1:], 2):
-        if VERBOSE:
-            print 'merging in F'+str(ifr),
+    left_trim = 0
+    seqs_all = []
+    for iov, (seq1, seq2) in enumerate(izip(seqs[:-1], seqs[1:])):
+        if VERBOSE >= 1:
+            print 'Overlap n', iov+1
 
-        # Avoid the first few bases because of low coverage
-        pos_seed_new = skip_initial
-        seed = seq[pos_seed_new: pos_seed_new + 30]
-        # Find seed from the right and allow imperfect matches
-        pos_seed = seqs_all[-1].rfind(seed)
-        if pos_seed != -1:
-            overlap_found = True
-        else:
-            refm = np.fromstring(seqs_all[-1], 'S1')
-            seed = np.fromstring(seed, 'S1')
-            sl = len(seed)
-            n_match = np.array([(refm[i: i + sl] == seed).sum()
-                                for i in xrange(len(refm) - sl)], int)
-            pos_seed = len(n_match) - 1 - np.argmax(n_match[::-1])
-            if n_match[pos_seed] >= minimal_fraction_match * sl:
-                overlap_found = True
-            else:
-                overlap_found = False
-                if VERBOSE:
-                    print 'WARNING: Cannot merge consensus F'+str(ifr)+\
-                            ' with previous ones'
+        (score, ali1, ali2) = align_ladder(seq1[left_trim:], seq2, score_gapopen=-20)
+        start2 = len(ali2) - len(ali2.lstrip('-'))
+        end1 = len(ali1.rstrip('-'))
 
-        if overlap_found:
-            seqs_all[-1] = seqs_all[-1][:pos_seed]
-            seqs_all.append(seq[pos_seed_new:])
-            if VERBOSE:
-                print 'merged, total length:', len(''.join(seqs_all))
-        else:
-            seqs_all.append(('N' * 10) + seq)
+        # Append first sequence until overlap
+        seqs_all.append(ali1[:start2 + skip_initial])
+
+        # Check overlap
+        ov1 = ali1[start2 + skip_initial: end1 - skip_initial]
+        ov2 = ali2[start2 + skip_initial: end1 - skip_initial]
+
+        if VERBOSE >= 2:
+            from hivwholeseq.utils.sequence import pretty_print_pairwise_ali
+            pretty_print_pairwise_ali((ov1, ov2), width=100,
+                                      name1='seq1', name2='seq2')
+
+        if (not accept_gaps) and (('-' in ov1) or ('-' in ov2)):
+            raise ValueError('Gaps in the overlap n. '+str(iov+1))
+
+        # Trust the first sequence until half, then the other one
+        i_mid = len(ov1) // 2
+        seqs_all.append(ov1[:i_mid])
+        seqs_all.append(ov2[i_mid:])
+
+        # Set the left trim for the trailing sequence
+        left_trim = len(ali2[: end1 - skip_initial].replace('-', ''))
+
+    if VERBOSE >= 1:
+        print 'Add last sequence'
+    seqs_all.append(seq2[left_trim:])
 
     return ''.join(seqs_all)
 

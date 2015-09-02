@@ -46,7 +46,6 @@ from hivwholeseq.utils.one_site_statistics import build_consensus_from_mapped_re
 from hivwholeseq.utils.genome_info import locate_gene, gene_edges
 from hivwholeseq.utils.genome_info import genes as genes_all
 from hivwholeseq.data.primers import fragments_genes
-from hivwholeseq.utils.sequence import merge_sequences
 
 
 
