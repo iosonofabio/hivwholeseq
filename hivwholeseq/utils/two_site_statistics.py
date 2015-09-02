@@ -11,8 +11,8 @@ import numpy as np
 from itertools import izip
 import pysam
 
-from hivwholeseq.utils.miseq import alpha, alphal
-from hivwholeseq.utils.mapping import pair_generator
+from .miseq import alpha, alphal
+from .mapping import pair_generator
 
 
 

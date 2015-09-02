@@ -137,6 +137,13 @@ class SamplePat(pd.Series):
                                           PCR=PCR, qual_min=qual_min, type=type)
 
 
+    def get_insertions_filename(self, fragment, PCR=1, qual_min=30, type='nuc'):
+        '''Get the filename of the insertions'''
+        from hivwholeseq.patients.filenames import get_insertions_filename
+        return get_insertions_filename(self.patient, self.name, fragment,
+                                       PCR=PCR, qual_min=qual_min, type=type)
+
+
     def get_allele_cocounts_filename(self, fragment, PCR=1, qual_min=30,
                                      compressed=True):
         '''Get the filename of the allele counts'''
@@ -199,6 +206,36 @@ class SamplePat(pd.Series):
         if merge_read_types:
             ac = ac.sum(axis=0)
         return ac
+
+
+    def get_insertions(self, region, PCR=1, qual_min=30, merge_read_types=True):
+        '''Get the insertions
+        
+        Returns:
+           inse: if merge_read_types, a Counter, else a list of Counters
+
+        Note: for convenience, one can call pd.Series on a Counter
+        '''
+        from collections import Counter
+        import cPickle as pickle
+        (fragment, start, end) = self.get_fragmented_roi((region, 0, '+oo'),
+                                                         include_genomewide=True)
+        fn = self.get_insertions_filename(fragment, PCR=PCR, qual_min=qual_min)
+        with open(fn, 'r') as f:
+            inse = pickle.load(f)
+        inse_new = []
+        for ins in inse:
+            ins_new = Counter()
+            for (pos, ins_string), value in ins.iteritems():
+                if (start <= pos < end):
+                    ins_new[(pos - start, ins_string)] = value
+            inse_new.append(ins_new)
+        inse = inse_new
+
+        if merge_read_types:
+            inse = sum(inse, Counter())
+
+        return inse
 
 
     def get_allele_counts_aa(self, protein, PCR=1, qual_min=30):

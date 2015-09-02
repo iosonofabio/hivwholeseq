@@ -5,7 +5,7 @@ date:       20/08/13
 content:    Details about the MiSeq, used in the downstream analysis scripts.
 '''
 # Modules
-from .utils.sequence import alphas, alphal, alpha
+from .sequence import alphas, alphal, alpha
 
 
 # Globals

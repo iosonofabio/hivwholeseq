@@ -181,6 +181,17 @@ def get_allele_counts_filename(pname, samplename_pat, fragment, PCR=1, qual_min=
     return filename
 
 
+def get_insertions_filename(pname, samplename_pat, fragment, PCR=1, qual_min=30,
+                            type='nuc'):
+    '''Get the filename of the insertions for a patient sample'''
+    filename = 'insertions_'
+    if type != 'nuc':
+        filename = filename+type+'_'
+    filename = filename+fragment+'_qual'+str(qual_min)+'+'+'.pickle'
+    filename = get_sample_foldername(pname, samplename_pat, PCR=PCR)+filename
+    return filename
+
+
 def get_allele_cocounts_filename(pname, samplename_pat, fragment, PCR=1, qual_min=30,
                                  compressed=True):
     '''Get the matrix of allele cocounts on the initial reference'''

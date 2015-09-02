@@ -17,3 +17,9 @@ class NoDataError(ValueError):
 class PipelineError(Exception):
     '''Error in the pipeline'''
     pass
+
+
+class NoDataWarning(Warning):
+    '''Warning in case we have no data covering this situation'''
+    pass
+

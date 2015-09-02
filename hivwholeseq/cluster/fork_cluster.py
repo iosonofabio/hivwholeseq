@@ -724,6 +724,37 @@ def fork_get_allele_counts_patient(samplename, fragment, VERBOSE=0, PCR=1, qual_
     return sp.check_output(qsub_list)
 
 
+def fork_get_insertions_patient(samplename, fragment, VERBOSE=0, PCR=1, qual_min=30):
+    '''Fork to the cluster for each sample and fragment'''
+    if VERBOSE:
+        print 'Forking to the cluster: '+samplename+', fragment '+fragment
+
+    JOBSCRIPT = JOBDIR+'store/store_insertions.py'
+    cluster_time = '0:59:59'
+    vmem = '2G'
+
+    qsub_list = ['qsub','-cwd',
+                 '-b', 'y',
+                 '-S', '/bin/bash',
+                 '-o', JOBLOGOUT,
+                 '-e', JOBLOGERR,
+                 '-N', 'in'+fragment+samplename,
+                 '-l', 'h_rt='+cluster_time,
+                 '-l', 'h_vmem='+vmem,
+                 JOBSCRIPT,
+                 '--samples', samplename,
+                 '--fragments', fragment,
+                 '--verbose', VERBOSE,
+                 '--save',
+                 '--qualmin', qual_min,
+                 '--PCR', PCR,
+                ]
+    qsub_list = map(str, qsub_list)
+    if VERBOSE:
+        print ' '.join(qsub_list)
+    return sp.check_output(qsub_list)
+
+
 def fork_get_allele_counts_aa_patient(samplename, protein, VERBOSE=0, PCR=1, qual_min=30):
     '''Fork to the cluster for each sample and fragment'''
     if VERBOSE:
