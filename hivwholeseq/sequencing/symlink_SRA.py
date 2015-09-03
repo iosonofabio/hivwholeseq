@@ -12,7 +12,7 @@ import numpy as np
 
 from hivwholeseq.sequencing.adapter_info import foldername_adapter
 from hivwholeseq.sequencing.samples import load_samples_sequenced, load_sequencing_run
-from hivwholeseq.sequencing.filenames import get_seqrun_foldername
+from hivwholeseq.sequencing.filenames import get_seqrun_foldername, get_sample_foldername
 
 
 # Functions
@@ -64,25 +64,27 @@ def make_symlinks(dataset, VERBOSE=0):
 
     # Samples
     for sn, sample in samples.iterrows():
+        if 'missing SRA' in str(sample['notes']):
+            continue
+
         if str(sample['raw name']) != 'nan':
             raw_fn = str(sample['raw name'])
         elif str(sample['patient sample']) != 'nan':
             raw_fn = str(sample['patient sample'])
         else:
-            print 'ERROR: Sample '+sn+': could not find raw data folder. Please fill in the table'
-            continue
+            raw_fn = str(sample.name)
 
-        try:
-            sample_fn = raw_root_folder+[fn for fn in os.listdir(raw_root_folder) 
-                                         if raw_fn in fn][0]+'/'
-        except IndexError:
+        tmp = [fn for fn in os.listdir(raw_root_folder) if raw_fn in fn]
+        if not tmp:
             print 'FAILED:', raw_fn
             print 'LISTDIR:', '\n'.join(os.listdir(raw_root_folder))
-            raise
+            raise ValueError('Folder not found')
+
+        sample_fn = raw_root_folder+tmp[0]+'/'
 
         fn1 = sample_fn+[fn for fn in os.listdir(sample_fn) if 'L001_R1' in fn][0]
         fn2 = sample_fn+[fn for fn in os.listdir(sample_fn) if 'L001_R2' in fn][0]
-        
+
         adaID = sample['adapter']
         dst_folder = data_folder+foldername_adapter(adaID)
         dst_fn1 = dst_folder+'read1.fastq.gz'
@@ -98,18 +100,26 @@ def make_symlinks(dataset, VERBOSE=0):
         if VERBOSE:
             print sn+' '+adaID+' reads symlinked'
 
+        # Symlink samples folder to runs folder
+        src_folder = data_folder+foldername_adapter(adaID).rstrip('/')
+        dst_folder = get_sample_foldername(sample.name).rstrip('/')
+        if not os.path.islink(dst_folder):
+            os.symlink(src_folder, dst_folder)
+        elif VERBOSE:
+                print dst_folder, 'exists already'
+
 
 
 # Script
 if __name__ == '__main__':
 
-    # Parse input args
-    parser = argparse.ArgumentParser(description='Symlink HIV read files')
+    parser = argparse.ArgumentParser(description='Symlink HIV read files',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--run', required=True,
                         help='Seq run to analyze (e.g. Tue28, test_tiny)')
-    parser.add_argument('--verbose', type=int, default=0,
+    parser.add_argument('--verbose', type=int, default=2,
                         help='Verbosity level [0-3]')
-    
+
     args = parser.parse_args()
     seq_run = args.run
     VERBOSE = args.verbose

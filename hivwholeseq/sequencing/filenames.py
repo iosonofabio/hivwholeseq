@@ -25,6 +25,12 @@ def get_seqrun_foldername(seq_run):
     return fn
 
 
+def get_sample_foldername(samplename):
+    '''Get the path of the folder for a sequencing sample'''
+    fn = sequencing_folder+'samples/'+samplename+'/'
+    return fn
+
+
 def get_reference_premap_filename(data_folder, adaID, fragment=None):
     '''Get the filename of the reference used from premapping'''
     fn = 'reference'
