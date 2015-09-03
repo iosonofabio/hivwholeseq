@@ -10,6 +10,7 @@ import argparse
 import numpy as np
 from Bio import SeqIO
 
+from hivwholeseq.utils.argparse import PatientsAction
 from hivwholeseq.utils.miseq import alpha, read_types
 from hivwholeseq.patients.samples import load_samples_sequenced as lssp
 from hivwholeseq.patients.samples import SamplePat
@@ -88,7 +89,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Store genomewide allele counts',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     pats_or_samples = parser.add_mutually_exclusive_group(required=False)
-    pats_or_samples.add_argument('--patients', nargs='+',
+    pats_or_samples.add_argument('--patients', action=PatientsAction,
                                  help='Patient to analyze')
     pats_or_samples.add_argument('--samples', nargs='+',
                                  help='Samples to analyze')

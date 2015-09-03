@@ -382,6 +382,25 @@ class Patient(pd.Series):
         return (aft, ind)
 
 
+    def get_insertion_trajectories(self, region, **kwargs):
+        '''Get the trajectory of insertions'''
+        from collections import Counter
+        (fragment, start, end) = self.get_fragmented_roi((region, 0, '+oo'),
+                                                         include_genomewide=True)
+        ind = []
+        ics = Counter()
+        for i, sample in enumerate(self.itersamples()):
+            time = sample['days since infection']
+            try:
+                ic = sample.get_insertions(region, **kwargs)
+            except IOError:
+                continue
+            ind.append(i)
+            for (position, insertion), value in ic.iteritems():
+                ics[(time, position, insertion)] = value
+        return (ics, ind)
+
+
     def get_allele_count_trajectories(self, region, safe=False, **kwargs):
         '''Get the allele count trajectories from files
         

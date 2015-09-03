@@ -117,6 +117,13 @@ def get_allele_counts_filename(samplename, fragment, format='npy', type='nuc'):
     return filename
 
 
+def get_insertions_filename(samplename, fragment, format='pickle'):
+    '''Get the filename of allele count trajectories'''
+    filename = 'insertions_'+samplename+'_'+fragment+'.'+format
+    filename = get_foldername('insertions')+filename
+    return filename
+
+
 def get_allele_cocounts_filename(samplename, fragment, format='zip', type='nuc'):
     '''Get the filename of allele count trajectories'''
     filename = 'cocounts_'+samplename+'_'+fragment+'.'+format
@@ -134,6 +141,13 @@ def get_allele_count_trajectories_filename(pname, fragment, format='npz'):
     '''Get the filename of allele count trajectories'''
     filename = 'allele_counts_'+pname+'_'+fragment+'.'+format
     filename = get_foldername('single_nucleotide_variants')+filename
+    return filename
+
+
+def get_insertion_trajectories_filename(pname, fragment, format='pickle'):
+    '''Get the filename of insertion trajectories'''
+    filename = 'insertions_'+pname+'_'+fragment+'.'+format
+    filename = get_foldername('insertions')+filename
     return filename
 
 
