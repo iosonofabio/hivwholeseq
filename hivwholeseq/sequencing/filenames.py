@@ -21,7 +21,13 @@ sequencing_folder = root_data_folder+'sequencing/'
 # Functions
 def get_seqrun_foldername(seq_run):
     '''Get the path of the folder for a sequencing run'''
-    fn = sequencing_folder+seq_run+'/'
+    fn = sequencing_folder+'runs/'+seq_run+'/'
+    return fn
+
+
+def get_sample_foldername(samplename):
+    '''Get the path of the folder for a sequencing sample'''
+    fn = sequencing_folder+'samples/'+samplename+'/'
     return fn
 
 
