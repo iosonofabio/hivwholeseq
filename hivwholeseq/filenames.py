@@ -14,6 +14,9 @@ from .utils.generic import which
 
 # Globals
 root_data_folder = 'HIVWHOLESEQ_ROOT_DATA_FOLDER'
+table_filename = 'HIV_table.xlsx'
+
+
 if root_data_folder not in os.environ:
     raise ValueError('Environment variable not found: '+root_data_folder)
 elif not os.path.isdir(os.environ[root_data_folder]):
@@ -55,7 +58,7 @@ tmp_folder = root_data_folder+'tmp/'
 reference_folder = root_data_folder+'reference/'
 theory_folder = root_data_folder+'theory/'
 table_folder = self.__path__[0] + '/data/'
-table_filename = table_folder+'HIV_reservoir_all.xlsx'
+table_filename = table_folder+table_filename
 
 
 
